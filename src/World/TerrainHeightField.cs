@@ -124,6 +124,9 @@ public sealed class TerrainHeightField
     /// <summary>Where the player starts. Y is resolved from the terrain by the world.</summary>
     public Vector3 SpawnXZ { get; } = new(LaneStartX + 20f, 0f, LaneZ);
 
+    /// <summary>The lane runs toward -X.</summary>
+    public Vector3 SpawnFacing { get; } = Vector3.Left;
+
     // ------------------------------------------------------------------ height
 
     /// <summary>
@@ -178,7 +181,19 @@ public sealed class TerrainHeightField
         float blend = Mathf.Min(wsum, 1f);
         float feature = wsum > 1e-4f ? hsum / wsum : 0f;
         float hills = blend >= 0.999f ? 0f : Hills(x, z);
-        return _t.TerrainAmplitude * Mathf.Lerp(hills, feature, blend);
+        return _t.TerrainAmplitude * Mathf.Lerp(hills, feature, blend) + RimWall(x, z);
+    }
+
+    /// <summary>World boundary: a rim rising toward the heightfield edge so the lab reads
+    /// as bounded instead of ending in sky. Steeper than the ground-normal limit, so the
+    /// ball climbs a little and rolls back rather than falling to the kill plane.</summary>
+    public const float RimStart = 482f;
+    public const float RimHeight = 55f;
+    private static float RimWall(float x, float z)
+    {
+        float edge = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
+        float t = Mathf.SmoothStep(RimStart, 512f, edge);
+        return RimHeight * t * t;
     }
 
     /// <summary>Gradient of the fan at a given x. Flat-topped at each marked lane.</summary>

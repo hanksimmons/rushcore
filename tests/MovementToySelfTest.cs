@@ -41,6 +41,12 @@ public partial class MovementToySelfTest : Node
 
     private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount;
     private bool _releaseJumpFromProcess;
+    /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
+    private Vector3? _worldDrive;
+    private bool _visCheck;
+    private int _visFrames, _visBlocked;
+    private int _groundViolations;
+    private Vector3 _laneFwd = Vector3.Forward;
     private float _lastJumpCharge;
     private bool _lastSlamPerfect;
 
@@ -93,7 +99,33 @@ public partial class MovementToySelfTest : Node
             return;
         }
 
+        if (_worldDrive is { } drive) PressWorldDirection(drive);
+        SampleCameraInvariants();
+
         if (!_script.MoveNext()) Finish();
+    }
+
+    /// <summary>Every tick: the lens must be above the heightfield, and while a run is
+    /// flagged for visibility the camera->ball line must be clear.</summary>
+    private void SampleCameraInvariants()
+    {
+        if (_player.CameraBasis is not Rushcore.Camera.CameraRig rig) return;
+        var world = _debug.World;
+        Vector3 cam = rig.Camera.GlobalPosition;
+        float half = MovementToyWorld.Extent * 0.5f - 8f;
+        if (Mathf.Abs(cam.X) < half && Mathf.Abs(cam.Z) < half && cam.Y < world.Bounds.End.Y + 50f)
+        {
+            if (cam.Y < world.SampleHeight(cam.X, cam.Z) + _debug.Tuning.Camera.GroundClearance - 0.15f)
+                _groundViolations++;
+        }
+
+        if (!_visCheck) return;
+        var q = PhysicsRayQueryParameters3D.Create(cam, _player.GlobalPosition + Vector3.Up * 0.5f);
+        q.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        q.CollideWithAreas = false;
+        var hit = _player.GetWorld3D().DirectSpaceState.IntersectRay(q);
+        _visFrames++;
+        if (hit.Count > 0) _visBlocked++;
     }
 
     private void BuildRig()
@@ -107,6 +139,7 @@ public partial class MovementToySelfTest : Node
         // 0.3 m plate across it. Kept away from the main plate so no other case can
         // strike the wall by accident.
         Vector3 fwd = _player.CameraBasis?.FlatForward ?? Vector3.Forward;
+        _laneFwd = fwd;
         var laneBasis = Basis.LookingAt(fwd, Vector3.Up);          // lane -Z == drive direction
         var lane = new StaticBody3D
         {
@@ -191,7 +224,11 @@ public partial class MovementToySelfTest : Node
         InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost, InputBootstrap.Carve
     };
 
-    private void ReleaseAll() { foreach (var a in AllActions) Input.ActionRelease(a); }
+    private void ReleaseAll()
+    {
+        _worldDrive = null;
+        foreach (var a in AllActions) Input.ActionRelease(a);
+    }
 
     /// <summary>Presses the WASD combination that steers toward a world-space direction.</summary>
     private void PressWorldDirection(Vector3 worldDir)
@@ -286,7 +323,7 @@ public partial class MovementToySelfTest : Node
 
         // ---- uphill propulsion still works without boost ----
         foreach (var _ in Settle(RampSurfacePoint(-60f) + Vector3.Up * 3f, 1.0f)) yield return null;
-        PressWorldDirection(Vector3.Right);      // +X is uphill on the test ramp
+        _worldDrive = Vector3.Right;             // +X is uphill on the test ramp
         foreach (var _ in Seconds(1.2f)) yield return null;
         float uphillY = _player.GlobalPosition.Y;
         foreach (var _ in Seconds(2.0f)) yield return null;
@@ -536,16 +573,16 @@ public partial class MovementToySelfTest : Node
         // ---- CCD: a max-speed run into a 0.3 m plate must stop, not tunnel ----
         foreach (var _ in Settle(_wallLaneStart)) yield return null;
         _player.RefillBoost(t.Boost.BoostCapacity);
-        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        _worldDrive = _laneFwd;
         Input.ActionPress(InputBootstrap.Boost, 1f);
         float maxProgress = float.MinValue, maxSpeedSeen = 0f;
         foreach (var _ in Seconds(6f))
         {
-            maxProgress = Mathf.Max(maxProgress, (_player.GlobalPosition - _wallCentre).Dot(Forward));
+            maxProgress = Mathf.Max(maxProgress, (_player.GlobalPosition - _wallCentre).Dot(_laneFwd));
             maxSpeedSeen = Mathf.Max(maxSpeedSeen, _player.LocomotionSpeed);
             yield return null;
         }
-        float finalProgress = (_player.GlobalPosition - _wallCentre).Dot(Forward);
+        float finalProgress = (_player.GlobalPosition - _wallCentre).Dot(_laneFwd);
         Check("reached the thin wall at playable max speed",
             maxSpeedSeen > m.HardMaxLocomotionSpeed - 3f && maxProgress > -3f,
             $"maxSpeed={maxSpeedSeen:0.0} closest={maxProgress:0.00} m");
@@ -559,12 +596,12 @@ public partial class MovementToySelfTest : Node
         // ---- landing at the cap on a slope bleeds the tangent excess instead of clipping it ----
         foreach (var _ in Settle(_landingStart)) yield return null;
         _player.RefillBoost(t.Boost.BoostCapacity);
-        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        _worldDrive = _laneFwd;
         Input.ActionPress(InputBootstrap.Boost, 1f);
         int landGuard = 0;
         while (_player.IsGrounded && landGuard++ < 900) yield return null;       // reach the crest and leave it
         Input.ActionRelease(InputBootstrap.Boost);
-        Input.ActionRelease(InputBootstrap.MoveForward);
+        _worldDrive = null;
         bool leftCrest = landGuard < 900;
         float speedAtCrest = _player.LocomotionSpeed;
         while (!_player.IsGrounded && landGuard++ < 1200) yield return null;     // land on the slope
@@ -594,13 +631,59 @@ public partial class MovementToySelfTest : Node
         var rig = (Rushcore.Camera.CameraRig)_player.CameraBasis!;
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
         Check("camera is unobstructed in the open", rig.OcclusionFraction > 0.95f, $"fraction={rig.OcclusionFraction:0.00}");
-        foreach (var _ in Settle(_wallCentre - Vector3.Up * 6f + Forward * 3f + Vector3.Up * 3f)) yield return null;
+        foreach (var _ in Settle(_wallCentre - Vector3.Up * 6f + _laneFwd * 3f + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(_laneFwd);
+        foreach (var _ in Frames(4)) yield return null;
         Check("camera pulls in when a wall blocks the line of sight", rig.OcclusionFraction < 0.5f,
             $"fraction={rig.OcclusionFraction:0.00}");
         t.Camera.OcclusionProbe = false;
         foreach (var _ in Seconds(1.5f)) yield return null;
         Check("occlusion probe can be disabled", rig.OcclusionFraction > 0.95f, $"fraction={rig.OcclusionFraction:0.00}");
         t.Camera.OcclusionProbe = true;
+
+        // ---- chase camera: yaw follows the trajectory, never flips on reverse ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        t.Camera.FollowTrajectoryYaw = true;
+        rig.SnapYawToward(Vector3.Forward);
+        _worldDrive = Vector3.Right;
+        foreach (var _ in Seconds(3.0f)) yield return null;
+        Check("chase yaw converges on the travel heading",
+            rig.FlatForward.Dot(Vector3.Right) > 0.96f,
+            $"camFwd={rig.FlatForward} yaw={rig.YawDegreesCurrent:0.0}");
+        _worldDrive = Vector3.Left;                      // brake through zero and reverse
+        foreach (var _ in Seconds(2.5f)) yield return null;
+        Check("reversing does not flip the chase camera",
+            rig.FlatForward.Dot(Vector3.Right) > 0.7f && _player.Velocity.Dot(Vector3.Right) < -2f,
+            $"camFwd={rig.FlatForward} vel.x={_player.Velocity.X:0.0}");
+        ReleaseAll();
+        t.Camera.FollowTrajectoryYaw = false;
+        foreach (var _ in Seconds(2.5f)) yield return null;
+        float fixedErr = Mathf.Abs(Mathf.Wrap(rig.YawDegreesCurrent - t.Camera.YawDegrees, -180f, 180f));
+        Check("fixed-yaw A/B mode returns to the configured yaw", fixedErr < 3f, $"err={fixedErr:0.0} deg");
+        t.Camera.FollowTrajectoryYaw = true;
+
+        // ---- real terrain crest run: climb, mesa lip, ramp, drop, chasms at speed ----
+        foreach (var _ in Settle(_debug.World.SurfacePoint(TerrainHeightField.Ramp1X, 210f, m.BallRadius + 1.5f), 0.8f)) yield return null;
+        rig.SnapYawToward(Vector3.Forward);
+        foreach (var _ in Frames(3)) yield return null;
+        _player.RefillBoost(t.Boost.BoostCapacity);
+        _worldDrive = Vector3.Forward;                   // -Z through the whole central column
+        Input.ActionPress(InputBootstrap.Boost, 1f);
+        _visFrames = 0; _visBlocked = 0; _visCheck = true;
+        int floored = 0;
+        foreach (var _ in Seconds(11f))
+        {
+            if (rig.FlooredThisFrame) floored++;
+            if (_player.GlobalPosition.Z < -430f) break;
+            yield return null;
+        }
+        _visCheck = false;
+        ReleaseAll();
+        Check("crest run covered the central column", _player.GlobalPosition.Z < -150f,
+            $"z={_player.GlobalPosition.Z:0}");
+        Check("camera->ball line stays clear over crests (<=2% of ticks)",
+            _visFrames > 0 && _visBlocked <= Mathf.CeilToInt(_visFrames * 0.02f),
+            $"blocked {_visBlocked}/{_visFrames} ticks, floored {floored} frames");
 
         // ---- fall recovery ----
         foreach (var _ in Seconds(0.5f)) yield return null;
@@ -619,6 +702,8 @@ public partial class MovementToySelfTest : Node
 
         foreach (var _ in Seconds(0.5f)) yield return null;
         Check("velocity is finite at the end of the run", _player.Velocity.IsFinite());
+        Check("camera lens never went below the heightfield during the whole run", _groundViolations == 0,
+            $"violations={_groundViolations}");
     }
 
     /// <summary>

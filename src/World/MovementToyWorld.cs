@@ -36,6 +36,8 @@ public partial class MovementToyWorld : Node3D
 
     public int Seed { get; private set; }
     public Vector3 SpawnPoint { get; private set; }
+    /// <summary>Flat direction the player faces at spawn (down the calibration lane).</summary>
+    public Vector3 SpawnFacing => _field.SpawnFacing;
     public float KillPlaneY { get; private set; }
     public Aabb Bounds { get; private set; }
     public TerrainHeightField Field => _field;

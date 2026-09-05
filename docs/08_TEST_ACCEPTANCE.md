@@ -70,7 +70,6 @@ Toy contains only:
 - Boost cannot bypass hard locomotion cap.
 - Slow passive boost regeneration and active refill follow tuning.
 - Fall recovery restores a valid pose and resets physics interpolation so no old→new-position visual streak occurs.
-- Carve can be toggled for A/B testing.
 
 ### Manual playtest
 
@@ -88,11 +87,12 @@ Toy contains only:
 - Perfect-apex result feels noticeably faster/more powerful than a normal slam.
 - Slam is useful for reconnecting with favorable downslopes.
 - Boost increases route possibilities.
-- Carve is retained only if it clearly improves control decisions.
 - Camera lets player read terrain at maximum normal playable speed.
 - Representative thin/edge collision tests at playable max speed do not show routine player tunneling.
 
 **Hard gate:** do not build roguelike progression if M0 fails.
+
+**Result:** M0 passed 2026-09-05 (human playtest; objective checks automated in `tests/MovementToySelfTest.cs`).
 
 ## 4. Scale calibration — Gate M1
 

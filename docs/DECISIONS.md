@@ -1,6 +1,6 @@
 # Decisions & Validation Register
 
-**Status:** Draft 0.3 — final audited accepted baseline  
+**Status:** Draft 0.4 — Movement Toy accepted 2026-09-05 (Gate M0 passed)  
 **Purpose:** Record settled design rules and the small set of empirical questions intentionally left to playtesting/profiling.
 
 ## Status meanings
@@ -19,7 +19,7 @@
 | D-004 | ACCEPTED | RUSHCORE uses a hard tunable maximum playable locomotion speed, not a soft asymptotic ceiling. |
 | D-005 | ACCEPTED | Downhill slopes materially accelerate the player; terrain is a strategic movement resource. |
 | D-006 | ACCEPTED | Base propulsion works on flat/uphill terrain; boost is not the only way to move against gravity. |
-| D-007 | VALIDATE | Prototype carve/traction as one held action trading speed for tighter control; remove it if it does not clearly improve play. |
+| D-007 | RESOLVED — REMOVED | Carve was prototyped and playtested (2026-09-05) and never felt impactful; it is removed from the game, its tuning, input and VFX. The movement vocabulary is steer, charge jump, slam, boost. |
 | D-008 | ACCEPTED | Prototype steering uses WASD; Space is the shared jump/slam input. |
 | D-009 | ACCEPTED | Jump charges while Space is held and occurs on Space release. |
 | D-010 | ACCEPTED | Jump charge maps hold duration between minimum and maximum vertical takeoff velocity. |
@@ -90,8 +90,8 @@
 |---|---|---|
 | D-056 | ACCEPTED | Normal gameplay does not require an exact numerical speedometer; raw m/s is debug telemetry. |
 | D-057 | ACCEPTED | Crushability/threat is communicated primarily through speed VFX, enemy silhouette/material, and interaction feedback. |
-| D-058 | ACCEPTED | MVP camera orientation is fixed; player may control bounded zoom but not manual rotation. |
-| D-059 | ACCEPTED | Perspective camera is composed to read as isometric-like while preserving depth/speed cues. |
+| D-058 | SUPERSEDED by D-072 | ~~MVP camera orientation is fixed~~. Playtest showed the fixed yaw hid what was ahead. Bounded zoom stays; still no manual rotation. |
+| D-059 | SUPERSEDED by D-072 | ~~Isometric-like composition~~. The fixed 45° yaw remains available only as a tuning A/B toggle. |
 | D-060 | ACCEPTED | Complexity should come from recombining existing verbs/systems, not adding more player actions. |
 
 ## Accepted engineering constraints
@@ -109,6 +109,10 @@
 | D-069 | ACCEPTED | Hard locomotion cap means ground-tangent speed while grounded and world-horizontal speed while airborne; jump/slam vertical velocity is not clipped by the gameplay cap. |
 | D-070 | ACCEPTED | Perfect-apex slam eligibility exists only in the same airborne arc created by a player-triggered jump, not generic falls/external launches. |
 | D-071 | ACCEPTED | Player-controlled `RigidBody3D` starts with sleeping disabled and `CustomIntegrator` left off; standard Jolt gravity/damping remain active while `_IntegrateForces()` provides arcade control. |
+| D-072 | ACCEPTED | Chase camera: yaw follows the player's flat velocity heading (damped, turn-rate capped, held below a minimum speed and on reverse intent). Fixed pitch, no manual rotation, bounded zoom. Camera never clips: focus and lens are floored above the heightfield and same-frame sphere casts (focus→camera and ball→camera) pull the camera in. |
+| D-073 | ACCEPTED | The perfect-apex window is tuned in seconds (total window centred on the apex); the detection remains a vertical-speed test with threshold = gravity × window / 2 (keeps D-017). |
+| D-074 | ACCEPTED | Landing at the cap on a slope converts world-horizontal speed to a larger ground-tangent speed (D-069); that excess becomes a short allowance bled at a tunable rate rather than being clipped in one tick. |
+| D-075 | ACCEPTED | Tuning persistence: the saved override (diff from compiled defaults, versioned JSON under `user://`) is applied on launch; override state is always visible in the panel and telemetry; named presets are stashes and never the startup state. |
 
 ## Empirical validation register
 
@@ -116,17 +120,17 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 
 | ID | Status | Validate |
 |---|---|---|
-| V-001 | VALIDATE | Exact high-speed steering curve/authority. |
-| V-002 | VALIDATE | Whether carve earns its input and remains in the game. |
-| V-003 | VALIDATE | Exact passive boost regeneration and active refill rates. |
-| V-004 | VALIDATE | Effective hard playable speed cap plus Rush/Crush/Overdrive thresholds. |
-| V-005 | VALIDATE | Ball diameter and world/terrain scale relationship. |
-| V-006 | VALIDATE | Camera pitch/yaw/FOV/distance/look-ahead/damping values. |
-| V-007 | VALIDATE | Physics tick rate: begin at 60 Hz; test 120 only if evidence warrants it. |
+| V-001 | RESOLVED | Lateral steering 151 m/s² with no additional high-speed falloff (multiplier 1.0); turn radius grows as v²/a, which alone satisfies D-002. |
+| V-002 | RESOLVED | Carve removed (see D-007). |
+| V-003 | RESOLVED (toy) | Boost 48 m/s², blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35, perfect-apex +20. Active refill from combat is re-examined at Gate C0. |
+| V-004 | RESOLVED / OPEN | Cap 148.5 m/s accepted. Bands 18/32/48 were left unchanged during the playtest and now sit low against the cap; revisit when Flow/combat give them a purpose. |
+| V-005 | RESOLVED | Ball radius 2.1 m (4.2 m diameter). The Movement Toy lab keeps amplitude 1.0; Gate M1 sizes generation features from the accepted speed/jump envelope. |
+| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 8/s, vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2 m/s, occlusion margin 0.6, ground clearance 1.5. |
+| V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |
 | V-008 | VALIDATE | Exact terrain/stage physical dimensions and heightfield sampling density. |
 | V-009 | VALIDATE | Exact stage clear-time and full-run duration targets. |
-| V-010 | VALIDATE | Jump min/max takeoff speeds, max charge duration, and whether linear charge mapping is sufficient. |
-| V-011 | VALIDATE | Perfect-apex vertical-velocity window and slam/impact bonus strength. |
+| V-010 | RESOLVED | 8 → 35 m/s over 0.65 s, linear mapping sufficient, release grace 0.10 s. |
+| V-011 | RESOLVED | Window 0.62 s (D-073; |vY| ≤ 12.2 m/s at g = 39.4), slam ×1.35, impact ×1.35. Slam itself: 43 m/s initial, 141 m/s². |
 | V-012 | VALIDATE | Approximate successful-run level-up count; starting target 8–15. |
 
 ## Deferred implementation details
@@ -138,7 +142,7 @@ The following are not unresolved product-design gaps and should be chosen by the
 - exact collision-layer numbers,
 - polyline vs helper curve representation internally,
 - concrete C# record/class choices,
-- exact boost/carve keyboard default keys,
+- exact boost keyboard default keys,
 - whether a specific projectile type eventually merits pooling,
 - whether render terrain needs chunking after profiling.
 

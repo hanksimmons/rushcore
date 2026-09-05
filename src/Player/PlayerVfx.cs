@@ -21,11 +21,11 @@ public partial class PlayerVfx : Node3D
     private QuadMesh _quad = null!;
     private BoxMesh _chunk = null!;
 
-    private GpuParticles3D _dust = null!, _carve = null!, _trail = null!, _charge = null!;
+    private GpuParticles3D _dust = null!, _trail = null!, _charge = null!;
     private GpuParticles3D _slam = null!, _slamPerfect = null!;
     private GpuParticles3D _jumpBurst = null!, _apexRing = null!, _landBurst = null!;
 
-    private ParticleProcessMaterial _dustPm = null!, _carvePm = null!, _trailPm = null!, _chargePm = null!;
+    private ParticleProcessMaterial _dustPm = null!, _trailPm = null!, _chargePm = null!;
     private ParticleProcessMaterial _slamPm = null!, _slamPerfectPm = null!;
     private ParticleProcessMaterial _jumpPm = null!, _apexPm = null!, _landPm = null!;
 
@@ -61,7 +61,6 @@ public partial class PlayerVfx : Node3D
         var chunkAdd = SoftMaterial(billboard: false, additive: true);
 
         BuildDust(softMix);
-        BuildCarve(softAdd);
         BuildTrail(chunkAdd);
         BuildCharge(softAdd);
         BuildSlamStreaks(chunkMix, chunkAdd);
@@ -123,7 +122,6 @@ public partial class PlayerVfx : Node3D
         if (flatSpeed > 0.1f) _travelDir = flat / flatSpeed;
 
         float dustI = Str(vfx.DustIntensity);
-        float carveI = Str(_t.Carve.CarveVfxStrength);
         float trailI = Str(vfx.TrailIntensity);
         float chargeI = Str(vfx.ChargeEffectStrength);
         float slamI = Str(vfx.SlamEffectStrength);
@@ -132,11 +130,6 @@ public partial class PlayerVfx : Node3D
         bool dustOn = grounded && speed > 2f && dustI > 0.01f;
         Emit(_dust, dustOn);
         if (dustOn) _dust.AmountRatio = Mathf.Clamp(speed01 * 2.0f * dustI, 0.12f, 1f);
-
-        // carve skid: deliberately louder than dust so the prototype verb reads
-        bool carveOn = _player.CarveActive && grounded && speed > 3f && carveI > 0.01f;
-        Emit(_carve, carveOn);
-        if (carveOn) _carve.AmountRatio = Mathf.Clamp((0.45f + 0.55f * speed01) * carveI, 0.15f, 1f);
 
         // boost trail, thrown backwards along travel
         bool trailOn = _player.BoostActive && trailI > 0.01f;
@@ -229,13 +222,6 @@ public partial class PlayerVfx : Node3D
         _dustPm.ScaleMin = 0.10f * r;
         _dustPm.ScaleMax = 0.30f * r;
 
-        _carve.Position = contact;
-        _carvePm.EmissionRingRadius = r * 1.25f;
-        _carvePm.EmissionRingInnerRadius = r * 0.5f;
-        _carvePm.EmissionRingHeight = r * 0.1f;
-        _carvePm.ScaleMin = 0.18f * r;
-        _carvePm.ScaleMax = 0.50f * r;
-
         _trailPm.EmissionSphereRadius = r * 0.7f;
         _trailPm.ScaleMin = 0.10f * r;
         _trailPm.ScaleMax = 0.26f * r;
@@ -287,16 +273,6 @@ public partial class PlayerVfx : Node3D
         _dustPm.DampingMin = 1.5f;
         _dustPm.DampingMax = 3.0f;
         _dust = Emitter("RollDust", 64, 0.50f, false, _dustPm, _quad, draw);
-    }
-
-    private void BuildCarve(Material draw)
-    {
-        _carvePm = Ring(new Vector3(0f, 1f, 0f), 60f, 4.0f, 9.0f, new Vector3(0f, -6f, 0f),
-                        Ramp(new Color(0.80f, 0.94f, 1.00f), 0.85f));
-        _carvePm.DampingMin = 2.0f;
-        _carvePm.DampingMax = 5.0f;
-        _carvePm.Flatness = 0.7f;
-        _carve = Emitter("CarveSkid", 96, 0.55f, false, _carvePm, _quad, draw);
     }
 
     private void BuildTrail(Material draw)

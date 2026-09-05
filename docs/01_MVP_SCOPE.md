@@ -33,7 +33,6 @@ Anything not required to prove that proposition is deferred.
 - Boost with finite/refillable meter, including slow emergency passive regeneration plus active refill sources.
 - Boost usable in air.
 - Boost direction blended between current travel direction and desired input, with current trajectory dominating at high speed.
-- One prototype carve/traction action that trades speed for tighter control; retention is **VALIDATE**.
 - Health/damage.
 - Four qualitative speed bands: Roll, Rush, Crush, Overdrive.
 - Flow execution/combo system.
@@ -41,13 +40,13 @@ Anything not required to prove that proposition is deferred.
 
 ### Camera
 
-- Fixed orientation identity; no manual camera rotation in MVP.
-- Perspective projection with isometric-like composition.
+- Chase camera: yaw follows the trajectory; no manual camera rotation in MVP (D-072).
+- Perspective projection with a fixed pitch.
 - Player zoom within bounded range.
 - Speed-responsive look-ahead.
 - Speed-responsive distance/FOV presentation.
 - Damped follow and bounded impact/slam shake.
-- Exact pitch/yaw/FOV/distance values are **VALIDATE**.
+- Pitch/FOV/distance values were accepted at Movement Toy acceptance (03 §15).
 
 ### Stages/run
 

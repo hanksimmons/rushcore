@@ -5,7 +5,7 @@
 **Development platform:** macOS arm64 (Apple Silicon)  
 **Implementation language:** C#  
 **Working directory:** `~/rushcore`  
-**Current phase:** Final audited design/specification baseline; ready for coding-agent kickoff and Movement Toy implementation
+**Current phase:** Movement Toy accepted (Gate M0 passed 2026-09-05); Phase 2 — Procedural Terrain Core
 
 ## Product thesis
 

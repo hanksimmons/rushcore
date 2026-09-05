@@ -145,7 +145,6 @@ Currency may burst physically, then magnetize/auto-collect to preserve momentum.
 VFX explains physics:
 
 - rolling contact dust,
-- carve skid if retained,
 - boost trail,
 - jump charge,
 - jump release,
@@ -163,12 +162,13 @@ Prefer particles/shared simple meshes/shaders over temporary heavy node hierarch
 
 ## 11. Camera presentation
 
-Accepted identity:
+Accepted identity (D-072, after playtest):
 
-- perspective,
-- fixed orientation / isometric-like composition,
+- perspective, fixed pitch,
+- chase composition: yaw follows the trajectory so the player always sees what is ahead,
 - no manual rotation,
-- player-adjustable bounded zoom.
+- player-adjustable bounded zoom,
+- never clips terrain (03 §14).
 
 At higher speed:
 
@@ -179,8 +179,6 @@ At higher speed:
 - keep enough view ahead to read terrain.
 
 No extreme FOV distortion.
-
-**VALIDATE:** pitch, yaw, FOV, distance, look-ahead, damping.
 
 ### Camera shake
 

@@ -14,7 +14,6 @@ public static class InputBootstrap
     public const string MoveRight = "rc_move_right";
     public const string Jump = "rc_jump";
     public const string Boost = "rc_boost";
-    public const string Carve = "rc_carve";
     public const string ZoomIn = "rc_zoom_in";
     public const string ZoomOut = "rc_zoom_out";
     public const string ToggleTuning = "rc_toggle_tuning";
@@ -22,7 +21,6 @@ public static class InputBootstrap
     public const string Recover = "rc_recover";
     public const string DebugRefillBoost = "rc_debug_refill_boost";
     public const string DebugRegenerateWorld = "rc_debug_regen_world";
-    public const string DebugToggleCarve = "rc_debug_toggle_carve";
     public const string DebugTeleportStart = "rc_debug_teleport_start";
     public const string DebugTogglePhysicsHz = "rc_debug_toggle_physics_hz";
 
@@ -34,7 +32,6 @@ public static class InputBootstrap
         Key(MoveRight, Godot.Key.D, Godot.Key.Right);
         Key(Jump, Godot.Key.Space);
         Key(Boost, Godot.Key.Shift);
-        Key(Carve, Godot.Key.Ctrl);
         Key(ZoomIn, Godot.Key.Equal, Godot.Key.KpAdd);
         Key(ZoomOut, Godot.Key.Minus, Godot.Key.KpSubtract);
         Key(ToggleTuning, Godot.Key.F1);
@@ -42,14 +39,12 @@ public static class InputBootstrap
         Key(Recover, Godot.Key.R);
         Key(DebugRefillBoost, Godot.Key.B);
         Key(DebugRegenerateWorld, Godot.Key.F5);
-        Key(DebugToggleCarve, Godot.Key.F3);
         Key(DebugTeleportStart, Godot.Key.T);
         Key(DebugTogglePhysicsHz, Godot.Key.F4);
 
         // Gamepad parity for the movement verbs.
         JoyButton(Jump, Godot.JoyButton.A);
         JoyButton(Boost, Godot.JoyButton.X);
-        JoyButton(Carve, Godot.JoyButton.LeftShoulder);
         JoyButton(ZoomIn, Godot.JoyButton.DpadUp);
         JoyButton(ZoomOut, Godot.JoyButton.DpadDown);
         JoyAxis(MoveLeft, Godot.JoyAxis.LeftX, -1f);

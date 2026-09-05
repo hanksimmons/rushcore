@@ -1,6 +1,6 @@
 # 03 — Player Movement & Physics Specification
 
-**Status:** Draft 0.3 — final audited  
+**Status:** Draft 0.4 — Movement Toy accepted 2026-09-05; §15 holds the accepted baseline  
 **Authority:** Canonical player locomotion, jump/slam/boost behavior, collision feel, camera-follow mechanics, and movement tunables
 
 ## 1. Implementation model
@@ -42,8 +42,8 @@ The visible ball roll is presentation-driven and does not need to be a literal m
 - Because grounded-state logic reads direct-body contacts, configure the player to report a small sufficient number of contacts; do not leave contact reporting at Godot's default zero.
 - Keep the player awake (`CanSleep = false`) so a player-controlled body never depends on physics wake-up behavior for responsiveness.
 - Do not enable `CustomIntegrator` initially; retain Godot/Jolt's standard gravity/damping integration and shape the direct body state in `_IntegrateForces()`.
-- No manual camera rotation in MVP.
-- Boost/carve are semantic actions; physical key choices may be chosen during implementation and remain configurable.
+- No manual camera rotation in MVP; the camera yaw follows the trajectory (§14, D-072).
+- Boost is a semantic action; its physical key may be chosen during implementation and remains configurable.
 
 ## 3. Ground detection
 
@@ -313,24 +313,12 @@ Baseline:
 
 **VALIDATE:** exact capacity, drain, passive refill, active refill.
 
-## 11. Carve / traction action
+## 11. Carve / traction action — REMOVED
 
-**Status: VALIDATE via prototype.**
-
-Prototype one held action that:
-
-- increases turn authority,
-- increases lateral traction/control,
-- increases speed loss,
-- produces readable skid/dust feedback.
-
-Purpose:
-
-- trade speed for a tighter line,
-- provide intentional recovery,
-- combine “brake” and “drift/control” into one verb.
-
-If it does not clearly improve line-choice depth, remove it and remove any progression hooks built around it.
+Prototyped in the Movement Toy as one held action trading speed for tighter control, and
+playtested with its steering/drag multipliers pushed well past the defaults. It never felt
+impactful, so it was removed on 2026-09-05 (D-007, V-002) along with its tuning, input
+binding and skid VFX. The movement vocabulary is steer, charge jump, slam, boost (00 P8).
 
 ## 12. Collision behavior
 
@@ -374,56 +362,59 @@ Never deform collision to match squash/stretch.
 
 ## 14. Camera-follow mechanics
 
-Presentation styling lives in `06`.
+Presentation styling lives in `06`. Accepted after playtest (D-072): a **chase camera**.
 
 Mechanically:
 
-- fixed baseline orientation,
-- no manual rotation,
-- camera follows with damping,
-- focus/look target leads along useful velocity,
-- look-ahead grows with speed and is bounded,
-- distance/FOV may grow modestly with speed,
+- yaw follows the player's flat velocity heading with damping and a turn-rate cap,
+- yaw holds below a minimum speed, on reverse intent (input pushing back relative to the view),
+  and when velocity reverses without input, so the view never swings 180° and inverts the controls,
+- fixed pitch; no manual rotation; player may adjust baseline zoom within limits,
+- focus/look target leads along useful velocity; look-ahead grows with speed and is bounded,
+- distance/FOV grow modestly with speed,
 - vertical follow is independently damped,
-- impact shake is short and bounded,
-- player may adjust baseline zoom within limits.
+- impact shake is short, bounded to the occlusion margin, and event-driven,
+- the camera never clips: focus and lens are floored above the heightfield, and same-frame
+  sphere casts from both the focus and the ball toward the camera pull it in instantly and
+  ease it back out,
+- the original fixed 45° yaw remains as a tuning A/B toggle only.
 
-**VALIDATE:** exact pitch, yaw, FOV, distance, look-ahead, damping.
-
-Evaluate camera smoothness separately from rigid-body transform inheritance; do not blindly parent camera motion to raw physics transform.
+Camera follows with damping from the player's interpolated transform; it is never parented to
+the raw physics transform. Teleports snap the camera and re-aim it along the spawn facing.
 
 ## 15. Tuning schema
 
-Numbers below are **starting calibration values only**. Accepted behavior matters more than these initial values.
+**Accepted baseline** (Movement Toy playtest, 2026-09-05). These are the compiled defaults in
+`GameplayTuning`; the runtime panel edits the same values and persists overrides (D-075).
 
-| Parameter | Initial placeholder | Status |
+| Parameter | Accepted | Status |
 |---|---:|---|
-| Physics tick rate | 60 Hz | VALIDATE 60 vs 120 |
-| Gravity | 28 m/s² | VALIDATE |
-| Ground drive accel | 28 m/s² | VALIDATE |
-| Ground steering lateral accel | 42 m/s² | VALIDATE |
-| High-speed steering multiplier/curve | TBD | VALIDATE |
-| Hard max locomotion speed | 60 m/s | VALIDATE |
-| Air control multiplier | 0.35 | VALIDATE |
-| Min jump takeoff vertical speed | 8 m/s | VALIDATE |
-| Max jump takeoff vertical speed | 16 m/s | VALIDATE |
-| Max jump charge seconds | 0.65 s | VALIDATE |
-| Charge release grace | 0.10 s | VALIDATE |
-| Slam downward acceleration | 70 m/s² | VALIDATE |
-| Slam steering multiplier | 0.25 | VALIDATE |
-| Perfect-apex vertical-speed threshold | 1.25 m/s | VALIDATE |
-| Perfect-apex slam strength multiplier | 1.35 | VALIDATE |
-| Perfect-apex impact multiplier | 1.35 | VALIDATE |
-| Boost acceleration | 48 m/s² | VALIDATE |
-| Boost direction blend | 0.25 | VALIDATE |
-| Boost capacity | 100 | VALIDATE |
-| Boost drain | 30/s | VALIDATE |
-| Passive boost regen | 4/s | VALIDATE |
-| Carve steering multiplier | 1.8 | VALIDATE FEATURE |
-| Carve drag multiplier | 3.0 | VALIDATE FEATURE |
-| Rush threshold | 18 m/s | VALIDATE |
-| Crush threshold | 32 m/s | VALIDATE |
-| Overdrive threshold | 48 m/s | VALIDATE |
+| Physics tick rate | 60 Hz | ACCEPTED (V-007) |
+| Gravity | 39.4 m/s² | ACCEPTED |
+| Ground drive accel | 28 m/s² | ACCEPTED |
+| Ground steering lateral accel | 151 m/s² | ACCEPTED (V-001) |
+| High-speed steering multiplier | 1.0 (no extra falloff; radius = v²/a) | ACCEPTED (V-001) |
+| Hard max locomotion speed | 148.5 m/s | ACCEPTED (V-004) |
+| Landing cap bleed | 40 m/s² | ACCEPTED (D-074) |
+| Drag coefficient | 0.08 | ACCEPTED |
+| Air control multiplier | 0.35 | ACCEPTED |
+| Ball radius | 2.1 m | ACCEPTED (V-005) |
+| Min jump takeoff vertical speed | 8 m/s | ACCEPTED (V-010) |
+| Max jump takeoff vertical speed | 35 m/s | ACCEPTED (V-010) |
+| Max jump charge seconds | 0.65 s, linear | ACCEPTED (V-010) |
+| Charge release grace | 0.10 s | ACCEPTED |
+| Slam initial downward speed | 43 m/s | ACCEPTED |
+| Slam downward acceleration | 141 m/s² | ACCEPTED |
+| Slam steering multiplier | 0.25 | ACCEPTED |
+| Slam lateral retention | 1.0 | ACCEPTED |
+| Perfect-apex window | 0.62 s total (threshold = g·window/2) | ACCEPTED (V-011, D-073) |
+| Perfect-apex slam strength multiplier | 1.35 | ACCEPTED |
+| Perfect-apex impact multiplier | 1.35 | ACCEPTED |
+| Boost acceleration | 48 m/s² | ACCEPTED (V-003) |
+| Boost direction blend | 0.25 | ACCEPTED |
+| Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
+| Boost pickup refill / perfect-apex refill | 35 / 20 | ACCEPTED (toy) |
+| Rush / Crush / Overdrive thresholds | 18 / 32 / 48 m/s | OPEN — unchanged; low against the cap (V-004) |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 
@@ -464,7 +455,6 @@ Before progression systems:
 - normal slam feels immediate/powerful,
 - perfect-apex slam is learnable, forgiving, and noticeably stronger,
 - boost increases route possibility,
-- carve remains only if it clearly improves play,
 - mistakes are recoverable,
 - high-speed collisions are stable with CCD enabled and do not routinely tunnel through valid collision geometry.
 
@@ -472,12 +462,6 @@ Exact cases are defined in `08_TEST_ACCEPTANCE.md`.
 
 ## Empirical validation items
 
-The design intent is settled; these values/features must be playtested:
-
-1. exact high-speed steering curve,
-2. whether carve earns its input,
-3. exact passive boost recovery rate,
-4. exact playable speed cap/speed thresholds,
-5. ball/world scale relationship,
-6. camera composition/response,
-7. physics tick rate (60 vs 120 if needed).
+Resolved at Movement Toy acceptance (2026-09-05); see `DECISIONS.md` V-001…V-011. Still open:
+the Rush/Crush/Overdrive thresholds relative to the accepted cap (V-004), to be settled when
+Flow and combat give the bands a purpose.

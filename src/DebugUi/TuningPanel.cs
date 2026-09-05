@@ -23,10 +23,12 @@ public partial class TuningPanel : Control
 
     private static readonly Color TextDim = new(0.62f, 0.68f, 0.78f);
     private static readonly Color TextAccent = new(1f, 0.78f, 0.35f);
+    private static readonly Color TextModified = new(1f, 0.62f, 0.30f);
 
     private sealed class ParamRow
     {
         public required TuningParameter Param { get; init; }
+        public required Label Name { get; init; }
         public required HSlider Slider { get; init; }
         public required LineEdit Field { get; init; }
         public required string Format { get; init; }
@@ -41,7 +43,12 @@ public partial class TuningPanel : Control
             Slider.Value = v;
             Field.Text = Render(v);
             Suppress = false;
+            Tint();
         }
+
+        /// <summary>Modified values are highlighted so drift from the baseline is always visible.</summary>
+        public void Tint() =>
+            Name.AddThemeColorOverride("font_color", GameplayTuning.IsModified(Param) ? TextModified : TextDim);
     }
 
     private sealed class ToggleRow
@@ -53,11 +60,17 @@ public partial class TuningPanel : Control
         public void Refresh()
         {
             var v = Toggle.Get();
-            if (Box.ButtonPressed == v) return;
-            Suppress = true;
-            Box.ButtonPressed = v;
-            Suppress = false;
+            if (Box.ButtonPressed != v)
+            {
+                Suppress = true;
+                Box.ButtonPressed = v;
+                Suppress = false;
+            }
+            Tint();
         }
+
+        public void Tint() =>
+            Box.AddThemeColorOverride("font_color", GameplayTuning.IsModified(Toggle) ? TextModified : TextDim);
     }
 
     private readonly IDebugActions _debug;
@@ -65,6 +78,8 @@ public partial class TuningPanel : Control
     private readonly List<ToggleRow> _toggleRows = new();
 
     private Label _seedLabel = null!;
+    private Label _overrideLabel = null!;
+    private int _overrideShown = -1;
     private Label _statusLabel = null!;
     private CheckBox _pauseBox = null!;
     private string _seedShown = string.Empty;
@@ -143,6 +158,10 @@ public partial class TuningPanel : Control
         _seedLabel.AddThemeColorOverride("font_color", TextDim);
         root.AddChild(_seedLabel);
 
+        _overrideLabel = new Label { Text = "compiled defaults" };
+        _overrideLabel.AddThemeColorOverride("font_color", TextDim);
+        root.AddChild(_overrideLabel);
+
         _pauseBox = new CheckBox
         {
             Text = "Pause game while editing",
@@ -156,8 +175,8 @@ public partial class TuningPanel : Control
         root.AddChild(ButtonGrid(new (string, Action)[]
         {
             ("Reset All", Tuning.ResetAll),
-            ("Save Override", () => Status(Tuning.SaveOverride() ? "Saved override." : "Save failed.")),
-            ("Load Override", () => Status(Tuning.LoadOverride() ? "Loaded override." : "No override file.")),
+            ("Save Override", () => Status(Tuning.SaveOverride() ? "Saved override; it will load on next launch." : "Save failed.")),
+            ("Load Override", () => { int n = Tuning.LoadOverride(); Status(n < 0 ? "No override file." : $"Loaded override ({n} values)."); }),
         }));
 
         root.AddChild(Header("DEBUG ACTIONS", 12, TextDim));
@@ -268,8 +287,9 @@ public partial class TuningPanel : Control
         };
         row.AddChild(field);
 
-        var entry = new ParamRow { Param = param, Slider = slider, Field = field, Format = format };
+        var entry = new ParamRow { Param = param, Name = name, Slider = slider, Field = field, Format = format };
         _paramRows.Add(entry);
+        entry.Tint();
 
         slider.ValueChanged += value =>
         {
@@ -277,6 +297,7 @@ public partial class TuningPanel : Control
             var v = (float)value;
             param.Set(v);                            // applied immediately, same frame
             field.Text = entry.Render(v);
+            entry.Tint();
         };
 
         field.TextSubmitted += text =>
@@ -350,6 +371,15 @@ public partial class TuningPanel : Control
         {
             _seedShown = _debug.SeedText;
             _seedLabel.Text = $"seed {_seedShown}";
+        }
+        int overrides = Tuning.OverrideCount;
+        if (overrides != _overrideShown)
+        {
+            _overrideShown = overrides;
+            _overrideLabel.Text = overrides == 0
+                ? "compiled defaults"
+                : $"OVERRIDE ACTIVE — {overrides} {(overrides == 1 ? "value differs" : "values differ")} from compiled defaults";
+            _overrideLabel.AddThemeColorOverride("font_color", overrides == 0 ? TextDim : TextModified);
         }
 
         if (_statusTimer > 0d)

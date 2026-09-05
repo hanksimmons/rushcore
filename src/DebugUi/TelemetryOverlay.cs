@@ -29,7 +29,7 @@ public partial class TelemetryOverlay : Control
     {
         Frame, Physics, State, Band, Ground, Normal, Velocity, Locomotion, Vertical,
         Charge, Takeoff, Arc, Apex, Slam, Boost, Carve, Steering, Input, Impact,
-        Position, Checkpoint, Camera, Seed, Count,
+        Position, Checkpoint, Camera, Seed, Tuning, Count,
     }
 
     private readonly IDebugActions _debug;
@@ -94,6 +94,7 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Checkpoint, "checkpoint");
         AddRow(Row.Camera, "camera");
         AddRow(Row.Seed, "seed");
+        AddRow(Row.Tuning, "tuning");
     }
 
     private void AddRow(Row row, string caption)
@@ -163,6 +164,8 @@ public partial class TelemetryOverlay : Control
         Set(Row.Position, $"{pos.X,7:0.0} {pos.Y,7:0.0} {pos.Z,7:0.0}");
         Set(Row.Checkpoint, $"{cp.X,7:0.0} {cp.Y,7:0.0} {cp.Z,7:0.0}");
         Set(Row.Seed, _debug.SeedText);
+        int overrides = _debug.Tuning.OverrideCount;
+        Set(Row.Tuning, overrides == 0 ? "compiled defaults" : $"OVERRIDE ({overrides} {(overrides == 1 ? "value differs" : "values differ")})");
 
         if (p.Band != _shownBand)
         {

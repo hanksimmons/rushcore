@@ -298,41 +298,71 @@ public sealed class GameplayTuning
     }
 
     public const string OverridePath = "user://tuning_override_v1.json";
+    private const float ModifiedEpsilon = 1e-4f;
 
-    public bool SaveOverride()
+    public static bool IsModified(TuningParameter p) => Mathf.Abs(p.Get() - p.DefaultValue) > ModifiedEpsilon;
+    public static bool IsModified(TuningToggle t) => t.Get() != t.DefaultValue;
+
+    /// <summary>How many values currently differ from the compiled defaults.</summary>
+    public int OverrideCount
     {
-        var dict = new Godot.Collections.Dictionary { { "version", 1 } };
-        var values = new Godot.Collections.Dictionary();
-        foreach (var e in Parameters) values[e.Key] = e.Get();
-        foreach (var e in Toggles) values[e.Key] = e.Get();
-        dict["values"] = values;
+        get
+        {
+            int n = 0;
+            foreach (var e in Parameters) if (IsModified(e)) n++;
+            foreach (var e in Toggles) if (IsModified(e)) n++;
+            return n;
+        }
+    }
 
-        using var f = FileAccess.Open(OverridePath, FileAccess.ModeFlags.Write);
+    public static bool OverrideFileExists(string? path = null) => FileAccess.FileExists(path ?? OverridePath);
+
+    /// <summary>
+    /// Writes only the values that differ from compiled defaults (05 §17: simple versioned
+    /// JSON under user://). The file is therefore a diff of developer intent, and a fresh
+    /// build with new defaults is not pinned to stale copies of unchanged values.
+    /// </summary>
+    public bool SaveOverride(string? path = null)
+    {
+        path ??= OverridePath;
+        var values = new Godot.Collections.Dictionary();
+        foreach (var e in Parameters) if (IsModified(e)) values[e.Key] = e.Get();
+        foreach (var e in Toggles) if (IsModified(e)) values[e.Key] = e.Get();
+        var dict = new Godot.Collections.Dictionary { { "version", 1 }, { "values", values } };
+
+        using var f = FileAccess.Open(path, FileAccess.ModeFlags.Write);
         if (f is null)
         {
-            GD.PushWarning($"[RUSHCORE] Could not write {OverridePath}: {FileAccess.GetOpenError()}");
+            GD.PushWarning($"[RUSHCORE] Could not write {path}: {FileAccess.GetOpenError()}");
             return false;
         }
         f.StoreString(Json.Stringify(dict, "  "));
-        GD.Print("[RUSHCORE] Saved tuning override.");
+        GD.Print($"[RUSHCORE] Saved tuning override ({values.Count} values differ from defaults).");
         return true;
     }
 
-    public bool LoadOverride()
+    /// <summary>Applies the override on top of compiled defaults. Returns the number of values applied, or -1 if no file.</summary>
+    public int LoadOverride(string? path = null)
     {
-        if (!FileAccess.FileExists(OverridePath)) return false;
-        using var f = FileAccess.Open(OverridePath, FileAccess.ModeFlags.Read);
-        if (f is null) return false;
-        if (Json.ParseString(f.GetAsText()).Obj is not Godot.Collections.Dictionary root) return false;
-        if (root["values"].Obj is not Godot.Collections.Dictionary values) return false;
+        path ??= OverridePath;
+        if (!FileAccess.FileExists(path)) return -1;
+        using var f = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+        if (f is null) return -1;
+        if (Json.ParseString(f.GetAsText()).Obj is not Godot.Collections.Dictionary root) return -1;
+        if (!root.ContainsKey("values") || root["values"].Obj is not Godot.Collections.Dictionary values) return -1;
 
+        // Start from defaults so a diff-only file fully defines the resulting state.
+        foreach (var e in Parameters) e.Set(e.DefaultValue);
+        foreach (var e in Toggles) e.Set(e.DefaultValue);
+
+        int applied = 0;
         foreach (var e in Parameters)
-            if (values.TryGetValue(e.Key, out var v)) e.Set(Mathf.Clamp((float)v, e.Min, e.Max));
+            if (values.TryGetValue(e.Key, out var v)) { e.Set(Mathf.Clamp((float)v, e.Min, e.Max)); applied++; }
         foreach (var e in Toggles)
-            if (values.TryGetValue(e.Key, out var v)) e.Set((bool)v);
+            if (values.TryGetValue(e.Key, out var v)) { e.Set((bool)v); applied++; }
 
         BulkChanged?.Invoke();
-        GD.Print("[RUSHCORE] Loaded tuning override.");
-        return true;
+        GD.Print($"[RUSHCORE] Loaded tuning override: {applied} values applied.");
+        return applied;
     }
 }

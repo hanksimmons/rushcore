@@ -685,6 +685,36 @@ public partial class MovementToySelfTest : Node
             _visFrames > 0 && _visBlocked <= Mathf.CeilToInt(_visFrames * 0.02f),
             $"blocked {_visBlocked}/{_visFrames} ticks, floored {floored} frames");
 
+        // ---- tuning persistence: diff-only JSON round-trip on a scratch path ----
+        {
+            const string scratch = "user://tuning_selftest.json";
+            float driveDefault = m.GroundDriveAcceleration;
+            bool carveDefault = t.Carve.Enabled;
+            Check("harness starts on compiled defaults", t.OverrideCount == 0, $"overrides={t.OverrideCount}");
+            m.GroundDriveAcceleration = driveDefault + 7f;
+            t.Carve.Enabled = !carveDefault;
+            Check("modified values are counted", t.OverrideCount == 2, $"overrides={t.OverrideCount}");
+            Check("override saves", t.SaveOverride(scratch));
+
+            string text = Godot.FileAccess.GetFileAsString(scratch);
+            var parsed = Json.ParseString(text).Obj as Godot.Collections.Dictionary;
+            var values = parsed?["values"].Obj as Godot.Collections.Dictionary;
+            Check("override file is a versioned diff of only the changed values",
+                parsed is not null && (int)parsed["version"] == 1 && values is { Count: 2 },
+                $"keys={values?.Count}");
+
+            t.ResetAll();
+            Check("reset returns to compiled defaults", t.OverrideCount == 0 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault));
+            int applied = t.LoadOverride(scratch);
+            Check("override loads on top of defaults",
+                applied == 2 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault + 7f) && t.Carve.Enabled == !carveDefault,
+                $"applied={applied} drive={m.GroundDriveAcceleration}");
+
+            t.ResetAll();
+            DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(scratch));
+            Check("scratch override removed and defaults restored", !Godot.FileAccess.FileExists(scratch) && t.OverrideCount == 0);
+        }
+
         // ---- fall recovery ----
         foreach (var _ in Seconds(0.5f)) yield return null;
         _player.SetCheckpoint(PlatformCenter + Vector3.Up * 3f);

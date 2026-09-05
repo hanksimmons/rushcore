@@ -40,11 +40,15 @@ public partial class GameBootstrap : Node3D, IDebugActions
         InputBootstrap.Register();
 
         _tuning = new GameplayTuning();
-        // Compiled defaults are the clean-build authority and the playtest comparison
-        // baseline (07 §8). An override is never applied silently: the developer loads
-        // it deliberately from the tuning panel.
-        if (Godot.FileAccess.FileExists(GameplayTuning.OverridePath))
-            GD.Print($"[RUSHCORE] Tuning override file present at {GameplayTuning.OverridePath} (not applied; use Load Override in F1 panel).");
+        // Compiled defaults remain the clean-build authority (07 §8); the saved override is
+        // applied on launch so feel work persists between sessions, and the panel/telemetry
+        // show how many values differ so the baseline is never drifted from unknowingly.
+        // The self-test always runs on compiled defaults.
+        if (!WantsSelfTest())
+        {
+            int applied = _tuning.LoadOverride();
+            if (applied < 0) GD.Print("[RUSHCORE] No tuning override; running compiled defaults.");
+        }
 
         _world = new MovementToyWorld(_tuning, _seed);
         AddChild(_world);
@@ -137,8 +141,15 @@ public partial class GameBootstrap : Node3D, IDebugActions
         switch (_screenshotFrame)
         {
             case 60: Capture("rushcore_01_spawn.png"); break;
-            case 62: _tuningPanel.Visible = true; break;
-            case 75: Capture("rushcore_02_panel.png"); _tuningPanel.Visible = false; break;
+            case 62:
+                _tuning.Movement.DragCoefficient += 0.02f;      // show the override state in the capture
+                _tuningPanel.Visible = true;
+                break;
+            case 75:
+                Capture("rushcore_02_panel.png");
+                _tuningPanel.Visible = false;
+                _tuning.Movement.DragCoefficient -= 0.02f;
+                break;
             case 80: Input.ActionPress(InputBootstrap.MoveForward, 1f); break;   // straight down the lane
             case 200: Capture("rushcore_03_rolling.png", checkGroundVisible: true); break;
             case 202: Input.ActionPress(InputBootstrap.Boost, 1f); break;

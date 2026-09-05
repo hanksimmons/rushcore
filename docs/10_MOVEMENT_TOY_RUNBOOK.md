@@ -38,8 +38,13 @@ Falling below the kill plane recovers automatically. Recovery resets physics int
 ## Tuning baseline rule
 
 Compiled defaults in `src/Tuning/GameplayTuning.cs` mirror `03 §15` and are the comparison
-baseline. An override file (`user://tuning_override_v1.json`) is **never applied at startup**;
-load it deliberately from the panel. Reset All returns to compiled defaults.
+baseline. Slider changes live in memory until you press **Save Override**, which writes only
+the values that differ from defaults to `user://tuning_override_v1.json`
+(`~/Library/Application Support/Godot/app_userdata/RUSHCORE/`). That file is **applied
+automatically on the next launch**. The panel header and the telemetry `tuning` row show
+`OVERRIDE ACTIVE — n values differ`, and modified rows are highlighted, so you always know
+whether you are on the baseline. **Reset All** returns to compiled defaults (save again to
+clear the file's contents). The self-test always runs on compiled defaults.
 
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:

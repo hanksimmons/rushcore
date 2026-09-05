@@ -165,7 +165,7 @@ public partial class TelemetryOverlay : Control
         Set(Row.Checkpoint, $"{cp.X,7:0.0} {cp.Y,7:0.0} {cp.Z,7:0.0}");
         Set(Row.Seed, _debug.SeedText);
         int overrides = _debug.Tuning.OverrideCount;
-        Set(Row.Tuning, overrides == 0 ? "compiled defaults" : $"OVERRIDE ({overrides} values differ)");
+        Set(Row.Tuning, overrides == 0 ? "compiled defaults" : $"OVERRIDE ({overrides} {(overrides == 1 ? "value differs" : "values differ")})");
 
         if (p.Band != _shownBand)
         {

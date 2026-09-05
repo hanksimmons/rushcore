@@ -378,7 +378,7 @@ public partial class TuningPanel : Control
             _overrideShown = overrides;
             _overrideLabel.Text = overrides == 0
                 ? "compiled defaults"
-                : $"OVERRIDE ACTIVE — {overrides} value{(overrides == 1 ? "" : "s")} differ from compiled defaults";
+                : $"OVERRIDE ACTIVE — {overrides} {(overrides == 1 ? "value differs" : "values differ")} from compiled defaults";
             _overrideLabel.AddThemeColorOverride("font_color", overrides == 0 ? TextDim : TextModified);
         }
 

@@ -120,16 +120,16 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 
 | ID | Status | Validate |
 |---|---|---|
-| V-001 | RESOLVED | Lateral steering 151 m/s² with no additional high-speed falloff (multiplier 1.0); turn radius grows as v²/a, which alone satisfies D-002. |
+| V-001 | RESOLVED | Lateral steering 151 m/s², rising to ×1.45 at the cap; turn radius still grows as v²/(a·mult), which satisfies D-002. |
 | V-002 | RESOLVED | Carve removed (see D-007). |
 | V-003 | RESOLVED (toy) | Boost 48 m/s², blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35, perfect-apex +20. Active refill from combat is re-examined at Gate C0. |
-| V-004 | RESOLVED / OPEN | Cap 148.5 m/s accepted. Bands 18/32/48 were left unchanged during the playtest and now sit low against the cap; revisit when Flow/combat give them a purpose. |
-| V-005 | RESOLVED | Ball radius 2.1 m (4.2 m diameter). The Movement Toy lab keeps amplitude 1.0; Gate M1 sizes generation features from the accepted speed/jump envelope. |
+| V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 131 m/s accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
+| V-005 | RESOLVED | Ball radius 2.125 m (4.25 m diameter). The Movement Toy lab keeps amplitude 1.0; Gate M1 sizes generation features from the accepted speed/jump envelope. |
 | V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 8/s, vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2 m/s, occlusion margin 0.6, ground clearance 1.5. |
 | V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |
 | V-008 | VALIDATE | Exact terrain/stage physical dimensions and heightfield sampling density. |
 | V-009 | VALIDATE | Exact stage clear-time and full-run duration targets. |
-| V-010 | RESOLVED | 8 → 35 m/s over 0.65 s, linear mapping sufficient, release grace 0.10 s. |
+| V-010 | RESOLVED | 2 → 49.5 m/s over 0.45 s, linear mapping sufficient, release grace 0.10 s. A bare tap is a hop by design; the charge is the jump. |
 | V-011 | RESOLVED | Window 0.62 s (D-073; |vY| ≤ 12.2 m/s at g = 39.4), slam ×1.35, impact ×1.35. Slam itself: 43 m/s initial, 141 m/s². |
 | V-012 | VALIDATE | Approximate successful-run level-up count; starting target 8–15. |
 

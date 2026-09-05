@@ -65,8 +65,9 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
 Accepted baseline (playtest 2026-09-05, preset `manual-finetune-punchy` promoted to compiled
-defaults): cap 148.5 m/s, steering 151 m/s² with no high-speed falloff, gravity 39.4, ball radius
-2.1 m, jump 8→35 m/s over 0.65 s, slam 43 m/s + 141 m/s², apex window 0.62 s, chase camera.
+defaults): cap 148.5 m/s, steering 151 m/s² rising ×1.45 at the cap, gravity 39.4, ball radius
+2.125 m, jump 2→49.5 m/s over 0.45 s, slam 43 m/s + 141 m/s², apex window 0.62 s, Overdrive at
+131 m/s, chase camera.
 Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.

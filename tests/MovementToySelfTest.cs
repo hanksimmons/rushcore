@@ -421,7 +421,13 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Act()) yield return null;
         CheckNear("quick tap produces min takeoff (again, after off-tick case)", _player.LastTakeoffVerticalSpeed, js.MinJumpTakeoffVerticalSpeed, 0.6f);
 
-        // ---- perfect apex ----
+        // ---- perfect apex (from a full-charge arc: at the accepted 2 m/s a tap barely leaves the ground) ----
+        foreach (var _ in Seconds(2.0f)) yield return null;
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        Input.ActionPress(InputBootstrap.Jump, 1f);
+        foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.1f)) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        foreach (var _ in Act()) yield return null;
         int apexFrames = 0;
         while (_player.VerticalSpeed > _player.PerfectApexVerticalSpeedThreshold * 0.4f && apexFrames++ < 300) yield return null;
         Check("apex window reached", apexFrames < 300, $"frames={apexFrames}");

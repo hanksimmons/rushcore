@@ -393,15 +393,15 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 | Gravity | 39.4 m/s² | ACCEPTED |
 | Ground drive accel | 28 m/s² | ACCEPTED |
 | Ground steering lateral accel | 151 m/s² | ACCEPTED (V-001) |
-| High-speed steering multiplier | 1.0 (no extra falloff; radius = v²/a) | ACCEPTED (V-001) |
+| High-speed steering multiplier | 1.45 at the cap (authority rises with speed; radius = v²/(a·mult)) | ACCEPTED (V-001) |
 | Hard max locomotion speed | 148.5 m/s | ACCEPTED (V-004) |
 | Landing cap bleed | 40 m/s² | ACCEPTED (D-074) |
 | Drag coefficient | 0.08 | ACCEPTED |
 | Air control multiplier | 0.35 | ACCEPTED |
-| Ball radius | 2.1 m | ACCEPTED (V-005) |
-| Min jump takeoff vertical speed | 8 m/s | ACCEPTED (V-010) |
-| Max jump takeoff vertical speed | 35 m/s | ACCEPTED (V-010) |
-| Max jump charge seconds | 0.65 s, linear | ACCEPTED (V-010) |
+| Ball radius | 2.125 m | ACCEPTED (V-005) |
+| Min jump takeoff vertical speed | 2 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
+| Max jump takeoff vertical speed | 49.5 m/s | ACCEPTED (V-010) |
+| Max jump charge seconds | 0.45 s, linear | ACCEPTED (V-010) |
 | Charge release grace | 0.10 s | ACCEPTED |
 | Slam initial downward speed | 43 m/s | ACCEPTED |
 | Slam downward acceleration | 141 m/s² | ACCEPTED |
@@ -414,7 +414,7 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
 | Boost pickup refill / perfect-apex refill | 35 / 20 | ACCEPTED (toy) |
-| Rush / Crush / Overdrive thresholds | 18 / 32 / 48 m/s | OPEN — unchanged; low against the cap (V-004) |
+| Rush / Crush / Overdrive thresholds | 18 / 32 / 131 m/s | Overdrive ACCEPTED; Rush/Crush OPEN (V-004) |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 
@@ -463,5 +463,5 @@ Exact cases are defined in `08_TEST_ACCEPTANCE.md`.
 ## Empirical validation items
 
 Resolved at Movement Toy acceptance (2026-09-05); see `DECISIONS.md` V-001…V-011. Still open:
-the Rush/Crush/Overdrive thresholds relative to the accepted cap (V-004), to be settled when
-Flow and combat give the bands a purpose.
+the Rush and Crush thresholds relative to the accepted cap (V-004), to be settled when Flow and
+combat give the bands a purpose.

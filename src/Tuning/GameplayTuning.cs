@@ -32,9 +32,9 @@ public sealed class MovementTuning
     public float GroundDriveAcceleration = 28f;
     public float GroundSteeringLateralAccel = 151f;
     /// <summary>Steering-authority multiplier reached at the hard speed cap (lerped from 1.0
-    /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.0
-    /// (V-001): turn radius already grows as v^2 / lateralAccel, which satisfies D-002.</summary>
-    public float HighSpeedSteeringMultiplier = 1.0f;
+    /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.45
+    /// (V-001): turn radius still grows as v^2 / (lateralAccel * mult), which satisfies D-002.</summary>
+    public float HighSpeedSteeringMultiplier = 1.45f;
     public float AirControlMultiplier = 0.35f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
     public float DragCoefficient = 0.08f;
@@ -49,15 +49,15 @@ public sealed class MovementTuning
     public float MinGroundNormalDot = 0.50f;
     public float RushThreshold = 18f;
     public float CrushThreshold = 32f;
-    public float OverdriveThreshold = 48f;
-    public float BallRadius = 2.1f;
+    public float OverdriveThreshold = 131f;
+    public float BallRadius = 2.125f;
 }
 
 public sealed class JumpSlamTuning
 {
-    public float MinJumpTakeoffVerticalSpeed = 8f;
-    public float MaxJumpTakeoffVerticalSpeed = 35f;
-    public float MaxJumpChargeSeconds = 0.65f;
+    public float MinJumpTakeoffVerticalSpeed = 2f;
+    public float MaxJumpTakeoffVerticalSpeed = 49.5f;
+    public float MaxJumpChargeSeconds = 0.45f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
     public float SlamInitialDownwardSpeed = 43f;

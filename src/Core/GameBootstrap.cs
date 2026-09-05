@@ -60,6 +60,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _camera = new CameraRig(_tuning, _player);
         AddChild(_camera);
         _player.CameraBasis = _camera;
+        _camera.GroundHeight = _world.SampleHeight;
+        _camera.SnapYawToward(_world.SpawnFacing);
         _camera.SnapToPlayer();
 
         var ui = new CanvasLayer { Name = "UiRoot", Layer = 10 };
@@ -137,7 +139,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
             case 60: Capture("rushcore_01_spawn.png"); break;
             case 62: _tuningPanel.Visible = true; break;
             case 75: Capture("rushcore_02_panel.png"); _tuningPanel.Visible = false; break;
-            case 80: Input.ActionPress(InputBootstrap.MoveLeft, 1f); Input.ActionPress(InputBootstrap.MoveForward, 1f); break;
+            case 80: Input.ActionPress(InputBootstrap.MoveForward, 1f); break;   // straight down the lane
             case 200: Capture("rushcore_03_rolling.png", checkGroundVisible: true); break;
             case 202: Input.ActionPress(InputBootstrap.Boost, 1f); break;
             case 260: Capture("rushcore_04_boost.png"); Input.ActionRelease(InputBootstrap.Boost); break;
@@ -208,6 +210,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public void TeleportToStart()
     {
         _player.SetCheckpoint(_world.SpawnPoint);
+        _camera.SnapYawToward(_world.SpawnFacing);   // face down the lane, not the old heading
         _player.TeleportTo(_world.SpawnPoint);
     }
 

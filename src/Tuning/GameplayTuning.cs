@@ -99,7 +99,17 @@ public sealed class CameraTuning
 {
     public float Distance = 26f;
     public float PitchDegrees = -34f;
+    /// <summary>Yaw used by the fixed-orientation A/B mode (D-058 pending reconciliation).</summary>
     public float YawDegrees = 45f;
+    /// <summary>Chase camera: yaw follows the player's flat velocity heading.</summary>
+    public bool FollowTrajectoryYaw = true;
+    public float YawFollowDamping = 3f;
+    /// <summary>Degrees per second; caps how fast the view can swing.</summary>
+    public float YawMaxTurnRate = 140f;
+    /// <summary>Below this flat speed the yaw holds so a resting ball never spins the view.</summary>
+    public float YawFollowMinSpeed = 3f;
+    /// <summary>Minimum height of the lens (and, +0.5, of the focus) above the heightfield.</summary>
+    public float GroundClearance = 1.5f;
     public float HeightOffset = 3.0f;
     public float LookAheadMin = 2f;
     public float LookAheadMax = 22f;
@@ -229,7 +239,12 @@ public sealed class GameplayTuning
         var k = Camera;
         F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);
         F(CatCamera, "Pitch Degrees", -85f, -5f, () => k.PitchDegrees, v => k.PitchDegrees = v);
-        F(CatCamera, "Yaw Degrees", -180f, 180f, () => k.YawDegrees, v => k.YawDegrees = v);
+        B(CatCamera, "Follow Trajectory Yaw", () => k.FollowTrajectoryYaw, v => k.FollowTrajectoryYaw = v);
+        F(CatCamera, "Yaw Follow Damping", 0.2f, 20f, () => k.YawFollowDamping, v => k.YawFollowDamping = v);
+        F(CatCamera, "Yaw Max Turn Rate", 10f, 720f, () => k.YawMaxTurnRate, v => k.YawMaxTurnRate = v);
+        F(CatCamera, "Yaw Follow Min Speed", 0f, 20f, () => k.YawFollowMinSpeed, v => k.YawFollowMinSpeed = v);
+        F(CatCamera, "Fixed Yaw Degrees", -180f, 180f, () => k.YawDegrees, v => k.YawDegrees = v);
+        F(CatCamera, "Ground Clearance", 0.2f, 6f, () => k.GroundClearance, v => k.GroundClearance = v);
         F(CatCamera, "Height Offset", -5f, 20f, () => k.HeightOffset, v => k.HeightOffset = v);
         F(CatCamera, "Look-Ahead Min", 0f, 40f, () => k.LookAheadMin, v => k.LookAheadMin = v);
         F(CatCamera, "Look-Ahead Max", 0f, 90f, () => k.LookAheadMax, v => k.LookAheadMax = v);

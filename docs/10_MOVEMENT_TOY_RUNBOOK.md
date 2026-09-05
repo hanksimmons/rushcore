@@ -19,7 +19,7 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 
 | Input | Action |
 |---|---|
-| W A S D / left stick | camera-relative steering. With the default 45° yaw, **W+A drives −X** (down the calibration lane) and **W+D drives −Z**. |
+| W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes/reverses**. Spawn faces down the lane (−X). |
 | Space / A | press on ground = charge; release = jump; new press in air = slam |
 | Shift / X | boost (ground and air) |
 | Ctrl / LB | carve prototype (held) |
@@ -53,6 +53,13 @@ playtest:
 - **Camera occlusion probe** (`Camera`, on by default): sphere-cast from focus to camera pulls
   the camera in behind berms/mesa faces; disable to compare.
 - **Max Visual Roll = 3 rev/s** (`VFX`): visual-only spin cap so the ball does not strobe at speed.
+- **Chase camera** (`Camera › Follow Trajectory Yaw`, on): yaw tracks the flat velocity heading
+  (damping 3/s, ≤140°/s, holds below 3 m/s, never flips on reverse). Turning it off restores the
+  fixed 45° isometric-like composition for A/B. **This contradicts D-058/D-059, 03 §14 and 06 §11
+  as written**; it is the playtest-directed baseline pending reconciliation at acceptance.
+- Clipping defence: focus floored above ground; two same-frame sphere casts (focus→camera and
+  ball→camera); shake bounded to the probe margin; lens floored above the heightfield
+  (`Camera › Ground Clearance`).
 
 ## Calibration terrain (seed-invariant)
 

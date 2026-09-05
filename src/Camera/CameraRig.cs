@@ -6,9 +6,15 @@ using Rushcore.Tuning;
 namespace Rushcore.Camera;
 
 /// <summary>
-/// Fixed-orientation follow rig (03 §14, 06 §11). It reads the player's interpolated
-/// transform every rendered frame and applies its own damping, so it never inherits
-/// raw physics-step jitter.
+/// Follow rig. Baseline from playtest 2026-09-05: yaw tracks the player's trajectory
+/// (chase camera). The fixed-yaw composition of D-058/D-059 remains as an A/B toggle
+/// pending spec reconciliation. Reads the player's interpolated transform every rendered
+/// frame and applies its own damping, so it never inherits raw physics-step jitter.
+///
+/// Clipping defence, in order: (1) focus is floored above the ground so casts never start
+/// inside terrain; (2) two same-frame sphere casts, focus->camera and ball->camera, pull the
+/// camera in instantly; (3) shake is bounded to the probe margin; (4) the camera body is
+/// floored above the heightfield as a last resort and re-aimed at the focus.
 /// </summary>
 public partial class CameraRig : Node3D, ICameraBasis
 {
@@ -19,15 +25,14 @@ public partial class CameraRig : Node3D, ICameraBasis
     private Vector3 _focus;
     private float _zoom = 1f;
     private float _shake;
+    private float _yaw;                    // radians; the only orientation state
+    private float _occlusion = 1f;         // smoothed fraction of the full distance in use
 
-    // Occlusion probe: a sphere cast from the focus toward the camera, run in the
-    // physics step (space-state access is guaranteed there in every threading mode).
     private readonly SphereShape3D _probeShape = new();
     private readonly PhysicsShapeQueryParameters3D _probe = new();
-    private Vector3 _probeOffset;          // full-distance camera offset requested by _Process
-    private float _probeFraction = 1f;     // latest safe fraction from the physics step
-    private float _occlusion = 1f;         // smoothed fraction actually applied
     private readonly RandomNumberGenerator _rng = new();
+
+    private const float MinCameraDistance = 1.5f;
 
     public CameraRig(GameplayTuning tuning, PlayerPhysics player)
     {
@@ -35,20 +40,26 @@ public partial class CameraRig : Node3D, ICameraBasis
         _player = player;
     }
 
+    /// <summary>World height source used for the focus/camera floors. Terrain only;
+    /// props are handled by the sphere casts.</summary>
+    public Func<float, float, float>? GroundHeight { get; set; }
+
     public Vector3 FlatForward { get; private set; } = Vector3.Forward;
     public Vector3 FlatRight { get; private set; } = Vector3.Right;
     public Camera3D Camera => _camera;
     public float Zoom => _zoom;
+    public float YawDegreesCurrent => Mathf.RadToDeg(_yaw);
     /// <summary>1 = unobstructed; lower = camera pulled in toward the focus by that fraction.</summary>
     public float OcclusionFraction => _occlusion;
     public float CurrentDistance { get; private set; }
     public float CurrentLookAhead { get; private set; }
+    /// <summary>True on frames where the last-resort ground floor had to lift the camera.</summary>
+    public bool FlooredThisFrame { get; private set; }
 
     public override void _Ready()
     {
         Name = "CameraRig";
-        // This rig is repositioned every rendered frame, so engine physics
-        // interpolation must not also smear it.
+        // Repositioned every rendered frame; engine interpolation must not also smear it.
         PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off;
 
         _camera = new Camera3D { Name = "Camera", Current = true, Near = 0.25f, Far = 4000f };
@@ -59,9 +70,11 @@ public partial class CameraRig : Node3D, ICameraBasis
         _probe.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
         _probe.CollideWithAreas = false;
         _probe.CollideWithBodies = true;
+
+        _yaw = Mathf.DegToRad(_t.Camera.YawDegrees);
         UpdateOrientation();
-        _focus = _player.GlobalPosition;
-        ApplyTransform(1f, 0f);
+        _focus = _player.GlobalPosition + Vector3.Up * _t.Camera.HeightOffset;
+        ApplyTransform(FullDistance(0f), 0f);
         _player.Landed += OnLanded;
         _player.Slammed += OnSlammed;
         _player.Recovered += SnapToPlayer;
@@ -76,83 +89,114 @@ public partial class CameraRig : Node3D, ICameraBasis
 
     public void AddShake(float amount) => _shake = Mathf.Min(_shake + amount, 4f);
 
-    public override void _PhysicsProcess(double delta)
+    /// <summary>Point the camera along a world direction immediately (spawn, teleport).</summary>
+    public void SnapYawToward(Vector3 flatDirection)
     {
-        var c = _t.Camera;
-        if (!c.OcclusionProbe || _probeOffset.LengthSquared() < 1e-4f)
-        {
-            _probeFraction = 1f;
-            return;
-        }
-        _probeShape.Radius = Mathf.Max(0.05f, c.OcclusionMargin);
-        _probe.Transform = new Transform3D(Basis.Identity, _focus);
-        _probe.Motion = _probeOffset;
-        float[] hit = GetWorld3D().DirectSpaceState.CastMotion(_probe);
-        _probeFraction = hit.Length > 0 ? Mathf.Clamp(hit[0], 0f, 1f) : 1f;
+        Vector3 d = new(flatDirection.X, 0f, flatDirection.Z);
+        if (d.LengthSquared() < 1e-6f) return;
+        _yaw = YawFor(d.Normalized());
+        UpdateOrientation();
     }
 
     public void SnapToPlayer()
     {
-        _focus = _player.GlobalPosition;
+        _focus = FloorAboveGround(_player.GlobalPosition + Vector3.Up * _t.Camera.HeightOffset, FocusClearance);
         _shake = 0f;
         _occlusion = 1f;
-        _probeFraction = 1f;
-        ApplyTransform(1f, 0f);
+        UpdateOrientation();
+        ApplyTransform(FullDistance(0f), 0f);
         ResetPhysicsInterpolation();
     }
 
     public override void _Process(double delta)
     {
         float dt = (float)delta;
-        if (Input.IsActionJustPressed(InputBootstrap.ZoomIn)) SetZoom(_zoom - _t.Camera.ZoomStep);
-        if (Input.IsActionJustPressed(InputBootstrap.ZoomOut)) SetZoom(_zoom + _t.Camera.ZoomStep);
-
-        UpdateOrientation();
+        var c = _t.Camera;
+        if (Input.IsActionJustPressed(InputBootstrap.ZoomIn)) SetZoom(_zoom - c.ZoomStep);
+        if (Input.IsActionJustPressed(InputBootstrap.ZoomOut)) SetZoom(_zoom + c.ZoomStep);
 
         Vector3 playerPos = _player.GetGlobalTransformInterpolated().Origin;
         Vector3 flatVel = new(_player.Velocity.X, 0f, _player.Velocity.Z);
+        float speed = flatVel.Length();
         float cap = Mathf.Max(0.001f, _t.Movement.HardMaxLocomotionSpeed);
-        float speed01 = Mathf.Clamp(flatVel.Length() / cap, 0f, 1f);
+        float speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
 
-        var c = _t.Camera;
+        UpdateYaw(flatVel, speed, dt);
+        UpdateOrientation();
+
         Vector3 lookAhead = Vector3.Zero;
-        if (flatVel.LengthSquared() > 1f)
-            lookAhead = flatVel.Normalized() * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, speed01);
+        if (speed > 1f) lookAhead = flatVel / speed * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, speed01);
         CurrentLookAhead = lookAhead.Length();
 
-        Vector3 target = playerPos + lookAhead + Vector3.Up * c.HeightOffset;
+        // The look-ahead point may lie inside an upslope; floor it so the focus, and
+        // therefore every cast that starts there, is always above ground.
+        Vector3 target = FloorAboveGround(playerPos + lookAhead + Vector3.Up * c.HeightOffset, FocusClearance);
 
-        // Exponential damping, vertical handled on its own slower constant so hills
-        // and jump arcs do not throw the horizon around.
+        // Exponential damping, vertical on its own slower constant so hills and jump
+        // arcs do not throw the horizon around. The damped result is floored again
+        // because lag alone can sink it into a slope.
         float aH = 1f - Mathf.Exp(-Mathf.Max(0.01f, c.FollowDamping) * dt);
         float aV = 1f - Mathf.Exp(-Mathf.Max(0.01f, c.VerticalDamping) * dt);
         _focus.X = Mathf.Lerp(_focus.X, target.X, aH);
         _focus.Z = Mathf.Lerp(_focus.Z, target.Z, aH);
         _focus.Y = Mathf.Lerp(_focus.Y, target.Y, aV);
+        _focus = FloorAboveGround(_focus, FocusClearance);
 
         if (_shake > 0f) _shake = Mathf.Max(0f, _shake - _shake * Mathf.Max(0.01f, c.ShakeDecay) * dt);
 
-        // Pull in immediately when blocked; ease back out so a cleared line of sight
-        // does not pop the camera.
-        float occlusionTarget = c.OcclusionProbe ? _probeFraction : 1f;
-        _occlusion = occlusionTarget < _occlusion
-            ? occlusionTarget
-            : Mathf.Lerp(_occlusion, occlusionTarget, 1f - Mathf.Exp(-Mathf.Max(0.01f, c.OcclusionRecoverSpeed) * dt));
-        ApplyTransform(speed01, _shake);
+        float fullDist = FullDistance(speed01);
+        UpdateOcclusion(playerPos, Basis.Z * fullDist, dt);
+        ApplyTransform(fullDist, _shake);
+        _camera.Fov = Mathf.Lerp(c.FovMin, c.FovMax, speed01);
     }
 
-    private void SetZoom(float value) =>
-        _zoom = Mathf.Clamp(value, _t.Camera.ZoomMin, _t.Camera.ZoomMax);
+    // ---------------- orientation ----------------
+
+    private void UpdateYaw(Vector3 flatVel, float speed, float dt)
+    {
+        var c = _t.Camera;
+        float targetYaw = _yaw;
+        float gain = 1f;
+        if (c.FollowTrajectoryYaw)
+        {
+            // Reverse intent: the player is pushing back relative to the view. Hold the
+            // yaw regardless of velocity so braking through zero and rolling backward
+            // never swings the view 180 degrees and inverts the controls.
+            bool reversingIntent = _player.InputVector.Y < -0.2f;
+            float minSpeed = Mathf.Max(0.1f, c.YawFollowMinSpeed);
+            // Follow gain ramps in with speed: near-stationary lateral residuals must
+            // not be allowed to steer the view.
+            gain = Mathf.Clamp((speed - minSpeed) / (2f * minSpeed), 0f, 1f);
+            if (!reversingIntent && gain > 0f)
+            {
+                Vector3 dir = flatVel / speed;
+                // Coasting backward with no input (e.g. after a wall bounce) is held too.
+                if (dir.Dot(FlatForward) > -0.5f) targetYaw = YawFor(dir);
+            }
+        }
+        else
+        {
+            targetYaw = Mathf.DegToRad(c.YawDegrees);
+        }
+
+        float diff = Mathf.Wrap(targetYaw - _yaw, -Mathf.Pi, Mathf.Pi);
+        float step = diff * (1f - Mathf.Exp(-Mathf.Max(0.01f, c.YawFollowDamping) * gain * dt));
+        float maxStep = Mathf.DegToRad(Mathf.Max(1f, c.YawMaxTurnRate)) * dt;
+        step = Mathf.Clamp(step, -maxStep, maxStep);
+        _yaw = Mathf.Wrap(_yaw + step, -Mathf.Pi, Mathf.Pi);
+    }
+
+    /// <summary>Yaw whose camera-forward equals the given flat direction.</summary>
+    private static float YawFor(Vector3 flatDir) => Mathf.Atan2(-flatDir.X, -flatDir.Z);
 
     private void UpdateOrientation()
     {
-        var c = _t.Camera;
-        Basis b = Basis.FromEuler(new Vector3(Mathf.DegToRad(c.PitchDegrees), Mathf.DegToRad(c.YawDegrees), 0f));
+        Basis b = Basis.FromEuler(new Vector3(Mathf.DegToRad(_t.Camera.PitchDegrees), _yaw, 0f));
         Basis = b;
 
         Vector3 fwd = -b.Z;
         fwd.Y = 0f;
-        if (fwd.LengthSquared() < 1e-6f) fwd = Vector3.Forward; else fwd = fwd.Normalized();
+        fwd = fwd.LengthSquared() < 1e-6f ? Vector3.Forward : fwd.Normalized();
         Vector3 right = b.X;
         right.Y = 0f;
         right = right.LengthSquared() < 1e-6f ? Vector3.Right : right.Normalized();
@@ -160,24 +204,92 @@ public partial class CameraRig : Node3D, ICameraBasis
         FlatRight = right;
     }
 
-    private void ApplyTransform(float speed01, float shake)
+    // ---------------- occlusion ----------------
+
+    private void UpdateOcclusion(Vector3 playerPos, Vector3 offset, float dt)
+    {
+        var c = _t.Camera;
+        float target = 1f;
+        if (c.OcclusionProbe && offset.LengthSquared() > 1e-4f)
+        {
+            _probeShape.Radius = Mathf.Max(0.05f, c.OcclusionMargin);
+            Vector3 cameraPos = _focus + offset;
+            // Both lines matter: the focus line keeps the framing clear, the ball line
+            // keeps the player visible when a crest sits between the two.
+            float fromFocus = Cast(_focus, offset);
+            float fromBall = Cast(playerPos + Vector3.Up * 0.5f, cameraPos - playerPos - Vector3.Up * 0.5f);
+            target = Mathf.Min(fromFocus, fromBall);
+        }
+
+        // Pull in on the same frame; ease back out so a cleared line does not pop.
+        _occlusion = target < _occlusion
+            ? target
+            : Mathf.Lerp(_occlusion, target, 1f - Mathf.Exp(-Mathf.Max(0.01f, c.OcclusionRecoverSpeed) * dt));
+    }
+
+    /// <summary>Safe fraction of the motion, run on the main thread this frame
+    /// (PlayerPhysics guards that physics is not on a separate thread).</summary>
+    private float Cast(Vector3 from, Vector3 motion)
+    {
+        _probe.Transform = new Transform3D(Basis.Identity, from);
+        _probe.Motion = motion;
+        float[] hit = GetWorld3D().DirectSpaceState.CastMotion(_probe);
+        if (hit.Length < 2) return 1f;
+        // Starting inside geometry gives no usable answer; keep what we have.
+        if (hit[0] <= 0f && hit[1] <= 0f) return _occlusion;
+        return Mathf.Clamp(hit[0], 0f, 1f);
+    }
+
+    // ---------------- placement ----------------
+
+    private float FocusClearance => _t.Camera.GroundClearance + 0.5f;
+
+    private float FullDistance(float speed01)
+    {
+        var c = _t.Camera;
+        return (c.Distance + c.SpeedDistanceGain * speed01) * _zoom;
+    }
+
+    private Vector3 FloorAboveGround(Vector3 p, float clearance)
+    {
+        if (GroundHeight is null) return p;
+        float minY = GroundHeight(p.X, p.Z) + clearance;
+        if (p.Y < minY) p.Y = minY;
+        return p;
+    }
+
+    private void ApplyTransform(float fullDist, float shake)
     {
         var c = _t.Camera;
         GlobalPosition = _focus;
 
-        float fullDist = (c.Distance + c.SpeedDistanceGain * speed01) * _zoom;
-        _probeOffset = Basis.Z * fullDist;                       // world offset focus -> camera
-        float dist = Mathf.Max(1.5f, fullDist * _occlusion);
+        float dist = Mathf.Max(MinCameraDistance, fullDist * _occlusion);
         CurrentDistance = dist;
         Vector3 local = new(0f, 0f, dist);
         if (shake > 0f)
         {
-            float s = shake * c.ShakeStrength;
+            // Bounded to the probe margin so shake can never push the lens through a wall.
+            float s = Mathf.Min(shake * c.ShakeStrength, c.OcclusionMargin * 0.8f);
             local += new Vector3(_rng.RandfRange(-s, s), _rng.RandfRange(-s, s), _rng.RandfRange(-s, s));
         }
         _camera.Position = local;
-        _camera.Fov = Mathf.Lerp(c.FovMin, c.FovMax, speed01);
+        _camera.Rotation = Vector3.Zero;
+
+        // Last resort: never let the lens go below the heightfield.
+        FlooredThisFrame = false;
+        if (GroundHeight is null) return;
+        Vector3 gp = _camera.GlobalPosition;
+        float minY = GroundHeight(gp.X, gp.Z) + c.GroundClearance;
+        if (gp.Y < minY)
+        {
+            gp.Y = minY;
+            _camera.GlobalPosition = gp;
+            _camera.LookAt(_focus, Vector3.Up);
+            FlooredThisFrame = true;
+        }
     }
+
+    private void SetZoom(float value) => _zoom = Mathf.Clamp(value, _t.Camera.ZoomMin, _t.Camera.ZoomMax);
 
     private void OnLanded(float impactSpeed, bool wasSlam, bool wasPerfect)
     {

@@ -28,15 +28,17 @@ public sealed class TuningToggle
 
 public sealed class MovementTuning
 {
-    public float Gravity = 28f;
+    public float Gravity = 39.4f;
     public float GroundDriveAcceleration = 28f;
-    public float GroundSteeringLateralAccel = 42f;
-    /// <summary>Fraction of steering authority remaining at the hard speed cap (V-001).</summary>
-    public float HighSpeedSteeringMultiplier = 0.40f;
+    public float GroundSteeringLateralAccel = 151f;
+    /// <summary>Fraction of steering authority remaining at the hard speed cap. Accepted at
+    /// 1.0 (V-001): turn radius already grows as v^2 / lateralAccel, which satisfies D-002
+    /// without an additional falloff.</summary>
+    public float HighSpeedSteeringMultiplier = 1.0f;
     public float AirControlMultiplier = 0.35f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
     public float DragCoefficient = 0.08f;
-    public float HardMaxLocomotionSpeed = 60f;
+    public float HardMaxLocomotionSpeed = 148.5f;
     /// <summary>
     /// Landing on a slope at the cap makes ground-tangent speed exceed the cap by
     /// 1/cos(slope) (D-069). That excess is bled at this rate (m/s^2) instead of being
@@ -48,18 +50,18 @@ public sealed class MovementTuning
     public float RushThreshold = 18f;
     public float CrushThreshold = 32f;
     public float OverdriveThreshold = 48f;
-    public float BallRadius = 1.0f;
+    public float BallRadius = 2.1f;
 }
 
 public sealed class JumpSlamTuning
 {
     public float MinJumpTakeoffVerticalSpeed = 8f;
-    public float MaxJumpTakeoffVerticalSpeed = 16f;
+    public float MaxJumpTakeoffVerticalSpeed = 35f;
     public float MaxJumpChargeSeconds = 0.65f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
-    public float SlamInitialDownwardSpeed = 25f;
-    public float SlamDownwardAcceleration = 70f;
+    public float SlamInitialDownwardSpeed = 43f;
+    public float SlamDownwardAcceleration = 141f;
     public float SlamSteeringMultiplier = 0.25f;
     /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
     public float SlamLateralRetention = 1.0f;
@@ -67,9 +69,9 @@ public sealed class JumpSlamTuning
     /// Total duration of the perfect-apex window, centred on the apex. The detection
     /// itself stays a vertical-speed test (D-017): threshold = gravity * window / 2.
     /// Expressed in seconds so retuning gravity does not silently shrink the window.
-    /// Baseline 0.20 s; the 03 §15 placeholder of 1.25 m/s is 0.089 s at g = 28.
+    /// Accepted at 0.62 s (V-011).
     /// </summary>
-    public float PerfectApexWindowSeconds = 0.20f;
+    public float PerfectApexWindowSeconds = 0.62f;
     public float PerfectApexSlamStrengthMultiplier = 1.35f;
     public float PerfectApexImpactMultiplier = 1.35f;
 }
@@ -87,14 +89,6 @@ public sealed class BoostTuning
     public float PerfectApexRefillAmount = 20f;
 }
 
-public sealed class CarveTuning
-{
-    public bool Enabled = true;
-    public float CarveSteeringMultiplier = 1.8f;
-    public float CarveDragMultiplier = 3.0f;
-    public float CarveVfxStrength = 1.0f;
-}
-
 public sealed class CameraTuning
 {
     public float Distance = 26f;
@@ -107,7 +101,7 @@ public sealed class CameraTuning
     /// <summary>Degrees per second; caps how fast the view can swing.</summary>
     public float YawMaxTurnRate = 140f;
     /// <summary>Below this flat speed the yaw holds so a resting ball never spins the view.</summary>
-    public float YawFollowMinSpeed = 3f;
+    public float YawFollowMinSpeed = 2f;
     /// <summary>Minimum height of the lens (and, +0.5, of the focus) above the heightfield.</summary>
     public float GroundClearance = 1.5f;
     public float HeightOffset = 3.0f;
@@ -161,7 +155,6 @@ public sealed class GameplayTuning
     public readonly MovementTuning Movement = new();
     public readonly JumpSlamTuning JumpSlam = new();
     public readonly BoostTuning Boost = new();
-    public readonly CarveTuning Carve = new();
     public readonly CameraTuning Camera = new();
     public readonly VfxTuning Vfx = new();
     public readonly WorldTuning World = new();
@@ -169,13 +162,12 @@ public sealed class GameplayTuning
     public const string CatMovement = "Movement";
     public const string CatJumpSlam = "Jump / Slam";
     public const string CatBoost = "Boost";
-    public const string CatCarve = "Carve";
     public const string CatCamera = "Camera";
     public const string CatVfx = "VFX";
     public const string CatWorld = "World";
 
     public static readonly string[] Categories =
-        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatCamera, CatVfx, CatWorld };
+        { CatMovement, CatJumpSlam, CatBoost, CatCamera, CatVfx, CatWorld };
 
     public IReadOnlyList<TuningParameter> Parameters { get; }
     public IReadOnlyList<TuningToggle> Toggles { get; }
@@ -196,16 +188,16 @@ public sealed class GameplayTuning
         var m = Movement;
         F(CatMovement, "Gravity", 5f, 60f, () => m.Gravity, v => m.Gravity = v);
         F(CatMovement, "Drive Acceleration", 0f, 120f, () => m.GroundDriveAcceleration, v => m.GroundDriveAcceleration = v);
-        F(CatMovement, "Steering Lateral Accel", 0f, 160f, () => m.GroundSteeringLateralAccel, v => m.GroundSteeringLateralAccel = v);
+        F(CatMovement, "Steering Lateral Accel", 0f, 300f, () => m.GroundSteeringLateralAccel, v => m.GroundSteeringLateralAccel = v);
         F(CatMovement, "High-Speed Steer Mult", 0.02f, 1f, () => m.HighSpeedSteeringMultiplier, v => m.HighSpeedSteeringMultiplier = v);
         F(CatMovement, "Air Control Mult", 0f, 1f, () => m.AirControlMultiplier, v => m.AirControlMultiplier = v);
         F(CatMovement, "Drag", 0f, 1.5f, () => m.DragCoefficient, v => m.DragCoefficient = v);
-        F(CatMovement, "Hard Max Locomotion Speed", 5f, 160f, () => m.HardMaxLocomotionSpeed, v => m.HardMaxLocomotionSpeed = v);
+        F(CatMovement, "Hard Max Locomotion Speed", 5f, 250f, () => m.HardMaxLocomotionSpeed, v => m.HardMaxLocomotionSpeed = v);
         F(CatMovement, "Landing Cap Bleed", 2f, 400f, () => m.LandingCapBleed, v => m.LandingCapBleed = v);
         F(CatMovement, "Min Ground Normal Dot", 0.1f, 0.95f, () => m.MinGroundNormalDot, v => m.MinGroundNormalDot = v);
-        F(CatMovement, "Rush Threshold", 1f, 160f, () => m.RushThreshold, v => m.RushThreshold = v);
-        F(CatMovement, "Crush Threshold", 1f, 160f, () => m.CrushThreshold, v => m.CrushThreshold = v);
-        F(CatMovement, "Overdrive Threshold", 1f, 160f, () => m.OverdriveThreshold, v => m.OverdriveThreshold = v);
+        F(CatMovement, "Rush Threshold", 1f, 250f, () => m.RushThreshold, v => m.RushThreshold = v);
+        F(CatMovement, "Crush Threshold", 1f, 250f, () => m.CrushThreshold, v => m.CrushThreshold = v);
+        F(CatMovement, "Overdrive Threshold", 1f, 250f, () => m.OverdriveThreshold, v => m.OverdriveThreshold = v);
         F(CatMovement, "Ball Radius", 0.25f, 4f, () => m.BallRadius, v => m.BallRadius = v);
 
         var j = JumpSlam;
@@ -229,12 +221,6 @@ public sealed class GameplayTuning
         F(CatBoost, "Passive Regen", 0f, 60f, () => b.PassiveBoostRegen, v => b.PassiveBoostRegen = v);
         F(CatBoost, "Pickup Refill", 0f, 200f, () => b.PickupRefillAmount, v => b.PickupRefillAmount = v);
         F(CatBoost, "Perfect-Apex Refill", 0f, 200f, () => b.PerfectApexRefillAmount, v => b.PerfectApexRefillAmount = v);
-
-        var c = Carve;
-        B(CatCarve, "Carve Enabled", () => c.Enabled, v => c.Enabled = v);
-        F(CatCarve, "Steering Multiplier", 1f, 5f, () => c.CarveSteeringMultiplier, v => c.CarveSteeringMultiplier = v);
-        F(CatCarve, "Drag Multiplier", 1f, 20f, () => c.CarveDragMultiplier, v => c.CarveDragMultiplier = v);
-        F(CatCarve, "VFX Strength", 0f, 3f, () => c.CarveVfxStrength, v => c.CarveVfxStrength = v);
 
         var k = Camera;
         F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);

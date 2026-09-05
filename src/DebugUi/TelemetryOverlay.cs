@@ -28,7 +28,7 @@ public partial class TelemetryOverlay : Control
     private enum Row
     {
         Frame, Physics, State, Band, Ground, Normal, Velocity, Locomotion, Vertical,
-        Charge, Takeoff, Arc, Apex, Slam, Boost, Carve, Steering, Input, Impact,
+        Charge, Takeoff, Arc, Apex, Slam, Boost, Steering, Input, Impact,
         Position, Checkpoint, Camera, Seed, Tuning, Count,
     }
 
@@ -86,7 +86,6 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Apex, "apex win");
         AddRow(Row.Slam, "slam");
         AddRow(Row.Boost, "boost");
-        AddRow(Row.Carve, "carve");
         AddRow(Row.Steering, "steering");
         AddRow(Row.Input, "input");
         AddRow(Row.Impact, "impact");
@@ -157,7 +156,6 @@ public partial class TelemetryOverlay : Control
             Set(Row.Camera, $"dist {rig.CurrentDistance:0.0}  occl {rig.OcclusionFraction:0.00}  lookahead {rig.CurrentLookAhead:0.0}");
         Set(Row.Slam, $"{(p.SlamActive ? "ACTIVE" : "idle")}   last perfect {YesNo(p.LastSlamWasPerfect)}");
         Set(Row.Boost, $"{p.BoostAmount,6:0.0} ({p.Boost01:0.00}) {(p.BoostActive ? "FIRING" : "")}");
-        Set(Row.Carve, OnOff(p.CarveActive));
         Set(Row.Steering, $"{p.SteeringAuthority:0.0} m/s2");
         Set(Row.Input, $"{input.X,6:0.00} {input.Y,6:0.00}");
         Set(Row.Impact, $"{p.ImpactPowerEstimate:0.0}");

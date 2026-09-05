@@ -22,11 +22,9 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 | W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes/reverses**. Spawn faces down the lane (−X). |
 | Space / A | press on ground = charge; release = jump; new press in air = slam |
 | Shift / X | boost (ground and air) |
-| Ctrl / LB | carve prototype (held) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
 | F2 | telemetry overlay |
-| F3 | carve on/off (A/B) |
 | F4 | physics 60 ↔ 120 Hz (V-007) |
 | F5 | new world seed (instruments are seed-invariant; only scenery hills change) |
 | R | recover to last checkpoint |
@@ -53,6 +51,33 @@ after loading the one you prefer, press **Save Override** to make it load on lau
 the name field pauses the game and suspends hotkeys.
 
 Starter presets ship in `tuning/presets/` and are installed into `user://` on first launch
+(never overwriting one you have edited). Each is a deliberate concept, not a recommendation (absolute values, saved before acceptance):
+
+| Preset | Concept |
+|---|---|
+| `baseline` | compiled defaults; the comparison point |
+| `heavy-marble` | weight and momentum: stronger gravity, softer drive, hard slams, camera back |
+| `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide apex window |
+| `glide-and-soar` | air game: low gravity, big jumps, real air control, generous boost |
+| `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
+| `technical-lines` | line craft: cap 50, sharper steering, small tank |
+| `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
+| `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
+
+Accepted baseline (playtest 2026-09-05, preset `manual-finetune-punchy` promoted to compiled
+defaults): cap 148.5 m/s, steering 151 m/s² with no high-speed falloff, gravity 39.4, ball radius
+2.1 m, jump 8→35 m/s over 0.65 s, slam 43 m/s + 141 m/s², apex window 0.62 s, chase camera.
+Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
+presets hold absolute values from before acceptance; they still load but read as variations on
+the old, slower baseline.
+
+**Presets** (F1 › PRESETS): type a name and press Enter / **Save As** to stash the current
+values as `user://tuning_presets/<name>.json`; pick one from the dropdown and **Load** to apply
+it live for comparison; **Delete** removes it. Presets are stashes, not the startup state —
+after loading the one you prefer, press **Save Override** to make it load on launch. Typing in
+the name field pauses the game and suspends hotkeys.
+
+Starter presets ship in `tuning/presets/` and are installed into `user://` on first launch
 (never overwriting one you have edited). Each is a deliberate concept, not a recommendation:
 
 | Preset | Concept |
@@ -62,7 +87,7 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide apex window |
 | `glide-and-soar` | air game: low gravity, big jumps, real air control, generous boost |
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
-| `technical-carve` | line craft: cap 50, sharper steering, carve as a real tool, small tank |
+| `technical-lines` | line craft: cap 50, sharper steering, small tank |
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
 | `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
@@ -99,6 +124,6 @@ Terrain spans ±512 m, 4 m facets. Spawn on the flat plain at (470, 380).
 | Launch ramps | off the mesa lip at x 40 / 112 / 184 (11° / 19° / 27°) | charge jump, apex slam, landings |
 | Chasms | south rim z = −220 (34 m) and z = −380 (58 m) | gap jumps; 25° exit wall |
 | Bowl | centre (340, −320), r 160, floor −48 m | momentum storage |
-| Banked hairpin | centre (330, 155), r 145, berm +18 m; boost rings on the line | high-speed banked turns, carve |
+| Banked hairpin | centre (330, 155), r 145, berm +18 m; boost rings on the line | high-speed banked turns |
 
 Rocks, crystals, pylons, posts and pillars are solid (thin-object / CCD targets).

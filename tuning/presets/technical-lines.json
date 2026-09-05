@@ -1,13 +1,11 @@
 {
   "version": 1,
-  "note": "Line craft. Lower cap, sharper steering, carve is a real tool (much tighter, much costlier), smaller boost tank; camera closer and steeper to read the line.",
+  "note": "Line craft. Lower cap, sharper steering, smaller boost tank; camera closer and steeper to read the line. (Absolute values; the accepted baseline is far faster.)",
   "values": {
     "Movement/Hard Max Locomotion Speed": 50,
     "Movement/Steering Lateral Accel": 48,
     "Movement/High-Speed Steer Mult": 0.45,
     "Movement/Drag": 0.1,
-    "Carve/Steering Multiplier": 2.4,
-    "Carve/Drag Multiplier": 4.0,
     "Jump / Slam/Slam Steering Mult": 0.35,
     "Boost/Boost Acceleration": 40,
     "Boost/Capacity": 80,

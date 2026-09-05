@@ -8,7 +8,7 @@
 
 **RUSHCORE** is a high-speed 3D physics-action roguelite where **movement is combat**.
 
-The player controls a rolling ball across large procedurally generated landscapes. Gravity, slopes, player propulsion, boost, charge-jumping, aerial steering, ground slams, and possibly a carve action combine into an expressive arcade-physics movement system. The player becomes dangerous by building and preserving speed.
+The player controls a rolling ball across large procedurally generated landscapes. Gravity, slopes, player propulsion, boost, charge-jumping, aerial steering, and ground slams combine into an expressive arcade-physics movement system. The player becomes dangerous by building and preserving speed.
 
 Runs consist of nine stages connected by informed branching route choices. Temporary upgrades, passive items, shops, escalating hazards, enemies, and route rewards create run-to-run variation. Run performance converts into meta-progression.
 
@@ -60,7 +60,7 @@ However, realism never outranks control quality. Steering assistance, charge-jum
 
 Jump, slam, boost, successful enemy impacts, and good landings preserve or add useful momentum unless an action's explicit purpose is to trade speed for control.
 
-The proposed carve action is the deliberate exception: tighter control in exchange for speed.
+A carve action was prototyped as the deliberate exception (control for speed) and removed after playtest.
 
 ### P5 — Successful play preserves Flow
 
@@ -91,8 +91,7 @@ The fundamental movement vocabulary is intentionally small:
 - steer,
 - charge jump,
 - slam,
-- boost,
-- carve only if validation proves it earns its input.
+- boost.
 
 ## Player experience targets
 
@@ -111,7 +110,7 @@ The MVP should make the player feel:
 
 ### Second-to-second
 
-Read terrain → steer/accelerate → charge jump/slam/boost/(carve) → attack or evade → preserve momentum.
+Read terrain → steer/accelerate → charge jump/slam/boost → attack or evade → preserve momentum.
 
 ### 10–30 seconds
 

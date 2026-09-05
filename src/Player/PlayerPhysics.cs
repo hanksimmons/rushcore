@@ -20,7 +20,7 @@ public partial class PlayerPhysics : RigidBody3D
 
     // ---- input snapshot, sampled on the main thread in _PhysicsProcess ----
     private Vector2 _moveInput;
-    private bool _boostHeld, _carveHeld;
+    private bool _boostHeld;
     private bool _jumpPressedEdge, _jumpReleasedEdge, _jumpHeld;
 
     // ---- movement state (03 §3: track only what behavior needs) ----
@@ -98,7 +98,6 @@ public partial class PlayerPhysics : RigidBody3D
     public bool BoostActive => _boostActive;
     public float BoostAmount => _boost;
     public float Boost01 => Mathf.Clamp(_boost / Mathf.Max(0.001f, _t.Boost.BoostCapacity), 0f, 1f);
-    public bool CarveActive { get; private set; }
     public Vector2 InputVector => _moveInput;
     /// <summary>Effective lateral steering acceleration applied this physics step (m/s^2).</summary>
     public float SteeringAuthority { get; private set; }
@@ -150,7 +149,6 @@ public partial class PlayerPhysics : RigidBody3D
     {
         _moveInput = InputBootstrap.ReadMoveVector();
         _boostHeld = Input.IsActionPressed(InputBootstrap.Boost);
-        _carveHeld = _t.Carve.Enabled && Input.IsActionPressed(InputBootstrap.Carve);
         _jumpHeld = Input.IsActionPressed(InputBootstrap.Jump);
         if (Input.IsActionJustPressed(InputBootstrap.Jump)) _jumpPressedEdge = true;
         if (Input.IsActionJustReleased(InputBootstrap.Jump)) _jumpReleasedEdge = true;
@@ -245,8 +243,6 @@ public partial class PlayerPhysics : RigidBody3D
             drive *= m.AirControlMultiplier;
         }
         if (_slamActive) lateral *= _t.JumpSlam.SlamSteeringMultiplier;
-        CarveActive = _carveHeld;
-        if (CarveActive) lateral *= _t.Carve.CarveSteeringMultiplier;
         // Charge locks line-control authority only; drive/gravity/boost are untouched (03 §4).
         if (_isCharging) lateral = 0f;
         SteeringAuthority = lateral;
@@ -283,7 +279,7 @@ public partial class PlayerPhysics : RigidBody3D
         ApplyBoost(ref vT, planeNormal, curDir, desiredDir, speed01, dt);
 
         // ---- drag ----
-        float dragK = m.DragCoefficient * (CarveActive ? _t.Carve.CarveDragMultiplier : 1f);
+        float dragK = m.DragCoefficient;
         vT *= Mathf.Max(0f, 1f - dragK * dt);
 
         // ---- slam commits downward; vertical is never touched by the locomotion cap ----

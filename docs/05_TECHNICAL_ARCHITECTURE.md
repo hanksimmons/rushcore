@@ -100,7 +100,6 @@ Owns:
 - air control,
 - slam/apex timing,
 - boost,
-- carve prototype,
 - bounded collision response.
 
 A simple internal state model is sufficient, conceptually:
@@ -237,7 +236,7 @@ Applies:
 - speed-responsive FOV/distance,
 - short shake impulses.
 
-No manual camera rotation in MVP.
+No manual camera rotation in MVP; yaw follows the trajectory (D-072).
 
 Exact values are runtime-tuned.
 
@@ -305,7 +304,6 @@ Prototype contract:
 Additional actions:
 
 - boost,
-- carve,
 - zoom,
 - pause,
 - debug tuning/overlay.

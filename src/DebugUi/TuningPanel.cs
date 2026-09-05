@@ -399,7 +399,7 @@ public partial class TuningPanel : Control
     {
         if (!Visible) return;
 
-        // Cheap resync of the handful of toggles: carve can also be flipped with F3.
+        // Cheap resync of the handful of toggles in case one was flipped outside the panel.
         foreach (var entry in _toggleRows) entry.Refresh();
 
         if (_debug.SeedText != _seedShown)
@@ -442,7 +442,6 @@ public partial class TuningPanel : Control
         GameplayTuning.CatMovement => "Move",
         GameplayTuning.CatJumpSlam => "Jump",
         GameplayTuning.CatBoost => "Boost",
-        GameplayTuning.CatCarve => "Carve",
         GameplayTuning.CatCamera => "Camera",
         GameplayTuning.CatVfx => "VFX",
         GameplayTuning.CatWorld => "World",

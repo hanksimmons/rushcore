@@ -39,16 +39,13 @@ Deliver:
 - perfect-apex slam,
 - boost on ground/air,
 - slow passive boost regeneration + active refill hook,
-- carve prototype behind easy toggle,
-- fixed-orientation perspective camera,
+- chase-camera rig,
 - procedural player/terrain/VFX,
 - runtime tuning panel,
 - telemetry,
 - fall recovery with physics-interpolation reset after teleport.
 
-Gate: **M0**.
-
-Iterate here until fun.
+Gate: **M0** — passed 2026-09-05. Carve was removed at this gate.
 
 ## Phase 1B — Scale calibration
 

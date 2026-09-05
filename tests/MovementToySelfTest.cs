@@ -19,14 +19,14 @@ public partial class MovementToySelfTest : Node
     private const float PlatformY = 302f;
     private const float RampAngleDegrees = 20f;
     private static readonly Vector3 PlatformCenter = new(0f, PlatformY, 0f);
-    private static readonly Vector3 RampOrigin = new(0f, PlatformY - 2f, 800f);
+    private static readonly Vector3 RampOrigin = new(0f, PlatformY - 2f, 1300f);
 
     /// <summary>Injected input is observed by the player on the next physics frame and
     /// acted on during that frame's integration, so assertions wait two frames.</summary>
     private const int EdgeFrames = 2;
     private const float WallDistance = 110f;
-    private static readonly Vector3 WallLaneCentre = new(0f, PlatformY, -800f);
-    private static readonly Vector3 LandingLaneCentre = new(0f, PlatformY, 1600f);
+    private static readonly Vector3 WallLaneCentre = new(0f, PlatformY, -1400f);
+    private static readonly Vector3 LandingLaneCentre = new(0f, PlatformY, 2600f);
     private const float LandingSlopeDegrees = 25f;
     private Vector3 _landingStart;
     private Vector3 _wallCentre;
@@ -40,7 +40,7 @@ public partial class MovementToySelfTest : Node
     private int _checks;
     private bool _done;
 
-    private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount;
+    private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount, _landedCount;
     private bool _releaseJumpFromProcess;
     /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
     private Vector3? _worldDrive;
@@ -73,6 +73,7 @@ public partial class MovementToySelfTest : Node
         _player.JumpChargeCanceled += () => _chargeCanceledCount++;
         _player.Slammed += p => { _slammedCount++; _lastSlamPerfect = p; };
         _player.Recovered += () => _recoveredCount++;
+        _player.Landed += (_, _, _) => _landedCount++;
         _debug.World.BoostPickupCollected += _ => _pickupCount++;
 
         _script = Run();
@@ -132,7 +133,7 @@ public partial class MovementToySelfTest : Node
     private void BuildRig()
     {
         var plate = new StaticBody3D { Name = "TestPlate", Position = PlatformCenter - Vector3.Up * 2f };
-        plate.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(400f, 4f, 400f) } });
+        plate.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(1600f, 4f, 1600f) } });
         plate.PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f };
         AddChild(plate);
 
@@ -171,23 +172,23 @@ public partial class MovementToySelfTest : Node
             Transform = new Transform3D(laneBasis, LandingLaneCentre - Vector3.Up * 2f),
             PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
         };
-        landRunway.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(80f, 4f, 300f) } });
+        landRunway.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(120f, 4f, 600f) } });
         AddChild(landRunway);
 
         float sa = Mathf.DegToRad(LandingSlopeDegrees);
-        Vector3 crest = LandingLaneCentre + fwd * 150f;
-        _landingStart = LandingLaneCentre - fwd * 140f + Vector3.Up * 3f;
+        Vector3 crest = LandingLaneCentre + fwd * 300f;
+        _landingStart = LandingLaneCentre - fwd * 290f + Vector3.Up * 3f;
         // Slope box: tilt the lane basis nose-down about its local X, centre it half a
         // length down the incline, and sink it by half its thickness.
         Basis slopeBasis = laneBasis * new Basis(Vector3.Right, -sa);
-        Vector3 slopeCentre = crest + fwd * (150f * Mathf.Cos(sa)) - Vector3.Up * (150f * Mathf.Sin(sa) + 2f * Mathf.Cos(sa));
+        Vector3 slopeCentre = crest + fwd * (600f * Mathf.Cos(sa)) - Vector3.Up * (600f * Mathf.Sin(sa) + 2f * Mathf.Cos(sa));
         var landSlope = new StaticBody3D
         {
             Name = "TestLandingSlope",
             Transform = new Transform3D(slopeBasis, slopeCentre),
             PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
         };
-        landSlope.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(120f, 4f, 300f) } });
+        landSlope.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(160f, 4f, 1200f) } });
         AddChild(landSlope);
 
         var ramp = new StaticBody3D { Name = "TestRamp", Position = RampOrigin };
@@ -222,7 +223,7 @@ public partial class MovementToySelfTest : Node
     private static readonly string[] AllActions =
     {
         InputBootstrap.MoveForward, InputBootstrap.MoveBack, InputBootstrap.MoveLeft,
-        InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost, InputBootstrap.Carve
+        InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost
     };
 
     private void ReleaseAll()
@@ -561,16 +562,6 @@ public partial class MovementToySelfTest : Node
             _player.BoostAmount - boostAfterDrain, t.Boost.PassiveBoostRegen, t.Boost.PassiveBoostRegen * 0.3f);
         ReleaseAll();
 
-        // ---- carve A/B toggle ----
-        Input.ActionPress(InputBootstrap.Carve, 1f);
-        foreach (var _ in Act()) yield return null;
-        Check("carve engages when enabled", _player.CarveActive);
-        t.Carve.Enabled = false;
-        foreach (var _ in Act()) yield return null;
-        Check("carve can be toggled off for A/B testing", !_player.CarveActive);
-        t.Carve.Enabled = true;
-        ReleaseAll();
-
         // ---- CCD: a max-speed run into a 0.3 m plate must stop, not tunnel ----
         foreach (var _ in Settle(_wallLaneStart)) yield return null;
         _player.RefillBoost(t.Boost.BoostCapacity);
@@ -608,6 +599,7 @@ public partial class MovementToySelfTest : Node
         while (!_player.IsGrounded && landGuard++ < 1200) yield return null;     // land on the slope
         bool landed = landGuard < 1200;
         float prev = _player.LocomotionSpeed, worstDrop = 0f, peakOverCap = 0f;
+        int landingsBefore = _landedCount;
         foreach (var _ in Seconds(0.6f))
         {
             float now = _player.LocomotionSpeed;
@@ -624,8 +616,12 @@ public partial class MovementToySelfTest : Node
         float maxTickDrop = (m.LandingCapBleed + 5f) / Engine.PhysicsTicksPerSecond + 0.5f;
         Check("the excess bleeds instead of clipping in one tick", worstDrop < maxTickDrop,
             $"worst single-tick drop={worstDrop:0.00} m/s allowed<{maxTickDrop:0.00}");
+        // The fall's vertical momentum also folds into tangent speed on landing, so the
+        // excess can be well above the pure 1/cos(slope) figure; wait for the measured peak
+        // to bleed at the tuned rate before asserting the cap is back.
+        foreach (var _ in Seconds(Mathf.Max(0f, peakOverCap / Mathf.Max(1f, m.LandingCapBleed) - 0.6f) + 0.3f)) yield return null;
         Check("allowance decays back to the cap", _player.LocomotionSpeed <= m.HardMaxLocomotionSpeed + 0.5f,
-            $"speed={_player.LocomotionSpeed:0.0} cap={m.HardMaxLocomotionSpeed}");
+            $"speed={_player.LocomotionSpeed:0.0} cap={m.HardMaxLocomotionSpeed} peakOverCap={peakOverCap:0.0} re-landings={_landedCount - landingsBefore}");
         ReleaseAll();
 
         // ---- camera occlusion probe pulls the camera in when terrain blocks the focus ----
@@ -690,10 +686,10 @@ public partial class MovementToySelfTest : Node
         {
             const string scratch = "user://tuning_selftest.json";
             float driveDefault = m.GroundDriveAcceleration;
-            bool carveDefault = t.Carve.Enabled;
+            bool probeDefault = t.Camera.OcclusionProbe;
             Check("harness starts on compiled defaults", t.OverrideCount == 0, $"overrides={t.OverrideCount}");
             m.GroundDriveAcceleration = driveDefault + 7f;
-            t.Carve.Enabled = !carveDefault;
+            t.Camera.OcclusionProbe = !probeDefault;
             Check("modified values are counted", t.OverrideCount == 2, $"overrides={t.OverrideCount}");
             Check("override saves", t.SaveOverride(scratch));
 
@@ -708,7 +704,7 @@ public partial class MovementToySelfTest : Node
             Check("reset returns to compiled defaults", t.OverrideCount == 0 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault));
             int applied = t.LoadOverride(scratch);
             Check("override loads on top of defaults",
-                applied == 2 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault + 7f) && t.Carve.Enabled == !carveDefault,
+                applied == 2 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault + 7f) && t.Camera.OcclusionProbe == !probeDefault,
                 $"applied={applied} drive={m.GroundDriveAcceleration}");
 
             t.ResetAll();
@@ -718,9 +714,14 @@ public partial class MovementToySelfTest : Node
 
         // ---- named presets: save, list, load, delete ----
         {
-            var bundled = GameplayTuning.ListPresets();
-            Check("bundled starter presets were installed", bundled.Contains("baseline") && bundled.Contains("iso-classic"),
-                $"presets={string.Join(",", bundled)}");
+            var installed = GameplayTuning.ListPresets();
+            Check("bundled starter presets were installed", installed.Contains("baseline") && installed.Contains("iso-classic"),
+                $"presets={string.Join(",", installed)}");
+            // Validate what ships in the repo, not whatever else the developer has stashed locally.
+            var bundled = new List<string>();
+            using (var dir = DirAccess.Open(GameplayTuning.BundledPresetDir))
+                foreach (string f in dir?.GetFiles() ?? System.Array.Empty<string>())
+                    if (f.EndsWith(".json")) bundled.Add(f[..^5]);
             // Every bundled preset must load with every key recognised: a typo in a key
             // would otherwise be dropped silently by the loader.
             var unrecognised = new List<string>();
@@ -871,7 +872,7 @@ public partial class MovementToySelfTest : Node
         var js = _debug.Tuning.JumpSlam;
         string label = releaseInsideGrace ? "inside grace" : "after grace expiry";
 
-        foreach (var _ in Settle(PlatformCenter - Forward * 150f + Vector3.Up * 3f)) yield return null;
+        foreach (var _ in Settle(PlatformCenter + Forward * 300f + Vector3.Up * 3f)) yield return null;
         Input.ActionPress(InputBootstrap.MoveForward, 1f);
         foreach (var _ in Seconds(2.0f)) yield return null;
         Input.ActionPress(InputBootstrap.Jump, 1f);

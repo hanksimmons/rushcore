@@ -128,12 +128,6 @@ public partial class GameBootstrap : Node3D, IDebugActions
             Engine.PhysicsTicksPerSecond = Engine.PhysicsTicksPerSecond == 60 ? 120 : 60;
             GD.Print("[RUSHCORE] Physics tick rate now ", Engine.PhysicsTicksPerSecond, " Hz");
         }
-        if (Input.IsActionJustPressed(InputBootstrap.DebugToggleCarve))
-        {
-            _tuning.Carve.Enabled = !_tuning.Carve.Enabled;
-            _tuning.NotifyChanged();
-            GD.Print("[RUSHCORE] Carve prototype ", _tuning.Carve.Enabled ? "ENABLED" : "DISABLED");
-        }
     }
 
     /// <summary>

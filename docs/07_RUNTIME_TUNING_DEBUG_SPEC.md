@@ -44,16 +44,6 @@ Expose first:
 - active refill values
 - Rush/Crush/Overdrive thresholds
 
-### Carve prototype
-
-If enabled:
-
-- CarveSteeringMultiplier
-- CarveDragMultiplier
-- CarveVfxStrength
-
-The entire carve feature should be togglable for A/B playtesting.
-
 ## 4. Camera tuning
 
 Expose:
@@ -118,7 +108,8 @@ No duplicate magic-number copies.
 
 Debug-only:
 
-- Save override → `user://tuning_override_v1.json`
+- Save override → `user://tuning_override_v1.json` (diff from compiled defaults; applied on launch; state always visible — D-075)
+- Named presets → `user://tuning_presets/<name>.json` (stashes for comparison)
 - Load override
 - Reset category
 - Reset all
@@ -185,7 +176,6 @@ Useful controls:
 - teleport checkpoint/near exit,
 - clear enemies,
 - pause,
-- toggle carve prototype.
 
 These intentionally bypass normal game rules to accelerate iteration.
 
@@ -203,6 +193,5 @@ A developer must be able to:
 2. alter steering/speed cap/jump charge/slam/boost/camera feel,
 3. immediately feel the change,
 4. reset values,
-5. compare carve on/off,
-6. reproduce the same seed/environment,
-7. do all of this without using the Godot editor for scene composition.
+5. reproduce the same seed/environment,
+6. do all of this without using the Godot editor for scene composition.

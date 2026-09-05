@@ -76,7 +76,7 @@ The Movement Toy must implement these accepted behaviors:
 - boost works in air,
 - boost direction blends current travel and desired input,
 - slow emergency passive boost refill plus active refill hooks,
-- carve is a prototype/validation feature, not a guaranteed permanent verb.
+- there is no carve verb: it was prototyped and removed at Movement Toy acceptance (D-007).
 
 Do not reinterpret charge jump as “jump on press with variable gravity.” Jump occurs on **release**.
 
@@ -244,8 +244,6 @@ After coding:
 
 Until the implementation plan advances:
 
-> **Bootstrap → Movement Toy → Scale Calibration.**
+> **Phase 2 — Procedural Terrain Core** (Movement Toy accepted 2026-09-05; Gate M0 passed).
 
-The first real success criterion is:
-
-> The ball, terrain, charge jump, slam, boost, camera, and optional carve are fun for ten minutes with no roguelike progression.
+The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` is frozen input to generation. Do not retune it while building Phase 2.

@@ -718,6 +718,22 @@ public partial class MovementToySelfTest : Node
 
         // ---- named presets: save, list, load, delete ----
         {
+            var bundled = GameplayTuning.ListPresets();
+            Check("bundled starter presets were installed", bundled.Contains("baseline") && bundled.Contains("iso-classic"),
+                $"presets={string.Join(",", bundled)}");
+            // Every bundled preset must load with every key recognised: a typo in a key
+            // would otherwise be dropped silently by the loader.
+            var unrecognised = new List<string>();
+            foreach (string preset in bundled)
+            {
+                var doc = Json.ParseString(Godot.FileAccess.GetFileAsString(GameplayTuning.PresetPath(preset))).Obj as Godot.Collections.Dictionary;
+                int keyCount = doc?["values"].Obj is Godot.Collections.Dictionary dv ? dv.Count : -1;
+                int applied = t.LoadPreset(preset);
+                if (applied != keyCount) unrecognised.Add($"{preset}({applied}/{keyCount})");
+            }
+            Check("every bundled preset loads with all keys recognised", unrecognised.Count == 0,
+                string.Join(" ", unrecognised));
+            t.ResetAll();
             string name = GameplayTuning.SanitizePresetName(" selftest/variant #A ");
             Check("preset names are made file-safe", name == "selftest_variant__A", $"name='{name}'");
             float driveDefault = m.GroundDriveAcceleration;

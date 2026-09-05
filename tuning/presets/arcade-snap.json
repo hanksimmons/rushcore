@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "Tight and forgiving. Strong drive and steering at every speed, quick charge, wide apex window, boost bends more toward input, camera turns fast.",
+  "values": {
+    "Movement/Drive Acceleration": 36,
+    "Movement/Steering Lateral Accel": 60,
+    "Movement/High-Speed Steer Mult": 0.55,
+    "Movement/Air Control Mult": 0.5,
+    "Movement/Drag": 0.12,
+    "Jump / Slam/Min Jump Takeoff": 9,
+    "Jump / Slam/Max Jump Takeoff": 18,
+    "Jump / Slam/Max Charge Seconds": 0.5,
+    "Jump / Slam/Apex Window (s)": 0.28,
+    "Jump / Slam/Slam Steering Mult": 0.4,
+    "Boost/Direction Blend": 0.45,
+    "Camera/Yaw Follow Damping": 5,
+    "Camera/Yaw Max Turn Rate": 200,
+    "Camera/Follow Damping": 10
+  }
+}

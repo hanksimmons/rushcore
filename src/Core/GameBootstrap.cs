@@ -40,6 +40,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         InputBootstrap.Register();
 
         _tuning = new GameplayTuning();
+        GameplayTuning.InstallBundledPresets();
         // Compiled defaults remain the clean-build authority (07 §8); the saved override is
         // applied on launch so feel work persists between sessions, and the panel/telemetry
         // show how many values differ so the baseline is never drifted from unknowingly.

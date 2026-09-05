@@ -23,7 +23,7 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 | Space / A | press on ground = charge; release = jump; new press in air = slam |
 | Shift / X | boost (ground and air) |
 | Ctrl / LB | carve prototype (held) |
-| Mouse wheel, + / − | camera zoom (bounded) |
+| Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
 | F2 | telemetry overlay |
 | F3 | carve on/off (A/B) |
@@ -40,6 +40,19 @@ Falling below the kill plane recovers automatically. Recovery resets physics int
 Compiled defaults in `src/Tuning/GameplayTuning.cs` mirror `03 §15` and are the comparison
 baseline. An override file (`user://tuning_override_v1.json`) is **never applied at startup**;
 load it deliberately from the panel. Reset All returns to compiled defaults.
+
+Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
+playtest:
+
+- **Apex window is 0.20 s** (`Jump › Apex Window (s)`), i.e. |vY| ≤ 2.80 m/s at g = 28. The
+  detection is still a vertical-speed threshold (D-017); the knob is in seconds so retuning
+  gravity cannot silently shrink the window. The spec placeholder 1.25 m/s equals 0.089 s.
+- **Landing Cap Bleed = 40 m/s²** (new, `Move`). Landing on a slope at the cap makes tangent
+  speed exceed the cap by 1/cos(slope) (D-069); the excess now bleeds over ~0.2 s instead of
+  clipping in one tick. Set very high to restore the instant clamp.
+- **Camera occlusion probe** (`Camera`, on by default): sphere-cast from focus to camera pulls
+  the camera in behind berms/mesa faces; disable to compare.
+- **Max Visual Roll = 3 rev/s** (`VFX`): visual-only spin cap so the ball does not strobe at speed.
 
 ## Calibration terrain (seed-invariant)
 

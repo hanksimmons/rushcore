@@ -167,8 +167,10 @@ public partial class PlayerVisual : Node3D
         {
             _travelDir = flat / flatSpeed;
             Vector3 axis = Vector3.Up.Cross(_travelDir);
+            // Visual-only spin cap: the true rate strobes at 60 fps near the speed cap.
+            float omega = Mathf.Min(flatSpeed / r, Mathf.Max(0.1f, vfx.MaxVisualRollRevPerSecond) * Mathf.Tau);
             if (axis.LengthSquared() > 1e-6f)
-                _roll = new Basis(axis.Normalized(), flatSpeed / r * dt) * _roll;
+                _roll = new Basis(axis.Normalized(), omega * dt) * _roll;
         }
 
         bool charging = _player.IsCharging;
@@ -239,9 +241,12 @@ public partial class PlayerVisual : Node3D
         if (charging)
         {
             // Pulse rate climbs with charge so "nearly full" is audible-in-the-eyes.
-            float pulse = 0.55f + 0.45f * Mathf.Sin(_time * (10f + 26f * charge01));
-            col = col.Lerp(ChargeColor, 0.35f + 0.65f * charge01);
-            energy += (0.5f + 2.6f * charge01) * pulse * chargeStrength;
+            // The pulse trough is deliberately dark and the band glow yields to it:
+            // at Overdrive the band is already near-white, so an additive charge glow
+            // would be invisible. Gold hue keeps it distinct from the cyan-white band.
+            float pulse = 0.12f + 0.88f * (0.5f + 0.5f * Mathf.Sin(_time * (10f + 26f * charge01)));
+            col = col.Lerp(ChargeColor, 0.55f + 0.45f * charge01);
+            energy = _bandEnergy * 0.2f + (0.6f + 2.6f * charge01) * pulse * chargeStrength;
         }
 
         if (slam)

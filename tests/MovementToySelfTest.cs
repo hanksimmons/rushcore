@@ -25,6 +25,9 @@ public partial class MovementToySelfTest : Node
     private const int EdgeFrames = 2;
     private const float WallDistance = 110f;
     private static readonly Vector3 WallLaneCentre = new(0f, PlatformY, -800f);
+    private static readonly Vector3 LandingLaneCentre = new(0f, PlatformY, 1600f);
+    private const float LandingSlopeDegrees = 25f;
+    private Vector3 _landingStart;
     private Vector3 _wallCentre;
     private Vector3 _wallLaneStart;
 
@@ -124,6 +127,34 @@ public partial class MovementToySelfTest : Node
         };
         wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(80f, 12f, 0.3f) } });
         AddChild(wall);
+
+        // Landing lane: runway into a 25 deg downslope. Arriving at the cap, the ball
+        // leaves the crest ballistically and lands on the slope with tangent speed above
+        // the cap (1/cos 25 deg); the cap must bleed that, not clip it (D-069, 03 §5).
+        var landRunway = new StaticBody3D
+        {
+            Name = "TestLandingRunway",
+            Transform = new Transform3D(laneBasis, LandingLaneCentre - Vector3.Up * 2f),
+            PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+        };
+        landRunway.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(80f, 4f, 300f) } });
+        AddChild(landRunway);
+
+        float sa = Mathf.DegToRad(LandingSlopeDegrees);
+        Vector3 crest = LandingLaneCentre + fwd * 150f;
+        _landingStart = LandingLaneCentre - fwd * 140f + Vector3.Up * 3f;
+        // Slope box: tilt the lane basis nose-down about its local X, centre it half a
+        // length down the incline, and sink it by half its thickness.
+        Basis slopeBasis = laneBasis * new Basis(Vector3.Right, -sa);
+        Vector3 slopeCentre = crest + fwd * (150f * Mathf.Cos(sa)) - Vector3.Up * (150f * Mathf.Sin(sa) + 2f * Mathf.Cos(sa));
+        var landSlope = new StaticBody3D
+        {
+            Name = "TestLandingSlope",
+            Transform = new Transform3D(slopeBasis, slopeCentre),
+            PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+        };
+        landSlope.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(120f, 4f, 300f) } });
+        AddChild(landSlope);
 
         var ramp = new StaticBody3D { Name = "TestRamp", Position = RampOrigin };
         ramp.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(400f, 4f, 200f) } });
@@ -306,7 +337,7 @@ public partial class MovementToySelfTest : Node
         Check("airborne press does not begin a new charge", !_player.IsCharging);
         Check("airborne press triggers slam", _slammedCount == slamsBefore + 1 && _player.SlamActive);
         Check("early slam is not a perfect apex", !_lastSlamPerfect,
-            $"vy at slam={_player.LastSlamVerticalSpeed:0.##} window={js.PerfectApexVerticalSpeedThreshold}");
+            $"vy at slam={_player.LastSlamVerticalSpeed:0.##} threshold={_player.PerfectApexVerticalSpeedThreshold:0.##}");
         Input.ActionRelease(InputBootstrap.Jump);
 
         // ---- no double jump ----
@@ -353,13 +384,13 @@ public partial class MovementToySelfTest : Node
 
         // ---- perfect apex ----
         int apexFrames = 0;
-        while (_player.VerticalSpeed > js.PerfectApexVerticalSpeedThreshold * 0.4f && apexFrames++ < 300) yield return null;
+        while (_player.VerticalSpeed > _player.PerfectApexVerticalSpeedThreshold * 0.4f && apexFrames++ < 300) yield return null;
         Check("apex window reached", apexFrames < 300, $"frames={apexFrames}");
         Input.ActionPress(InputBootstrap.Jump, 1f);
         foreach (var _ in Act()) yield return null;
         Input.ActionRelease(InputBootstrap.Jump);
         Check("slam inside the apex window is a perfect apex", _lastSlamPerfect,
-            $"vy at slam={_player.LastSlamVerticalSpeed:0.###} window={js.PerfectApexVerticalSpeedThreshold}");
+            $"vy at slam={_player.LastSlamVerticalSpeed:0.###} threshold={_player.PerfectApexVerticalSpeedThreshold:0.##}");
         ReleaseAll();
         foreach (var _ in Seconds(2.0f)) yield return null;
 
@@ -390,16 +421,16 @@ public partial class MovementToySelfTest : Node
         Check("arc from a fall is not apex-eligible", !_player.JumpArcEligible);
         // Widen the window absurdly for this case so the ONLY thing that can deny the
         // bonus is the missing jump arc (D-070), rather than the timing.
-        float savedWindow = js.PerfectApexVerticalSpeedThreshold;
-        js.PerfectApexVerticalSpeedThreshold = 100f;
+        float savedWindow = js.PerfectApexWindowSeconds;
+        js.PerfectApexWindowSeconds = 100f;
         Input.ActionPress(InputBootstrap.Jump, 1f);
         foreach (var _ in Act()) yield return null;
         Input.ActionRelease(InputBootstrap.Jump);
         Check("the fall slam was well inside the (widened) apex window",
-            Mathf.Abs(_player.LastSlamVerticalSpeed) <= js.PerfectApexVerticalSpeedThreshold,
+            Mathf.Abs(_player.LastSlamVerticalSpeed) <= _player.PerfectApexVerticalSpeedThreshold,
             $"vy at slam={_player.LastSlamVerticalSpeed:0.###}");
         Check("fall without a jump cannot earn a perfect apex even inside the window", !_lastSlamPerfect);
-        js.PerfectApexVerticalSpeedThreshold = savedWindow;
+        js.PerfectApexWindowSeconds = savedWindow;
         ReleaseAll();
         foreach (var _ in Seconds(3.0f)) yield return null;
 
@@ -524,6 +555,52 @@ public partial class MovementToySelfTest : Node
         Check("velocity finite after the high-speed impact", _player.Velocity.IsFinite());
         ReleaseAll();
         foreach (var _ in Seconds(0.5f)) yield return null;
+
+        // ---- landing at the cap on a slope bleeds the tangent excess instead of clipping it ----
+        foreach (var _ in Settle(_landingStart)) yield return null;
+        _player.RefillBoost(t.Boost.BoostCapacity);
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        Input.ActionPress(InputBootstrap.Boost, 1f);
+        int landGuard = 0;
+        while (_player.IsGrounded && landGuard++ < 900) yield return null;       // reach the crest and leave it
+        Input.ActionRelease(InputBootstrap.Boost);
+        Input.ActionRelease(InputBootstrap.MoveForward);
+        bool leftCrest = landGuard < 900;
+        float speedAtCrest = _player.LocomotionSpeed;
+        while (!_player.IsGrounded && landGuard++ < 1200) yield return null;     // land on the slope
+        bool landed = landGuard < 1200;
+        float prev = _player.LocomotionSpeed, worstDrop = 0f, peakOverCap = 0f;
+        foreach (var _ in Seconds(0.6f))
+        {
+            float now = _player.LocomotionSpeed;
+            worstDrop = Mathf.Max(worstDrop, prev - now);
+            peakOverCap = Mathf.Max(peakOverCap, now - m.HardMaxLocomotionSpeed);
+            prev = now;
+            yield return null;
+        }
+        Check("reached the cap and flew off the landing crest", leftCrest && speedAtCrest > m.HardMaxLocomotionSpeed - 3f,
+            $"leftCrest={leftCrest} speed={speedAtCrest:0.0}");
+        Check("landed on the 25 deg slope", landed);
+        Check("landing at the cap on a slope produces a tangent excess (allowance engaged)", peakOverCap > 1.0f,
+            $"peak over cap={peakOverCap:0.00} m/s (expect ~{m.HardMaxLocomotionSpeed * (1f / Mathf.Cos(Mathf.DegToRad(LandingSlopeDegrees)) - 1f):0.0})");
+        float maxTickDrop = (m.LandingCapBleed + 5f) / Engine.PhysicsTicksPerSecond + 0.5f;
+        Check("the excess bleeds instead of clipping in one tick", worstDrop < maxTickDrop,
+            $"worst single-tick drop={worstDrop:0.00} m/s allowed<{maxTickDrop:0.00}");
+        Check("allowance decays back to the cap", _player.LocomotionSpeed <= m.HardMaxLocomotionSpeed + 0.5f,
+            $"speed={_player.LocomotionSpeed:0.0} cap={m.HardMaxLocomotionSpeed}");
+        ReleaseAll();
+
+        // ---- camera occlusion probe pulls the camera in when terrain blocks the focus ----
+        var rig = (Rushcore.Camera.CameraRig)_player.CameraBasis!;
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        Check("camera is unobstructed in the open", rig.OcclusionFraction > 0.95f, $"fraction={rig.OcclusionFraction:0.00}");
+        foreach (var _ in Settle(_wallCentre - Vector3.Up * 6f + Forward * 3f + Vector3.Up * 3f)) yield return null;
+        Check("camera pulls in when a wall blocks the line of sight", rig.OcclusionFraction < 0.5f,
+            $"fraction={rig.OcclusionFraction:0.00}");
+        t.Camera.OcclusionProbe = false;
+        foreach (var _ in Seconds(1.5f)) yield return null;
+        Check("occlusion probe can be disabled", rig.OcclusionFraction > 0.95f, $"fraction={rig.OcclusionFraction:0.00}");
+        t.Camera.OcclusionProbe = true;
 
         // ---- fall recovery ----
         foreach (var _ in Seconds(0.5f)) yield return null;

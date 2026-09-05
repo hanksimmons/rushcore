@@ -19,6 +19,14 @@ public partial class CameraRig : Node3D, ICameraBasis
     private Vector3 _focus;
     private float _zoom = 1f;
     private float _shake;
+
+    // Occlusion probe: a sphere cast from the focus toward the camera, run in the
+    // physics step (space-state access is guaranteed there in every threading mode).
+    private readonly SphereShape3D _probeShape = new();
+    private readonly PhysicsShapeQueryParameters3D _probe = new();
+    private Vector3 _probeOffset;          // full-distance camera offset requested by _Process
+    private float _probeFraction = 1f;     // latest safe fraction from the physics step
+    private float _occlusion = 1f;         // smoothed fraction actually applied
     private readonly RandomNumberGenerator _rng = new();
 
     public CameraRig(GameplayTuning tuning, PlayerPhysics player)
@@ -31,6 +39,10 @@ public partial class CameraRig : Node3D, ICameraBasis
     public Vector3 FlatRight { get; private set; } = Vector3.Right;
     public Camera3D Camera => _camera;
     public float Zoom => _zoom;
+    /// <summary>1 = unobstructed; lower = camera pulled in toward the focus by that fraction.</summary>
+    public float OcclusionFraction => _occlusion;
+    public float CurrentDistance { get; private set; }
+    public float CurrentLookAhead { get; private set; }
 
     public override void _Ready()
     {
@@ -43,6 +55,10 @@ public partial class CameraRig : Node3D, ICameraBasis
         AddChild(_camera);
 
         _rng.Randomize();
+        _probe.Shape = _probeShape;
+        _probe.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+        _probe.CollideWithAreas = false;
+        _probe.CollideWithBodies = true;
         UpdateOrientation();
         _focus = _player.GlobalPosition;
         ApplyTransform(1f, 0f);
@@ -60,10 +76,27 @@ public partial class CameraRig : Node3D, ICameraBasis
 
     public void AddShake(float amount) => _shake = Mathf.Min(_shake + amount, 4f);
 
+    public override void _PhysicsProcess(double delta)
+    {
+        var c = _t.Camera;
+        if (!c.OcclusionProbe || _probeOffset.LengthSquared() < 1e-4f)
+        {
+            _probeFraction = 1f;
+            return;
+        }
+        _probeShape.Radius = Mathf.Max(0.05f, c.OcclusionMargin);
+        _probe.Transform = new Transform3D(Basis.Identity, _focus);
+        _probe.Motion = _probeOffset;
+        float[] hit = GetWorld3D().DirectSpaceState.CastMotion(_probe);
+        _probeFraction = hit.Length > 0 ? Mathf.Clamp(hit[0], 0f, 1f) : 1f;
+    }
+
     public void SnapToPlayer()
     {
         _focus = _player.GlobalPosition;
         _shake = 0f;
+        _occlusion = 1f;
+        _probeFraction = 1f;
         ApplyTransform(1f, 0f);
         ResetPhysicsInterpolation();
     }
@@ -85,6 +118,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         Vector3 lookAhead = Vector3.Zero;
         if (flatVel.LengthSquared() > 1f)
             lookAhead = flatVel.Normalized() * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, speed01);
+        CurrentLookAhead = lookAhead.Length();
 
         Vector3 target = playerPos + lookAhead + Vector3.Up * c.HeightOffset;
 
@@ -97,6 +131,13 @@ public partial class CameraRig : Node3D, ICameraBasis
         _focus.Y = Mathf.Lerp(_focus.Y, target.Y, aV);
 
         if (_shake > 0f) _shake = Mathf.Max(0f, _shake - _shake * Mathf.Max(0.01f, c.ShakeDecay) * dt);
+
+        // Pull in immediately when blocked; ease back out so a cleared line of sight
+        // does not pop the camera.
+        float occlusionTarget = c.OcclusionProbe ? _probeFraction : 1f;
+        _occlusion = occlusionTarget < _occlusion
+            ? occlusionTarget
+            : Mathf.Lerp(_occlusion, occlusionTarget, 1f - Mathf.Exp(-Mathf.Max(0.01f, c.OcclusionRecoverSpeed) * dt));
         ApplyTransform(speed01, _shake);
     }
 
@@ -124,7 +165,10 @@ public partial class CameraRig : Node3D, ICameraBasis
         var c = _t.Camera;
         GlobalPosition = _focus;
 
-        float dist = (c.Distance + c.SpeedDistanceGain * speed01) * _zoom;
+        float fullDist = (c.Distance + c.SpeedDistanceGain * speed01) * _zoom;
+        _probeOffset = Basis.Z * fullDist;                       // world offset focus -> camera
+        float dist = Mathf.Max(1.5f, fullDist * _occlusion);
+        CurrentDistance = dist;
         Vector3 local = new(0f, 0f, dist);
         if (shake > 0f)
         {

@@ -14,7 +14,7 @@ namespace Rushcore.DebugUi;
 /// </summary>
 public partial class TuningPanel : Control
 {
-    private const float PanelWidth = 486f;
+    private const float PanelWidth = 540f;
     private const float NameWidth = 150f;
     private const float FieldWidth = 78f;
 
@@ -189,7 +189,7 @@ public partial class TuningPanel : Control
         {
             var category = GameplayTuning.Categories[i];
             tabs.AddChild(BuildCategory(category, i));
-            tabs.SetTabTitle(i, category);
+            tabs.SetTabTitle(i, ShortTabTitle(category));
         }
     }
 
@@ -369,6 +369,19 @@ public partial class TuningPanel : Control
         if (Array.IndexOf(DriveKeys, key.PhysicalKeycode) < 0) return;
         ReleaseOwnedFocus();
     }
+
+    /// <summary>All seven categories must fit the strip without scroll arrows.</summary>
+    private static string ShortTabTitle(string category) => category switch
+    {
+        GameplayTuning.CatMovement => "Move",
+        GameplayTuning.CatJumpSlam => "Jump",
+        GameplayTuning.CatBoost => "Boost",
+        GameplayTuning.CatCarve => "Carve",
+        GameplayTuning.CatCamera => "Camera",
+        GameplayTuning.CatVfx => "VFX",
+        GameplayTuning.CatWorld => "World",
+        _ => category,
+    };
 
     private void OnVisibilityChanged()
     {

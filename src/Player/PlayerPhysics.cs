@@ -38,6 +38,8 @@ public partial class PlayerPhysics : RigidBody3D
     private bool _boostActive;
     private float _boost;
     private float _defaultGravity = 9.8f;
+    private float _capAllowance;
+    private bool _landedThisTick;
 
     // ---- recovery ----
     private Vector3 _checkpoint;
@@ -82,6 +84,11 @@ public partial class PlayerPhysics : RigidBody3D
     public float ComputedTakeoffSpeed =>
         Mathf.Lerp(_t.JumpSlam.MinJumpTakeoffVerticalSpeed, _t.JumpSlam.MaxJumpTakeoffVerticalSpeed, Charge01);
     public bool JumpArcEligible => _jumpArcEligible && !_slamUsedThisArc;
+    /// <summary>|vY| threshold for a perfect apex: gravity * window / 2 (D-017).</summary>
+    public float PerfectApexVerticalSpeedThreshold =>
+        _t.Movement.Gravity * Mathf.Max(0f, _t.JumpSlam.PerfectApexWindowSeconds) * 0.5f;
+    /// <summary>Cap currently enforced: base cap plus any decaying landing allowance.</summary>
+    public float EffectiveLocomotionCap => _t.Movement.HardMaxLocomotionSpeed + _capAllowance;
     public bool SlamActive => _slamActive;
     /// <summary>Vertical speed established by the most recent jump release.</summary>
     public float LastTakeoffVerticalSpeed { get; private set; }
@@ -132,6 +139,10 @@ public partial class PlayerPhysics : RigidBody3D
         PhysicsMaterialOverride = new PhysicsMaterial { Friction = ArcadeSurfaceFriction, Bounce = 0f };
 
         _defaultGravity = (float)ProjectSettings.GetSetting("physics/3d/default_gravity", 9.8f);
+        // Semantic events are raised from inside _IntegrateForces and subscribers touch
+        // scene state directly; that is only safe while physics runs on the main thread.
+        if ((bool)ProjectSettings.GetSetting("physics/3d/run_on_separate_thread", false))
+            GD.PushError("[RUSHCORE] physics/3d/run_on_separate_thread is enabled; player events assume main-thread physics.");
         _checkpoint = GlobalPosition;
     }
 
@@ -199,6 +210,7 @@ public partial class PlayerPhysics : RigidBody3D
         float preVerticalSpeed = v.Y;
         bool wasGrounded = IsGrounded;
 
+        _landedThisTick = false;
         UpdateGroundState(state, dt);
         HandleLanding(wasGrounded, preVerticalSpeed);
         UpdateJumpInput(dt, ref v);
@@ -212,6 +224,13 @@ public partial class PlayerPhysics : RigidBody3D
         var m = _t.Movement;
         float cap = Mathf.Max(0.001f, m.HardMaxLocomotionSpeed);
         float speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
+
+        // Landing converts world-horizontal speed into ground-tangent speed, which is
+        // larger by 1/cos(slope). Clipping that in one tick reads as hitting a wall, so
+        // the excess becomes a short-lived allowance that bleeds away (03 §5, D-069).
+        if (_landedThisTick && speed > cap) _capAllowance = Mathf.Max(_capAllowance, speed - cap);
+        _capAllowance = Mathf.Max(0f, _capAllowance - m.LandingCapBleed * dt);
+        float effectiveCap = cap + _capAllowance;
 
         Vector3 curDir = speed > 0.5f ? vT / speed : Vector3.Zero;
         Vector3 desiredDir = ComputeDesiredDirection(planeNormal, curDir);
@@ -276,10 +295,10 @@ public partial class PlayerPhysics : RigidBody3D
 
         // ---- hard locomotion cap: clamp magnitude only, never rotate (03 §5, D-069) ----
         float locSpeed = vT.Length();
-        if (locSpeed > cap)
+        if (locSpeed > effectiveCap)
         {
-            vT *= cap / locSpeed;
-            locSpeed = cap;
+            vT *= effectiveCap / locSpeed;
+            locSpeed = effectiveCap;
         }
 
         v = vT + planeNormal * vN;
@@ -322,6 +341,7 @@ public partial class PlayerPhysics : RigidBody3D
         _slamUsedThisArc = false;
         _jumpLockout = 0f;
         _groundStick = 0f;
+        _capAllowance = 0f;
         _rawGrounded = false;
         IsGrounded = false;
         _groundNormal = Vector3.Up;
@@ -366,6 +386,7 @@ public partial class PlayerPhysics : RigidBody3D
     {
         if (wasGrounded || !IsGrounded) return;
 
+        _landedThisTick = true;
         bool wasSlam = _slamActive;
         bool wasPerfect = _slamActive && _lastSlamPerfect;
         _slamActive = false;
@@ -449,7 +470,7 @@ public partial class PlayerPhysics : RigidBody3D
         var js = _t.JumpSlam;
         bool perfect = _jumpArcEligible
                        && !_slamUsedThisArc
-                       && Mathf.Abs(v.Y) <= js.PerfectApexVerticalSpeedThreshold;
+                       && Mathf.Abs(v.Y) <= PerfectApexVerticalSpeedThreshold;
 
         LastSlamVerticalSpeed = v.Y;
         _slamActive = true;

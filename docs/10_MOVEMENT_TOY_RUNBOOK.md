@@ -46,6 +46,12 @@ automatically on the next launch**. The panel header and the telemetry `tuning` 
 whether you are on the baseline. **Reset All** returns to compiled defaults (save again to
 clear the file's contents). The self-test always runs on compiled defaults.
 
+**Presets** (F1 › PRESETS): type a name and press Enter / **Save As** to stash the current
+values as `user://tuning_presets/<name>.json`; pick one from the dropdown and **Load** to apply
+it live for comparison; **Delete** removes it. Presets are stashes, not the startup state —
+after loading the one you prefer, press **Save Override** to make it load on launch. Typing in
+the name field pauses the game and suspends hotkeys.
+
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:
 

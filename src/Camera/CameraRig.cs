@@ -112,8 +112,11 @@ public partial class CameraRig : Node3D, ICameraBasis
     {
         float dt = (float)delta;
         var c = _t.Camera;
-        if (Input.IsActionJustPressed(InputBootstrap.ZoomIn)) SetZoom(_zoom - c.ZoomStep);
-        if (Input.IsActionJustPressed(InputBootstrap.ZoomOut)) SetZoom(_zoom + c.ZoomStep);
+        if (!InputBootstrap.IsTextEntryFocused(GetViewport()))
+        {
+            if (Input.IsActionJustPressed(InputBootstrap.ZoomIn)) SetZoom(_zoom - c.ZoomStep);
+            if (Input.IsActionJustPressed(InputBootstrap.ZoomOut)) SetZoom(_zoom + c.ZoomStep);
+        }
 
         Vector3 playerPos = _player.GetGlobalTransformInterpolated().Origin;
         Vector3 flatVel = new(_player.Velocity.X, 0f, _player.Velocity.Z);

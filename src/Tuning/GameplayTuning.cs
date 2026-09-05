@@ -341,6 +341,53 @@ public sealed class GameplayTuning
         return true;
     }
 
+    // ---------------- named presets: stash and compare variations ----------------
+
+    public const string PresetDir = "user://tuning_presets";
+
+    /// <summary>File-safe name: letters, digits, '-' and '_' only; at most 40 characters.</summary>
+    public static string SanitizePresetName(string raw)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (char ch in raw.Trim())
+        {
+            if (sb.Length >= 40) break;
+            sb.Append(char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' ? ch : '_');
+        }
+        return sb.ToString().Trim('_');
+    }
+
+    public static string PresetPath(string name) => $"{PresetDir}/{name}.json";
+    public static bool PresetExists(string name) => FileAccess.FileExists(PresetPath(name));
+
+    public static List<string> ListPresets()
+    {
+        var names = new List<string>();
+        using var dir = DirAccess.Open(PresetDir);
+        if (dir is null) return names;
+        foreach (string file in dir.GetFiles())
+            if (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                names.Add(file[..^5]);
+        names.Sort(StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
+    public bool SavePreset(string name)
+    {
+        using var user = DirAccess.Open("user://");
+        if (user is null) return false;
+        if (!user.DirExists("tuning_presets") && user.MakeDirRecursive("tuning_presets") != Error.Ok) return false;
+        return SaveOverride(PresetPath(name));
+    }
+
+    public int LoadPreset(string name) => LoadOverride(PresetPath(name));
+
+    public static bool DeletePreset(string name)
+    {
+        if (!PresetExists(name)) return false;
+        return DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(PresetPath(name))) == Error.Ok;
+    }
+
     /// <summary>Applies the override on top of compiled defaults. Returns the number of values applied, or -1 if no file.</summary>
     public int LoadOverride(string? path = null)
     {

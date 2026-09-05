@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "note": "Weight and momentum. Stronger gravity, softer drive, less drag: slopes matter more, turns need commitment, slams hit hard, camera sits back.",
+  "values": {
+    "Movement/Gravity": 34,
+    "Movement/Drive Acceleration": 22,
+    "Movement/Drag": 0.05,
+    "Movement/Steering Lateral Accel": 34,
+    "Movement/High-Speed Steer Mult": 0.3,
+    "Movement/Landing Cap Bleed": 25,
+    "Jump / Slam/Min Jump Takeoff": 7,
+    "Jump / Slam/Max Jump Takeoff": 14,
+    "Jump / Slam/Slam Initial Speed": 30,
+    "Jump / Slam/Slam Downward Accel": 90,
+    "Boost/Boost Acceleration": 40,
+    "Camera/Distance": 30,
+    "Camera/FOV Min": 60,
+    "Camera/FOV Max": 74,
+    "Camera/Look-Ahead Max": 26,
+    "Camera/Shake Strength": 1.3
+  }
+}

@@ -372,6 +372,37 @@ public sealed class GameplayTuning
         return names;
     }
 
+    public const string BundledPresetDir = "res://tuning/presets";
+
+    /// <summary>
+    /// Copies presets shipped in the repo into user:// on first sight so they appear in
+    /// the panel. Never overwrites a preset the developer has since edited or saved.
+    /// Returns how many were installed.
+    /// </summary>
+    public static int InstallBundledPresets()
+    {
+        using var bundled = DirAccess.Open(BundledPresetDir);
+        if (bundled is null) return 0;
+        using var user = DirAccess.Open("user://");
+        if (user is null) return 0;
+        if (!user.DirExists("tuning_presets") && user.MakeDirRecursive("tuning_presets") != Error.Ok) return 0;
+
+        int installed = 0;
+        foreach (string file in bundled.GetFiles())
+        {
+            if (!file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
+            string name = file[..^5];
+            if (PresetExists(name)) continue;
+            string text = FileAccess.GetFileAsString($"{BundledPresetDir}/{file}");
+            using var f = FileAccess.Open(PresetPath(name), FileAccess.ModeFlags.Write);
+            if (f is null) continue;
+            f.StoreString(text);
+            installed++;
+        }
+        if (installed > 0) GD.Print($"[RUSHCORE] Installed {installed} bundled tuning preset(s).");
+        return installed;
+    }
+
     public bool SavePreset(string name)
     {
         using var user = DirAccess.Open("user://");

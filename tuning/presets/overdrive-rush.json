@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "Top-speed fantasy. Higher cap and bands, strong drive, wide arcs at speed, hungrier boost; camera pulls back and widens with speed, shake toned down.",
+  "values": {
+    "Movement/Hard Max Locomotion Speed": 80,
+    "Movement/Rush Threshold": 22,
+    "Movement/Crush Threshold": 40,
+    "Movement/Overdrive Threshold": 62,
+    "Movement/Drive Acceleration": 32,
+    "Movement/High-Speed Steer Mult": 0.3,
+    "Movement/Drag": 0.06,
+    "Boost/Boost Acceleration": 60,
+    "Boost/Drain Rate": 40,
+    "Camera/Speed Distance Gain": 16,
+    "Camera/FOV Min": 64,
+    "Camera/FOV Max": 86,
+    "Camera/Look-Ahead Max": 30,
+    "Camera/Shake Strength": 0.7
+  }
+}

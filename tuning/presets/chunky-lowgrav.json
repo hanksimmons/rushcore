@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "Scale probe (V-005). Bigger ball, low gravity, slower world and bands, longer charge; camera higher and further. Tests whether the world reads at a different scale.",
+  "values": {
+    "Movement/Ball Radius": 1.5,
+    "Movement/Gravity": 20,
+    "Movement/Hard Max Locomotion Speed": 45,
+    "Movement/Rush Threshold": 14,
+    "Movement/Crush Threshold": 26,
+    "Movement/Overdrive Threshold": 38,
+    "Movement/Drive Acceleration": 24,
+    "Jump / Slam/Min Jump Takeoff": 8,
+    "Jump / Slam/Max Jump Takeoff": 15,
+    "Jump / Slam/Max Charge Seconds": 0.75,
+    "Jump / Slam/Slam Downward Accel": 60,
+    "Camera/Distance": 30,
+    "Camera/Height Offset": 4,
+    "VFX/Max Visual Roll (rev/s)": 2.5
+  }
+}

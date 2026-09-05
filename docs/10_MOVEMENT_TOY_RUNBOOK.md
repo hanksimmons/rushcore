@@ -52,6 +52,20 @@ it live for comparison; **Delete** removes it. Presets are stashes, not the star
 after loading the one you prefer, press **Save Override** to make it load on launch. Typing in
 the name field pauses the game and suspends hotkeys.
 
+Starter presets ship in `tuning/presets/` and are installed into `user://` on first launch
+(never overwriting one you have edited). Each is a deliberate concept, not a recommendation:
+
+| Preset | Concept |
+|---|---|
+| `baseline` | compiled defaults; the comparison point |
+| `heavy-marble` | weight and momentum: stronger gravity, softer drive, hard slams, camera back |
+| `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide apex window |
+| `glide-and-soar` | air game: low gravity, big jumps, real air control, generous boost |
+| `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
+| `technical-carve` | line craft: cap 50, sharper steering, carve as a real tool, small tank |
+| `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
+| `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
+
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:
 

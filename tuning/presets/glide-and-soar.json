@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "note": "Air game. Low gravity, big charged jumps, real air control, longer apex window, gentler slam, generous boost; camera flatter and further for the arcs.",
+  "values": {
+    "Movement/Gravity": 22,
+    "Movement/Air Control Mult": 0.55,
+    "Jump / Slam/Min Jump Takeoff": 10,
+    "Jump / Slam/Max Jump Takeoff": 20,
+    "Jump / Slam/Max Charge Seconds": 0.8,
+    "Jump / Slam/Apex Window (s)": 0.24,
+    "Jump / Slam/Slam Initial Speed": 20,
+    "Jump / Slam/Slam Downward Accel": 55,
+    "Boost/Boost Acceleration": 55,
+    "Boost/Capacity": 130,
+    "Boost/Passive Regen": 6,
+    "Camera/Pitch Degrees": -28,
+    "Camera/Distance": 30,
+    "Camera/Look-Ahead Max": 28,
+    "Camera/FOV Max": 84
+  }
+}

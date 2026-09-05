@@ -50,6 +50,8 @@ public static class InputBootstrap
         JoyButton(Jump, Godot.JoyButton.A);
         JoyButton(Boost, Godot.JoyButton.X);
         JoyButton(Carve, Godot.JoyButton.LeftShoulder);
+        JoyButton(ZoomIn, Godot.JoyButton.DpadUp);
+        JoyButton(ZoomOut, Godot.JoyButton.DpadDown);
         JoyAxis(MoveLeft, Godot.JoyAxis.LeftX, -1f);
         JoyAxis(MoveRight, Godot.JoyAxis.LeftX, 1f);
         JoyAxis(MoveForward, Godot.JoyAxis.LeftY, -1f);

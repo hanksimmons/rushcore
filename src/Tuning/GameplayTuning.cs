@@ -37,6 +37,12 @@ public sealed class MovementTuning
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
     public float DragCoefficient = 0.08f;
     public float HardMaxLocomotionSpeed = 60f;
+    /// <summary>
+    /// Landing on a slope at the cap makes ground-tangent speed exceed the cap by
+    /// 1/cos(slope) (D-069). That excess is bled at this rate (m/s^2) instead of being
+    /// clipped in one tick, so the cap reads as feel rather than a wall (03 §5).
+    /// </summary>
+    public float LandingCapBleed = 40f;
     /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
     public float MinGroundNormalDot = 0.50f;
     public float RushThreshold = 18f;
@@ -57,7 +63,13 @@ public sealed class JumpSlamTuning
     public float SlamSteeringMultiplier = 0.25f;
     /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
     public float SlamLateralRetention = 1.0f;
-    public float PerfectApexVerticalSpeedThreshold = 1.25f;
+    /// <summary>
+    /// Total duration of the perfect-apex window, centred on the apex. The detection
+    /// itself stays a vertical-speed test (D-017): threshold = gravity * window / 2.
+    /// Expressed in seconds so retuning gravity does not silently shrink the window.
+    /// Baseline 0.20 s; the 03 §15 placeholder of 1.25 m/s is 0.089 s at g = 28.
+    /// </summary>
+    public float PerfectApexWindowSeconds = 0.20f;
     public float PerfectApexSlamStrengthMultiplier = 1.35f;
     public float PerfectApexImpactMultiplier = 1.35f;
 }
@@ -101,6 +113,11 @@ public sealed class CameraTuning
     public float ZoomMin = 0.55f;
     public float ZoomMax = 2.0f;
     public float ZoomStep = 0.08f;
+    /// <summary>Sphere-cast from the focus to the camera; pull in on terrain/props.</summary>
+    public bool OcclusionProbe = true;
+    public float OcclusionMargin = 0.6f;
+    /// <summary>How fast the camera eases back out once the line of sight clears (1/s).</summary>
+    public float OcclusionRecoverSpeed = 4f;
 }
 
 public sealed class VfxTuning
@@ -112,6 +129,9 @@ public sealed class VfxTuning
     public float SlamEffectStrength = 1f;
     public float ImpactEffectStrength = 1f;
     public float SquashStretchStrength = 1f;
+    /// <summary>Visual-only cap on the ball's spin: a real 1 m ball at 60 m/s turns 9.5
+    /// rev/s, which strobes at 60 fps. Collision is unaffected.</summary>
+    public float MaxVisualRollRevPerSecond = 3f;
 }
 
 /// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>
@@ -171,6 +191,7 @@ public sealed class GameplayTuning
         F(CatMovement, "Air Control Mult", 0f, 1f, () => m.AirControlMultiplier, v => m.AirControlMultiplier = v);
         F(CatMovement, "Drag", 0f, 1.5f, () => m.DragCoefficient, v => m.DragCoefficient = v);
         F(CatMovement, "Hard Max Locomotion Speed", 5f, 160f, () => m.HardMaxLocomotionSpeed, v => m.HardMaxLocomotionSpeed = v);
+        F(CatMovement, "Landing Cap Bleed", 2f, 400f, () => m.LandingCapBleed, v => m.LandingCapBleed = v);
         F(CatMovement, "Min Ground Normal Dot", 0.1f, 0.95f, () => m.MinGroundNormalDot, v => m.MinGroundNormalDot = v);
         F(CatMovement, "Rush Threshold", 1f, 160f, () => m.RushThreshold, v => m.RushThreshold = v);
         F(CatMovement, "Crush Threshold", 1f, 160f, () => m.CrushThreshold, v => m.CrushThreshold = v);
@@ -186,7 +207,7 @@ public sealed class GameplayTuning
         F(CatJumpSlam, "Slam Downward Accel", 0f, 250f, () => j.SlamDownwardAcceleration, v => j.SlamDownwardAcceleration = v);
         F(CatJumpSlam, "Slam Steering Mult", 0f, 1.5f, () => j.SlamSteeringMultiplier, v => j.SlamSteeringMultiplier = v);
         F(CatJumpSlam, "Slam Lateral Retention", 0.3f, 1f, () => j.SlamLateralRetention, v => j.SlamLateralRetention = v);
-        F(CatJumpSlam, "Apex Window (|vY|)", 0.1f, 10f, () => j.PerfectApexVerticalSpeedThreshold, v => j.PerfectApexVerticalSpeedThreshold = v);
+        F(CatJumpSlam, "Apex Window (s)", 0.02f, 1.0f, () => j.PerfectApexWindowSeconds, v => j.PerfectApexWindowSeconds = v);
         F(CatJumpSlam, "Apex Slam Strength Mult", 1f, 4f, () => j.PerfectApexSlamStrengthMultiplier, v => j.PerfectApexSlamStrengthMultiplier = v);
         F(CatJumpSlam, "Apex Impact Mult", 1f, 4f, () => j.PerfectApexImpactMultiplier, v => j.PerfectApexImpactMultiplier = v);
 
@@ -219,6 +240,9 @@ public sealed class GameplayTuning
         F(CatCamera, "Speed Distance Gain", 0f, 60f, () => k.SpeedDistanceGain, v => k.SpeedDistanceGain = v);
         F(CatCamera, "Shake Strength", 0f, 3f, () => k.ShakeStrength, v => k.ShakeStrength = v);
         F(CatCamera, "Shake Decay", 0.5f, 20f, () => k.ShakeDecay, v => k.ShakeDecay = v);
+        B(CatCamera, "Occlusion Probe", () => k.OcclusionProbe, v => k.OcclusionProbe = v);
+        F(CatCamera, "Occlusion Margin", 0.1f, 3f, () => k.OcclusionMargin, v => k.OcclusionMargin = v);
+        F(CatCamera, "Occlusion Recover Speed", 0.5f, 20f, () => k.OcclusionRecoverSpeed, v => k.OcclusionRecoverSpeed = v);
 
         var x = Vfx;
         F(CatVfx, "Charge Effect", 0f, 3f, () => x.ChargeEffectStrength, v => x.ChargeEffectStrength = v);
@@ -228,6 +252,7 @@ public sealed class GameplayTuning
         F(CatVfx, "Slam Effect", 0f, 3f, () => x.SlamEffectStrength, v => x.SlamEffectStrength = v);
         F(CatVfx, "Impact Effect", 0f, 3f, () => x.ImpactEffectStrength, v => x.ImpactEffectStrength = v);
         F(CatVfx, "Squash / Stretch", 0f, 3f, () => x.SquashStretchStrength, v => x.SquashStretchStrength = v);
+        F(CatVfx, "Max Visual Roll (rev/s)", 0.5f, 12f, () => x.MaxVisualRollRevPerSecond, v => x.MaxVisualRollRevPerSecond = v);
 
         var w = World;
         F(CatWorld, "Terrain Amplitude", 0.1f, 3f, () => w.TerrainAmplitude, v => w.TerrainAmplitude = v);

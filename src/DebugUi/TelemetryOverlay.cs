@@ -28,8 +28,8 @@ public partial class TelemetryOverlay : Control
     private enum Row
     {
         Frame, Physics, State, Band, Ground, Normal, Velocity, Locomotion, Vertical,
-        Charge, Takeoff, Arc, Slam, Boost, Carve, Steering, Input, Impact,
-        Position, Checkpoint, Seed, Count,
+        Charge, Takeoff, Arc, Apex, Slam, Boost, Carve, Steering, Input, Impact,
+        Position, Checkpoint, Camera, Seed, Count,
     }
 
     private readonly IDebugActions _debug;
@@ -83,6 +83,7 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Charge, "charge");
         AddRow(Row.Takeoff, "takeoff");
         AddRow(Row.Arc, "arc");
+        AddRow(Row.Apex, "apex win");
         AddRow(Row.Slam, "slam");
         AddRow(Row.Boost, "boost");
         AddRow(Row.Carve, "carve");
@@ -91,6 +92,7 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Impact, "impact");
         AddRow(Row.Position, "position");
         AddRow(Row.Checkpoint, "checkpoint");
+        AddRow(Row.Camera, "camera");
         AddRow(Row.Seed, "seed");
     }
 
@@ -149,6 +151,9 @@ public partial class TelemetryOverlay : Control
             : $"idle   ({p.Charge01:0.00})");
         Set(Row.Takeoff, $"{p.ComputedTakeoffSpeed:0.0} m/s");
         Set(Row.Arc, p.JumpArcEligible ? "apex-eligible" : "not eligible");
+        Set(Row.Apex, $"|vy| <= {p.PerfectApexVerticalSpeedThreshold:0.00} m/s  (~{_debug.Tuning.JumpSlam.PerfectApexWindowSeconds * 1000f:0} ms)");
+        if (p.CameraBasis is Rushcore.Camera.CameraRig rig)
+            Set(Row.Camera, $"dist {rig.CurrentDistance:0.0}  occl {rig.OcclusionFraction:0.00}  lookahead {rig.CurrentLookAhead:0.0}");
         Set(Row.Slam, $"{(p.SlamActive ? "ACTIVE" : "idle")}   last perfect {YesNo(p.LastSlamWasPerfect)}");
         Set(Row.Boost, $"{p.BoostAmount,6:0.0} ({p.Boost01:0.00}) {(p.BoostActive ? "FIRING" : "")}");
         Set(Row.Carve, OnOff(p.CarveActive));

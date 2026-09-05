@@ -90,6 +90,11 @@ public static class InputBootstrap
         InputMap.ActionAddEvent(action, new InputEventMouseButton { ButtonIndex = button });
     }
 
+    /// <summary>True while a text field owns keyboard focus; hotkeys must stand down
+    /// so typing "r" or "-" does not recover the player or zoom the camera.</summary>
+    public static bool IsTextEntryFocused(Viewport? viewport) =>
+        viewport?.GuiGetFocusOwner() is LineEdit or TextEdit;
+
     /// <summary>Camera-relative stick/WASD vector; X = right, Y = forward.</summary>
     public static Vector2 ReadMoveVector()
         => Input.GetVector(MoveLeft, MoveRight, MoveBack, MoveForward);

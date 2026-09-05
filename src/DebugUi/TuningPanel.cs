@@ -78,6 +78,9 @@ public partial class TuningPanel : Control
     private readonly List<ToggleRow> _toggleRows = new();
 
     private Label _seedLabel = null!;
+    private LineEdit _presetName = null!;
+    private OptionButton _presetList = null!;
+    private bool _pausedForTyping;
     private Label _overrideLabel = null!;
     private int _overrideShown = -1;
     private Label _statusLabel = null!;
@@ -178,6 +181,38 @@ public partial class TuningPanel : Control
             ("Save Override", () => Status(Tuning.SaveOverride() ? "Saved override; it will load on next launch." : "Save failed.")),
             ("Load Override", () => { int n = Tuning.LoadOverride(); Status(n < 0 ? "No override file." : $"Loaded override ({n} values)."); }),
         }));
+
+        root.AddChild(Header("PRESETS  (stash and compare variations)", 12, TextDim));
+        var saveRow = new HBoxContainer();
+        saveRow.AddThemeConstantOverride("separation", 6);
+        _presetName = new LineEdit
+        {
+            PlaceholderText = "preset name",
+            FocusMode = FocusModeEnum.Click,
+            ContextMenuEnabled = false,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            TooltipText = "Letters, digits, - and _. Enter or Save As writes the current values as a named preset.",
+        };
+        _presetName.TextSubmitted += _ => SavePresetFromField();
+        _presetName.FocusEntered += OnTextEntryFocus;
+        _presetName.FocusExited += OnTextEntryBlur;
+        saveRow.AddChild(_presetName);
+        saveRow.AddChild(MakeButton("Save As", SavePresetFromField));
+        root.AddChild(saveRow);
+
+        var loadRow = new HBoxContainer();
+        loadRow.AddThemeConstantOverride("separation", 6);
+        _presetList = new OptionButton
+        {
+            FocusMode = FocusModeEnum.None,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            TooltipText = "Load applies the preset live. Save Override afterwards to make it the startup state.",
+        };
+        loadRow.AddChild(_presetList);
+        loadRow.AddChild(MakeButton("Load", LoadSelectedPreset));
+        loadRow.AddChild(MakeButton("Delete", DeleteSelectedPreset));
+        root.AddChild(loadRow);
+        RefreshPresetList(null);
 
         root.AddChild(Header("DEBUG ACTIONS", 12, TextDim));
         root.AddChild(ButtonGrid(new (string, Action)[]
@@ -397,6 +432,7 @@ public partial class TuningPanel : Control
     {
         if (!Visible || @event is not InputEventKey { Pressed: true, Echo: false } key) return;
         if (Array.IndexOf(DriveKeys, key.PhysicalKeycode) < 0) return;
+        if (GetViewport()?.GuiGetFocusOwner() == _presetName) return;   // typing a name
         ReleaseOwnedFocus();
     }
 
@@ -413,11 +449,91 @@ public partial class TuningPanel : Control
         _ => category,
     };
 
+    // ---------------- presets ----------------
+
+    private void RefreshPresetList(string? select)
+    {
+        _presetList.Clear();
+        var names = GameplayTuning.ListPresets();
+        if (names.Count == 0)
+        {
+            _presetList.AddItem("(no presets saved)");
+            _presetList.Disabled = true;
+            return;
+        }
+        _presetList.Disabled = false;
+        for (int i = 0; i < names.Count; i++)
+        {
+            _presetList.AddItem(names[i]);
+            if (names[i] == select) _presetList.Select(i);
+        }
+    }
+
+    private string? SelectedPreset()
+    {
+        if (_presetList.Disabled || _presetList.Selected < 0) return null;
+        return _presetList.GetItemText(_presetList.Selected);
+    }
+
+    private void SavePresetFromField()
+    {
+        string name = GameplayTuning.SanitizePresetName(_presetName.Text);
+        _presetName.ReleaseFocus();
+        if (name.Length == 0)
+        {
+            Status("Enter a preset name first.");
+            return;
+        }
+        bool existed = GameplayTuning.PresetExists(name);
+        if (!Tuning.SavePreset(name))
+        {
+            Status($"Could not save preset '{name}'.");
+            return;
+        }
+        _presetName.Text = name;
+        RefreshPresetList(name);
+        Status($"{(existed ? "Overwrote" : "Saved")} preset '{name}' ({Tuning.OverrideCount} values differ from defaults).");
+    }
+
+    private void LoadSelectedPreset()
+    {
+        if (SelectedPreset() is not { } name) { Status("No preset selected."); return; }
+        int n = Tuning.LoadPreset(name);
+        Status(n < 0 ? $"Preset '{name}' is missing." : $"Loaded '{name}' ({n} values). Save Override to make it the startup state.");
+        _presetName.Text = name;
+    }
+
+    private void DeleteSelectedPreset()
+    {
+        if (SelectedPreset() is not { } name) { Status("No preset selected."); return; }
+        Status(GameplayTuning.DeletePreset(name) ? $"Deleted preset '{name}'." : $"Could not delete '{name}'.");
+        RefreshPresetList(null);
+    }
+
+    /// <summary>Typing a name must not drive the ball or trigger hotkeys, so the tree
+    /// pauses for the duration of the edit unless it was already paused.</summary>
+    private void OnTextEntryFocus()
+    {
+        if (GetTree() is { Paused: false } tree)
+        {
+            tree.Paused = true;
+            _pausedForTyping = true;
+        }
+    }
+
+    private void OnTextEntryBlur()
+    {
+        if (!_pausedForTyping) return;
+        _pausedForTyping = false;
+        if (GetTree() is { } tree && !_pausedByPanel) tree.Paused = false;
+    }
+
     private void OnVisibilityChanged()
     {
         if (Visible)
         {
             RefreshAll();
+            RefreshPresetList(SelectedPreset());
             return;
         }
         ReleaseOwnedFocus();

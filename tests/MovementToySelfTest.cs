@@ -2,6 +2,7 @@ using System.Collections;
 using Godot;
 using Rushcore.Core;
 using Rushcore.Player;
+using Rushcore.Tuning;
 using Rushcore.World;
 
 namespace Rushcore.Testing;
@@ -713,6 +714,21 @@ public partial class MovementToySelfTest : Node
             t.ResetAll();
             DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(scratch));
             Check("scratch override removed and defaults restored", !Godot.FileAccess.FileExists(scratch) && t.OverrideCount == 0);
+        }
+
+        // ---- named presets: save, list, load, delete ----
+        {
+            string name = GameplayTuning.SanitizePresetName(" selftest/variant #A ");
+            Check("preset names are made file-safe", name == "selftest_variant__A", $"name='{name}'");
+            float driveDefault = m.GroundDriveAcceleration;
+            m.GroundDriveAcceleration = driveDefault + 3f;
+            Check("preset saves", t.SavePreset(name));
+            Check("preset appears in the list", GameplayTuning.ListPresets().Contains(name));
+            t.ResetAll();
+            Check("preset loads on top of defaults",
+                t.LoadPreset(name) == 1 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault + 3f));
+            t.ResetAll();
+            Check("preset deletes", GameplayTuning.DeletePreset(name) && !GameplayTuning.PresetExists(name));
         }
 
         // ---- fall recovery ----

@@ -104,6 +104,16 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
     public override void _Process(double delta)
     {
+        if (!InputBootstrap.IsTextEntryFocused(GetViewport())) HandleDebugHotkeys();
+
+        if (_screenshotFrame > 0) StepScreenshotCapture();
+
+        // Fall recovery: the toy must be hard to permanently break.
+        if (!GetTree().Paused && _player.GlobalPosition.Y < _world.KillPlaneY) RecoverPlayer();
+    }
+
+    private void HandleDebugHotkeys()
+    {
         if (Input.IsActionJustPressed(InputBootstrap.ToggleTuning)) _tuningPanel.Visible = !_tuningPanel.Visible;
         if (Input.IsActionJustPressed(InputBootstrap.ToggleTelemetry)) _telemetry.Visible = !_telemetry.Visible;
         if (Input.IsActionJustPressed(InputBootstrap.Recover)) RecoverPlayer();
@@ -123,11 +133,6 @@ public partial class GameBootstrap : Node3D, IDebugActions
             _tuning.NotifyChanged();
             GD.Print("[RUSHCORE] Carve prototype ", _tuning.Carve.Enabled ? "ENABLED" : "DISABLED");
         }
-
-        if (_screenshotFrame > 0) StepScreenshotCapture();
-
-        // Fall recovery: the toy must be hard to permanently break.
-        if (!GetTree().Paused && _player.GlobalPosition.Y < _world.KillPlaneY) RecoverPlayer();
     }
 
     /// <summary>

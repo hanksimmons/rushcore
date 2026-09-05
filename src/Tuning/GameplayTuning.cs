@@ -1,0 +1,298 @@
+using Godot;
+using FileAccess = Godot.FileAccess;
+
+namespace Rushcore.Tuning;
+
+/// <summary>One live-editable scalar. Explicit descriptors, not reflection (07 §2).</summary>
+public sealed class TuningParameter
+{
+    public required string Category { get; init; }
+    public required string Name { get; init; }
+    public required float Min { get; init; }
+    public required float Max { get; init; }
+    public required Func<float> Get { get; init; }
+    public required Action<float> Set { get; init; }
+    public float DefaultValue { get; internal set; }
+    public string Key => Category + "/" + Name;
+}
+
+public sealed class TuningToggle
+{
+    public required string Category { get; init; }
+    public required string Name { get; init; }
+    public required Func<bool> Get { get; init; }
+    public required Action<bool> Set { get; init; }
+    public bool DefaultValue { get; internal set; }
+    public string Key => Category + "/" + Name;
+}
+
+public sealed class MovementTuning
+{
+    public float Gravity = 28f;
+    public float GroundDriveAcceleration = 28f;
+    public float GroundSteeringLateralAccel = 42f;
+    /// <summary>Fraction of steering authority remaining at the hard speed cap (V-001).</summary>
+    public float HighSpeedSteeringMultiplier = 0.40f;
+    public float AirControlMultiplier = 0.35f;
+    /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
+    public float DragCoefficient = 0.08f;
+    public float HardMaxLocomotionSpeed = 60f;
+    /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
+    public float MinGroundNormalDot = 0.50f;
+    public float RushThreshold = 18f;
+    public float CrushThreshold = 32f;
+    public float OverdriveThreshold = 48f;
+    public float BallRadius = 1.0f;
+}
+
+public sealed class JumpSlamTuning
+{
+    public float MinJumpTakeoffVerticalSpeed = 8f;
+    public float MaxJumpTakeoffVerticalSpeed = 16f;
+    public float MaxJumpChargeSeconds = 0.65f;
+    public float ChargeReleaseGraceSeconds = 0.10f;
+    /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
+    public float SlamInitialDownwardSpeed = 25f;
+    public float SlamDownwardAcceleration = 70f;
+    public float SlamSteeringMultiplier = 0.25f;
+    /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
+    public float SlamLateralRetention = 1.0f;
+    public float PerfectApexVerticalSpeedThreshold = 1.25f;
+    public float PerfectApexSlamStrengthMultiplier = 1.35f;
+    public float PerfectApexImpactMultiplier = 1.35f;
+}
+
+public sealed class BoostTuning
+{
+    public float BoostAcceleration = 48f;
+    /// <summary>Max input influence on boost direction at zero speed; falls to 0 at the cap.</summary>
+    public float BoostDirectionBlend = 0.25f;
+    public float BoostCapacity = 100f;
+    public float BoostDrainRate = 30f;
+    public float PassiveBoostRegen = 4f;
+    public float PickupRefillAmount = 35f;
+    /// <summary>Active-refill hook exercised by perfect-apex slams in the Movement Toy.</summary>
+    public float PerfectApexRefillAmount = 20f;
+}
+
+public sealed class CarveTuning
+{
+    public bool Enabled = true;
+    public float CarveSteeringMultiplier = 1.8f;
+    public float CarveDragMultiplier = 3.0f;
+    public float CarveVfxStrength = 1.0f;
+}
+
+public sealed class CameraTuning
+{
+    public float Distance = 26f;
+    public float PitchDegrees = -34f;
+    public float YawDegrees = 45f;
+    public float HeightOffset = 3.0f;
+    public float LookAheadMin = 2f;
+    public float LookAheadMax = 22f;
+    public float FollowDamping = 8f;
+    public float VerticalDamping = 4f;
+    public float FovMin = 62f;
+    public float FovMax = 78f;
+    public float SpeedDistanceGain = 10f;
+    public float ShakeStrength = 1.0f;
+    public float ShakeDecay = 6f;
+    public float ZoomMin = 0.55f;
+    public float ZoomMax = 2.0f;
+    public float ZoomStep = 0.08f;
+}
+
+public sealed class VfxTuning
+{
+    public float ChargeEffectStrength = 1f;
+    public float JumpReleaseStrength = 1f;
+    public float TrailIntensity = 1f;
+    public float DustIntensity = 1f;
+    public float SlamEffectStrength = 1f;
+    public float ImpactEffectStrength = 1f;
+    public float SquashStretchStrength = 1f;
+}
+
+/// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>
+public sealed class WorldTuning
+{
+    public float TerrainAmplitude = 1.0f;
+    public float TerrainWavelength = 1.0f;
+    public float PropDensity = 1.0f;
+}
+
+/// <summary>
+/// Single source of truth for feel values. Gameplay reads these; the debug panel
+/// edits the same instance (07 §7). No duplicated magic numbers elsewhere.
+/// </summary>
+public sealed class GameplayTuning
+{
+    public readonly MovementTuning Movement = new();
+    public readonly JumpSlamTuning JumpSlam = new();
+    public readonly BoostTuning Boost = new();
+    public readonly CarveTuning Carve = new();
+    public readonly CameraTuning Camera = new();
+    public readonly VfxTuning Vfx = new();
+    public readonly WorldTuning World = new();
+
+    public const string CatMovement = "Movement";
+    public const string CatJumpSlam = "Jump / Slam";
+    public const string CatBoost = "Boost";
+    public const string CatCarve = "Carve";
+    public const string CatCamera = "Camera";
+    public const string CatVfx = "VFX";
+    public const string CatWorld = "World";
+
+    public static readonly string[] Categories =
+        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatCamera, CatVfx, CatWorld };
+
+    public IReadOnlyList<TuningParameter> Parameters { get; }
+    public IReadOnlyList<TuningToggle> Toggles { get; }
+
+    /// <summary>Raised after any bulk change (reset / load) so consumers can resync.</summary>
+    public event Action? BulkChanged;
+
+    public GameplayTuning()
+    {
+        var p = new List<TuningParameter>();
+        var t = new List<TuningToggle>();
+
+        void F(string cat, string name, float min, float max, Func<float> get, Action<float> set)
+            => p.Add(new TuningParameter { Category = cat, Name = name, Min = min, Max = max, Get = get, Set = set });
+        void B(string cat, string name, Func<bool> get, Action<bool> set)
+            => t.Add(new TuningToggle { Category = cat, Name = name, Get = get, Set = set });
+
+        var m = Movement;
+        F(CatMovement, "Gravity", 5f, 60f, () => m.Gravity, v => m.Gravity = v);
+        F(CatMovement, "Drive Acceleration", 0f, 120f, () => m.GroundDriveAcceleration, v => m.GroundDriveAcceleration = v);
+        F(CatMovement, "Steering Lateral Accel", 0f, 160f, () => m.GroundSteeringLateralAccel, v => m.GroundSteeringLateralAccel = v);
+        F(CatMovement, "High-Speed Steer Mult", 0.02f, 1f, () => m.HighSpeedSteeringMultiplier, v => m.HighSpeedSteeringMultiplier = v);
+        F(CatMovement, "Air Control Mult", 0f, 1f, () => m.AirControlMultiplier, v => m.AirControlMultiplier = v);
+        F(CatMovement, "Drag", 0f, 1.5f, () => m.DragCoefficient, v => m.DragCoefficient = v);
+        F(CatMovement, "Hard Max Locomotion Speed", 5f, 160f, () => m.HardMaxLocomotionSpeed, v => m.HardMaxLocomotionSpeed = v);
+        F(CatMovement, "Min Ground Normal Dot", 0.1f, 0.95f, () => m.MinGroundNormalDot, v => m.MinGroundNormalDot = v);
+        F(CatMovement, "Rush Threshold", 1f, 160f, () => m.RushThreshold, v => m.RushThreshold = v);
+        F(CatMovement, "Crush Threshold", 1f, 160f, () => m.CrushThreshold, v => m.CrushThreshold = v);
+        F(CatMovement, "Overdrive Threshold", 1f, 160f, () => m.OverdriveThreshold, v => m.OverdriveThreshold = v);
+        F(CatMovement, "Ball Radius", 0.25f, 4f, () => m.BallRadius, v => m.BallRadius = v);
+
+        var j = JumpSlam;
+        F(CatJumpSlam, "Min Jump Takeoff", 1f, 40f, () => j.MinJumpTakeoffVerticalSpeed, v => j.MinJumpTakeoffVerticalSpeed = v);
+        F(CatJumpSlam, "Max Jump Takeoff", 1f, 60f, () => j.MaxJumpTakeoffVerticalSpeed, v => j.MaxJumpTakeoffVerticalSpeed = v);
+        F(CatJumpSlam, "Max Charge Seconds", 0.05f, 2.5f, () => j.MaxJumpChargeSeconds, v => j.MaxJumpChargeSeconds = v);
+        F(CatJumpSlam, "Charge Release Grace", 0f, 0.6f, () => j.ChargeReleaseGraceSeconds, v => j.ChargeReleaseGraceSeconds = v);
+        F(CatJumpSlam, "Slam Initial Speed", 0f, 90f, () => j.SlamInitialDownwardSpeed, v => j.SlamInitialDownwardSpeed = v);
+        F(CatJumpSlam, "Slam Downward Accel", 0f, 250f, () => j.SlamDownwardAcceleration, v => j.SlamDownwardAcceleration = v);
+        F(CatJumpSlam, "Slam Steering Mult", 0f, 1.5f, () => j.SlamSteeringMultiplier, v => j.SlamSteeringMultiplier = v);
+        F(CatJumpSlam, "Slam Lateral Retention", 0.3f, 1f, () => j.SlamLateralRetention, v => j.SlamLateralRetention = v);
+        F(CatJumpSlam, "Apex Window (|vY|)", 0.1f, 10f, () => j.PerfectApexVerticalSpeedThreshold, v => j.PerfectApexVerticalSpeedThreshold = v);
+        F(CatJumpSlam, "Apex Slam Strength Mult", 1f, 4f, () => j.PerfectApexSlamStrengthMultiplier, v => j.PerfectApexSlamStrengthMultiplier = v);
+        F(CatJumpSlam, "Apex Impact Mult", 1f, 4f, () => j.PerfectApexImpactMultiplier, v => j.PerfectApexImpactMultiplier = v);
+
+        var b = Boost;
+        F(CatBoost, "Boost Acceleration", 0f, 200f, () => b.BoostAcceleration, v => b.BoostAcceleration = v);
+        F(CatBoost, "Direction Blend", 0f, 1f, () => b.BoostDirectionBlend, v => b.BoostDirectionBlend = v);
+        F(CatBoost, "Capacity", 10f, 400f, () => b.BoostCapacity, v => b.BoostCapacity = v);
+        F(CatBoost, "Drain Rate", 0f, 150f, () => b.BoostDrainRate, v => b.BoostDrainRate = v);
+        F(CatBoost, "Passive Regen", 0f, 60f, () => b.PassiveBoostRegen, v => b.PassiveBoostRegen = v);
+        F(CatBoost, "Pickup Refill", 0f, 200f, () => b.PickupRefillAmount, v => b.PickupRefillAmount = v);
+        F(CatBoost, "Perfect-Apex Refill", 0f, 200f, () => b.PerfectApexRefillAmount, v => b.PerfectApexRefillAmount = v);
+
+        var c = Carve;
+        B(CatCarve, "Carve Enabled", () => c.Enabled, v => c.Enabled = v);
+        F(CatCarve, "Steering Multiplier", 1f, 5f, () => c.CarveSteeringMultiplier, v => c.CarveSteeringMultiplier = v);
+        F(CatCarve, "Drag Multiplier", 1f, 20f, () => c.CarveDragMultiplier, v => c.CarveDragMultiplier = v);
+        F(CatCarve, "VFX Strength", 0f, 3f, () => c.CarveVfxStrength, v => c.CarveVfxStrength = v);
+
+        var k = Camera;
+        F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);
+        F(CatCamera, "Pitch Degrees", -85f, -5f, () => k.PitchDegrees, v => k.PitchDegrees = v);
+        F(CatCamera, "Yaw Degrees", -180f, 180f, () => k.YawDegrees, v => k.YawDegrees = v);
+        F(CatCamera, "Height Offset", -5f, 20f, () => k.HeightOffset, v => k.HeightOffset = v);
+        F(CatCamera, "Look-Ahead Min", 0f, 40f, () => k.LookAheadMin, v => k.LookAheadMin = v);
+        F(CatCamera, "Look-Ahead Max", 0f, 90f, () => k.LookAheadMax, v => k.LookAheadMax = v);
+        F(CatCamera, "Follow Damping", 0.5f, 30f, () => k.FollowDamping, v => k.FollowDamping = v);
+        F(CatCamera, "Vertical Damping", 0.2f, 30f, () => k.VerticalDamping, v => k.VerticalDamping = v);
+        F(CatCamera, "FOV Min", 30f, 110f, () => k.FovMin, v => k.FovMin = v);
+        F(CatCamera, "FOV Max", 30f, 120f, () => k.FovMax, v => k.FovMax = v);
+        F(CatCamera, "Speed Distance Gain", 0f, 60f, () => k.SpeedDistanceGain, v => k.SpeedDistanceGain = v);
+        F(CatCamera, "Shake Strength", 0f, 3f, () => k.ShakeStrength, v => k.ShakeStrength = v);
+        F(CatCamera, "Shake Decay", 0.5f, 20f, () => k.ShakeDecay, v => k.ShakeDecay = v);
+
+        var x = Vfx;
+        F(CatVfx, "Charge Effect", 0f, 3f, () => x.ChargeEffectStrength, v => x.ChargeEffectStrength = v);
+        F(CatVfx, "Jump Release Effect", 0f, 3f, () => x.JumpReleaseStrength, v => x.JumpReleaseStrength = v);
+        F(CatVfx, "Trail Intensity", 0f, 3f, () => x.TrailIntensity, v => x.TrailIntensity = v);
+        F(CatVfx, "Dust Intensity", 0f, 3f, () => x.DustIntensity, v => x.DustIntensity = v);
+        F(CatVfx, "Slam Effect", 0f, 3f, () => x.SlamEffectStrength, v => x.SlamEffectStrength = v);
+        F(CatVfx, "Impact Effect", 0f, 3f, () => x.ImpactEffectStrength, v => x.ImpactEffectStrength = v);
+        F(CatVfx, "Squash / Stretch", 0f, 3f, () => x.SquashStretchStrength, v => x.SquashStretchStrength = v);
+
+        var w = World;
+        F(CatWorld, "Terrain Amplitude", 0.1f, 3f, () => w.TerrainAmplitude, v => w.TerrainAmplitude = v);
+        F(CatWorld, "Terrain Wavelength", 0.3f, 3f, () => w.TerrainWavelength, v => w.TerrainWavelength = v);
+        F(CatWorld, "Prop Density", 0f, 3f, () => w.PropDensity, v => w.PropDensity = v);
+
+        foreach (var e in p) e.DefaultValue = e.Get();
+        foreach (var e in t) e.DefaultValue = e.Get();
+        Parameters = p;
+        Toggles = t;
+    }
+
+    /// <summary>Raise <see cref="BulkChanged"/> after an external edit (e.g. a debug hotkey).</summary>
+    public void NotifyChanged() => BulkChanged?.Invoke();
+
+    public void ResetAll()
+    {
+        foreach (var e in Parameters) e.Set(e.DefaultValue);
+        foreach (var e in Toggles) e.Set(e.DefaultValue);
+        BulkChanged?.Invoke();
+    }
+
+    public void ResetCategory(string category)
+    {
+        foreach (var e in Parameters) if (e.Category == category) e.Set(e.DefaultValue);
+        foreach (var e in Toggles) if (e.Category == category) e.Set(e.DefaultValue);
+        BulkChanged?.Invoke();
+    }
+
+    public const string OverridePath = "user://tuning_override_v1.json";
+
+    public bool SaveOverride()
+    {
+        var dict = new Godot.Collections.Dictionary { { "version", 1 } };
+        var values = new Godot.Collections.Dictionary();
+        foreach (var e in Parameters) values[e.Key] = e.Get();
+        foreach (var e in Toggles) values[e.Key] = e.Get();
+        dict["values"] = values;
+
+        using var f = FileAccess.Open(OverridePath, FileAccess.ModeFlags.Write);
+        if (f is null)
+        {
+            GD.PushWarning($"[RUSHCORE] Could not write {OverridePath}: {FileAccess.GetOpenError()}");
+            return false;
+        }
+        f.StoreString(Json.Stringify(dict, "  "));
+        GD.Print("[RUSHCORE] Saved tuning override.");
+        return true;
+    }
+
+    public bool LoadOverride()
+    {
+        if (!FileAccess.FileExists(OverridePath)) return false;
+        using var f = FileAccess.Open(OverridePath, FileAccess.ModeFlags.Read);
+        if (f is null) return false;
+        if (Json.ParseString(f.GetAsText()).Obj is not Godot.Collections.Dictionary root) return false;
+        if (root["values"].Obj is not Godot.Collections.Dictionary values) return false;
+
+        foreach (var e in Parameters)
+            if (values.TryGetValue(e.Key, out var v)) e.Set(Mathf.Clamp((float)v, e.Min, e.Max));
+        foreach (var e in Toggles)
+            if (values.TryGetValue(e.Key, out var v)) e.Set((bool)v);
+
+        BulkChanged?.Invoke();
+        GD.Print("[RUSHCORE] Loaded tuning override.");
+        return true;
+    }
+}

@@ -31,9 +31,9 @@ public sealed class MovementTuning
     public float Gravity = 39.4f;
     public float GroundDriveAcceleration = 28f;
     public float GroundSteeringLateralAccel = 151f;
-    /// <summary>Fraction of steering authority remaining at the hard speed cap. Accepted at
-    /// 1.0 (V-001): turn radius already grows as v^2 / lateralAccel, which satisfies D-002
-    /// without an additional falloff.</summary>
+    /// <summary>Steering-authority multiplier reached at the hard speed cap (lerped from 1.0
+    /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.0
+    /// (V-001): turn radius already grows as v^2 / lateralAccel, which satisfies D-002.</summary>
     public float HighSpeedSteeringMultiplier = 1.0f;
     public float AirControlMultiplier = 0.35f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
@@ -189,7 +189,7 @@ public sealed class GameplayTuning
         F(CatMovement, "Gravity", 5f, 60f, () => m.Gravity, v => m.Gravity = v);
         F(CatMovement, "Drive Acceleration", 0f, 120f, () => m.GroundDriveAcceleration, v => m.GroundDriveAcceleration = v);
         F(CatMovement, "Steering Lateral Accel", 0f, 300f, () => m.GroundSteeringLateralAccel, v => m.GroundSteeringLateralAccel = v);
-        F(CatMovement, "High-Speed Steer Mult", 0.02f, 1f, () => m.HighSpeedSteeringMultiplier, v => m.HighSpeedSteeringMultiplier = v);
+        F(CatMovement, "High-Speed Steer Mult", 0.02f, 4f, () => m.HighSpeedSteeringMultiplier, v => m.HighSpeedSteeringMultiplier = v);
         F(CatMovement, "Air Control Mult", 0f, 1f, () => m.AirControlMultiplier, v => m.AirControlMultiplier = v);
         F(CatMovement, "Drag", 0f, 1.5f, () => m.DragCoefficient, v => m.DragCoefficient = v);
         F(CatMovement, "Hard Max Locomotion Speed", 5f, 250f, () => m.HardMaxLocomotionSpeed, v => m.HardMaxLocomotionSpeed = v);

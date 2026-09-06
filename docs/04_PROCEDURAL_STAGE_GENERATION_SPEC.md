@@ -364,7 +364,12 @@ The model is calibrated against the real controller: the harness predicts the 0�
 curve on the scale-strip runway and the descent speeds on the lab grade fan and asserts the
 model is within 5% of what the ball does (delivered 2026-09-05: runway within 0.8%; real 0→cap
 is 7.1 s / ≈ 580 m). It is pure data code with no scene dependency
-(`src/Generation/RouteSpeedModel.cs`).
+(`src/Generation/RouteSpeedModel.cs`). Its first whole-route reading (Gate G0, D-087): the harness follower
+drives a generated stage end to end within 4.3% of the model's time. The model runs slightly fast because
+it has no airborne phase: contact per kilometre was 90 / 94 / 58 / 87 / 76 / 22%, the low readings on the
+two launch-crest kilometres, and after the second crest (taken at the cap) the ball skipped for most of
+the remaining kilometre and arrived at 119 m/s against the model's 149. Landing-zone and expected-speed
+assumptions for the Phase 3 modules (§5E, §11) must read that, not the model's 193 m landing estimate.
 
 Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove the numeric checks plus the route speed model insufficient.
 

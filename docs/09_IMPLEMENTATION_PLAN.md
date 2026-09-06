@@ -78,7 +78,11 @@ Deliver, in this order:
 - optional line/shortcut — delivered 2026-09-05 as ridge lines (D-086),
 - checkpoints — delivered 2026-09-05 (progression anchors, D-086),
 - validation — report per stage with attempts, timings, bounded regeneration and fallback; shown in the overlay and log,
-- same/new seed tooling — F5 / panel buttons / copy seed (Phase 1), plus the 100-seed harness batch.
+- same/new seed tooling — F5 / panel buttons / copy seed (Phase 1), plus the 100-seed harness batch,
+- regression seeds and the whole-route harness drive — delivered 2026-09-06 (D-087).
+
+Gate: **G0 (Rolling Highlands)** — objective checks passed 2026-09-06; the manual sample (08 §5) is the
+user's. G0 is re-run for each archetype Phase 3 adds.
 
 ## Phase 3 — Terrain Variety
 

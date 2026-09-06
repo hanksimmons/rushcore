@@ -8,7 +8,8 @@
 ```sh
 dotnet build                                                    # offline: Godot nupkgs from the app bundle
 /Applications/Godot_mono.app/Contents/MacOS/godot --path .      # play (or open in the Godot editor and press Play)
-/Applications/Godot_mono.app/Contents/MacOS/godot --headless --path . -- --rushcore-selftest    # Gate M0 objective checks
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 34     # play a named world seed (stage 34/0)
+/Applications/Godot_mono.app/Contents/MacOS/godot --headless --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
 
@@ -187,6 +188,14 @@ same request → same hash, distinct seeds → distinct stages, lengths and base
 ≈ 0.5 ms per stage skeleton. Measured over 1000 seeds (2026-09-05): 1000 valid, 0 fallbacks, 6.3–6.9 km,
 base-kit 46–53 s on the flat skeleton.
 
+**Regression seeds (08 §11).** `tests/RegressionSeeds.cs` is the list the harness generates on every run
+and asserts valid without fallback: the toy default seed (20260905/0, the first playtested stage) plus
+seeds that exercise the second route attempt (8/0, 15/5, 57/5), no ridge line (4/8), three lines or no
+crest (34/6, 13/5) and the slowest/longest and fastest stages of the 1000-seed scan (90/5, 7/4). To add
+one: read the seed from the telemetry `seed` row (or the log line `Stage generated seed=N/0`), append
+`new(N, 0, "why")`, and keep it there once the bug is fixed; `-- --seed N` launches the toy on it. The log prints each entry's attempts, length,
+base-kit time, crests, lines, anchors and hash, and for a second-attempt seed the reason attempt 1 failed.
+
 ### Generated stage in the toy (Phase 2, PR 2)
 
 `World › Generated Stage (Phase 2)` swaps the lab for a Rolling Highlands stage generated from the
@@ -198,8 +207,15 @@ launch-crest straights; boost rings on the line every 1.2 km; scatter kept out o
 magenta crest zones. The telemetry `seed` row shows the generation summary (valid / fallback,
 length, base-kit time, bends, crests, generation ms) and the log prints every validation check.
 Build: ≈ 3.6 s headless for 752 k samples / 1.5 M triangles / 48 tiles (world sampling dominates;
-the definition itself is ≈ 25 ms). The harness builds one stage every run and drives its first
-1.5 km with a route follower (a smoke test, not an agent): grounded ≥ 60% asserted, 92% measured.
+the definition itself is ≈ 25 ms). The harness builds one stage every run and drives its whole primary
+route with a route follower (a smoke test of one seed, not an agent): the ball must reach the exit pad,
+stay inside the corridor (off-line ≤ 15 m measured), keep contact ≥ 60% of the way, and arrive within 10%
+of the route speed model's base-kit time (Gate G0, D-087: ball 49.9 s vs model 47.8 s, 4.3%; the log prints
+ball vs model time and speed every kilometre with the contact fraction over that kilometre: 90 / 94 / 58 /
+87 / 76 / 22% on the default seed, the low values on the two launch-crest kilometres; after the second
+crest at the cap the ball skips for most of the last kilometre and reaches the exit at 119 m/s). The same case
+asserts no solid prop inside a corridor, that the SceneTree node count is flat across three regenerations
+and that neither generation nor the build writes to tuning or the rigid body (04 §7).
 
 Relief rules (D-085): three long swells with summed crest curvature ≤ 0.7 / 560 m and summed slope
 ≤ 0.18, micro relief inside the remaining curvature budget (≈ 0.9 m at λ 400), corridor profile =

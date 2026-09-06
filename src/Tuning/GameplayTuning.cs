@@ -56,7 +56,7 @@ public sealed class MovementTuning
 public sealed class JumpSlamTuning
 {
     public float MinJumpTakeoffVerticalSpeed = 2f;
-    public float MaxJumpTakeoffVerticalSpeed = 49.5f;
+    public float MaxJumpTakeoffVerticalSpeed = 58.2f;
     public float MaxJumpChargeSeconds = 0.45f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
@@ -141,9 +141,9 @@ public sealed class VfxTuning
 /// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>
 public sealed class WorldTuning
 {
-    public float TerrainAmplitude = 1.0f;
+    public float TerrainAmplitude = 2.125f;
     public float TerrainWavelength = 1.0f;
-    public float PropDensity = 1.0f;
+    public float PropDensity = 0.19f;
 }
 
 /// <summary>
@@ -202,7 +202,7 @@ public sealed class GameplayTuning
 
         var j = JumpSlam;
         F(CatJumpSlam, "Min Jump Takeoff", 1f, 40f, () => j.MinJumpTakeoffVerticalSpeed, v => j.MinJumpTakeoffVerticalSpeed = v);
-        F(CatJumpSlam, "Max Jump Takeoff", 1f, 60f, () => j.MaxJumpTakeoffVerticalSpeed, v => j.MaxJumpTakeoffVerticalSpeed = v);
+        F(CatJumpSlam, "Max Jump Takeoff", 1f, 100f, () => j.MaxJumpTakeoffVerticalSpeed, v => j.MaxJumpTakeoffVerticalSpeed = v);
         F(CatJumpSlam, "Max Charge Seconds", 0.05f, 2.5f, () => j.MaxJumpChargeSeconds, v => j.MaxJumpChargeSeconds = v);
         F(CatJumpSlam, "Charge Release Grace", 0f, 0.6f, () => j.ChargeReleaseGraceSeconds, v => j.ChargeReleaseGraceSeconds = v);
         F(CatJumpSlam, "Slam Initial Speed", 0f, 90f, () => j.SlamInitialDownwardSpeed, v => j.SlamInitialDownwardSpeed = v);

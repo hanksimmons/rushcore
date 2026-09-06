@@ -400,7 +400,7 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 | Air control multiplier | 0.35 | ACCEPTED |
 | Ball radius | 2.125 m | ACCEPTED (V-005) |
 | Min jump takeoff vertical speed | 2 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
-| Max jump takeoff vertical speed | 49.5 m/s | ACCEPTED (V-010) |
+| Max jump takeoff vertical speed | 58.2 m/s | ACCEPTED (V-010) |
 | Max jump charge seconds | 0.45 s, linear | ACCEPTED (V-010) |
 | Charge release grace | 0.10 s | ACCEPTED |
 | Slam initial downward speed | 43 m/s | ACCEPTED |

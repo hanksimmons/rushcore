@@ -59,7 +59,7 @@ Use known distances/features to settle:
 
 Instrument: the scale strip (`World › Calibration Strip (M1)`, D-079). Movement is frozen (D-078); only world scale is decided here, together with its terrain budget (cell size, footprint, build/draw cost, D-080).
 
-Gate: **M1**.
+Gate: **M1** — passed provisionally 2026-09-05 (D-082); feel verdicts re-judged on the first generated stage.
 
 These tuned values become generation inputs.
 

@@ -136,7 +136,7 @@ public partial class PlayerVfx : Node3D
         // rolling ground contact
         bool dustOn = grounded && speed > 2f && dustI > 0.01f;
         Emit(_dust, dustOn);
-        if (dustOn) _dust.AmountRatio = Mathf.Clamp(speed01 * 2.0f * dustI, 0.12f, 1f);
+        if (dustOn) _dust.AmountRatio = _player.IsCarving ? 1f : Mathf.Clamp(speed01 * 2.0f * dustI, 0.12f, 1f);
 
         // boost trail, thrown backwards along travel
         bool trailOn = _player.BoostActive && trailI > 0.01f;

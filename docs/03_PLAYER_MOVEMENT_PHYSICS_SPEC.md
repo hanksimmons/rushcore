@@ -344,12 +344,28 @@ Baseline:
 
 **VALIDATE:** exact capacity, drain, passive refill, active refill.
 
-## 11. Carve / traction action — REMOVED
+## 11. Carve
 
-Prototyped in the Movement Toy as one held action trading speed for tighter control, and
-playtested with its steering/drag multipliers pushed well past the defaults. It never felt
-impactful, so it was removed on 2026-09-05 (D-007, V-002) along with its tuning, input
-binding and skid VFX. The movement vocabulary is steer, charge jump, slam, boost (00 P8).
+The first carve (one held action trading speed for tighter control) was prototyped and removed
+on 2026-09-05 (D-007). It returned on 2026-09-06 as a different verb (D-089): a **held drift that
+preserves speed**, in the spirit of a kart drift but more exaggerated.
+
+- **Input:** hold `Left Alt` (gamepad `LB`). Starts only while grounded, not charging, and above a
+  minimum locomotion speed.
+- **While held:** the ball's **facing** swings toward the stick direction at a tunable yaw rate; the
+  **velocity understeers**, keeping only a fraction of normal steering authority aimed at the
+  facing, so the ball slides wide while it already looks at the exit. Drive stays along travel;
+  gravity, drag, brake, boost and the cap apply as always. The ball rolls about the facing
+  ("biting" toward the exit) and the roll dust runs at full.
+- **Release, or ground lost:** traction returns: the velocity is re-aimed along the facing at **no
+  less than the entry speed**. No speed is lost through a carve. The cap pipeline then applies.
+- **Camera:** yaw follows the facing for the whole carve, so the view is behind the model, not
+  behind the slide.
+- **Flow:** a carve that swung the heading by at least a tunable angle grants Flow at exit
+  (02 §8); a tap does not.
+- The skill is release timing: too early and you exit wide of the line, too late and you exit
+  pointed at the wall. The price is the wide line while sliding, which the terrain sets.
+- Charge, slam and boost are independent: a jump during a carve exits the carve at takeoff.
 
 ## 12. Collision behavior
 
@@ -453,6 +469,8 @@ part of the same promotion.
 | Flow gains: burst / slam landing / charged jump | 0.35 / 0.15 / 0.10 | PROVISIONAL (D-088) |
 | Flow losses: brake per s / impact / plain landing | 1.0 / 0.5 (one-tick loss > 20 m/s) / 0.25 (vertical ≥ 30 m/s) | PROVISIONAL (D-088) |
 | Flow chain window / idle decay | 6 s / 0.05 per s after it | PROVISIONAL (D-088) |
+| Carve min speed / yaw rate / understeer | 15 m/s / 220°/s / 0.25 of steering authority | PROVISIONAL (D-089) |
+| Carve Flow gain / min turn | 0.10 / 30° | PROVISIONAL (D-089) |
 | Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
@@ -470,6 +488,7 @@ Expose:
 - vertical velocity,
 - effective hard speed cap (base and Flow cap),
 - Flow, seconds since the last gain, impact count,
+- carve state, facing angle off travel, entry speed, carve count,
 - speed band,
 - grounded state,
 - ground normal,

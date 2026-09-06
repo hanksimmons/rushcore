@@ -236,7 +236,7 @@ public partial class MovementToySelfTest : Node
     private static readonly string[] AllActions =
     {
         InputBootstrap.MoveForward, InputBootstrap.MoveBack, InputBootstrap.MoveLeft,
-        InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost
+        InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost, InputBootstrap.Carve
     };
 
     private void ReleaseAll()
@@ -567,6 +567,9 @@ public partial class MovementToySelfTest : Node
 
         // ---- Flow headroom (02 §8, 03 §5, D-088): earned speed above the base cap ----
         foreach (var e in RunFlowHeadroomCase()) yield return e;
+
+        // ---- carve (03 §11, D-089): a held drift that preserves speed ----
+        foreach (var e in RunCarveCase()) yield return e;
 
         // ---- slam preserves lateral momentum and commits downward ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
@@ -1376,6 +1379,63 @@ public partial class MovementToySelfTest : Node
             _debug.RestartSameSeed();
             foreach (var _ in Frames(3)) yield return null;
         }
+    }
+
+    // ---------------- carve (03 §11; 08 §3; D-089) ----------------
+
+    private IEnumerable RunCarveCase()
+    {
+        var t = _debug.Tuning;
+        var cv = t.Carve;
+
+        // (a) below the minimum speed the button does nothing
+        foreach (var _ in Settle(PlatformCenter - Forward * 400f + Vector3.Up * 3f)) yield return null;
+        Input.ActionPress(InputBootstrap.Carve, 1f);
+        foreach (var _ in Frames(5)) yield return null;
+        Check("carve does nothing below the minimum speed", !_player.IsCarving, $"speed={_player.LocomotionSpeed:0.0}");
+        Input.ActionRelease(InputBootstrap.Carve);
+
+        // (b) a hot entry: boosted run, then hold the carve and aim a quarter turn to the right
+        _player.RefillBoost(t.Boost.BoostCapacity);
+        _worldDrive = Forward;
+        Input.ActionPress(InputBootstrap.Boost, 1f);
+        foreach (var _ in Seconds(2.0f)) yield return null;
+        Input.ActionRelease(InputBootstrap.Boost);
+        Vector3 entryDir = FlatVel.Normalized();
+        float entrySpeed = _player.LocomotionSpeed;
+        Vector3 turnDir = entryDir.Rotated(Vector3.Up, -Mathf.Pi * 0.5f);     // world-fixed: right of the entry heading
+        _worldDrive = turnDir;
+        Input.ActionPress(InputBootstrap.Carve, 1f);
+        foreach (var _ in Frames(2)) yield return null;
+        Check("carve starts when held above the minimum speed while grounded", _player.IsCarving && entrySpeed > cv.MinSpeed,
+            $"carving={_player.IsCarving} speed={entrySpeed:0.0}");
+        int carvesBefore = _player.CarveCount;
+        float flowBefore = _player.Flow, minSpeedDuring = float.MaxValue, maxOff = 0f;
+        foreach (var _ in Seconds(90f / Mathf.Max(30f, cv.YawRateDegrees) + 0.05f))
+        {
+            minSpeedDuring = Mathf.Min(minSpeedDuring, _player.LocomotionSpeed);
+            maxOff = Mathf.Max(maxOff, _player.CarveAngleDegrees);
+            yield return null;
+        }
+        Vector3 facing = new Vector3(_player.Facing.X, 0f, _player.Facing.Z).Normalized();
+        float facingTurn = Mathf.RadToDeg(entryDir.AngleTo(facing));
+        float travelTurn = Mathf.RadToDeg(entryDir.AngleTo(FlatVel.Normalized()));
+        float camToFacing = Forward.Dot(facing);
+        GD.Print($"[SELFTEST] carve: entry {entrySpeed:0.0} m/s, facing swung {facingTurn:0}°, travel turned {travelTurn:0}° (max off {maxOff:0}°), camera·facing {camToFacing:0.00}, min speed during {minSpeedDuring:0.0}");
+        Check("the facing swings toward the input at the yaw rate", facingTurn > 60f, $"{facingTurn:0}°");
+        Check("the velocity understeers: it turns far less than the facing", travelTurn < facingTurn * 0.6f, $"travel {travelTurn:0}° vs facing {facingTurn:0}°");
+        Check("the camera tracks behind the facing during the carve", camToFacing > 0.6f, $"dot={camToFacing:0.00}");
+        Check("the ball stays grounded through the carve", _player.IsGrounded && _player.IsCarving);
+        Input.ActionRelease(InputBootstrap.Carve);
+        foreach (var _ in Frames(2)) yield return null;
+        float exitOff = Mathf.RadToDeg(FlatVel.Normalized().AngleTo(facing));
+        Check("release snaps the velocity onto the facing", !_player.IsCarving && exitOff < 8f, $"off={exitOff:0.0}°");
+        Check("no speed is lost through the carve", _player.LocomotionSpeed >= entrySpeed - 1f, $"entry {entrySpeed:0.0} -> exit {_player.LocomotionSpeed:0.0}");
+        Check("a real carve counts and grants Flow", _player.CarveCount == carvesBefore + 1 && _player.Flow >= flowBefore + cv.FlowGain - 0.01f,
+            $"count {carvesBefore} -> {_player.CarveCount}, flow {flowBefore:0.00} -> {_player.Flow:0.00}");
+        Check("velocity finite after the carve", _player.Velocity.IsFinite());
+        ReleaseAll();
+        foreach (var _ in Seconds(0.5f)) yield return null;
     }
 
     // ---------------- Flow headroom (02 §8, 03 §5; 08 §3; D-088) ----------------

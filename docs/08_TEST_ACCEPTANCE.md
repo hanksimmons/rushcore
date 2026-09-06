@@ -69,6 +69,7 @@ Toy contains only:
 - The burst never slows the ball.
 - Flow headroom (D-088): Flow is zero after a recovery and the cap is the base cap; a charged jump, a slam landing and a burst each grant Flow and the chain stacks; with Flow the ball travels above the base cap and never above the effective cap; no time decay inside the chain window; braking drains Flow and the cap falls with it; with headroom 0 the cap is the frozen base cap; a clean drive on the rig and on a generated corridor registers no impact; recovery zeroes Flow.
 - Thin-wall CCD holds at the Flow ceiling (base cap × (1 + headroom)) as well as at the base cap.
+- Carve (D-089): the button does nothing below the minimum speed; held above it while grounded the facing swings toward the input at the yaw rate while the velocity turns far less; the camera tracks behind the facing; release re-aims the velocity onto the facing with no speed lost; a real carve grants Flow.
 - Boost works on ground and air.
 - Boost cannot bypass hard locomotion cap.
 - Slow passive boost regeneration and active refill follow tuning.

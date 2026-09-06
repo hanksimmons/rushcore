@@ -36,6 +36,7 @@ Expose first:
 - SlamImpactMultiplier
 - LandingBurstWindowSeconds
 - LandingBurstMultiplier
+- Carve min speed, yaw rate, understeer, Flow gain and its minimum turn (D-089)
 - Flow headroom, gains (burst, slam landing, charged jump), losses (brake, impact, plain landing) with their thresholds, chain window, idle decay (D-088)
 - BoostAcceleration
 - BoostDirectionBlend

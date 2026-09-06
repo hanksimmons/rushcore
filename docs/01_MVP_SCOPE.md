@@ -28,6 +28,7 @@ Anything not required to prove that proposition is deferred.
   - charging does not add artificial slowdown,
   - steering is disabled while charging.
 - Air steering.
+- Carve: a held drift (Left Alt / LB) whose facing swings toward the stick while the ball understeers wide; release re-aims the velocity along the facing at no less than the entry speed (D-089).
 - Ground slam triggered by a new jump/slam press while airborne.
 - Every slam landing is a power impact; a Space press at the slam touchdown fires a landing burst (current speed multiplied by a tuned factor along the current heading, limited by the effective cap; D-088).
 - Boost with finite/refillable meter, including slow emergency passive regeneration plus active refill sources.

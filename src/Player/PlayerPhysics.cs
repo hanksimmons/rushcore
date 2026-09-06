@@ -25,6 +25,12 @@ public partial class PlayerPhysics : RigidBody3D
     private const float BrakeConeDot = -0.866f;
     private bool _boostHeld;
     private bool _jumpPressedEdge, _jumpReleasedEdge, _jumpHeld;
+    private bool _carveHeld;
+
+    // ---- carve (03 §11, D-089): a held drift; facing swings, velocity understeers, release snaps ----
+    private Vector3 _facing = Vector3.Forward;
+    private float _carveEntrySpeed;
+    private float _carveTurned;                                   // radians the facing has swung this carve
 
     // ---- movement state (03 §3: track only what behavior needs) ----
     private bool _rawGrounded;
@@ -113,6 +119,15 @@ public partial class PlayerPhysics : RigidBody3D
     public float BoostAmount => _boost;
     public float Boost01 => Mathf.Clamp(_boost / Mathf.Max(0.001f, _t.Boost.BoostCapacity), 0f, 1f);
     public Vector2 InputVector => _moveInput;
+    /// <summary>True while the carve button is held and the drift is live (03 §11).</summary>
+    public bool IsCarving { get; private set; }
+    /// <summary>Flat direction the ball faces: the travel heading, or the swung heading while carving.</summary>
+    public Vector3 Facing => _facing;
+    public float CarveEntrySpeed => _carveEntrySpeed;
+    /// <summary>Degrees between the facing and the travel heading while carving.</summary>
+    public float CarveAngleDegrees { get; private set; }
+    public int CarveCount { get; private set; }
+    public event Action<float>? CarveExited;
     /// <summary>Effective lateral steering acceleration applied this physics step (m/s^2).</summary>
     public float SteeringAuthority { get; private set; }
     public float ImpactPowerEstimate { get; private set; }
@@ -166,6 +181,7 @@ public partial class PlayerPhysics : RigidBody3D
     {
         _moveInput = InputBootstrap.ReadMoveVector();
         _boostHeld = Input.IsActionPressed(InputBootstrap.Boost);
+        _carveHeld = Input.IsActionPressed(InputBootstrap.Carve);
         _jumpHeld = Input.IsActionPressed(InputBootstrap.Jump);
         if (Input.IsActionJustPressed(InputBootstrap.Jump)) _jumpPressedEdge = true;
         if (Input.IsActionJustReleased(InputBootstrap.Jump)) _jumpReleasedEdge = true;
@@ -306,8 +322,11 @@ public partial class PlayerPhysics : RigidBody3D
         if (_isCharging) lateral = 0f;
         SteeringAuthority = lateral;
 
+        // ---- carve (03 §11, D-089): held drift; the exit is the one place velocity is re-aimed ----
+        bool carveExitThisTick = UpdateCarve(dt, planeNormal, desiredDir, lateral, ref curDir, ref vT, ref speed);
+
         // ---- steer: rotate the travel direction, never rewrite it ----
-        if (speed > 0.5f && desiredDir != Vector3.Zero && lateral > 0f)
+        if (!IsCarving && !carveExitThisTick && speed > 0.5f && desiredDir != Vector3.Zero && lateral > 0f)
         {
             float angle = curDir.AngleTo(desiredDir);
             if (angle > 1e-5f)
@@ -332,7 +351,8 @@ public partial class PlayerPhysics : RigidBody3D
         {
             if (speed > 0.5f)
             {
-                float align = curDir.Dot(desiredDir);
+                // While carving the stick aims the facing, not the drive: drive stays along travel.
+                float align = IsCarving ? 1f : curDir.Dot(desiredDir);
                 vT += curDir * (drive * inputMag * align * dt);
             }
             else
@@ -413,6 +433,9 @@ public partial class PlayerPhysics : RigidBody3D
         _jumpLockout = 0f;
         _groundStick = 0f;
         _capAllowance = 0f;
+        IsCarving = false;
+        _carveTurned = 0f;
+        CarveAngleDegrees = 0f;
         Flow = 0f;                                   // recovery / teleport ends the chain (02 §8)
         _sinceFlowGain = float.PositiveInfinity;
         _prevLocSpeed = 0f;
@@ -482,6 +505,76 @@ public partial class PlayerPhysics : RigidBody3D
     {
         _burstArmed = false;
         _pendingBurst = true;
+    }
+
+    /// <summary>
+    /// Carve (03 §11, D-089). Start: button held, grounded, above the minimum speed. While held:
+    /// the facing swings toward the input at the yaw rate; the velocity keeps only the understeer
+    /// fraction of its steering authority, aimed at the facing, so the ball slides wide while the
+    /// "model" already looks at the exit. Exit (release, or ground lost): velocity is re-aimed
+    /// along the facing at no less than the entry speed. Nothing else in the tick changes, so the
+    /// cap, drag and Flow rules apply as always. Returns true on the exit tick.
+    /// </summary>
+    private bool UpdateCarve(float dt, Vector3 planeNormal, Vector3 desiredDir, float lateral,
+                             ref Vector3 curDir, ref Vector3 vT, ref float speed)
+    {
+        var c = _t.Carve;
+        if (!IsCarving)
+        {
+            _facing = curDir != Vector3.Zero ? curDir : _facing;
+            CarveAngleDegrees = 0f;
+            if (_carveHeld && IsGrounded && !_isCharging && speed >= c.MinSpeed && curDir != Vector3.Zero)
+            {
+                IsCarving = true;
+                _carveEntrySpeed = speed;
+                _carveTurned = 0f;
+                _facing = curDir;
+            }
+            return false;
+        }
+
+        // Keep the facing in the current locomotion plane.
+        _facing -= planeNormal * _facing.Dot(planeNormal);
+        _facing = _facing.LengthSquared() > 1e-6f ? _facing.Normalized() : curDir;
+
+        bool exit = !_carveHeld || !IsGrounded || speed < 0.5f;
+        if (!exit)
+        {
+            if (desiredDir != Vector3.Zero)
+            {
+                float angle = _facing.AngleTo(desiredDir);
+                Vector3 axis = _facing.Cross(desiredDir);
+                if (angle > 1e-4f && axis.LengthSquared() > 1e-8f)
+                {
+                    float step = Mathf.Min(angle, Mathf.DegToRad(Mathf.Max(0f, c.YawRateDegrees)) * dt);
+                    _facing = _facing.Rotated(axis.Normalized(), step).Normalized();
+                    _carveTurned += step;
+                }
+            }
+            // Understeer: the velocity bites toward the facing with a fraction of normal authority.
+            float bite = lateral * Mathf.Clamp(c.Understeer, 0f, 1f);
+            float toFacing = curDir.AngleTo(_facing);
+            Vector3 vAxis = curDir.Cross(_facing);
+            if (toFacing > 1e-4f && bite > 0f && vAxis.LengthSquared() > 1e-8f)
+            {
+                curDir = curDir.Rotated(vAxis.Normalized(), Mathf.Min(toFacing, bite * dt / Mathf.Max(0.5f, speed)));
+                vT = curDir * speed;
+            }
+            CarveAngleDegrees = Mathf.RadToDeg(curDir.AngleTo(_facing));
+            return false;
+        }
+
+        // Exit: traction returns along the facing; no speed is lost (03 §11).
+        IsCarving = false;
+        float exitSpeed = Mathf.Max(speed, _carveEntrySpeed);
+        curDir = _facing;
+        vT = curDir * exitSpeed;
+        speed = exitSpeed;
+        CarveAngleDegrees = 0f;
+        CarveCount++;
+        if (Mathf.RadToDeg(_carveTurned) >= c.FlowGainMinDegrees) AddFlow(c.FlowGain);
+        CarveExited?.Invoke(Mathf.RadToDeg(_carveTurned));
+        return true;
     }
 
     private void AddFlow(float amount)

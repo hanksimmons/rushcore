@@ -140,7 +140,8 @@ public partial class CameraRig : Node3D, ICameraBasis
         float speed01 = Mathf.Clamp(speed / cap, 0f, 1f + Mathf.Max(0f, _t.Flow.Headroom));
         float look01 = Mathf.Min(speed01, 1f);
 
-        UpdateYaw(flatVel, speed, dt);
+        // While carving the view tracks the facing (03 §11): the player looks at the exit, so does the camera.
+        UpdateYaw(_player.IsCarving ? new Vector3(_player.Facing.X, 0f, _player.Facing.Z).Normalized() * Mathf.Max(speed, 1f) : flatVel, speed, dt);
         UpdateOrientation();
 
         Vector3 lookAhead = Vector3.Zero;

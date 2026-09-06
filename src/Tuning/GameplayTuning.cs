@@ -88,6 +88,24 @@ public sealed class JumpSlamTuning
 }
 
 /// <summary>
+/// Carve (03 §11, D-089): a held drift. The ball understeers while its facing swings toward the
+/// input at an exaggerated rate; release snaps the velocity onto the facing at no less than the
+/// entry speed. Speed is preserved; the price is the wide line while sliding.
+/// </summary>
+public sealed class CarveTuning
+{
+    /// <summary>Below this locomotion speed the carve button does nothing.</summary>
+    public float MinSpeed = 15f;
+    /// <summary>How fast the facing swings toward the input while carving, degrees per second.</summary>
+    public float YawRateDegrees = 220f;
+    /// <summary>Fraction of normal lateral authority the velocity keeps while carving (the understeer).</summary>
+    public float Understeer = 0.25f;
+    /// <summary>Flow granted at exit when the carve turned the heading by at least <see cref="FlowGainMinDegrees"/>.</summary>
+    public float FlowGain = 0.10f;
+    public float FlowGainMinDegrees = 30f;
+}
+
+/// <summary>
 /// Flow headroom (02 §8, 03 §5, D-088): Flow (0..1) measures execution quality and raises the
 /// effective locomotion cap to base × (1 + Flow × Headroom). Gains come from perfect actions,
 /// losses from mistakes; there is no time decay while a chain is alive. The base cap and every
@@ -209,6 +227,7 @@ public sealed class GameplayTuning
     public readonly VfxTuning Vfx = new();
     public readonly WorldTuning World = new();
     public readonly FlowTuning Flow = new();
+    public readonly CarveTuning Carve = new();
 
     public const string CatMovement = "Movement";
     public const string CatJumpSlam = "Jump / Slam";
@@ -217,9 +236,10 @@ public sealed class GameplayTuning
     public const string CatVfx = "VFX";
     public const string CatWorld = "World";
     public const string CatFlow = "Flow";
+    public const string CatCarve = "Carve";
 
     public static readonly string[] Categories =
-        { CatMovement, CatJumpSlam, CatBoost, CatFlow, CatCamera, CatVfx, CatWorld };
+        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatWorld };
 
     public IReadOnlyList<TuningParameter> Parameters { get; }
     public IReadOnlyList<TuningToggle> Toggles { get; }
@@ -264,6 +284,13 @@ public sealed class GameplayTuning
         F(CatJumpSlam, "Slam Impact Mult", 1f, 4f, () => j.SlamImpactMultiplier, v => j.SlamImpactMultiplier = v);
         F(CatJumpSlam, "Burst Window (s)", 0.02f, 0.5f, () => j.LandingBurstWindowSeconds, v => j.LandingBurstWindowSeconds = v);
         F(CatJumpSlam, "Burst Multiplier", 1f, 1.3f, () => j.LandingBurstMultiplier, v => j.LandingBurstMultiplier = v);
+
+        var cv = Carve;
+        F(CatCarve, "Min Speed (m/s)", 0f, 60f, () => cv.MinSpeed, v => cv.MinSpeed = v);
+        F(CatCarve, "Yaw Rate (deg/s)", 30f, 540f, () => cv.YawRateDegrees, v => cv.YawRateDegrees = v);
+        F(CatCarve, "Understeer", 0f, 1f, () => cv.Understeer, v => cv.Understeer = v);
+        F(CatCarve, "Flow Gain", 0f, 1f, () => cv.FlowGain, v => cv.FlowGain = v);
+        F(CatCarve, "Flow Gain Min Turn (deg)", 0f, 180f, () => cv.FlowGainMinDegrees, v => cv.FlowGainMinDegrees = v);
 
         var fl = Flow;
         F(CatFlow, "Headroom", 0f, 1f, () => fl.Headroom, v => fl.Headroom = v);

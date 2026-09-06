@@ -180,6 +180,7 @@ zero Flow still has the whole base kit at the base cap; nobody is ever slow.
 - good landings,
 - well-timed slam continuation,
 - landing burst,
+- a carve that swings the heading through a real turn (D-089),
 - challenge lines,
 - optional shortcuts,
 - selected pickups.

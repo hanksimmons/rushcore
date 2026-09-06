@@ -23,6 +23,7 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 | W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes** (never reverses, D-076). Spawn faces down the lane (−X). |
 | Space / A | press on ground = charge; release = jump; new press in air = slam; **press again at the slam touchdown = landing burst** (±0.10 s; a press during the slam is buffered; ×1.15 of your speed, D-088) |
 | Shift / X | boost (ground and air) |
+| Left Alt / LB | **carve** (hold): the ball drifts wide while its facing swings toward the stick; release to bite off along the facing at no less than your entry speed (D-089) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
 | F2 | telemetry overlay |
@@ -70,7 +71,8 @@ defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5
 2.03→58.21 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
 landing burst ±0.10 s → ×1.15 of the current speed (D-088, was 80% of the cap), boost 88.64 m/s²,
 Overdrive at 141.06 m/s, chase camera (follow 4.99/s). Above the base cap sits Flow headroom (below).
-Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
+The first carve was removed (D-007); the drift carve of D-089 is a new verb on top of the baseline.
+`docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.
 
@@ -100,6 +102,11 @@ playtest:
   D-077/D-088): press Space again at the slam touchdown to multiply your speed along your heading,
   limited by the effective cap. Telemetry's `burst` row shows the window while it is open.
   `VFX › Burst Effect` scales the sparks and rings.
+- **Carve** (`Carve` panel category, D-089): hold Alt above 15 m/s and steer; the `carve` row shows
+  the facing's angle off travel and the entry speed. Facing swings at 220°/s, the velocity keeps
+  25% of its steering authority (`Understeer`), release re-aims at max(entry, current) speed. A
+  carve that turned ≥ 30° grants 0.10 Flow. Try it on the turn pad rings of the strip: enter the
+  160 m ring at the cap, hold, release when the facing points down the exit.
 - **Flow headroom** (`Flow` panel category, D-088): the `flow` telemetry row shows Flow 0..1, the
   Flow cap (base 148.5 × (1 + Flow × `Headroom` 0.33) → 197.5 at full Flow), seconds since the last
   gain and the impact count; the `locomotion` row shows speed over the effective cap. Gains: burst

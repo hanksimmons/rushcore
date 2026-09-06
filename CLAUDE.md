@@ -79,7 +79,7 @@ The Movement Toy must implement these accepted behaviors:
 - boost works in air,
 - boost direction blends current travel and desired input,
 - slow emergency passive boost refill plus active refill hooks,
-- there is no carve verb: it was prototyped and removed at Movement Toy acceptance (D-007).
+- **carve** (D-089; the D-007 removal covered a different, speed-costing verb): hold Left Alt / LB while grounded above a minimum speed; the facing swings toward the stick at a tunable yaw rate while the velocity understeers wide; release (or ground loss) re-aims the velocity along the facing at no less than the entry speed; the camera tracks the facing; a real turn grants Flow.
 
 Do not reinterpret charge jump as “jump on press with variable gravity.” Jump occurs on **release**.
 

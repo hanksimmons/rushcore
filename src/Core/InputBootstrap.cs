@@ -14,6 +14,7 @@ public static class InputBootstrap
     public const string MoveRight = "rc_move_right";
     public const string Jump = "rc_jump";
     public const string Boost = "rc_boost";
+    public const string Carve = "rc_carve";
     public const string ZoomIn = "rc_zoom_in";
     public const string ZoomOut = "rc_zoom_out";
     public const string ToggleTuning = "rc_toggle_tuning";
@@ -32,6 +33,7 @@ public static class InputBootstrap
         Key(MoveRight, Godot.Key.D, Godot.Key.Right);
         Key(Jump, Godot.Key.Space);
         Key(Boost, Godot.Key.Shift);
+        Key(Carve, Godot.Key.Alt);
         Key(ZoomIn, Godot.Key.Equal, Godot.Key.KpAdd);
         Key(ZoomOut, Godot.Key.Minus, Godot.Key.KpSubtract);
         Key(ToggleTuning, Godot.Key.F1);
@@ -45,6 +47,7 @@ public static class InputBootstrap
         // Gamepad parity for the movement verbs.
         JoyButton(Jump, Godot.JoyButton.A);
         JoyButton(Boost, Godot.JoyButton.X);
+        JoyButton(Carve, Godot.JoyButton.LeftShoulder);
         JoyButton(ZoomIn, Godot.JoyButton.DpadUp);
         JoyButton(ZoomOut, Godot.JoyButton.DpadDown);
         JoyAxis(MoveLeft, Godot.JoyAxis.LeftX, -1f);

@@ -183,7 +183,9 @@ public partial class PlayerVisual : Node3D
         float flatSpeed = flat.Length();
         if (flatSpeed > 0.05f)
         {
-            _travelDir = flat / flatSpeed;
+            // While carving the ball rolls about the facing, not the slide: it "bites" toward the exit (03 §11).
+            Vector3 facing = new(_player.Facing.X, 0f, _player.Facing.Z);
+            _travelDir = _player.IsCarving && facing.LengthSquared() > 1e-6f ? facing.Normalized() : flat / flatSpeed;
             Vector3 axis = Vector3.Up.Cross(_travelDir);
             // Visual-only spin cap: the true rate strobes at 60 fps near the speed cap.
             float omega = Mathf.Min(flatSpeed / r, Mathf.Max(0.1f, vfx.MaxVisualRollRevPerSecond) * Mathf.Tau);

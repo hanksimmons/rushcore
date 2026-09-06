@@ -392,11 +392,13 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 
 ## 15. Tuning schema
 
-**Accepted baseline** (Movement Toy playtest, 2026-09-05; the user's `manual-finetune-punchy`
-preset promoted verbatim, sub-percent slider values included, so the preset reads as
-"compiled defaults"). These are the compiled defaults in `GameplayTuning`; the runtime panel
-edits the same values and persists overrides (D-075). Min ground-normal dot 0.499, camera yaw
-hold below 2.035 m/s and terrain wavelength 1.005 are part of the same promotion.
+**Accepted baseline** (Movement Toy playtest, 2026-09-05; the user's final preset
+`boost-finetune-final`, promoted verbatim on top of `manual-finetune-punchy`, sub-percent slider
+values included, so the preset reads as "compiled defaults"; D-078). **This table is the
+authoritative movement baseline.** These are the compiled defaults in `GameplayTuning`; the
+runtime panel edits the same values and persists overrides (D-075). Min ground-normal dot 0.499,
+camera yaw hold below 2.035 m/s, camera follow damping 4.99/s and terrain wavelength 1.005 are
+part of the same promotion.
 
 | Parameter | Accepted | Status |
 |---|---:|---|
@@ -408,7 +410,7 @@ hold below 2.035 m/s and terrain wavelength 1.005 are part of the same promotion
 | Hard max locomotion speed | 148.5 m/s | ACCEPTED (V-004) |
 | Landing cap bleed | 39.95 m/s² | ACCEPTED (D-074) |
 | Drag coefficient | 0.077 | ACCEPTED |
-| Air control multiplier | 0.35 | ACCEPTED |
+| Air control multiplier | 0.308 | ACCEPTED (D-078) |
 | Ball radius | 2.125 m | ACCEPTED (V-005) |
 | Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
 | Max jump takeoff vertical speed | 58.21 m/s | ACCEPTED (V-010) |
@@ -421,11 +423,11 @@ hold below 2.035 m/s and terrain wavelength 1.005 are part of the same promotion
 | Slam impact multiplier | 1.35 on every slam landing | ACCEPTED (D-077) |
 | Landing-burst window | ±0.10 s around the slam touchdown | ACCEPTED (D-077) |
 | Landing-burst speed | 80% of the cap along the current heading (floor only) | ACCEPTED (D-077) |
-| Boost acceleration | 48 m/s² | ACCEPTED (V-003) |
+| Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
 | Boost pickup refill | 35 | ACCEPTED (toy) |
-| Rush / Crush / Overdrive thresholds | 18 / 32 / 131.34 m/s | Overdrive ACCEPTED; Rush/Crush OPEN (V-004) |
+| Rush / Crush / Overdrive thresholds | 18 / 32 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush OPEN (V-004) |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 

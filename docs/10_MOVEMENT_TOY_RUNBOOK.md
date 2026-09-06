@@ -64,11 +64,12 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
 | `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
-Accepted baseline (playtest 2026-09-05, preset `manual-finetune-punchy` promoted to compiled
-defaults verbatim, so the preset shows as "compiled defaults"): cap 148.5 m/s, steering
-151.25 m/s² rising ×1.45 at the cap, gravity 39.38, ball radius 2.125 m, jump 2.03→58.21 m/s
-over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing, landing burst ±0.10 s → 80% of the cap, Overdrive at 131.34 m/s, chase
-camera.
+Accepted baseline (playtest 2026-09-05, final preset `boost-finetune-final` promoted to compiled
+defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5 m/s, steering
+151.25 m/s² rising ×1.45 at the cap, gravity 39.38, air control 0.308, ball radius 2.125 m, jump
+2.03→58.21 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
+landing burst ±0.10 s → 80% of the cap, boost 88.64 m/s², Overdrive at 141.06 m/s, chase camera
+(follow 4.99/s).
 Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.

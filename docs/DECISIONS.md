@@ -115,6 +115,7 @@
 | D-075 | ACCEPTED | Tuning persistence: the saved override (diff from compiled defaults, versioned JSON under `user://`) is applied on launch; override state is always visible in the panel and telemetry; named presets are stashes and never the startup state. |
 | D-076 | ACCEPTED | `S` / stick-back is a brake, not a reverse drive: it sheds speed along the current heading and never pushes through zero. Input within ~30° of straight against the heading only brakes; a hairpin needs clear lateral intent (W+A/D). Rationale: reverse drive gave the chase camera a heading it could not follow, and the exact-opposition case turned the ball in a direction chosen by float noise. |
 | D-077 | ACCEPTED | Perfect-apex slam removed (supersedes D-016/D-017/D-070/D-073). Every slam landing is the **power impact** (impact ×1.35, strongest landing feedback). New **landing burst**: a fresh Space press within ±0.10 s of a slam touchdown (presses during the slam are buffered) fires blue sparks, a mini sonic boom with an air-parting ring, and sets locomotion speed to 80% of the hard cap along the current heading. The burst is a floor (never slows a faster ball), never changes direction, keeps the ball grounded, and the press never starts a charge. Charge jump is unchanged. |
+| D-078 | ACCEPTED | **Final movement baseline = the user's `boost-finetune-final` preset (2026-09-05), promoted verbatim to compiled defaults.** It is `manual-finetune-punchy` plus: boost acceleration 88.64 m/s², air control 0.308, Overdrive 141.06 m/s, camera follow damping 4.99/s. `docs/03 §15` is the authoritative register; the toy launches on it with no override (\"compiled defaults\"). Any later change goes through a saved preset → verbatim promotion → this log. |
 
 ## Empirical validation register
 
@@ -124,10 +125,10 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 |---|---|---|
 | V-001 | RESOLVED | Lateral steering 151.25 m/s², rising to ×1.45 at the cap; turn radius still grows as v²/(a·mult), which satisfies D-002. |
 | V-002 | RESOLVED | Carve removed (see D-007). |
-| V-003 | RESOLVED (toy) | Boost 48 m/s², blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35 (the perfect-apex refill went with D-077). Active refill from combat is re-examined at Gate C0. |
-| V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 131.34 m/s accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
+| V-003 | RESOLVED (toy) | Boost 88.64 m/s² (D-078), blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35 (the perfect-apex refill went with D-077). Active refill from combat is re-examined at Gate C0. |
+| V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 141.06 m/s (D-078) accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
 | V-005 | RESOLVED | Ball radius 2.125 m (4.25 m diameter). The Movement Toy lab scenery amplitude is 2.125 (instruments keep their stated geometry); Gate M1 sizes generation features from the accepted speed/jump envelope. |
-| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 8/s, vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2.035 m/s, reverse hold ≤1.0 s, occlusion margin 0.6, ground clearance 1.5. |
+| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 4.99/s (D-078), vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2.035 m/s, reverse hold ≤1.0 s, occlusion margin 0.6, ground clearance 1.5. |
 | V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |
 | V-008 | VALIDATE | Exact terrain/stage physical dimensions and heightfield sampling density. |
 | V-009 | VALIDATE | Exact stage clear-time and full-run duration targets. |

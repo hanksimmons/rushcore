@@ -35,7 +35,7 @@ public sealed class MovementTuning
     /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.45
     /// (V-001): turn radius still grows as v^2 / (lateralAccel * mult), which satisfies D-002.</summary>
     public float HighSpeedSteeringMultiplier = 1.45f;
-    public float AirControlMultiplier = 0.35f;
+    public float AirControlMultiplier = 0.308f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
     public float DragCoefficient = 0.077f;
     public float HardMaxLocomotionSpeed = 148.5f;
@@ -49,7 +49,7 @@ public sealed class MovementTuning
     public float MinGroundNormalDot = 0.499f;
     public float RushThreshold = 18f;
     public float CrushThreshold = 32f;
-    public float OverdriveThreshold = 131.34f;
+    public float OverdriveThreshold = 141.06f;
     public float BallRadius = 2.125f;
 }
 
@@ -77,7 +77,7 @@ public sealed class JumpSlamTuning
 
 public sealed class BoostTuning
 {
-    public float BoostAcceleration = 48f;
+    public float BoostAcceleration = 88.64f;
     /// <summary>Max input influence on boost direction at zero speed; falls to 0 at the cap.</summary>
     public float BoostDirectionBlend = 0.25f;
     public float BoostCapacity = 100f;
@@ -108,7 +108,7 @@ public sealed class CameraTuning
     public float HeightOffset = 3.0f;
     public float LookAheadMin = 2f;
     public float LookAheadMax = 22f;
-    public float FollowDamping = 8f;
+    public float FollowDamping = 4.99f;
     public float VerticalDamping = 4f;
     public float FovMin = 62f;
     public float FovMax = 78f;

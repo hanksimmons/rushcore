@@ -191,7 +191,7 @@ Geometry:
 
 ### Canyon Run
 
-**Primary skill:** high-speed steering and carving.
+**Primary skill:** high-speed steering and banked lines.
 
 Geometry:
 
@@ -241,6 +241,10 @@ The generator must ultimately support:
 - stable collision at the accepted hard playable speed cap.
 
 Calibration should explicitly compare known distances/features and speeds before fixing stage dimensions.
+The frozen movement baseline (03 §15, D-078) is the input: cap 148.5 m/s, full-charge jump
+2.03→58.21 m/s at g 39.38, and the landing burst (D-077), which can establish 80% of the cap from
+any slam landing. The calibration environment must be large enough to measure these at the cap;
+the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed.
 
 ## 9. Heightfield/render representation
 
@@ -293,7 +297,10 @@ Optional shortcuts/rewards may demand:
 - higher entry speed,
 - more precise landing control.
 
-Do not require landing-burst timing for mandatory progression.
+Do not require landing-burst timing for mandatory progression. The burst is nevertheless a
+first-class speed source for optional lines: module preconditions that assume an entry speed, and
+stage clear-time targets, must account for a player who can reach 80% of the cap from any slam
+landing (D-077).
 
 ## 12. Validation
 

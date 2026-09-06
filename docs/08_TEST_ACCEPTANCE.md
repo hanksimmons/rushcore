@@ -108,8 +108,10 @@ Evaluate:
 - hill height/wavelength,
 - gap lengths,
 - bank radius,
+- charge-jump height / hang time / range at representative speeds,
+- landing-burst surge as an entry-speed source for optional lines,
 - camera distance,
-- sightline needs.
+- sightline: seconds of readable terrain ahead at the cap with the chase camera.
 
 Outcome:
 

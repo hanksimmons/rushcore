@@ -111,8 +111,7 @@ playtest:
   held only while you push W against it and at most `Yaw Reverse Hold Seconds` (1.0 s); release
   or steer and it swings behind you at once. Telemetry's camera row shows `REV-HOLD` while the
   hold is active. Turning it off restores the
-  fixed 45° isometric-like composition for A/B. **This contradicts D-058/D-059, 03 §14 and 06 §11
-  as written**; it is the playtest-directed baseline pending reconciliation at acceptance.
+  fixed 45° isometric-like composition (D-058/D-059, superseded by D-072) for A/B only.
 - Clipping defence: focus floored above ground; two same-frame sphere casts (focus→camera and
   ball→camera); shake bounded to the probe margin; lens floored above the heightfield
   (`Camera › Ground Clearance`).

@@ -66,7 +66,7 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 
 Accepted baseline (playtest 2026-09-05, preset `manual-finetune-punchy` promoted to compiled
 defaults): cap 148.5 m/s, steering 151 m/s² rising ×1.45 at the cap, gravity 39.4, ball radius
-2.125 m, jump 2→49.5 m/s over 0.45 s, slam 43 m/s + 141 m/s², apex window 0.62 s, Overdrive at
+2.125 m, jump 2→58.2 m/s over 0.45 s, slam 43 m/s + 141 m/s², apex window 0.62 s, Overdrive at
 131 m/s, chase camera.
 Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
@@ -114,7 +114,8 @@ playtest:
 
 ## Calibration terrain (seed-invariant)
 
-Terrain spans ±512 m, 4 m facets. Spawn on the flat plain at (470, 380).
+Terrain spans ±512 m, 4 m facets. Spawn on the flat plain at (470, 380). `World › Terrain Amplitude`
+(default 2.125) scales only the scenery hills; the instruments below keep their stated geometry.
 
 | Instrument | Where | Measures |
 |---|---|---|

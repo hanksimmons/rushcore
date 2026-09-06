@@ -129,7 +129,7 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 | V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |
 | V-008 | VALIDATE | Exact terrain/stage physical dimensions and heightfield sampling density. |
 | V-009 | VALIDATE | Exact stage clear-time and full-run duration targets. |
-| V-010 | RESOLVED | 2 → 49.5 m/s over 0.45 s, linear mapping sufficient, release grace 0.10 s. A bare tap is a hop by design; the charge is the jump. |
+| V-010 | RESOLVED | 2 → 58.2 m/s over 0.45 s, linear mapping sufficient, release grace 0.10 s. A bare tap is a hop by design; the charge is the jump. |
 | V-011 | RESOLVED | Window 0.62 s (D-073; |vY| ≤ 12.2 m/s at g = 39.4), slam ×1.35, impact ×1.35. Slam itself: 43 m/s initial, 141 m/s². |
 | V-012 | VALIDATE | Approximate successful-run level-up count; starting target 8–15. |
 

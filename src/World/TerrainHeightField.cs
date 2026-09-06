@@ -180,8 +180,11 @@ public sealed class TerrainHeightField
 
         float blend = Mathf.Min(wsum, 1f);
         float feature = wsum > 1e-4f ? hsum / wsum : 0f;
-        float hills = blend >= 0.999f ? 0f : Hills(x, z);
-        return _t.TerrainAmplitude * Mathf.Lerp(hills, feature, blend) + RimWall(x, z);
+        // Amplitude scales the scenery hills only. The engineered instruments (lane, grade
+        // fan, ramps, chasms, bowl, hairpin) are calibration rulers and keep their stated
+        // geometry at any amplitude.
+        float hills = blend >= 0.999f ? 0f : Hills(x, z) * _t.TerrainAmplitude;
+        return Mathf.Lerp(hills, feature, blend) + RimWall(x, z);
     }
 
     /// <summary>World boundary: a rim rising toward the heightfield edge so the lab reads

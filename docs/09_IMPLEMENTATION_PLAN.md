@@ -70,7 +70,7 @@ Deliver, in this order:
 - **route speed model** (D-081): pure-data 1D integration of the frozen baseline along a polyline, calibrated by the harness against the real ball on the strip runway and the lab grade fan; every later validator reads it — delivered 2026-09-05,
 - deterministic generation request/definition — delivered 2026-09-05,
 - route-first skeleton — delivered 2026-09-05 (D-084),
-- Rolling Highlands — delivered 2026-09-05 (D-085; playtest pending),
+- Rolling Highlands — delivered 2026-09-05 (D-085; playtest passed: reads as a landscape; difficulty reassessed after Phase 4),
 - heightfield pipeline — delivered (one height source feeds the existing tiled mesh and collider),
 - `ArrayMesh` — delivered (Phase 1 tiles reused),
 - `HeightMapShape3D` — delivered (Phase 1 collider reused),

@@ -149,6 +149,30 @@ The cap should be communicated through feel/VFX, not an abrupt visible “wall�
 
 **VALIDATE:** actual maximum speed.
 
+### Flow headroom (D-088)
+
+The hard cap above is the **base cap**: the free speed every driven ball reaches. Above it sits
+earned headroom:
+
+```text
+effectiveCap = baseCap × (1 + Flow × Headroom) + landingAllowance
+```
+
+- Flow is 0..1 (02 §8). Gains, at the moment of the action: the landing burst, a slam landing, a
+  charged jump (charge ≥ ½) at takeoff; later, crushes and challenge lines. Losses, at the moment
+  of the mistake: braking (per second of brake), a hard impact (one tick sheds more locomotion
+  speed than a threshold between two grounded or two airborne ticks), a hard landing without a
+  slam (vertical speed above a threshold); recovery sets Flow to zero. No time decay while a gain
+  is more recent than the chain window; after it, a slow idle decay.
+- Drive, gravity and boost accelerate up to the effective cap, so a held chain sits above the base
+  cap on any straight and every further perfect action buys more. A mistake drops the cap, and the
+  ball with it, toward the base cap, never below it.
+- Steering authority saturates at the base cap: the frozen steering curve (§4) is untouched, so
+  turn radius keeps growing as v² above it. Living on the edge costs line commitment, by design.
+- With Headroom 0 (or Flow 0) the controller is byte-identical to the D-078 baseline; every
+  D-078 value stays frozen and Flow's own values are the user's (§15).
+- The landing allowance (D-069) is measured against the Flow cap, not the base cap.
+
 ## 6. Gravity and slope behavior
 
 Slopes are a primary acceleration mechanic.
@@ -264,10 +288,13 @@ A **fresh `Space` press at the slam touchdown** fires the landing burst:
 - a short tunable window either side of the touchdown instant; a press during the slam is
   buffered and counts if it was inside the window when the ball lands,
 - the press is consumed: it never starts a charge and never jumps,
-- locomotion speed is set to a tunable fraction of the hard cap **along the current heading**,
-- it is a floor: a faster ball is never slowed, direction is never rewritten, the ball stays
-  grounded, and the normal drive/steer/cap pipeline continues on the same tick, so the burst reads
-  as a seamless surge out of the landing rather than a launch,
+- locomotion speed is **multiplied by a tunable factor** (1.0–1.3) **along the current heading**,
+  limited by the effective cap after the burst's own Flow gain (D-088; the 80%-of-cap floor of
+  D-077 is superseded: a burst at the cap must read as faster, and a chain of jump → slam → burst
+  keeps buying speed),
+- the ball is never slowed, direction is never rewritten, the ball stays grounded, and the normal
+  drive/steer/cap pipeline continues on the same tick, so the burst reads as a seamless surge out
+  of the landing rather than a launch,
 - feedback: electric-blue sparks, a mini sonic boom (ground shock ring plus an air-parting bow
   ring ahead of the ball), blue flash and a stretch along travel.
 
@@ -421,7 +448,11 @@ part of the same promotion.
 | Slam lateral retention | 1.0 | ACCEPTED |
 | Slam impact multiplier | 1.35 on every slam landing | ACCEPTED (D-077) |
 | Landing-burst window | ±0.10 s around the slam touchdown | ACCEPTED (D-077) |
-| Landing-burst speed | 80% of the cap along the current heading (floor only) | ACCEPTED (D-077) |
+| Landing-burst multiplier | ×1.15 of the current speed along the heading (slider 1.0–1.3), limited by the effective cap | PROVISIONAL (D-088; user's default, tuned by preset) |
+| Flow headroom | 0.33 → effective cap up to 197.5 m/s at full Flow (slider 0–1) | PROVISIONAL (D-088; user's default, V-013) |
+| Flow gains: burst / slam landing / charged jump | 0.35 / 0.15 / 0.10 | PROVISIONAL (D-088) |
+| Flow losses: brake per s / impact / plain landing | 1.0 / 0.5 (one-tick loss > 20 m/s) / 0.25 (vertical ≥ 30 m/s) | PROVISIONAL (D-088) |
+| Flow chain window / idle decay | 6 s / 0.05 per s after it | PROVISIONAL (D-088) |
 | Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
@@ -437,7 +468,8 @@ Expose:
 - full velocity,
 - useful/tangent speed,
 - vertical velocity,
-- effective hard speed cap,
+- effective hard speed cap (base and Flow cap),
+- Flow, seconds since the last gain, impact count,
 - speed band,
 - grounded state,
 - ground normal,
@@ -467,6 +499,8 @@ Before progression systems:
 - normal slam feels immediate/powerful,
 - the landing burst is learnable and reads as a seamless surge,
 - boost increases route possibility,
+- speed above the base cap is earned by chaining and lost only by mistakes; a mistake never drops
+  the ball below the base cap's reach (D-088),
 - mistakes are recoverable,
 - high-speed collisions are stable with CCD enabled and do not routinely tunnel through valid collision geometry.
 

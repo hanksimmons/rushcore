@@ -46,6 +46,10 @@ public partial class PlayerPhysics : RigidBody3D
     private float _capAllowance;
     private bool _landedThisTick;
 
+    // ---- Flow (02 §8, 03 §5, D-088): execution quality that raises the effective cap ----
+    private float _sinceFlowGain = float.PositiveInfinity;
+    private float _prevLocSpeed;
+
     // ---- recovery ----
     private Vector3 _checkpoint;
     private float _checkpointTimer;
@@ -77,6 +81,14 @@ public partial class PlayerPhysics : RigidBody3D
     public float LocomotionSpeed { get; private set; }
     public float VerticalSpeed => Velocity.Y;
     public float LocomotionCap => _t.Movement.HardMaxLocomotionSpeed;
+    /// <summary>Flow 0..1: gained by perfect actions, lost by mistakes, never by time while a chain lives.</summary>
+    public float Flow { get; private set; }
+    /// <summary>Seconds since the last Flow gain (∞ before the first).</summary>
+    public float SinceFlowGain => _sinceFlowGain;
+    /// <summary>Base cap raised by Flow headroom: base × (1 + Flow × Headroom).</summary>
+    public float FlowCap => Mathf.Max(0.001f, _t.Movement.HardMaxLocomotionSpeed) * (1f + Flow * Mathf.Max(0f, _t.Flow.Headroom));
+    /// <summary>Hard impacts counted (one-tick locomotion loss above the tuned threshold).</summary>
+    public int ImpactCount { get; private set; }
     public SpeedBand Band { get; private set; } = SpeedBand.Roll;
     public bool IsCharging => _isCharging;
     public float ChargeSeconds => _chargeSeconds;
@@ -91,7 +103,7 @@ public partial class PlayerPhysics : RigidBody3D
     public float LastBurstSpeed { get; private set; }
     public int BurstCount { get; private set; }
     /// <summary>Cap currently enforced: base cap plus any decaying landing allowance.</summary>
-    public float EffectiveLocomotionCap => _t.Movement.HardMaxLocomotionSpeed + _capAllowance;
+    public float EffectiveLocomotionCap => FlowCap + _capAllowance;
     public bool SlamActive => _slamActive;
     /// <summary>Vertical speed established by the most recent jump release.</summary>
     public float LastTakeoffVerticalSpeed { get; private set; }
@@ -230,15 +242,26 @@ public partial class PlayerPhysics : RigidBody3D
         float speed = vT.Length();
 
         var m = _t.Movement;
+        var f = _t.Flow;
         float cap = Mathf.Max(0.001f, m.HardMaxLocomotionSpeed);
+        // Steering authority saturates at the base cap: the frozen curve (03 §4) is untouched by headroom.
         float speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
+
+        // Flow mistakes read from the ball, not from a subsystem: a hard impact sheds locomotion
+        // speed in one tick between two grounded (or two airborne) ticks; brake and idle are below.
+        _sinceFlowGain += dt;
+        if (wasGrounded == IsGrounded && _prevLocSpeed - speed > f.ImpactSpeedLoss)
+        {
+            ImpactCount++;
+            LoseFlow(f.LossImpact);
+        }
 
         // Landing converts world-horizontal speed into ground-tangent speed, which is
         // larger by 1/cos(slope). Clipping that in one tick reads as hitting a wall, so
         // the excess becomes a short-lived allowance that bleeds away (03 §5, D-069).
-        if (_landedThisTick && speed > cap) _capAllowance = Mathf.Max(_capAllowance, speed - cap);
+        float flowCap = FlowCap;
+        if (_landedThisTick && speed > flowCap) _capAllowance = Mathf.Max(_capAllowance, speed - flowCap);
         _capAllowance = Mathf.Max(0f, _capAllowance - m.LandingCapBleed * dt);
-        float effectiveCap = cap + _capAllowance;
 
         Vector3 curDir = speed > 0.5f ? vT / speed : Vector3.Zero;
         // S / stick-back is a brake, never a reverse drive (D-076): it has no direction of
@@ -248,30 +271,27 @@ public partial class PlayerPhysics : RigidBody3D
         Vector3 desiredDir = ComputeDesiredDirection(planeNormal, curDir, driveInput);
         float inputMag = Mathf.Min(driveInput.Length(), 1f);
 
-        // ---- landing burst (D-077): a speed floor along the current heading, nothing else ----
-        // Direction is never rewritten and a faster ball is never slowed, so the burst
-        // reads as a seamless surge out of the landing rather than a launch.
+        // ---- landing burst (D-077, D-088): multiply the current speed along the current heading ----
+        // Direction is never rewritten and the ball is never slowed, so the burst reads as a
+        // seamless surge out of the landing. The burst's own Flow gain lands first, so the
+        // multiplied speed is limited by the raised effective cap it just earned.
         if (_pendingBurst)
         {
             _pendingBurst = false;
-            float burst = Mathf.Clamp(_t.JumpSlam.LandingBurstSpeedFraction, 0f, 1f) * cap;
-            Vector3 dir = curDir != Vector3.Zero ? curDir : desiredDir;
-            if (dir == Vector3.Zero && CameraBasis is not null)
+            AddFlow(f.GainBurst);
+            float limit = FlowCap + _capAllowance;
+            if (curDir != Vector3.Zero && speed > 0.5f)
             {
-                dir = CameraBasis.FlatForward - planeNormal * CameraBasis.FlatForward.Dot(planeNormal);
-                dir = dir.LengthSquared() > 1e-6f ? dir.Normalized() : Vector3.Zero;
-            }
-            if (dir != Vector3.Zero && speed < burst)
-            {
-                vT = dir * burst;
-                speed = burst;
+                float target = Mathf.Min(speed * Mathf.Max(1f, _t.JumpSlam.LandingBurstMultiplier), Mathf.Max(speed, limit));
+                vT = curDir * target;
+                speed = target;
                 speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
-                curDir = dir;
             }
-            LastBurstSpeed = vT.Length();
+            LastBurstSpeed = speed;
             BurstCount++;
             LandingBurst?.Invoke(LastBurstSpeed);
         }
+        float effectiveCap = FlowCap + _capAllowance;
 
         // ---- authority ----
         float lateral = m.GroundSteeringLateralAccel * Mathf.Lerp(1f, m.HighSpeedSteeringMultiplier, speed01);
@@ -326,7 +346,9 @@ public partial class PlayerPhysics : RigidBody3D
         {
             float shed = Mathf.Min(speed, drive * brake01 * dt);
             vT -= curDir * shed;
+            LoseFlow(f.LossBrakePerSecond * brake01 * dt);   // braking is the one voluntary mistake
         }
+        if (_sinceFlowGain > f.ChainWindowSeconds) LoseFlow(f.IdleDecayPerSecond * dt);
 
         ApplyBoost(ref vT, planeNormal, curDir, desiredDir, speed01, dt);
 
@@ -362,6 +384,7 @@ public partial class PlayerPhysics : RigidBody3D
         UpdateSpeedBand(locSpeed);
         UpdateBoostMeter(dt);
         UpdateCheckpoint(state, dt);
+        _prevLocSpeed = locSpeed;
 
         _jumpPressedEdge = false;
         _jumpReleasedEdge = false;
@@ -390,6 +413,9 @@ public partial class PlayerPhysics : RigidBody3D
         _jumpLockout = 0f;
         _groundStick = 0f;
         _capAllowance = 0f;
+        Flow = 0f;                                   // recovery / teleport ends the chain (02 §8)
+        _sinceFlowGain = float.PositiveInfinity;
+        _prevLocSpeed = 0f;
         _rawGrounded = false;
         IsGrounded = false;
         _groundNormal = Vector3.Up;
@@ -445,6 +471,10 @@ public partial class PlayerPhysics : RigidBody3D
         if (wasSlam && _sinceSlamPress <= _t.JumpSlam.LandingBurstWindowSeconds) FireBurst();
         _sinceSlamPress = float.PositiveInfinity;
 
+        // Flow (02 §8): a slam landing is a perfect action; a hard landing without one is a mistake.
+        if (wasSlam) AddFlow(_t.Flow.GainSlamLanding);
+        else if (Mathf.Abs(preVerticalSpeed) >= _t.Flow.PlainLandingSpeed) LoseFlow(_t.Flow.LossPlainLanding);
+
         Landed?.Invoke(Mathf.Abs(preVerticalSpeed), wasSlam);
     }
 
@@ -452,6 +482,19 @@ public partial class PlayerPhysics : RigidBody3D
     {
         _burstArmed = false;
         _pendingBurst = true;
+    }
+
+    private void AddFlow(float amount)
+    {
+        if (amount <= 0f) return;
+        Flow = Mathf.Min(1f, Flow + amount);
+        _sinceFlowGain = 0f;
+    }
+
+    private void LoseFlow(float amount)
+    {
+        if (amount <= 0f) return;
+        Flow = Mathf.Max(0f, Flow - amount);
     }
 
     private void UpdateJumpInput(float dt, ref Vector3 v)
@@ -517,6 +560,7 @@ public partial class PlayerPhysics : RigidBody3D
             // Preserve all useful horizontal momentum; only establish upward velocity (D-012).
             v.Y = Mathf.Max(v.Y, takeoff);
             LastTakeoffVerticalSpeed = v.Y;
+            if (charge01 >= 0.5f) AddFlow(_t.Flow.GainChargedJump);   // a large, risky jump (02 §8)
 
             _isCharging = false;
             _chargeSeconds = 0f;

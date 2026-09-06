@@ -29,7 +29,7 @@ Anything not required to prove that proposition is deferred.
   - steering is disabled while charging.
 - Air steering.
 - Ground slam triggered by a new jump/slam press while airborne.
-- Every slam landing is a power impact; a Space press at the slam touchdown fires a landing burst (speed surge to a tuned fraction of the cap along the current heading).
+- Every slam landing is a power impact; a Space press at the slam touchdown fires a landing burst (current speed multiplied by a tuned factor along the current heading, limited by the effective cap; D-088).
 - Boost with finite/refillable meter, including slow emergency passive regeneration plus active refill sources.
 - Boost usable in air.
 - Boost direction blended between current travel direction and desired input, with current trajectory dominating at high speed.
@@ -105,7 +105,8 @@ Terrain archetypes do not secretly change player physics.
 
 - Measures uninterrupted skilled execution, not raw speed.
 - Increases through high-quality traversal/combat/shortcut play.
-- Decays slowly when play loses momentum and drops strongly on major mistakes.
+- Drops on mistakes; decays only when play loses momentum (D-088).
+- Raises the effective speed cap above the frozen base cap (Flow headroom, D-088): speed above the base is earned and kept by chaining, lost by mistakes.
 - Rewards score plus modest XP/currency bonuses and stronger presentation.
 - Does not initially provide a large damage multiplier.
 

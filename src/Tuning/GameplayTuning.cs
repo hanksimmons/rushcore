@@ -81,9 +81,36 @@ public sealed class JumpSlamTuning
     /// <summary>Landing burst (D-077): a fresh Space press within this many seconds either side
     /// of a slam touchdown fires the burst. Presses during the slam are buffered.</summary>
     public float LandingBurstWindowSeconds = 0.10f;
-    /// <summary>The burst sets locomotion speed to this fraction of the hard cap along the
-    /// current heading; it never slows a faster ball and never changes direction.</summary>
-    public float LandingBurstSpeedFraction = 0.8f;
+    /// <summary>The burst multiplies the current locomotion speed by this factor along the
+    /// current heading, limited by the effective cap (Flow headroom, D-088); it never slows
+    /// the ball and never changes direction.</summary>
+    public float LandingBurstMultiplier = 1.15f;
+}
+
+/// <summary>
+/// Flow headroom (02 §8, 03 §5, D-088): Flow (0..1) measures execution quality and raises the
+/// effective locomotion cap to base × (1 + Flow × Headroom). Gains come from perfect actions,
+/// losses from mistakes; there is no time decay while a chain is alive. The base cap and every
+/// D-078 value stay frozen; with Flow at zero the controller is byte-identical to the baseline.
+/// </summary>
+public sealed class FlowTuning
+{
+    public float Headroom = 0.33f;
+    public float GainBurst = 0.35f;
+    public float GainSlamLanding = 0.15f;
+    /// <summary>Granted at takeoff when the charge is at least half (a large, risky jump).</summary>
+    public float GainChargedJump = 0.10f;
+    /// <summary>Flow shed per second of full brake.</summary>
+    public float LossBrakePerSecond = 1.0f;
+    /// <summary>Flow lost when one tick sheds more than <see cref="ImpactSpeedLoss"/> of locomotion speed.</summary>
+    public float LossImpact = 0.5f;
+    public float ImpactSpeedLoss = 20f;
+    /// <summary>Flow lost on a landing without a slam whose vertical speed is at least <see cref="PlainLandingSpeed"/>.</summary>
+    public float LossPlainLanding = 0.25f;
+    public float PlainLandingSpeed = 30f;
+    /// <summary>Seconds after the last gain during which Flow does not decay.</summary>
+    public float ChainWindowSeconds = 6f;
+    public float IdleDecayPerSecond = 0.05f;
 }
 
 public sealed class BoostTuning
@@ -181,6 +208,7 @@ public sealed class GameplayTuning
     public readonly CameraTuning Camera = new();
     public readonly VfxTuning Vfx = new();
     public readonly WorldTuning World = new();
+    public readonly FlowTuning Flow = new();
 
     public const string CatMovement = "Movement";
     public const string CatJumpSlam = "Jump / Slam";
@@ -188,9 +216,10 @@ public sealed class GameplayTuning
     public const string CatCamera = "Camera";
     public const string CatVfx = "VFX";
     public const string CatWorld = "World";
+    public const string CatFlow = "Flow";
 
     public static readonly string[] Categories =
-        { CatMovement, CatJumpSlam, CatBoost, CatCamera, CatVfx, CatWorld };
+        { CatMovement, CatJumpSlam, CatBoost, CatFlow, CatCamera, CatVfx, CatWorld };
 
     public IReadOnlyList<TuningParameter> Parameters { get; }
     public IReadOnlyList<TuningToggle> Toggles { get; }
@@ -234,7 +263,20 @@ public sealed class GameplayTuning
         F(CatJumpSlam, "Slam Lateral Retention", 0.3f, 1f, () => j.SlamLateralRetention, v => j.SlamLateralRetention = v);
         F(CatJumpSlam, "Slam Impact Mult", 1f, 4f, () => j.SlamImpactMultiplier, v => j.SlamImpactMultiplier = v);
         F(CatJumpSlam, "Burst Window (s)", 0.02f, 0.5f, () => j.LandingBurstWindowSeconds, v => j.LandingBurstWindowSeconds = v);
-        F(CatJumpSlam, "Burst Speed Fraction", 0f, 1f, () => j.LandingBurstSpeedFraction, v => j.LandingBurstSpeedFraction = v);
+        F(CatJumpSlam, "Burst Multiplier", 1f, 1.3f, () => j.LandingBurstMultiplier, v => j.LandingBurstMultiplier = v);
+
+        var fl = Flow;
+        F(CatFlow, "Headroom", 0f, 1f, () => fl.Headroom, v => fl.Headroom = v);
+        F(CatFlow, "Gain: Burst", 0f, 1f, () => fl.GainBurst, v => fl.GainBurst = v);
+        F(CatFlow, "Gain: Slam Landing", 0f, 1f, () => fl.GainSlamLanding, v => fl.GainSlamLanding = v);
+        F(CatFlow, "Gain: Charged Jump", 0f, 1f, () => fl.GainChargedJump, v => fl.GainChargedJump = v);
+        F(CatFlow, "Loss: Brake /s", 0f, 5f, () => fl.LossBrakePerSecond, v => fl.LossBrakePerSecond = v);
+        F(CatFlow, "Loss: Impact", 0f, 1f, () => fl.LossImpact, v => fl.LossImpact = v);
+        F(CatFlow, "Impact Speed Loss (m/s)", 5f, 80f, () => fl.ImpactSpeedLoss, v => fl.ImpactSpeedLoss = v);
+        F(CatFlow, "Loss: Plain Landing", 0f, 1f, () => fl.LossPlainLanding, v => fl.LossPlainLanding = v);
+        F(CatFlow, "Plain Landing Speed (m/s)", 5f, 80f, () => fl.PlainLandingSpeed, v => fl.PlainLandingSpeed = v);
+        F(CatFlow, "Chain Window (s)", 0f, 20f, () => fl.ChainWindowSeconds, v => fl.ChainWindowSeconds = v);
+        F(CatFlow, "Idle Decay /s", 0f, 1f, () => fl.IdleDecayPerSecond, v => fl.IdleDecayPerSecond = v);
 
         var b = Boost;
         F(CatBoost, "Boost Acceleration", 0f, 200f, () => b.BoostAcceleration, v => b.BoostAcceleration = v);

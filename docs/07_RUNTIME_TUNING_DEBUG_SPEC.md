@@ -35,7 +35,8 @@ Expose first:
 - SlamSteeringMultiplier
 - SlamImpactMultiplier
 - LandingBurstWindowSeconds
-- LandingBurstSpeedFraction
+- LandingBurstMultiplier
+- Flow headroom, gains (burst, slam landing, charged jump), losses (brake, impact, plain landing) with their thresholds, chain window, idle decay (D-088)
 - BoostAcceleration
 - BoostDirectionBlend
 - BoostCapacity

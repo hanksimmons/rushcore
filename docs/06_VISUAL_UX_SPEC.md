@@ -108,6 +108,10 @@ Do not show a large timing minigame or QTE indicator.
 
 Players should learn the timing from motion and feedback.
 
+Speed above the base cap (Flow headroom, D-088) must read as more speed: camera distance and FOV
+keep extrapolating past the base cap (delivered with the mechanic), and Overdrive gets a distinct
+look at Gate V0 (streaks, tint, stronger roll dust). A 25% number increase reads as nothing without it.
+
 ## 8. Enemy visual language
 
 ### Pylon

@@ -64,9 +64,11 @@ Toy contains only:
 - New Space press while airborne triggers slam.
 - Slam preserves configured lateral momentum.
 - Every slam landing raises the power impact (slam flag on the landing event).
-- A Space press inside the burst window either side of a slam touchdown fires the landing burst: speed set to the tuned fraction of the cap along the unchanged heading, ball still grounded, and the press never starts a charge or a jump.
+- A Space press inside the burst window either side of a slam touchdown fires the landing burst: speed multiplied by the tuned factor along the unchanged heading, limited by the effective cap, ball still grounded, and the press never starts a charge or a jump.
 - A press outside the window, or after a plain (non-slam) landing, is an ordinary charge and never a burst.
-- The burst never slows a faster ball.
+- The burst never slows the ball.
+- Flow headroom (D-088): Flow is zero after a recovery and the cap is the base cap; a charged jump, a slam landing and a burst each grant Flow and the chain stacks; with Flow the ball travels above the base cap and never above the effective cap; no time decay inside the chain window; braking drains Flow and the cap falls with it; with headroom 0 the cap is the frozen base cap; a clean drive on the rig and on a generated corridor registers no impact; recovery zeroes Flow.
+- Thin-wall CCD holds at the Flow ceiling (base cap × (1 + headroom)) as well as at the base cap.
 - Boost works on ground and air.
 - Boost cannot bypass hard locomotion cap.
 - Slow passive boost regeneration and active refill follow tuning.
@@ -122,6 +124,11 @@ Outcome:
 **Result:** M1 passed provisionally 2026-09-05 (D-082, `docs/11`): the family is derived from the frozen
 envelope and the strip/budget measurements; the feel verdicts and the frame-time reading are taken on the
 first generated stage instead of the strip.
+
+**M1 addendum (D-088, pending):** the Flow ceiling re-derives the safety side of the family. Measure on the
+strip at base cap × (1 + headroom): crest contact radius, turn radius, sightline, cell contact, landing run
+after a launch; the route speed model gains an airborne-and-landing phase calibrated there. Generation then
+reads two speeds (04 §12).
 
 ## 5. Procedural Generation — Gate G0
 

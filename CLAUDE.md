@@ -72,7 +72,8 @@ The Movement Toy must implement these accepted behaviors:
 - new Space press while airborne slams,
 - slam preserves lateral momentum and commits downward,
 - every slam landing is the power impact (stronger impact and feedback than a plain fall),
-- a fresh Space press at the slam touchdown, inside a short tunable window (early presses during the slam are buffered), fires the **landing burst**: blue sparks, a mini sonic boom with an air-parting ring, and locomotion speed set to a tunable fraction of the cap along the current heading; it is a floor (never slows a faster ball), never changes direction, and the press never starts a charge,
+- a fresh Space press at the slam touchdown, inside a short tunable window (early presses during the slam are buffered), fires the **landing burst**: blue sparks, a mini sonic boom with an air-parting ring, and locomotion speed multiplied by a tunable factor (1.0–1.3) along the current heading, limited by the effective cap (D-088); it never slows the ball, never changes direction, and the press never starts a charge,
+- **Flow headroom** (D-088): the hard cap is the base cap; the effective cap is base × (1 + Flow × headroom). Flow is gained by perfect actions (burst, slam landing, charged jump; later crushes and challenge lines), lost by mistakes (brake, hard impact, hard landing without a slam, recovery) and never by time while a chain is alive. Steering saturates at the base cap. With headroom 0 the controller is the frozen baseline,
 - there is no perfect-apex mechanic: it was prototyped and removed after playtest (D-077),
 - landing-burst logic stays simple and local (two timers, one window),
 - boost works in air,
@@ -246,8 +247,9 @@ After coding:
 
 Until the implementation plan advances:
 
-> **Phase 2 — Procedural Terrain Core** (Movement Toy accepted 2026-09-05; Gate M0 passed; Gate G0
-> objective checks for Rolling Highlands passed 2026-09-06, D-087). Phase 3 (Terrain Variety) opens
-> when the user accepts the G0 manual sample.
+> **Phase 2C — Flow headroom** (D-088), inserted after Gate G0's objective closure (D-087) and before
+> Phase 3. The mechanic is in the toy with the user's provisional values; the user tunes it and names
+> a preset final, then the ceiling addendum (08 §4) re-derives the safety side of the world scale.
+> Phase 3 (Terrain Variety) opens at Gate F0 with the G0 manual sample played with Flow on.
 
-The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-078: the user's `boost-finetune-final` preset, promoted verbatim) is frozen input to generation. Do not retune it while building Phase 2; a change only enters through a saved preset that the user names final, promoted verbatim and logged.
+The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-078: the user's `boost-finetune-final` preset, promoted verbatim) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is a layer above that baseline with its own tuning values; with headroom 0 the controller is the baseline.

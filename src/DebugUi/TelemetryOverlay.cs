@@ -28,7 +28,7 @@ public partial class TelemetryOverlay : Control
     private enum Row
     {
         Frame, Physics, State, Band, Ground, Normal, Velocity, Locomotion, Vertical,
-        Charge, Takeoff, Slam, Burst, Boost, Steering, Input, Impact,
+        Charge, Takeoff, Slam, Burst, Flow, Boost, Steering, Input, Impact,
         Position, Checkpoint, Camera, Seed, Stage, Tuning, Count,
     }
 
@@ -84,6 +84,7 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Takeoff, "takeoff");
         AddRow(Row.Slam, "slam");
         AddRow(Row.Burst, "burst");
+        AddRow(Row.Flow, "flow");
         AddRow(Row.Boost, "boost");
         AddRow(Row.Steering, "steering");
         AddRow(Row.Input, "input");
@@ -144,7 +145,7 @@ public partial class TelemetryOverlay : Control
         Set(Row.Ground, $"{OnOff(p.IsGrounded)}   raw {OnOff(p.IsRawGrounded)}");
         Set(Row.Normal, $"{n.X,6:0.00} {n.Y,6:0.00} {n.Z,6:0.00}");
         Set(Row.Velocity, $"{v.X,7:0.0} {v.Y,7:0.0} {v.Z,7:0.0}   |v| {v.Length():0.0}");
-        Set(Row.Locomotion, $"{p.LocomotionSpeed,6:0.0} / {p.LocomotionCap:0.0} m/s");
+        Set(Row.Locomotion, $"{p.LocomotionSpeed,6:0.0} / {p.EffectiveLocomotionCap:0.0} m/s   (base {p.LocomotionCap:0.0})");
         Set(Row.Vertical, $"{p.VerticalSpeed,6:0.0} m/s");
         Set(Row.Charge, p.IsCharging
             ? $"{p.ChargeSeconds:0.00}s  ({p.Charge01:0.00})"
@@ -156,6 +157,8 @@ public partial class TelemetryOverlay : Control
         Set(Row.Burst, p.BurstWindowOpen
             ? $"WINDOW OPEN  {p.BurstWindowRemaining * 1000f:0} ms left"
             : $"idle   ±{_debug.Tuning.JumpSlam.LandingBurstWindowSeconds * 1000f:0} ms   count {p.BurstCount}  last {p.LastBurstSpeed:0.0} m/s");
+        Set(Row.Flow, $"{p.Flow,5:0.00}   cap {p.FlowCap:0.0} m/s (headroom {_debug.Tuning.Flow.Headroom:P0})   " +
+                      $"chain {(float.IsPositiveInfinity(p.SinceFlowGain) ? "—" : $"{p.SinceFlowGain:0.0} s")}   impacts {p.ImpactCount}");
         Set(Row.Boost, $"{p.BoostAmount,6:0.0} ({p.Boost01:0.00}) {(p.BoostActive ? "FIRING" : "")}");
         Set(Row.Steering, $"{p.SteeringAuthority:0.0} m/s2");
         Set(Row.Input, $"{input.X,6:0.00} {input.Y,6:0.00}");

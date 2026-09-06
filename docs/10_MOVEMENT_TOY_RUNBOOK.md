@@ -21,7 +21,7 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 | Input | Action |
 |---|---|
 | W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes** (never reverses, D-076). Spawn faces down the lane (−X). |
-| Space / A | press on ground = charge; release = jump; new press in air = slam; **press again at the slam touchdown = landing burst** (±0.10 s; a press during the slam is buffered) |
+| Space / A | press on ground = charge; release = jump; new press in air = slam; **press again at the slam touchdown = landing burst** (±0.10 s; a press during the slam is buffered; ×1.15 of your speed, D-088) |
 | Shift / X | boost (ground and air) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
@@ -68,8 +68,8 @@ Accepted baseline (playtest 2026-09-05, final preset `boost-finetune-final` prom
 defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5 m/s, steering
 151.25 m/s² rising ×1.45 at the cap, gravity 39.38, air control 0.308, ball radius 2.125 m, jump
 2.03→58.21 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
-landing burst ±0.10 s → 80% of the cap, boost 88.64 m/s², Overdrive at 141.06 m/s, chase camera
-(follow 4.99/s).
+landing burst ±0.10 s → ×1.15 of the current speed (D-088, was 80% of the cap), boost 88.64 m/s²,
+Overdrive at 141.06 m/s, chase camera (follow 4.99/s). Above the base cap sits Flow headroom (below).
 Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.
@@ -96,9 +96,18 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:
 
-- **Landing burst** (`Jump › Burst Window (s)` = 0.10, `Burst Speed Fraction` = 0.8, D-077): press
-  Space again at the slam touchdown to surge to 80% of the cap along your heading. Telemetry's
-  `burst` row shows the window while it is open. `VFX › Burst Effect` scales the sparks and rings.
+- **Landing burst** (`Jump › Burst Window (s)` = 0.10, `Burst Multiplier` = 1.15, slider 1.0–1.3;
+  D-077/D-088): press Space again at the slam touchdown to multiply your speed along your heading,
+  limited by the effective cap. Telemetry's `burst` row shows the window while it is open.
+  `VFX › Burst Effect` scales the sparks and rings.
+- **Flow headroom** (`Flow` panel category, D-088): the `flow` telemetry row shows Flow 0..1, the
+  Flow cap (base 148.5 × (1 + Flow × `Headroom` 0.33) → 197.5 at full Flow), seconds since the last
+  gain and the impact count; the `locomotion` row shows speed over the effective cap. Gains: burst
+  0.35, slam landing 0.15, charged jump 0.10. Losses: brake 1.0 per second held, impact 0.5 (a tick
+  that sheds > 20 m/s), plain landing 0.25 (no slam, vertical ≥ 30 m/s); recovery → 0. No decay for
+  6 s after a gain, then 0.05 per second. Tune it on the runway: boost to the cap, charge-jump, slam,
+  burst at touchdown, keep driving: the ball climbs past 148.5. Brake (S) and watch the cap fall.
+  `Headroom` 0 is the frozen baseline. Name the preset final and it is promoted verbatim.
 - **Landing Cap Bleed = 39.95 m/s²** (new, `Move`). Landing on a slope at the cap makes tangent
   speed exceed the cap by 1/cos(slope) (D-069); the excess now bleeds over ~0.2 s instead of
   clipping in one tick. Set very high to restore the instant clamp.
@@ -153,7 +162,9 @@ x = +3110 facing −X; distance s is metres from the spawn, on every 100 m post.
 Reference envelope at the frozen baseline: turn radius ≈ 100 m at the cap; full-charge jump
 43 m up, 2.96 s hang, ≈ 180 m range at 60 m/s and ≈ 440 m at the cap; 0→cap **7.1 s / ≈ 580 m**
 unboosted (measured by the harness on the runway; the earlier paper figure of 5.3 s / 394 m
-ignored drag); landing burst → 118.8 m/s from any slam touchdown.
+ignored drag); landing burst → ×1.15 of the touchdown speed (D-088; the 118.8 m/s floor is gone).
+Flow ceiling 197.5 m/s at full Flow with headroom 0.33: turn radius ≈ 178 m, crest contact radius
+≈ 990 m; the ceiling addendum (08 §4) measures these on the strip.
 
 ### Route speed model (D-081)
 
@@ -267,9 +278,9 @@ hops; at 8 m it is grounded 86% with 8 hops. Judge cell size on contact first, t
 
 **Crest contact.** A ball leaves the ground at any crest whose radius is below v²/g:
 
-| Speed | 60 m/s | 100 m/s | 118.8 (burst) | 148.5 (cap) |
+| Speed | 60 m/s | 100 m/s | 148.5 (base cap) | 197.5 (Flow ceiling) |
 |---|---|---|---|---|
-| Minimum crest radius to stay grounded | 91 m | 254 m | 358 m | 560 m |
+| Minimum crest radius to stay grounded | 91 m | 254 m | 560 m | 990 m |
 
 A cosine hill of wavelength λ and height H has crest radius λ²/(2π²H): the strip's 100/10,
 200/20, 400/40 and 800/80 stations keep contact only up to ≈ 45, 63, 89 and 126 m/s. Above

@@ -34,7 +34,9 @@ The visible ball roll is presentation-driven and does not need to be a literal m
 ## 2. Coordinate/input conventions
 
 - `Vector3.Up` is world up.
-- Prototype steering is camera-relative **WASD**.
+- Prototype steering is camera-relative **WASD**. `W` drives along the view, `A`/`D` steer,
+  and `S` / stick-back is a **brake**: it sheds speed along the current heading and never
+  drives in reverse (D-076). There is no reverse locomotion.
 - `Space` is the shared charge-jump / airborne-slam input. Charge starts only from ground contact; a new airborne press is otherwise unambiguously slam.
 - Ground movement is projected onto the usable surface tangent.
 - Player collision is a true sphere.
@@ -92,7 +94,12 @@ turnRadius ≈ speed² / lateralAcceleration
 
 This need not be a physically exact vehicle model.
 
-**VALIDATE:** exact steering curve/authority falloff in the Movement Toy.
+Input within ~30° of straight against the heading has no turn side; it only brakes (negative
+alignment). Clear lateral intent (W+A/D, a deflected stick) makes the turn side unambiguous and
+the normal lateral-authority rotation applies, so a hairpin is always the player's choice,
+never a direction picked by numerical noise.
+
+Steering curve/authority falloff was validated in the Movement Toy (§15, V-002).
 
 ### Charge-jump steering lock
 
@@ -367,8 +374,11 @@ Presentation styling lives in `06`. Accepted after playtest (D-072): a **chase c
 Mechanically:
 
 - yaw follows the player's flat velocity heading with damping and a turn-rate cap,
-- yaw holds below a minimum speed, on reverse intent (input pushing back relative to the view),
-  and when velocity reverses without input, so the view never swings 180° and inverts the controls,
+- yaw holds below a minimum speed, so a resting ball never spins the view,
+- after the heading reverses (wall bounce, backward slide) the yaw is held only while the
+  player pushes forward against it, and never longer than a tunable bound; a quick recovery
+  therefore never swings the view twice, yet the camera always ends up behind the direction
+  of travel. There is no reverse-drive hold because `S` cannot reverse (D-076),
 - fixed pitch; no manual rotation; player may adjust baseline zoom within limits,
 - focus/look target leads along useful velocity; look-ahead grows with speed and is bounded,
 - distance/FOV grow modestly with speed,

@@ -20,6 +20,9 @@ public partial class PlayerPhysics : RigidBody3D
 
     // ---- input snapshot, sampled on the main thread in _PhysicsProcess ----
     private Vector2 _moveInput;
+    /// <summary>cos(150°): desired input closer than 30° to straight against the heading brakes
+    /// instead of turning, so plain W/S can never spin the ball (D-076).</summary>
+    private const float BrakeConeDot = -0.866f;
     private bool _boostHeld;
     private bool _jumpPressedEdge, _jumpReleasedEdge, _jumpHeld;
 
@@ -231,8 +234,12 @@ public partial class PlayerPhysics : RigidBody3D
         float effectiveCap = cap + _capAllowance;
 
         Vector3 curDir = speed > 0.5f ? vT / speed : Vector3.Zero;
-        Vector3 desiredDir = ComputeDesiredDirection(planeNormal, curDir);
-        float inputMag = Mathf.Min(_moveInput.Length(), 1f);
+        // S / stick-back is a brake, never a reverse drive (D-076): it has no direction of
+        // its own, so the travel heading, and therefore the chase camera, cannot flip from it.
+        Vector2 driveInput = new(_moveInput.X, Mathf.Max(0f, _moveInput.Y));
+        float brake01 = Mathf.Clamp(-_moveInput.Y, 0f, 1f);
+        Vector3 desiredDir = ComputeDesiredDirection(planeNormal, curDir, driveInput);
+        float inputMag = Mathf.Min(driveInput.Length(), 1f);
 
         // ---- authority ----
         float lateral = m.GroundSteeringLateralAccel * Mathf.Lerp(1f, m.HighSpeedSteeringMultiplier, speed01);
@@ -256,13 +263,19 @@ public partial class PlayerPhysics : RigidBody3D
                 // a_lat = v * omega  =>  turnRadius = v^2 / a_lat
                 float maxAngle = lateral * dt / speed;
                 Vector3 axis = curDir.Cross(desiredDir);
-                axis = axis.LengthSquared() < 1e-8f ? planeNormal : axis.Normalized();
-                curDir = curDir.Rotated(axis, Mathf.Min(maxAngle, angle));
-                vT = curDir * speed;
+                // Input within the brake cone of straight against the heading has no turn
+                // side: it only brakes (negative-alignment drive below), it is never a U-turn
+                // whose direction float noise would pick. Clear lateral intent (W+A/D) makes
+                // the side unambiguous and the normal hairpin applies.
+                if (curDir.Dot(desiredDir) > BrakeConeDot && axis.LengthSquared() >= 1e-6f)
+                {
+                    curDir = curDir.Rotated(axis.Normalized(), Mathf.Min(maxAngle, angle));
+                    vT = curDir * speed;
+                }
             }
         }
 
-        // ---- longitudinal drive (negative alignment brakes) ----
+        // ---- longitudinal drive (negative alignment still brakes on sharp turns) ----
         if (inputMag > 0.01f && desiredDir != Vector3.Zero)
         {
             if (speed > 0.5f)
@@ -274,6 +287,13 @@ public partial class PlayerPhysics : RigidBody3D
             {
                 vT += desiredDir * (drive * inputMag * dt);
             }
+        }
+
+        // ---- brake: shed speed along the current heading, never through zero ----
+        if (brake01 > 0.01f && speed > 0.5f)
+        {
+            float shed = Mathf.Min(speed, drive * brake01 * dt);
+            vT -= curDir * shed;
         }
 
         ApplyBoost(ref vT, planeNormal, curDir, desiredDir, speed01, dt);
@@ -481,7 +501,7 @@ public partial class PlayerPhysics : RigidBody3D
         Slammed?.Invoke(perfect);
     }
 
-    private Vector3 ComputeDesiredDirection(Vector3 planeNormal, Vector3 curDir)
+    private Vector3 ComputeDesiredDirection(Vector3 planeNormal, Vector3 curDir, Vector2 driveInput)
     {
         // While charging, propulsion follows the existing travel heading instead of
         // letting WASD redirect the ball (03 §4).
@@ -489,7 +509,7 @@ public partial class PlayerPhysics : RigidBody3D
 
         Vector3 fwd = CameraBasis?.FlatForward ?? Vector3.Forward;
         Vector3 right = CameraBasis?.FlatRight ?? Vector3.Right;
-        Vector3 desired = right * _moveInput.X + fwd * _moveInput.Y;
+        Vector3 desired = right * driveInput.X + fwd * driveInput.Y;
         desired -= planeNormal * desired.Dot(planeNormal);
         return desired.LengthSquared() > 1e-6f ? desired.Normalized() : Vector3.Zero;
     }

@@ -55,6 +55,7 @@ The Movement Toy must implement these accepted behaviors:
 
 - real 3D rigid-body physics with arcade authority,
 - WASD camera-relative steering,
+- S / stick-back is a brake only; there is no reverse drive (D-076),
 - tight low-speed steering and broader high-speed arcs,
 - hard tunable max playable locomotion speed,
 - downhill slope acceleration,

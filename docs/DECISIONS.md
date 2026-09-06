@@ -109,10 +109,11 @@
 | D-069 | ACCEPTED | Hard locomotion cap means ground-tangent speed while grounded and world-horizontal speed while airborne; jump/slam vertical velocity is not clipped by the gameplay cap. |
 | D-070 | ACCEPTED | Perfect-apex slam eligibility exists only in the same airborne arc created by a player-triggered jump, not generic falls/external launches. |
 | D-071 | ACCEPTED | Player-controlled `RigidBody3D` starts with sleeping disabled and `CustomIntegrator` left off; standard Jolt gravity/damping remain active while `_IntegrateForces()` provides arcade control. |
-| D-072 | ACCEPTED | Chase camera: yaw follows the player's flat velocity heading (damped, turn-rate capped, held below a minimum speed and on reverse intent). Fixed pitch, no manual rotation, bounded zoom. Camera never clips: focus and lens are floored above the heightfield and same-frame sphere casts (focus→camera and ball→camera) pull the camera in. |
+| D-072 | ACCEPTED | Chase camera: yaw follows the player's flat velocity heading (damped, turn-rate capped, held below a minimum speed). After a heading reversal the yaw is held only while the player pushes forward against it and never longer than a tunable bound, so the camera always ends up behind the direction of travel (amended 2026-09-05 after playtest; the earlier unbounded reverse/coast hold left the view facing the wrong way). Fixed pitch, no manual rotation, bounded zoom. Camera never clips: focus and lens are floored above the heightfield and same-frame sphere casts (focus→camera and ball→camera) pull the camera in. |
 | D-073 | ACCEPTED | The perfect-apex window is tuned in seconds (total window centred on the apex); the detection remains a vertical-speed test with threshold = gravity × window / 2 (keeps D-017). |
 | D-074 | ACCEPTED | Landing at the cap on a slope converts world-horizontal speed to a larger ground-tangent speed (D-069); that excess becomes a short allowance bled at a tunable rate rather than being clipped in one tick. |
 | D-075 | ACCEPTED | Tuning persistence: the saved override (diff from compiled defaults, versioned JSON under `user://`) is applied on launch; override state is always visible in the panel and telemetry; named presets are stashes and never the startup state. |
+| D-076 | ACCEPTED | `S` / stick-back is a brake, not a reverse drive: it sheds speed along the current heading and never pushes through zero. Input within ~30° of straight against the heading only brakes; a hairpin needs clear lateral intent (W+A/D). Rationale: reverse drive gave the chase camera a heading it could not follow, and the exact-opposition case turned the ball in a direction chosen by float noise. |
 
 ## Empirical validation register
 
@@ -125,7 +126,7 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 | V-003 | RESOLVED (toy) | Boost 48 m/s², blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35, perfect-apex +20. Active refill from combat is re-examined at Gate C0. |
 | V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 131 m/s accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
 | V-005 | RESOLVED | Ball radius 2.125 m (4.25 m diameter). The Movement Toy lab keeps amplitude 1.0; Gate M1 sizes generation features from the accepted speed/jump envelope. |
-| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 8/s, vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2 m/s, occlusion margin 0.6, ground clearance 1.5. |
+| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 8/s, vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2 m/s, reverse hold ≤1.0 s, occlusion margin 0.6, ground clearance 1.5. |
 | V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |
 | V-008 | VALIDATE | Exact terrain/stage physical dimensions and heightfield sampling density. |
 | V-009 | VALIDATE | Exact stage clear-time and full-run duration targets. |

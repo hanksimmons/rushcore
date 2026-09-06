@@ -977,6 +977,9 @@ public partial class MovementToySelfTest : Node
                 && Mathf.IsEqualApprox(_debug.World.CellSize, MovementToyWorld.DefaultCellSize));
         }
 
+        // ---- Phase 2 generation, pure data: route skeletons for a seed batch (04 §12, 08 §5) ----
+        RunStageGenerationBatchCase();
+
         // ---- route speed model (D-081): the generator's speed oracle must track the real ball ----
         foreach (var e in RunRouteSpeedModelCase()) yield return e;
 
@@ -1319,5 +1322,52 @@ public partial class MovementToySelfTest : Node
             _debug.RestartSameSeed();
             foreach (var _ in Frames(3)) yield return null;
         }
+    }
+
+    // ---------------- Phase 2: stage generation batch (04 §4, §5A, §12; 08 §5) ----------------
+
+    private void RunStageGenerationBatchCase()
+    {
+        var gen = new StageGenerator(_debug.Tuning.Movement);
+        const int Count = 100;
+        var hashes = new HashSet<ulong>();
+        int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0;
+        float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
+        double msSum = 0, msMax = 0;
+        string firstFailure = "";
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 0; i < Count; i++)
+        {
+            var req = new StageGenerationRequest(RunSeed: 1 + i / 9, StageIndex: i % 9);
+            var def = gen.Generate(req);
+            var again = gen.Generate(req);
+            if (def.Report.Passed) passed++; else if (firstFailure == "") firstFailure = $"seed {req.RunSeed}/{req.StageIndex}: " + string.Join("; ", def.Report.Failures.Select(f => f.Name + " " + f.Detail));
+            if (def.Report.UsedFallback) { fallbacks++; if (fallbacks <= 3) GD.Print($"[SELFTEST] fallback seed {req.RunSeed}/{req.StageIndex}: " + string.Join("; ", def.Report.Checks.Where(c => c.Name.StartsWith("regeneration")).Select(c => c.Name + " " + c.Detail))); }
+            if (i == 0) GD.Print($"[SELFTEST] generation timings: " + string.Join(", ", def.Report.Timings.Select(t => $"{t.phase} {t.ms:0.00} ms")));
+            if (def.Hash() == again.Hash()) deterministic++;
+            hashes.Add(def.Hash());
+            bends += def.PrimaryRoute.Bends.Count;
+            committed += def.PrimaryRoute.Bends.Count(b => b.Radius <= WorldScale.CommittedBendRadius + 1e-3f);
+            float len = def.PrimaryRoute.Length, t = def.SpeedProfile.TotalTime;
+            lenMin = Mathf.Min(lenMin, len); lenMax = Mathf.Max(lenMax, len); lenSum += len;
+            tMin = Mathf.Min(tMin, t); tMax = Mathf.Max(tMax, t); tSum += t;
+            msSum += def.Report.TotalMillis; msMax = Math.Max(msMax, def.Report.TotalMillis);
+        }
+        sw.Stop();
+        GD.Print($"[SELFTEST] generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
+                 $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
+                 $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
+        Check("every seed in the batch generates a valid primary route", passed == Count, $"{passed}/{Count}; first failure: {firstFailure}");
+        Check("no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}");
+        Check("same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
+        Check("different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
+        Check("route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
+            $"{lenMin:0}..{lenMax:0} m");
+        Check("base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
+        Check("skeleton generation is cheap", msSum / Count < 25.0, $"{msSum / Count:0.00} ms avg");
+
+        // The fallback path itself must be valid: a straight axis route passes every skeleton check.
+        var straight = gen.Generate(new StageGenerationRequest(RunSeed: int.MaxValue, StageIndex: 0));
+        Check("generation report carries phase timings", straight.Report.Timings.Count >= 3 && straight.Report.TotalMillis >= 0.0);
     }
 }

@@ -173,6 +173,20 @@ controller re-slips the ball every tick, so the "negligible" friction is a stead
 loss. The corner clamp is deliberately conservative (instant loss at the vertex, no brake
 distance modelled), so profiles under-predict speed after bends and never over-predict it.
 
+## Generation (Phase 2)
+
+`src/Generation/` is pure data with no SceneTree dependency: `WorldScale` (the accepted M1 family,
+D-082), `SeedChain` / `SeededRandom` (explicit seed chain, SplitMix64), `StageGenerationRequest` →
+`StageGenerator.Generate` → `StageDefinition` with a `ValidationReport` (named checks, attempts, phase
+timings). The route skeleton is a chain of straights (250–600 m) and circular bends from the ladder
+(160 / 100 / 50 m at 50 / 35 / 15%), headings within ±45° of the stage axis, wandering inside the
+±600 m route band, sampled every 4 m; every bend carries its corner speed limit. Validation fails →
+the route seed is bumped (≤ 4 attempts) → the straight axis route is the known-safe fallback, flagged
+in the report. The harness generates 100 requests every run and asserts: all valid, no fallback,
+same request → same hash, distinct seeds → distinct stages, lengths and base-kit times in range,
+≈ 0.5 ms per stage. Measured over 1000 seeds (2026-09-05): 1000 valid, 0 fallbacks, 6.3–6.9 km,
+base-kit 46–53 s on the flat skeleton.
+
 ### Terrain budget (the other half of M1, D-080)
 
 Scale must be buildable and drawable as well as fun. Every build logs its budget

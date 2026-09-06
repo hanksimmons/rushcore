@@ -9,7 +9,8 @@ namespace Rushcore.Player;
 ///
 /// Every emitter is created once in <see cref="_Ready"/>; the physics-step event
 /// handlers only set flags. Counts are small and lifetimes short so effects never
-/// hide the landing surface (08 acceptance).
+/// hide the landing surface (08 acceptance). The landing burst (D-077) adds blue
+/// sparks, a ground shock ring and an air-parting bow ring ahead of the ball.
 /// </summary>
 public partial class PlayerVfx : Node3D
 {
@@ -22,21 +23,30 @@ public partial class PlayerVfx : Node3D
     private BoxMesh _chunk = null!;
 
     private GpuParticles3D _dust = null!, _trail = null!, _charge = null!;
-    private GpuParticles3D _slam = null!, _slamPerfect = null!;
-    private GpuParticles3D _jumpBurst = null!, _apexRing = null!, _landBurst = null!;
+    private GpuParticles3D _slam = null!;
+    private GpuParticles3D _jumpBurst = null!, _landBurst = null!, _sparks = null!;
 
     private ParticleProcessMaterial _dustPm = null!, _trailPm = null!, _chargePm = null!;
-    private ParticleProcessMaterial _slamPm = null!, _slamPerfectPm = null!;
-    private ParticleProcessMaterial _jumpPm = null!, _apexPm = null!, _landPm = null!;
+    private ParticleProcessMaterial _slamPm = null!;
+    private ParticleProcessMaterial _jumpPm = null!, _landPm = null!, _sparksPm = null!;
+
+    // Sonic-boom rings (mesh, not particles, so the shape stays a clean ring at speed).
+    private MeshInstance3D _boomRing = null!, _bowRing = null!;
+    private StandardMaterial3D _boomMat = null!, _bowMat = null!;
+    private float _burstAge = -1f;
+    private Vector3 _burstOrigin;
+    private const float BurstEffectSeconds = 0.42f;
+    private static readonly Color SparkColor = new(0.40f, 0.78f, 1.00f);
+    private static readonly Color BoomColor = new(0.72f, 0.90f, 1.00f);
 
     private float _lastRadius = -1f;
     private Vector3 _travelDir = Vector3.Forward;
 
     // Pending one-shots: set in physics-step handlers, fired in _Process.
-    private bool _pendingJump, _pendingApex, _pendingLand;
+    private bool _pendingJump, _pendingLand, _pendingBurst;
     private float _pendingJumpCharge;
     private float _pendingLandImpact;
-    private bool _pendingLandSlam, _pendingLandPerfect;
+    private bool _pendingLandSlam;
 
     public PlayerVfx(GameplayTuning tuning, PlayerPhysics player)
     {
@@ -63,23 +73,23 @@ public partial class PlayerVfx : Node3D
         BuildDust(softMix);
         BuildTrail(chunkAdd);
         BuildCharge(softAdd);
-        BuildSlamStreaks(chunkMix, chunkAdd);
+        BuildSlamStreak(chunkMix);
         BuildJumpBurst(softMix);
-        BuildApexRing(chunkAdd);
         BuildLandBurst(softMix);
+        BuildBurst(chunkAdd);
 
         ApplyRadius(Mathf.Max(0.05f, _t.Movement.BallRadius));
 
         _player.Jumped += OnJumped;
-        _player.Slammed += OnSlammed;
         _player.Landed += OnLanded;
+        _player.LandingBurst += OnLandingBurst;
     }
 
     public override void _ExitTree()
     {
         _player.Jumped -= OnJumped;
-        _player.Slammed -= OnSlammed;
         _player.Landed -= OnLanded;
+        _player.LandingBurst -= OnLandingBurst;
     }
 
     // ---------------- events (physics step: flags only) ----------------
@@ -90,23 +100,20 @@ public partial class PlayerVfx : Node3D
         _pendingJump = true;
     }
 
-    private void OnSlammed(bool perfect)
-    {
-        if (perfect) _pendingApex = true;
-    }
-
-    private void OnLanded(float impactSpeed, bool wasSlam, bool wasPerfectApexSlam)
+    private void OnLanded(float impactSpeed, bool wasSlam)
     {
         _pendingLandImpact = impactSpeed;
         _pendingLandSlam = wasSlam;
-        _pendingLandPerfect = wasPerfectApexSlam;
         _pendingLand = true;
     }
+
+    private void OnLandingBurst(float speed) => _pendingBurst = true;
 
     // ---------------- per-frame drive ----------------
 
     public override void _Process(double delta)
     {
+        float dt = (float)delta;
         var vfx = _t.Vfx;
         float r = Mathf.Max(0.05f, _t.Movement.BallRadius);
         if (!Mathf.IsEqualApprox(r, _lastRadius)) ApplyRadius(r);
@@ -148,13 +155,11 @@ public partial class PlayerVfx : Node3D
         Emit(_charge, chargeOn);
         if (chargeOn) _charge.AmountRatio = Mathf.Clamp((0.25f + 0.75f * _player.Charge01) * chargeI, 0.1f, 1f);
 
-        // slam streaks: two separate emitters so a perfect apex is never confusable
-        bool slamming = _player.SlamActive && slamI > 0.01f;
-        bool perfect = slamming && _player.LastSlamWasPerfect;
-        Emit(_slam, slamming && !perfect);
-        Emit(_slamPerfect, slamming && perfect);
+        // slam streak while committed downward
+        Emit(_slam, _player.SlamActive && slamI > 0.01f);
 
         FirePendingBursts(r);
+        AnimateBurst(dt, r);
     }
 
     private void FirePendingBursts(float r)
@@ -175,17 +180,6 @@ public partial class PlayerVfx : Node3D
             }
         }
 
-        if (_pendingApex)
-        {
-            _pendingApex = false;
-            float s = Str(vfx.SlamEffectStrength);
-            if (s > 0.01f)
-            {
-                _apexRing.AmountRatio = Mathf.Clamp(s, 0.2f, 1f);
-                _apexRing.Restart();
-            }
-        }
-
         if (_pendingLand)
         {
             _pendingLand = false;
@@ -193,14 +187,66 @@ public partial class PlayerVfx : Node3D
             if (s > 0.01f)
             {
                 float impact = Mathf.Clamp(_pendingLandImpact / 30f, 0f, 1.5f);
-                float mult = _pendingLandPerfect ? 2.0f : _pendingLandSlam ? 1.4f : 1f;
+                // Every slam landing is the power impact (D-077).
+                float mult = _pendingLandSlam ? 2.0f : 1f;
                 _landPm.InitialVelocityMin = (2f + 8f * impact) * mult * r;
                 _landPm.InitialVelocityMax = (4f + 16f * impact) * mult * r;
                 _landBurst.AmountRatio = Mathf.Clamp((0.2f + 0.8f * impact) * mult * s, 0.1f, 1f);
                 _landBurst.Restart();
             }
         }
+
+        if (_pendingBurst)
+        {
+            _pendingBurst = false;
+            float s = Str(vfx.BurstEffectStrength);
+            if (s > 0.01f)
+            {
+                _sparks.AmountRatio = Mathf.Clamp(s, 0.2f, 1f);
+                _sparks.Restart();
+                _burstAge = 0f;
+                _burstOrigin = GlobalPosition + Vector3.Up * (-r * 0.9f);
+                _boomRing.Visible = true;
+                _bowRing.Visible = true;
+            }
+        }
     }
+
+    /// <summary>Ground shock ring expands from the landing point; the bow ring rides
+    /// ahead of the ball, perpendicular to travel, and widens as it fades: the air parting.</summary>
+    private void AnimateBurst(float dt, float r)
+    {
+        if (_burstAge < 0f) return;
+        _burstAge += dt;
+        float t01 = _burstAge / BurstEffectSeconds;
+        if (t01 >= 1f)
+        {
+            _burstAge = -1f;
+            _boomRing.Visible = false;
+            _bowRing.Visible = false;
+            return;
+        }
+        float s = Str(_t.Vfx.BurstEffectStrength);
+        float fade = Mathf.Pow(1f - t01, 1.6f) * Mathf.Min(1f, s);
+        float ease = 1f - (1f - t01) * (1f - t01);
+
+        float boomScale = r * (1.2f + 12f * ease);
+        _boomRing.GlobalTransform = new Transform3D(Basis.Identity.Scaled(new Vector3(boomScale, r * 0.6f, boomScale)), _boomOriginAbove(r));
+        _boomMat.AlbedoColor = new Color(BoomColor, 0.85f * fade);
+
+        Vector3 fwd = _travelDir;
+        Vector3 right = Vector3.Up.Cross(fwd);
+        if (right.LengthSquared() < 1e-6f) right = Vector3.Right; else right = right.Normalized();
+        Vector3 up = fwd.Cross(right).Normalized();
+        // Torus lies in its local XZ plane; aim local Y along travel so the ring faces the way we go.
+        Basis face = new(right, fwd, -up);
+        float bowScale = r * (1.0f + 3.5f * ease);
+        _bowRing.Basis = face * Basis.Identity.Scaled(new Vector3(bowScale, r * 0.5f, bowScale));
+        _bowRing.Position = fwd * r * (1.3f + 2.2f * ease);
+        _bowMat.AlbedoColor = new Color(BoomColor, 0.7f * fade);
+    }
+
+    private Vector3 _boomOriginAbove(float r) => _burstOrigin + Vector3.Up * (r * 0.12f);
 
     private static void Emit(GpuParticles3D e, bool on)
     {
@@ -233,13 +279,9 @@ public partial class PlayerVfx : Node3D
         _chargePm.ScaleMin = 0.10f * r;
         _chargePm.ScaleMax = 0.26f * r;
 
-        _slamPm.EmissionSphereRadius = r * 0.6f;
-        _slamPm.ScaleMin = 0.10f * r;
-        _slamPm.ScaleMax = 0.22f * r;
-
-        _slamPerfectPm.EmissionSphereRadius = r * 0.8f;
-        _slamPerfectPm.ScaleMin = 0.18f * r;
-        _slamPerfectPm.ScaleMax = 0.42f * r;
+        _slamPm.EmissionSphereRadius = r * 0.7f;
+        _slamPm.ScaleMin = 0.12f * r;
+        _slamPm.ScaleMax = 0.30f * r;
 
         _jumpBurst.Position = contact;
         _jumpPm.EmissionRingRadius = r * 1.1f;
@@ -248,20 +290,21 @@ public partial class PlayerVfx : Node3D
         _jumpPm.ScaleMin = 0.14f * r;
         _jumpPm.ScaleMax = 0.36f * r;
 
-        // Fired at slam start, in mid-air: the shockwave reads from the ball centre.
-        _apexRing.Position = Vector3.Zero;
-        _apexPm.EmissionRingRadius = r * 0.6f;
-        _apexPm.EmissionRingInnerRadius = r * 0.3f;
-        _apexPm.EmissionRingHeight = r * 0.05f;
-        _apexPm.ScaleMin = 0.20f * r;
-        _apexPm.ScaleMax = 0.45f * r;
-
         _landBurst.Position = contact;
         _landPm.EmissionRingRadius = r * 0.9f;
         _landPm.EmissionRingInnerRadius = r * 0.25f;
         _landPm.EmissionRingHeight = r * 0.05f;
         _landPm.ScaleMin = 0.16f * r;
         _landPm.ScaleMax = 0.42f * r;
+
+        _sparks.Position = contact;
+        _sparksPm.EmissionRingRadius = r * 0.8f;
+        _sparksPm.EmissionRingInnerRadius = r * 0.2f;
+        _sparksPm.EmissionRingHeight = r * 0.05f;
+        _sparksPm.InitialVelocityMin = 6f * r;
+        _sparksPm.InitialVelocityMax = 15f * r;
+        _sparksPm.ScaleMin = 0.07f * r;
+        _sparksPm.ScaleMax = 0.18f * r;
     }
 
     // ---------------- construction ----------------
@@ -297,16 +340,12 @@ public partial class PlayerVfx : Node3D
         _charge = Emitter("ChargeBuild", 64, 0.40f, false, _chargePm, _quad, draw);
     }
 
-    private void BuildSlamStreaks(Material chunkMix, Material chunkAdd)
+    private void BuildSlamStreak(Material draw)
     {
         // Parent body never rotates, so local -Y is world down.
-        _slamPm = Sphere(new Vector3(0f, -1f, 0f), 6f, 6f, 14f, Vector3.Zero,
+        _slamPm = Sphere(new Vector3(0f, -1f, 0f), 6f, 8f, 18f, Vector3.Zero,
                          Ramp(new Color(0.45f, 0.52f, 1.00f), 0.90f));
-        _slam = Emitter("SlamStreak", 72, 0.30f, false, _slamPm, _chunk, chunkMix);
-
-        _slamPerfectPm = Sphere(new Vector3(0f, -1f, 0f), 4f, 14f, 26f, Vector3.Zero,
-                                Ramp(new Color(1.00f, 0.95f, 0.72f), 1.00f));
-        _slamPerfect = Emitter("SlamStreakPerfect", 110, 0.34f, false, _slamPerfectPm, _chunk, chunkAdd);
+        _slam = Emitter("SlamStreak", 96, 0.30f, false, _slamPm, _chunk, draw);
     }
 
     private void BuildJumpBurst(Material draw)
@@ -318,17 +357,6 @@ public partial class PlayerVfx : Node3D
         _jumpBurst = Emitter("JumpReleaseBurst", 72, 0.42f, true, _jumpPm, _quad, draw);
     }
 
-    private void BuildApexRing(Material draw)
-    {
-        // Flat outward shockwave: horizontal so it never covers the ground ahead.
-        _apexPm = Ring(new Vector3(1f, 0f, 0f), 180f, 13f, 20f, new Vector3(0f, -4f, 0f),
-                       Ramp(new Color(1.00f, 0.96f, 0.78f), 1.00f));
-        _apexPm.Flatness = 1f;
-        _apexPm.DampingMin = 6f;
-        _apexPm.DampingMax = 12f;
-        _apexRing = Emitter("PerfectApexRing", 120, 0.45f, true, _apexPm, _chunk, draw);
-    }
-
     private void BuildLandBurst(Material draw)
     {
         _landPm = Ring(new Vector3(1f, 0f, 0f), 180f, 4f, 12f, new Vector3(0f, -8f, 0f),
@@ -337,6 +365,35 @@ public partial class PlayerVfx : Node3D
         _landPm.DampingMin = 3f;
         _landPm.DampingMax = 7f;
         _landBurst = Emitter("LandBurst", 96, 0.38f, true, _landPm, _quad, draw);
+    }
+
+    /// <summary>Landing burst (D-077): electric-blue sparks plus two boom rings.</summary>
+    private void BuildBurst(Material draw)
+    {
+        _sparksPm = Ring(new Vector3(0f, 1f, 0f), 70f, 12f, 30f, new Vector3(0f, -30f, 0f),
+                         Ramp(SparkColor, 1.00f));
+        _sparksPm.DampingMin = 4f;
+        _sparksPm.DampingMax = 9f;
+        _sparksPm.AngularVelocityMin = -420f;
+        _sparksPm.AngularVelocityMax = 420f;
+        _sparks = Emitter("BurstSparks", 140, 0.50f, true, _sparksPm, _chunk, draw);
+
+        var torus = new TorusMesh { InnerRadius = 0.86f, OuterRadius = 1.0f, Rings = 32, RingSegments = 8 };
+        _boomMat = RingMaterial();
+        _bowMat = RingMaterial();
+        // World-space: it must stay on the landing point while the ball surges away.
+        _boomRing = new MeshInstance3D
+        {
+            Name = "BurstBoomRing", Mesh = torus, MaterialOverride = _boomMat, TopLevel = true, Visible = false,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_boomRing);
+        _bowRing = new MeshInstance3D
+        {
+            Name = "BurstBowRing", Mesh = torus, MaterialOverride = _bowMat, Visible = false,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_bowRing);
     }
 
     private GpuParticles3D Emitter(string name, int amount, float lifetime, bool oneShot,
@@ -419,5 +476,15 @@ public partial class PlayerVfx : Node3D
             ? BaseMaterial3D.BillboardModeEnum.Particles
             : BaseMaterial3D.BillboardModeEnum.Disabled,
         BillboardKeepScale = billboard,
+    };
+
+    private static StandardMaterial3D RingMaterial() => new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        NoDepthTest = false,
+        AlbedoColor = new Color(BoomColor, 0f),
     };
 }

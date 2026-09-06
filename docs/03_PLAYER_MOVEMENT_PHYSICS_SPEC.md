@@ -34,7 +34,9 @@ The visible ball roll is presentation-driven and does not need to be a literal m
 ## 2. Coordinate/input conventions
 
 - `Vector3.Up` is world up.
-- Prototype steering is camera-relative **WASD**.
+- Prototype steering is camera-relative **WASD**. `W` drives along the view, `A`/`D` steer,
+  and `S` / stick-back is a **brake**: it sheds speed along the current heading and never
+  drives in reverse (D-076). There is no reverse locomotion.
 - `Space` is the shared charge-jump / airborne-slam input. Charge starts only from ground contact; a new airborne press is otherwise unambiguously slam.
 - Ground movement is projected onto the usable surface tangent.
 - Player collision is a true sphere.
@@ -92,7 +94,12 @@ turnRadius ≈ speed² / lateralAcceleration
 
 This need not be a physically exact vehicle model.
 
-**VALIDATE:** exact steering curve/authority falloff in the Movement Toy.
+Input within ~30° of straight against the heading has no turn side; it only brakes (negative
+alignment). Clear lateral intent (W+A/D, a deflected stick) makes the turn side unambiguous and
+the normal lateral-authority rotation applies, so a hairpin is always the player's choice,
+never a direction picked by numerical noise.
+
+Steering curve/authority falloff was validated in the Movement Toy (§15, V-002).
 
 ### Charge-jump steering lock
 
@@ -223,7 +230,7 @@ Goals:
 
 Use the same general desired-direction idea with a separate authority multiplier.
 
-## 9. Slam and perfect-apex timing
+## 9. Slam, power impact and landing burst
 
 ### Base slam
 
@@ -244,38 +251,35 @@ Traversal use is first-class:
 
 The base slam does not require a large AoE; that remains an item/upgrade hook.
 
-### Perfect-apex slam
+### Power impact
 
-A slam initiated near the apex of a **player-triggered charge-jump arc** receives a clear bonus.
+Every slam landing is the **power impact** (D-077): the impact-power multiplier, the strongest
+landing feedback and the hot flash on the ball. There is no separate "perfect" tier; the
+perfect-apex mechanic was prototyped and removed after playtest.
 
-Eligibility stays intentionally small:
+### Landing burst
 
-- a jump was actually released/performed during the current airborne arc,
-- slam has not already begun/resolved,
-- the player is still in that same airborne arc.
+A **fresh `Space` press at the slam touchdown** fires the landing burst:
 
-Simply rolling/falling off a cliff, being launched by an external impulse, or otherwise becoming airborne without performing the jump does **not** create perfect-apex eligibility.
+- a short tunable window either side of the touchdown instant; a press during the slam is
+  buffered and counts if it was inside the window when the ball lands,
+- the press is consumed: it never starts a charge and never jumps,
+- locomotion speed is set to a tunable fraction of the hard cap **along the current heading**,
+- it is a floor: a faster ball is never slowed, direction is never rewritten, the ball stays
+  grounded, and the normal drive/steer/cap pipeline continues on the same tick, so the burst reads
+  as a seamless surge out of the landing rather than a launch,
+- feedback: electric-blue sparks, a mini sonic boom (ground shock ring plus an air-parting bow
+  ring ahead of the ball), blue flash and a stretch along travel.
 
 Keep timing detection KISS:
 
 ```text
-isPerfectApex =
-    jumpArcEligible
-    && abs(verticalVelocity) <= PerfectApexVerticalSpeedThreshold
+burst =
+    slamLandedThisWindow
+    && (freshSpacePress || bufferedSlamPressAge <= window)
 ```
 
-The threshold is deliberately forgiving and tunable; the mechanic should reward timing rather than a single exact physics frame.
-
-A perfect-apex slam may apply:
-
-- stronger immediate downward slam velocity/acceleration,
-- higher slam impact multiplier,
-- distinct snappy visual feedback,
-- small Flow reward.
-
 Do **not** build a separate combo/timing subsystem.
-
-**VALIDATE:** apex threshold and bonus strength.
 
 ## 10. Boost
 
@@ -355,7 +359,8 @@ The physical collider remains spherical.
 - boost stretch,
 - landing squash,
 - slam streak,
-- perfect-apex flash,
+- slam-landing power flash,
+- landing-burst flash, sparks and boom rings,
 - impact flash.
 
 Never deform collision to match squash/stretch.
@@ -367,8 +372,11 @@ Presentation styling lives in `06`. Accepted after playtest (D-072): a **chase c
 Mechanically:
 
 - yaw follows the player's flat velocity heading with damping and a turn-rate cap,
-- yaw holds below a minimum speed, on reverse intent (input pushing back relative to the view),
-  and when velocity reverses without input, so the view never swings 180° and inverts the controls,
+- yaw holds below a minimum speed, so a resting ball never spins the view,
+- after the heading reverses (wall bounce, backward slide) the yaw is held only while the
+  player pushes forward against it, and never longer than a tunable bound; a quick recovery
+  therefore never swings the view twice, yet the camera always ends up behind the direction
+  of travel. There is no reverse-drive hold because `S` cannot reverse (D-076),
 - fixed pitch; no manual rotation; player may adjust baseline zoom within limits,
 - focus/look target leads along useful velocity; look-ahead grows with speed and is bounded,
 - distance/FOV grow modestly with speed,
@@ -384,37 +392,42 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 
 ## 15. Tuning schema
 
-**Accepted baseline** (Movement Toy playtest, 2026-09-05). These are the compiled defaults in
-`GameplayTuning`; the runtime panel edits the same values and persists overrides (D-075).
+**Accepted baseline** (Movement Toy playtest, 2026-09-05; the user's final preset
+`boost-finetune-final`, promoted verbatim on top of `manual-finetune-punchy`, sub-percent slider
+values included, so the preset reads as "compiled defaults"; D-078). **This table is the
+authoritative movement baseline.** These are the compiled defaults in `GameplayTuning`; the
+runtime panel edits the same values and persists overrides (D-075). Min ground-normal dot 0.499,
+camera yaw hold below 2.035 m/s, camera follow damping 4.99/s and terrain wavelength 1.005 are
+part of the same promotion.
 
 | Parameter | Accepted | Status |
 |---|---:|---|
 | Physics tick rate | 60 Hz | ACCEPTED (V-007) |
-| Gravity | 39.4 m/s² | ACCEPTED |
-| Ground drive accel | 28 m/s² | ACCEPTED |
-| Ground steering lateral accel | 151 m/s² | ACCEPTED (V-001) |
+| Gravity | 39.38 m/s² | ACCEPTED |
+| Ground drive accel | 27.99 m/s² | ACCEPTED |
+| Ground steering lateral accel | 151.25 m/s² | ACCEPTED (V-001) |
 | High-speed steering multiplier | 1.45 at the cap (authority rises with speed; radius = v²/(a·mult)) | ACCEPTED (V-001) |
 | Hard max locomotion speed | 148.5 m/s | ACCEPTED (V-004) |
-| Landing cap bleed | 40 m/s² | ACCEPTED (D-074) |
-| Drag coefficient | 0.08 | ACCEPTED |
-| Air control multiplier | 0.35 | ACCEPTED |
+| Landing cap bleed | 39.95 m/s² | ACCEPTED (D-074) |
+| Drag coefficient | 0.077 | ACCEPTED |
+| Air control multiplier | 0.308 | ACCEPTED (D-078) |
 | Ball radius | 2.125 m | ACCEPTED (V-005) |
-| Min jump takeoff vertical speed | 2 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
-| Max jump takeoff vertical speed | 58.2 m/s | ACCEPTED (V-010) |
-| Max jump charge seconds | 0.45 s, linear | ACCEPTED (V-010) |
+| Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
+| Max jump takeoff vertical speed | 58.21 m/s | ACCEPTED (V-010) |
+| Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |
 | Charge release grace | 0.10 s | ACCEPTED |
-| Slam initial downward speed | 43 m/s | ACCEPTED |
-| Slam downward acceleration | 141 m/s² | ACCEPTED |
+| Slam initial downward speed | 42.95 m/s | ACCEPTED |
+| Slam downward acceleration | 141.1 m/s² | ACCEPTED |
 | Slam steering multiplier | 0.25 | ACCEPTED |
 | Slam lateral retention | 1.0 | ACCEPTED |
-| Perfect-apex window | 0.62 s total (threshold = g·window/2) | ACCEPTED (V-011, D-073) |
-| Perfect-apex slam strength multiplier | 1.35 | ACCEPTED |
-| Perfect-apex impact multiplier | 1.35 | ACCEPTED |
-| Boost acceleration | 48 m/s² | ACCEPTED (V-003) |
+| Slam impact multiplier | 1.35 on every slam landing | ACCEPTED (D-077) |
+| Landing-burst window | ±0.10 s around the slam touchdown | ACCEPTED (D-077) |
+| Landing-burst speed | 80% of the cap along the current heading (floor only) | ACCEPTED (D-077) |
+| Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
-| Boost pickup refill / perfect-apex refill | 35 / 20 | ACCEPTED (toy) |
-| Rush / Crush / Overdrive thresholds | 18 / 32 / 131 m/s | Overdrive ACCEPTED; Rush/Crush OPEN (V-004) |
+| Boost pickup refill | 35 | ACCEPTED (toy) |
+| Rush / Crush / Overdrive thresholds | 18 / 32 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush OPEN (V-004) |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 
@@ -432,7 +445,7 @@ Expose:
 - jump charge seconds/normalized charge,
 - computed jump takeoff speed,
 - slam active,
-- perfect-apex eligibility/result,
+- burst window state/result,
 - boost amount,
 - input vector,
 - current steering authority,
@@ -453,7 +466,7 @@ Before progression systems:
 - jump release preserves momentum,
 - air control corrects rather than rewrites trajectory,
 - normal slam feels immediate/powerful,
-- perfect-apex slam is learnable, forgiving, and noticeably stronger,
+- the landing burst is learnable and reads as a seamless surge,
 - boost increases route possibility,
 - mistakes are recoverable,
 - high-speed collisions are stable with CCD enabled and do not routinely tunnel through valid collision geometry.

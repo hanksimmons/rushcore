@@ -19,8 +19,8 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 
 | Input | Action |
 |---|---|
-| W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes/reverses**. Spawn faces down the lane (−X). |
-| Space / A | press on ground = charge; release = jump; new press in air = slam |
+| W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes** (never reverses, D-076). Spawn faces down the lane (−X). |
+| Space / A | press on ground = charge; release = jump; new press in air = slam; **press again at the slam touchdown = landing burst** (±0.10 s; a press during the slam is buffered) |
 | Shift / X | boost (ground and air) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
@@ -57,17 +57,19 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 |---|---|
 | `baseline` | compiled defaults; the comparison point |
 | `heavy-marble` | weight and momentum: stronger gravity, softer drive, hard slams, camera back |
-| `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide apex window |
+| `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide burst window |
 | `glide-and-soar` | air game: low gravity, big jumps, real air control, generous boost |
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
 | `technical-lines` | line craft: cap 50, sharper steering, small tank |
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
 | `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
-Accepted baseline (playtest 2026-09-05, preset `manual-finetune-punchy` promoted to compiled
-defaults): cap 148.5 m/s, steering 151 m/s² rising ×1.45 at the cap, gravity 39.4, ball radius
-2.125 m, jump 2→58.2 m/s over 0.45 s, slam 43 m/s + 141 m/s², apex window 0.62 s, Overdrive at
-131 m/s, chase camera.
+Accepted baseline (playtest 2026-09-05, final preset `boost-finetune-final` promoted to compiled
+defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5 m/s, steering
+151.25 m/s² rising ×1.45 at the cap, gravity 39.38, air control 0.308, ball radius 2.125 m, jump
+2.03→58.21 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
+landing burst ±0.10 s → 80% of the cap, boost 88.64 m/s², Overdrive at 141.06 m/s, chase camera
+(follow 4.99/s).
 Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.
@@ -85,7 +87,7 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 |---|---|
 | `baseline` | compiled defaults; the comparison point |
 | `heavy-marble` | weight and momentum: stronger gravity, softer drive, hard slams, camera back |
-| `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide apex window |
+| `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide burst window |
 | `glide-and-soar` | air game: low gravity, big jumps, real air control, generous boost |
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
 | `technical-lines` | line craft: cap 50, sharper steering, small tank |
@@ -95,17 +97,20 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:
 
-- **Apex window is 0.20 s** (`Jump › Apex Window (s)`), i.e. |vY| ≤ 2.80 m/s at g = 28. The
-  detection is still a vertical-speed threshold (D-017); the knob is in seconds so retuning
-  gravity cannot silently shrink the window. The spec placeholder 1.25 m/s equals 0.089 s.
-- **Landing Cap Bleed = 40 m/s²** (new, `Move`). Landing on a slope at the cap makes tangent
+- **Landing burst** (`Jump › Burst Window (s)` = 0.10, `Burst Speed Fraction` = 0.8, D-077): press
+  Space again at the slam touchdown to surge to 80% of the cap along your heading. Telemetry's
+  `burst` row shows the window while it is open. `VFX › Burst Effect` scales the sparks and rings.
+- **Landing Cap Bleed = 39.95 m/s²** (new, `Move`). Landing on a slope at the cap makes tangent
   speed exceed the cap by 1/cos(slope) (D-069); the excess now bleeds over ~0.2 s instead of
   clipping in one tick. Set very high to restore the instant clamp.
 - **Camera occlusion probe** (`Camera`, on by default): sphere-cast from focus to camera pulls
   the camera in behind berms/mesa faces; disable to compare.
 - **Max Visual Roll = 3 rev/s** (`VFX`): visual-only spin cap so the ball does not strobe at speed.
 - **Chase camera** (`Camera › Follow Trajectory Yaw`, on): yaw tracks the flat velocity heading
-  (damping 3/s, ≤140°/s, holds below 3 m/s, never flips on reverse). Turning it off restores the
+  (damping 3/s, ≤140°/s, holds below 2 m/s). After a wall bounce or backward slide the view is
+  held only while you push W against it and at most `Yaw Reverse Hold Seconds` (1.0 s); release
+  or steer and it swings behind you at once. Telemetry's camera row shows `REV-HOLD` while the
+  hold is active. Turning it off restores the
   fixed 45° isometric-like composition for A/B. **This contradicts D-058/D-059, 03 §14 and 06 §11
   as written**; it is the playtest-directed baseline pending reconciliation at acceptance.
 - Clipping defence: focus floored above ground; two same-frame sphere casts (focus→camera and
@@ -123,7 +128,7 @@ Terrain spans ±512 m, 4 m facets. Spawn on the flat plain at (470, 380). `World
 | Spawn pillars | just north of the lane start, 5 / 10 / 20 / 40 m tall | vertical scale, jump height |
 | Grade fan | west (x −450 / −300 / −150), crest z = 150, drops 45 m | 8° / 15° / 25° downhill acceleration; boost rings on the 15° lane |
 | Climb + mesa | x 0..225 from z = 130 up 12° to +25.5 m | uphill propulsion |
-| Launch ramps | off the mesa lip at x 40 / 112 / 184 (11° / 19° / 27°) | charge jump, apex slam, landings |
+| Launch ramps | off the mesa lip at x 40 / 112 / 184 (11° / 19° / 27°) | charge jump, slam landings, landing burst |
 | Chasms | south rim z = −220 (34 m) and z = −380 (58 m) | gap jumps; 25° exit wall |
 | Bowl | centre (340, −320), r 160, floor −48 m | momentum storage |
 | Banked hairpin | centre (330, 155), r 145, berm +18 m; boost rings on the line | high-speed banked turns |

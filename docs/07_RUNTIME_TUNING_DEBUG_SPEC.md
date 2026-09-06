@@ -33,9 +33,9 @@ Expose first:
 - ChargeReleaseGraceSeconds
 - SlamDownwardAcceleration/Speed
 - SlamSteeringMultiplier
-- PerfectApexVerticalSpeedThreshold
-- PerfectApexSlamStrengthMultiplier
-- PerfectApexImpactMultiplier
+- SlamImpactMultiplier
+- LandingBurstWindowSeconds
+- LandingBurstSpeedFraction
 - BoostAcceleration
 - BoostDirectionBlend
 - BoostCapacity
@@ -81,7 +81,7 @@ Do not expose every internal constant.
 - trail length/intensity,
 - dust,
 - slam effect,
-- perfect-apex effect,
+- landing-burst effect,
 - impact effect,
 - motion-effect intensity.
 
@@ -140,7 +140,7 @@ Display as useful:
 - jump charge time/normalized,
 - computed takeoff speed,
 - vertical velocity,
-- perfect-apex eligibility/result,
+- burst window state/result,
 - boost,
 - health,
 - Flow,

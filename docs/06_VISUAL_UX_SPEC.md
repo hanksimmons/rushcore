@@ -67,7 +67,8 @@ Generated low-poly sphere/icosphere with:
 - boost stretch/trail,
 - landing squash,
 - slam streak,
-- perfect-apex slam flash,
+- slam-landing power flash,
+- landing-burst sparks/boom,
 - impact feedback.
 
 Collider remains unchanged.
@@ -87,15 +88,20 @@ A full charge bar is not required for MVP unless playtesting shows the charge am
 
 Because steering is locked while charging, presentation should clearly communicate that the player is committed.
 
-## 7. Perfect-apex slam UX
+## 7. Slam power impact and landing burst UX
 
-The mechanic must feel “snappy, speedy, powerful” without pausing gameplay.
+Both must feel “snappy, speedy, powerful” without pausing gameplay.
 
-On a perfect-apex slam:
+On every slam landing:
 
-- immediate distinct flash/ring/snap cue,
-- visibly stronger downward streak,
-- stronger landing/impact effect,
+- the strongest landing/impact effect and a hot flash on the ball.
+
+On a landing burst (D-077):
+
+- electric-blue sparks from the contact point,
+- a mini sonic boom: a ground shock ring at the landing point plus an air-parting bow ring
+  riding ahead of the ball,
+- blue flash and a stretch along travel,
 - optional compact Flow feedback.
 
 Do not show a large timing minigame or QTE indicator.
@@ -149,7 +155,7 @@ VFX explains physics:
 - jump charge,
 - jump release,
 - slam streak,
-- perfect-apex cue,
+- landing-burst cue,
 - slam landing,
 - enemy crush,
 - failed impact,
@@ -185,7 +191,7 @@ No extreme FOV distortion.
 - short,
 - event-driven,
 - bounded,
-- stronger for slam/major impact/perfect-apex slam,
+- stronger for slam landings/major impact/landing burst,
 - reducible/disable-able.
 
 No permanent noise shake during high speed.
@@ -244,7 +250,7 @@ Show:
 - score,
 - major performance stats,
 - build/items,
-- perfect-apex slam count if useful,
+- landing-burst count if useful,
 - meta XP.
 
 Prioritize emotional recap over exhaustive telemetry.

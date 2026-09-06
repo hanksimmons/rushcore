@@ -63,9 +63,10 @@ Toy contains only:
 - Air steering remains bounded.
 - New Space press while airborne triggers slam.
 - Slam preserves configured lateral momentum.
-- Slam started inside apex threshold during the same player-triggered jump arc receives perfect-apex bonus.
-- Slam outside threshold does not receive perfect-apex bonus.
-- Falling/rolling off a ledge without performing a jump cannot receive perfect-apex bonus.
+- Every slam landing raises the power impact (slam flag on the landing event).
+- A Space press inside the burst window either side of a slam touchdown fires the landing burst: speed set to the tuned fraction of the cap along the unchanged heading, ball still grounded, and the press never starts a charge or a jump.
+- A press outside the window, or after a plain (non-slam) landing, is an ordinary charge and never a burst.
+- The burst never slows a faster ball.
 - Boost works on ground and air.
 - Boost cannot bypass hard locomotion cap.
 - Slow passive boost regeneration and active refill follow tuning.
@@ -83,8 +84,8 @@ Toy contains only:
 - Jump preserves the sensation of speed.
 - Air control corrects rather than rewrites trajectory.
 - Slam feels exceptionally snappy.
-- Timing a slam near apex is learnable without a QTE.
-- Perfect-apex result feels noticeably faster/more powerful than a normal slam.
+- Timing the burst press at touchdown is learnable without a QTE.
+- The landing burst reads as a seamless surge, noticeably faster than the landing speed.
 - Slam is useful for reconnecting with favorable downslopes.
 - Boost increases route possibilities.
 - Camera lets player read terrain at maximum normal playable speed.
@@ -198,7 +199,7 @@ At maximum playable speed:
 
 - player remains visually distinct,
 - charge state is readable,
-- perfect-apex slam has clear feedback,
+- slam landings and the landing burst have clear feedback,
 - gaps/ramps/banks are readable early enough,
 - enemy archetypes are distinguishable,
 - reward lines do not read as hazards,

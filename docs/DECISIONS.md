@@ -28,8 +28,8 @@
 | D-013 | ACCEPTED | No double jump. |
 | D-014 | ACCEPTED | A new Space press while airborne initiates slam. |
 | D-015 | ACCEPTED | Slam preserves lateral momentum, commits strongly downward, allows limited steering, and is both movement and offense. |
-| D-016 | ACCEPTED | Slam initiated near the jump apex receives a stronger “perfect apex” bonus. |
-| D-017 | ACCEPTED | Perfect-apex detection stays KISS: forgiving vertical-velocity threshold, not a separate timing/combo system. |
+| D-016 | SUPERSEDED by D-077 | ~~Slam initiated near the jump apex receives a stronger “perfect apex” bonus.~~ Removed after playtest; every slam landing is the power impact. |
+| D-017 | SUPERSEDED by D-077 | ~~Perfect-apex detection stays KISS: forgiving vertical-velocity threshold.~~ The KISS rule carries over to the landing burst: a touchdown window, no combo system. |
 | D-018 | ACCEPTED | Boost works in air. |
 | D-019 | ACCEPTED | Boost direction blends current trajectory and desired input; trajectory dominates more at high speed. |
 | D-020 | ACCEPTED | Boost has slow emergency passive regeneration plus stronger active refill sources. |
@@ -107,12 +107,15 @@
 | D-067 | ACCEPTED | Player contact reporting is enabled with a small sufficient contact budget because grounded-state logic reads direct-body contacts. |
 | D-068 | ACCEPTED | Checkpoint/debug/stage teleports reset physics interpolation after repositioning. |
 | D-069 | ACCEPTED | Hard locomotion cap means ground-tangent speed while grounded and world-horizontal speed while airborne; jump/slam vertical velocity is not clipped by the gameplay cap. |
-| D-070 | ACCEPTED | Perfect-apex slam eligibility exists only in the same airborne arc created by a player-triggered jump, not generic falls/external launches. |
+| D-070 | SUPERSEDED by D-077 | ~~Perfect-apex slam eligibility exists only in the same airborne arc created by a player-triggered jump.~~ No apex mechanic remains. |
 | D-071 | ACCEPTED | Player-controlled `RigidBody3D` starts with sleeping disabled and `CustomIntegrator` left off; standard Jolt gravity/damping remain active while `_IntegrateForces()` provides arcade control. |
-| D-072 | ACCEPTED | Chase camera: yaw follows the player's flat velocity heading (damped, turn-rate capped, held below a minimum speed and on reverse intent). Fixed pitch, no manual rotation, bounded zoom. Camera never clips: focus and lens are floored above the heightfield and same-frame sphere casts (focus→camera and ball→camera) pull the camera in. |
-| D-073 | ACCEPTED | The perfect-apex window is tuned in seconds (total window centred on the apex); the detection remains a vertical-speed test with threshold = gravity × window / 2 (keeps D-017). |
+| D-072 | ACCEPTED | Chase camera: yaw follows the player's flat velocity heading (damped, turn-rate capped, held below a minimum speed). After a heading reversal the yaw is held only while the player pushes forward against it and never longer than a tunable bound, so the camera always ends up behind the direction of travel (amended 2026-09-05 after playtest; the earlier unbounded reverse/coast hold left the view facing the wrong way). Fixed pitch, no manual rotation, bounded zoom. Camera never clips: focus and lens are floored above the heightfield and same-frame sphere casts (focus→camera and ball→camera) pull the camera in. |
+| D-073 | SUPERSEDED by D-077 | ~~The perfect-apex window is tuned in seconds; detection is a vertical-speed test.~~ |
 | D-074 | ACCEPTED | Landing at the cap on a slope converts world-horizontal speed to a larger ground-tangent speed (D-069); that excess becomes a short allowance bled at a tunable rate rather than being clipped in one tick. |
 | D-075 | ACCEPTED | Tuning persistence: the saved override (diff from compiled defaults, versioned JSON under `user://`) is applied on launch; override state is always visible in the panel and telemetry; named presets are stashes and never the startup state. |
+| D-076 | ACCEPTED | `S` / stick-back is a brake, not a reverse drive: it sheds speed along the current heading and never pushes through zero. Input within ~30° of straight against the heading only brakes; a hairpin needs clear lateral intent (W+A/D). Rationale: reverse drive gave the chase camera a heading it could not follow, and the exact-opposition case turned the ball in a direction chosen by float noise. |
+| D-077 | ACCEPTED | Perfect-apex slam removed (supersedes D-016/D-017/D-070/D-073). Every slam landing is the **power impact** (impact ×1.35, strongest landing feedback). New **landing burst**: a fresh Space press within ±0.10 s of a slam touchdown (presses during the slam are buffered) fires blue sparks, a mini sonic boom with an air-parting ring, and sets locomotion speed to 80% of the hard cap along the current heading. The burst is a floor (never slows a faster ball), never changes direction, keeps the ball grounded, and the press never starts a charge. Charge jump is unchanged. |
+| D-078 | ACCEPTED | **Final movement baseline = the user's `boost-finetune-final` preset (2026-09-05), promoted verbatim to compiled defaults.** It is `manual-finetune-punchy` plus: boost acceleration 88.64 m/s², air control 0.308, Overdrive 141.06 m/s, camera follow damping 4.99/s. `docs/03 §15` is the authoritative register; the toy launches on it with no override (\"compiled defaults\"). Any later change goes through a saved preset → verbatim promotion → this log. |
 
 ## Empirical validation register
 
@@ -120,17 +123,17 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 
 | ID | Status | Validate |
 |---|---|---|
-| V-001 | RESOLVED | Lateral steering 151 m/s², rising to ×1.45 at the cap; turn radius still grows as v²/(a·mult), which satisfies D-002. |
+| V-001 | RESOLVED | Lateral steering 151.25 m/s², rising to ×1.45 at the cap; turn radius still grows as v²/(a·mult), which satisfies D-002. |
 | V-002 | RESOLVED | Carve removed (see D-007). |
-| V-003 | RESOLVED (toy) | Boost 48 m/s², blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35, perfect-apex +20. Active refill from combat is re-examined at Gate C0. |
-| V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 131 m/s accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
-| V-005 | RESOLVED | Ball radius 2.125 m (4.25 m diameter). The Movement Toy lab keeps amplitude 1.0; Gate M1 sizes generation features from the accepted speed/jump envelope. |
-| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 8/s, vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2 m/s, occlusion margin 0.6, ground clearance 1.5. |
+| V-003 | RESOLVED (toy) | Boost 88.64 m/s² (D-078), blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35 (the perfect-apex refill went with D-077). Active refill from combat is re-examined at Gate C0. |
+| V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 141.06 m/s (D-078) accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
+| V-005 | RESOLVED | Ball radius 2.125 m (4.25 m diameter). The Movement Toy lab scenery amplitude is 2.125 (instruments keep their stated geometry); Gate M1 sizes generation features from the accepted speed/jump envelope. |
+| V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 4.99/s (D-078), vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2.035 m/s, reverse hold ≤1.0 s, occlusion margin 0.6, ground clearance 1.5. |
 | V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |
 | V-008 | VALIDATE | Exact terrain/stage physical dimensions and heightfield sampling density. |
 | V-009 | VALIDATE | Exact stage clear-time and full-run duration targets. |
-| V-010 | RESOLVED | 2 → 58.2 m/s over 0.45 s, linear mapping sufficient, release grace 0.10 s. A bare tap is a hop by design; the charge is the jump. |
-| V-011 | RESOLVED | Window 0.62 s (D-073; |vY| ≤ 12.2 m/s at g = 39.4), slam ×1.35, impact ×1.35. Slam itself: 43 m/s initial, 141 m/s². |
+| V-010 | RESOLVED | 2.03 → 58.21 m/s over 0.445 s, linear mapping sufficient, release grace 0.10 s. A bare tap is a hop by design; the charge is the jump. |
+| V-011 | SUPERSEDED (D-077) | ~~Window 0.618 s, slam ×1.35, impact ×1.35.~~ Slam itself: 42.95 m/s initial, 141.1 m/s²; impact ×1.35 on every slam landing; burst ±0.10 s → 80% of the cap. |
 | V-012 | VALIDATE | Approximate successful-run level-up count; starting target 8–15. |
 
 ## Deferred implementation details

@@ -112,8 +112,8 @@ public partial class WorldDressing : Node3D
             FogDepthCurve = 1.6f,
             FogDensity = 0.8f,
             FogSkyAffect = 0.35f,
-            // Player emissive cues (charge buildup, Overdrive band, the perfect-apex
-            // white-out) drive emission above 1.0; without HDR glow they would simply
+            // Player emissive cues (charge buildup, Overdrive band, the slam-landing and
+            // burst flashes) drive emission above 1.0; without HDR glow they would simply
             // clip to white and lose the readability those cues exist for (06 §6/§7).
             GlowEnabled = true,
             GlowIntensity = 0.7f,

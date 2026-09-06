@@ -28,65 +28,62 @@ public sealed class TuningToggle
 
 public sealed class MovementTuning
 {
-    public float Gravity = 39.4f;
-    public float GroundDriveAcceleration = 28f;
-    public float GroundSteeringLateralAccel = 151f;
+    public float Gravity = 39.38f;
+    public float GroundDriveAcceleration = 27.99f;
+    public float GroundSteeringLateralAccel = 151.25f;
     /// <summary>Steering-authority multiplier reached at the hard speed cap (lerped from 1.0
     /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.45
     /// (V-001): turn radius still grows as v^2 / (lateralAccel * mult), which satisfies D-002.</summary>
     public float HighSpeedSteeringMultiplier = 1.45f;
-    public float AirControlMultiplier = 0.35f;
+    public float AirControlMultiplier = 0.308f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
-    public float DragCoefficient = 0.08f;
+    public float DragCoefficient = 0.077f;
     public float HardMaxLocomotionSpeed = 148.5f;
     /// <summary>
     /// Landing on a slope at the cap makes ground-tangent speed exceed the cap by
     /// 1/cos(slope) (D-069). That excess is bled at this rate (m/s^2) instead of being
     /// clipped in one tick, so the cap reads as feel rather than a wall (03 §5).
     /// </summary>
-    public float LandingCapBleed = 40f;
+    public float LandingCapBleed = 39.95f;
     /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
-    public float MinGroundNormalDot = 0.50f;
+    public float MinGroundNormalDot = 0.499f;
     public float RushThreshold = 18f;
     public float CrushThreshold = 32f;
-    public float OverdriveThreshold = 131f;
+    public float OverdriveThreshold = 141.06f;
     public float BallRadius = 2.125f;
 }
 
 public sealed class JumpSlamTuning
 {
-    public float MinJumpTakeoffVerticalSpeed = 2f;
-    public float MaxJumpTakeoffVerticalSpeed = 58.2f;
-    public float MaxJumpChargeSeconds = 0.45f;
+    public float MinJumpTakeoffVerticalSpeed = 2.03f;
+    public float MaxJumpTakeoffVerticalSpeed = 58.21f;
+    public float MaxJumpChargeSeconds = 0.445f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
-    public float SlamInitialDownwardSpeed = 43f;
-    public float SlamDownwardAcceleration = 141f;
+    public float SlamInitialDownwardSpeed = 42.95f;
+    public float SlamDownwardAcceleration = 141.1f;
     public float SlamSteeringMultiplier = 0.25f;
     /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
     public float SlamLateralRetention = 1.0f;
-    /// <summary>
-    /// Total duration of the perfect-apex window, centred on the apex. The detection
-    /// itself stays a vertical-speed test (D-017): threshold = gravity * window / 2.
-    /// Expressed in seconds so retuning gravity does not silently shrink the window.
-    /// Accepted at 0.62 s (V-011).
-    /// </summary>
-    public float PerfectApexWindowSeconds = 0.62f;
-    public float PerfectApexSlamStrengthMultiplier = 1.35f;
-    public float PerfectApexImpactMultiplier = 1.35f;
+    /// <summary>Every slam landing is a power impact (D-077): impact-power multiplier over a plain fall.</summary>
+    public float SlamImpactMultiplier = 1.35f;
+    /// <summary>Landing burst (D-077): a fresh Space press within this many seconds either side
+    /// of a slam touchdown fires the burst. Presses during the slam are buffered.</summary>
+    public float LandingBurstWindowSeconds = 0.10f;
+    /// <summary>The burst sets locomotion speed to this fraction of the hard cap along the
+    /// current heading; it never slows a faster ball and never changes direction.</summary>
+    public float LandingBurstSpeedFraction = 0.8f;
 }
 
 public sealed class BoostTuning
 {
-    public float BoostAcceleration = 48f;
+    public float BoostAcceleration = 88.64f;
     /// <summary>Max input influence on boost direction at zero speed; falls to 0 at the cap.</summary>
     public float BoostDirectionBlend = 0.25f;
     public float BoostCapacity = 100f;
     public float BoostDrainRate = 30f;
     public float PassiveBoostRegen = 4f;
     public float PickupRefillAmount = 35f;
-    /// <summary>Active-refill hook exercised by perfect-apex slams in the Movement Toy.</summary>
-    public float PerfectApexRefillAmount = 20f;
 }
 
 public sealed class CameraTuning
@@ -101,13 +98,17 @@ public sealed class CameraTuning
     /// <summary>Degrees per second; caps how fast the view can swing.</summary>
     public float YawMaxTurnRate = 140f;
     /// <summary>Below this flat speed the yaw holds so a resting ball never spins the view.</summary>
-    public float YawFollowMinSpeed = 2f;
+    public float YawFollowMinSpeed = 2.035f;
+    /// <summary>After the travel heading reverses (wall bounce, backward slide) the yaw is held
+    /// only while the player pushes forward against it, and never longer than this. The camera
+    /// always ends up behind the direction of travel.</summary>
+    public float YawReverseHoldSeconds = 1.0f;
     /// <summary>Minimum height of the lens (and, +0.5, of the focus) above the heightfield.</summary>
     public float GroundClearance = 1.5f;
     public float HeightOffset = 3.0f;
     public float LookAheadMin = 2f;
     public float LookAheadMax = 22f;
-    public float FollowDamping = 8f;
+    public float FollowDamping = 4.99f;
     public float VerticalDamping = 4f;
     public float FovMin = 62f;
     public float FovMax = 78f;
@@ -132,6 +133,8 @@ public sealed class VfxTuning
     public float DustIntensity = 1f;
     public float SlamEffectStrength = 1f;
     public float ImpactEffectStrength = 1f;
+    /// <summary>Landing burst sparks, boom rings and flash (D-077).</summary>
+    public float BurstEffectStrength = 1f;
     public float SquashStretchStrength = 1f;
     /// <summary>Visual-only cap on the ball's spin: a real 1 m ball at 60 m/s turns 9.5
     /// rev/s, which strobes at 60 fps. Collision is unaffected.</summary>
@@ -142,7 +145,7 @@ public sealed class VfxTuning
 public sealed class WorldTuning
 {
     public float TerrainAmplitude = 2.125f;
-    public float TerrainWavelength = 1.0f;
+    public float TerrainWavelength = 1.005f;
     public float PropDensity = 0.19f;
 }
 
@@ -209,9 +212,9 @@ public sealed class GameplayTuning
         F(CatJumpSlam, "Slam Downward Accel", 0f, 250f, () => j.SlamDownwardAcceleration, v => j.SlamDownwardAcceleration = v);
         F(CatJumpSlam, "Slam Steering Mult", 0f, 1.5f, () => j.SlamSteeringMultiplier, v => j.SlamSteeringMultiplier = v);
         F(CatJumpSlam, "Slam Lateral Retention", 0.3f, 1f, () => j.SlamLateralRetention, v => j.SlamLateralRetention = v);
-        F(CatJumpSlam, "Apex Window (s)", 0.02f, 1.0f, () => j.PerfectApexWindowSeconds, v => j.PerfectApexWindowSeconds = v);
-        F(CatJumpSlam, "Apex Slam Strength Mult", 1f, 4f, () => j.PerfectApexSlamStrengthMultiplier, v => j.PerfectApexSlamStrengthMultiplier = v);
-        F(CatJumpSlam, "Apex Impact Mult", 1f, 4f, () => j.PerfectApexImpactMultiplier, v => j.PerfectApexImpactMultiplier = v);
+        F(CatJumpSlam, "Slam Impact Mult", 1f, 4f, () => j.SlamImpactMultiplier, v => j.SlamImpactMultiplier = v);
+        F(CatJumpSlam, "Burst Window (s)", 0.02f, 0.5f, () => j.LandingBurstWindowSeconds, v => j.LandingBurstWindowSeconds = v);
+        F(CatJumpSlam, "Burst Speed Fraction", 0f, 1f, () => j.LandingBurstSpeedFraction, v => j.LandingBurstSpeedFraction = v);
 
         var b = Boost;
         F(CatBoost, "Boost Acceleration", 0f, 200f, () => b.BoostAcceleration, v => b.BoostAcceleration = v);
@@ -220,7 +223,6 @@ public sealed class GameplayTuning
         F(CatBoost, "Drain Rate", 0f, 150f, () => b.BoostDrainRate, v => b.BoostDrainRate = v);
         F(CatBoost, "Passive Regen", 0f, 60f, () => b.PassiveBoostRegen, v => b.PassiveBoostRegen = v);
         F(CatBoost, "Pickup Refill", 0f, 200f, () => b.PickupRefillAmount, v => b.PickupRefillAmount = v);
-        F(CatBoost, "Perfect-Apex Refill", 0f, 200f, () => b.PerfectApexRefillAmount, v => b.PerfectApexRefillAmount = v);
 
         var k = Camera;
         F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);
@@ -229,6 +231,7 @@ public sealed class GameplayTuning
         F(CatCamera, "Yaw Follow Damping", 0.2f, 20f, () => k.YawFollowDamping, v => k.YawFollowDamping = v);
         F(CatCamera, "Yaw Max Turn Rate", 10f, 720f, () => k.YawMaxTurnRate, v => k.YawMaxTurnRate = v);
         F(CatCamera, "Yaw Follow Min Speed", 0f, 20f, () => k.YawFollowMinSpeed, v => k.YawFollowMinSpeed = v);
+        F(CatCamera, "Yaw Reverse Hold Seconds", 0f, 3f, () => k.YawReverseHoldSeconds, v => k.YawReverseHoldSeconds = v);
         F(CatCamera, "Fixed Yaw Degrees", -180f, 180f, () => k.YawDegrees, v => k.YawDegrees = v);
         F(CatCamera, "Ground Clearance", 0.2f, 6f, () => k.GroundClearance, v => k.GroundClearance = v);
         F(CatCamera, "Height Offset", -5f, 20f, () => k.HeightOffset, v => k.HeightOffset = v);
@@ -252,6 +255,7 @@ public sealed class GameplayTuning
         F(CatVfx, "Dust Intensity", 0f, 3f, () => x.DustIntensity, v => x.DustIntensity = v);
         F(CatVfx, "Slam Effect", 0f, 3f, () => x.SlamEffectStrength, v => x.SlamEffectStrength = v);
         F(CatVfx, "Impact Effect", 0f, 3f, () => x.ImpactEffectStrength, v => x.ImpactEffectStrength = v);
+        F(CatVfx, "Burst Effect", 0f, 3f, () => x.BurstEffectStrength, v => x.BurstEffectStrength = v);
         F(CatVfx, "Squash / Stretch", 0f, 3f, () => x.SquashStretchStrength, v => x.SquashStretchStrength = v);
         F(CatVfx, "Max Visual Roll (rev/s)", 0.5f, 12f, () => x.MaxVisualRollRevPerSecond, v => x.MaxVisualRollRevPerSecond = v);
 
@@ -426,7 +430,7 @@ public sealed class GameplayTuning
             if (values.TryGetValue(e.Key, out var v)) { e.Set((bool)v); applied++; }
 
         BulkChanged?.Invoke();
-        GD.Print($"[RUSHCORE] Loaded tuning override: {applied} values applied.");
+        GD.Print($"[RUSHCORE] Loaded tuning override: {applied} values applied; {OverrideCount} differ from compiled defaults.");
         return applied;
     }
 }

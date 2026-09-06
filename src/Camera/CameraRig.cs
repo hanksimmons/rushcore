@@ -6,10 +6,12 @@ using Rushcore.Tuning;
 namespace Rushcore.Camera;
 
 /// <summary>
-/// Follow rig. Baseline from playtest 2026-09-05: yaw tracks the player's trajectory
-/// (chase camera). The fixed-yaw composition of D-058/D-059 remains as an A/B toggle
-/// pending spec reconciliation. Reads the player's interpolated transform every rendered
-/// frame and applies its own damping, so it never inherits raw physics-step jitter.
+/// Follow rig. Accepted 2026-09-05 (D-072): yaw tracks the player's trajectory (chase
+/// camera); the fixed-yaw composition of D-058/D-059 remains as an A/B toggle. Reads the
+/// player's interpolated transform every rendered frame and applies its own damping, so it
+/// never inherits raw physics-step jitter. The yaw always converges on the direction of
+/// travel: the only holds are below the minimum speed and a bounded, intent-gated hold
+/// against a reversed heading (see UpdateYaw).
 ///
 /// Clipping defence, in order: (1) focus is floored above the ground so casts never start
 /// inside terrain; (2) two same-frame sphere casts, focus->camera and ball->camera, pull the
@@ -27,12 +29,15 @@ public partial class CameraRig : Node3D, ICameraBasis
     private float _shake;
     private float _yaw;                    // radians; the only orientation state
     private float _occlusion = 1f;         // smoothed fraction of the full distance in use
+    private float _reverseHold;            // seconds the yaw has been held against a reversed heading
 
     private readonly SphereShape3D _probeShape = new();
     private readonly PhysicsShapeQueryParameters3D _probe = new();
     private readonly RandomNumberGenerator _rng = new();
 
     private const float MinCameraDistance = 1.5f;
+    /// <summary>cos(120°): a heading further than this from the view is a reversal, not a turn.</summary>
+    private const float ReverseCone = -0.5f;
 
     public CameraRig(GameplayTuning tuning, PlayerPhysics player)
     {
@@ -55,6 +60,8 @@ public partial class CameraRig : Node3D, ICameraBasis
     public float CurrentLookAhead { get; private set; }
     /// <summary>True on frames where the last-resort ground floor had to lift the camera.</summary>
     public bool FlooredThisFrame { get; private set; }
+    /// <summary>True while the yaw is deliberately held against a reversed travel heading.</summary>
+    public bool ReverseHoldActive { get; private set; }
 
     public override void _Ready()
     {
@@ -77,6 +84,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         ApplyTransform(FullDistance(0f), 0f);
         _player.Landed += OnLanded;
         _player.Slammed += OnSlammed;
+        _player.LandingBurst += OnLandingBurst;
         _player.Recovered += SnapToPlayer;
     }
 
@@ -84,6 +92,7 @@ public partial class CameraRig : Node3D, ICameraBasis
     {
         _player.Landed -= OnLanded;
         _player.Slammed -= OnSlammed;
+        _player.LandingBurst -= OnLandingBurst;
         _player.Recovered -= SnapToPlayer;
     }
 
@@ -95,6 +104,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         Vector3 d = new(flatDirection.X, 0f, flatDirection.Z);
         if (d.LengthSquared() < 1e-6f) return;
         _yaw = YawFor(d.Normalized());
+        _reverseHold = 0f;
         UpdateOrientation();
     }
 
@@ -103,6 +113,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         _focus = FloorAboveGround(_player.GlobalPosition + Vector3.Up * _t.Camera.HeightOffset, FocusClearance);
         _shake = 0f;
         _occlusion = 1f;
+        _reverseHold = 0f;
         UpdateOrientation();
         ApplyTransform(FullDistance(0f), 0f);
         ResetPhysicsInterpolation();
@@ -160,21 +171,33 @@ public partial class CameraRig : Node3D, ICameraBasis
         var c = _t.Camera;
         float targetYaw = _yaw;
         float gain = 1f;
+        ReverseHoldActive = false;
         if (c.FollowTrajectoryYaw)
         {
-            // Reverse intent: the player is pushing back relative to the view. Hold the
-            // yaw regardless of velocity so braking through zero and rolling backward
-            // never swings the view 180 degrees and inverts the controls.
-            bool reversingIntent = _player.InputVector.Y < -0.2f;
             float minSpeed = Mathf.Max(0.1f, c.YawFollowMinSpeed);
             // Follow gain ramps in with speed: near-stationary lateral residuals must
             // not be allowed to steer the view.
             gain = Mathf.Clamp((speed - minSpeed) / (2f * minSpeed), 0f, 1f);
-            if (!reversingIntent && gain > 0f)
+            if (gain > 0f)
             {
                 Vector3 dir = flatVel / speed;
-                // Coasting backward with no input (e.g. after a wall bounce) is held too.
-                if (dir.Dot(FlatForward) > -0.5f) targetYaw = YawFor(dir);
+                bool reversed = dir.Dot(FlatForward) < ReverseCone;
+                // A reversed heading (wall bounce, backward slide) is held only while the
+                // player pushes forward against it, and only for a bounded time, so a quick
+                // recovery does not swing the view twice yet the camera always ends up
+                // behind the direction of travel. S is a brake and cannot reverse (D-076),
+                // so there is no reverse-drive case to hold for.
+                bool fighting = _player.InputVector.Y > 0.2f;
+                if (reversed && fighting && _reverseHold < c.YawReverseHoldSeconds)
+                {
+                    _reverseHold += dt;
+                    ReverseHoldActive = true;
+                }
+                else
+                {
+                    targetYaw = YawFor(dir);
+                }
+                if (!reversed) _reverseHold = 0f;
             }
         }
         else
@@ -294,13 +317,14 @@ public partial class CameraRig : Node3D, ICameraBasis
 
     private void SetZoom(float value) => _zoom = Mathf.Clamp(value, _t.Camera.ZoomMin, _t.Camera.ZoomMax);
 
-    private void OnLanded(float impactSpeed, bool wasSlam, bool wasPerfect)
+    private void OnLanded(float impactSpeed, bool wasSlam)
     {
         float baseShake = Mathf.Clamp(impactSpeed / 40f, 0f, 1f) * 0.35f;
-        if (wasSlam) baseShake += 0.35f;
-        if (wasPerfect) baseShake += 0.35f;
+        if (wasSlam) baseShake += 0.60f;          // every slam landing is the power impact (D-077)
         AddShake(baseShake);
     }
 
-    private void OnSlammed(bool perfect) => AddShake(perfect ? 0.30f : 0.15f);
+    private void OnSlammed() => AddShake(0.15f);
+
+    private void OnLandingBurst(float speed) => AddShake(0.45f);
 }

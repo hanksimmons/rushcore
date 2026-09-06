@@ -10,7 +10,7 @@ Build in risk order.
 
 The first risk is not “can we make a roguelike UI?” It is:
 
-> Is RUSHCORE's rolling, charging, jumping, apex-slamming, boosting, and terrain reading intrinsically fun?
+> Is RUSHCORE's rolling, charging, jumping, slamming, burst-timing, boosting, and terrain reading intrinsically fun?
 
 Each slice should compile, run, expose useful tuning, pass its gate, and avoid prebuilding future phases.
 
@@ -36,7 +36,7 @@ Deliver:
   - no steering while charging,
 - air control,
 - Space airborne slam,
-- perfect-apex slam,
+- slam power impact + landing burst,
 - boost on ground/air,
 - slow passive boost regeneration + active refill hook,
 - chase-camera rig,
@@ -201,7 +201,7 @@ Stop feature expansion and fix foundation if:
 
 - movement is not fun/readable,
 - charge jump becomes strictly superior rather than a tradeoff,
-- perfect-apex slam is too finicky or unnoticeable,
+- the landing burst is too finicky or unnoticeable,
 - hard speed cap produces broken-feeling motion,
 - high-speed collisions are unstable,
 - generation routinely produces invalid mandatory routes,

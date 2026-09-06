@@ -20,6 +20,9 @@ public partial class PlayerPhysics : RigidBody3D
 
     // ---- input snapshot, sampled on the main thread in _PhysicsProcess ----
     private Vector2 _moveInput;
+    /// <summary>cos(150°): desired input closer than 30° to straight against the heading brakes
+    /// instead of turning, so plain W/S can never spin the ball (D-076).</summary>
+    private const float BrakeConeDot = -0.866f;
     private bool _boostHeld;
     private bool _jumpPressedEdge, _jumpReleasedEdge, _jumpHeld;
 
@@ -31,10 +34,12 @@ public partial class PlayerPhysics : RigidBody3D
     private bool _isCharging;
     private float _chargeSeconds;
     private float _chargeGrace;
-    private bool _jumpArcEligible;
-    private bool _slamUsedThisArc;
     private bool _slamActive;
-    private bool _lastSlamPerfect;
+    // ---- landing burst (D-077): timing only; no combo/rhythm state ----
+    private float _sinceSlamLanding = float.PositiveInfinity;   // seconds since the last slam landing
+    private float _sinceSlamPress = float.PositiveInfinity;     // seconds since a Space press during a slam
+    private bool _burstArmed;                                     // slam landed; burst not yet fired or expired
+    private bool _pendingBurst;
     private bool _boostActive;
     private float _boost;
     private float _defaultGravity = 9.8f;
@@ -83,10 +88,13 @@ public partial class PlayerPhysics : RigidBody3D
     public float Charge01 => Mathf.Clamp(_chargeSeconds / Mathf.Max(0.001f, _t.JumpSlam.MaxJumpChargeSeconds), 0f, 1f);
     public float ComputedTakeoffSpeed =>
         Mathf.Lerp(_t.JumpSlam.MinJumpTakeoffVerticalSpeed, _t.JumpSlam.MaxJumpTakeoffVerticalSpeed, Charge01);
-    public bool JumpArcEligible => _jumpArcEligible && !_slamUsedThisArc;
-    /// <summary>|vY| threshold for a perfect apex: gravity * window / 2 (D-017).</summary>
-    public float PerfectApexVerticalSpeedThreshold =>
-        _t.Movement.Gravity * Mathf.Max(0f, _t.JumpSlam.PerfectApexWindowSeconds) * 0.5f;
+    /// <summary>True while a fresh Space press would fire the landing burst (D-077).</summary>
+    public bool BurstWindowOpen => _burstArmed && _sinceSlamLanding <= _t.JumpSlam.LandingBurstWindowSeconds;
+    /// <summary>Seconds left in the post-landing half of the burst window (0 when closed).</summary>
+    public float BurstWindowRemaining => BurstWindowOpen ? _t.JumpSlam.LandingBurstWindowSeconds - _sinceSlamLanding : 0f;
+    /// <summary>Locomotion speed established by the most recent landing burst.</summary>
+    public float LastBurstSpeed { get; private set; }
+    public int BurstCount { get; private set; }
     /// <summary>Cap currently enforced: base cap plus any decaying landing allowance.</summary>
     public float EffectiveLocomotionCap => _t.Movement.HardMaxLocomotionSpeed + _capAllowance;
     public bool SlamActive => _slamActive;
@@ -94,7 +102,6 @@ public partial class PlayerPhysics : RigidBody3D
     public float LastTakeoffVerticalSpeed { get; private set; }
     /// <summary>Vertical speed observed at the instant the most recent slam began.</summary>
     public float LastSlamVerticalSpeed { get; private set; }
-    public bool LastSlamWasPerfect => _lastSlamPerfect;
     public bool BoostActive => _boostActive;
     public float BoostAmount => _boost;
     public float Boost01 => Mathf.Clamp(_boost / Mathf.Max(0.001f, _t.Boost.BoostCapacity), 0f, 1f);
@@ -110,8 +117,11 @@ public partial class PlayerPhysics : RigidBody3D
     public event Action? JumpChargeStarted;
     public event Action? JumpChargeCanceled;
     public event Action<float>? Jumped;
-    public event Action<bool>? Slammed;
-    public event Action<float, bool, bool>? Landed;
+    public event Action? Slammed;
+    /// <summary>(impact speed, was a slam). Every slam landing is a power impact (D-077).</summary>
+    public event Action<float, bool>? Landed;
+    /// <summary>Landing burst fired; argument is the locomotion speed established.</summary>
+    public event Action<float>? LandingBurst;
     public event Action<bool>? BoostActiveChanged;
     public event Action<SpeedBand>? SpeedBandChanged;
     public event Action? Recovered;
@@ -209,6 +219,8 @@ public partial class PlayerPhysics : RigidBody3D
         bool wasGrounded = IsGrounded;
 
         _landedThisTick = false;
+        _sinceSlamLanding += dt;
+        _sinceSlamPress += dt;
         UpdateGroundState(state, dt);
         HandleLanding(wasGrounded, preVerticalSpeed);
         UpdateJumpInput(dt, ref v);
@@ -231,8 +243,37 @@ public partial class PlayerPhysics : RigidBody3D
         float effectiveCap = cap + _capAllowance;
 
         Vector3 curDir = speed > 0.5f ? vT / speed : Vector3.Zero;
-        Vector3 desiredDir = ComputeDesiredDirection(planeNormal, curDir);
-        float inputMag = Mathf.Min(_moveInput.Length(), 1f);
+        // S / stick-back is a brake, never a reverse drive (D-076): it has no direction of
+        // its own, so the travel heading, and therefore the chase camera, cannot flip from it.
+        Vector2 driveInput = new(_moveInput.X, Mathf.Max(0f, _moveInput.Y));
+        float brake01 = Mathf.Clamp(-_moveInput.Y, 0f, 1f);
+        Vector3 desiredDir = ComputeDesiredDirection(planeNormal, curDir, driveInput);
+        float inputMag = Mathf.Min(driveInput.Length(), 1f);
+
+        // ---- landing burst (D-077): a speed floor along the current heading, nothing else ----
+        // Direction is never rewritten and a faster ball is never slowed, so the burst
+        // reads as a seamless surge out of the landing rather than a launch.
+        if (_pendingBurst)
+        {
+            _pendingBurst = false;
+            float burst = Mathf.Clamp(_t.JumpSlam.LandingBurstSpeedFraction, 0f, 1f) * cap;
+            Vector3 dir = curDir != Vector3.Zero ? curDir : desiredDir;
+            if (dir == Vector3.Zero && CameraBasis is not null)
+            {
+                dir = CameraBasis.FlatForward - planeNormal * CameraBasis.FlatForward.Dot(planeNormal);
+                dir = dir.LengthSquared() > 1e-6f ? dir.Normalized() : Vector3.Zero;
+            }
+            if (dir != Vector3.Zero && speed < burst)
+            {
+                vT = dir * burst;
+                speed = burst;
+                speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
+                curDir = dir;
+            }
+            LastBurstSpeed = vT.Length();
+            BurstCount++;
+            LandingBurst?.Invoke(LastBurstSpeed);
+        }
 
         // ---- authority ----
         float lateral = m.GroundSteeringLateralAccel * Mathf.Lerp(1f, m.HighSpeedSteeringMultiplier, speed01);
@@ -256,13 +297,19 @@ public partial class PlayerPhysics : RigidBody3D
                 // a_lat = v * omega  =>  turnRadius = v^2 / a_lat
                 float maxAngle = lateral * dt / speed;
                 Vector3 axis = curDir.Cross(desiredDir);
-                axis = axis.LengthSquared() < 1e-8f ? planeNormal : axis.Normalized();
-                curDir = curDir.Rotated(axis, Mathf.Min(maxAngle, angle));
-                vT = curDir * speed;
+                // Input within the brake cone of straight against the heading has no turn
+                // side: it only brakes (negative-alignment drive below), it is never a U-turn
+                // whose direction float noise would pick. Clear lateral intent (W+A/D) makes
+                // the side unambiguous and the normal hairpin applies.
+                if (curDir.Dot(desiredDir) > BrakeConeDot && axis.LengthSquared() >= 1e-6f)
+                {
+                    curDir = curDir.Rotated(axis.Normalized(), Mathf.Min(maxAngle, angle));
+                    vT = curDir * speed;
+                }
             }
         }
 
-        // ---- longitudinal drive (negative alignment brakes) ----
+        // ---- longitudinal drive (negative alignment still brakes on sharp turns) ----
         if (inputMag > 0.01f && desiredDir != Vector3.Zero)
         {
             if (speed > 0.5f)
@@ -276,6 +323,13 @@ public partial class PlayerPhysics : RigidBody3D
             }
         }
 
+        // ---- brake: shed speed along the current heading, never through zero ----
+        if (brake01 > 0.01f && speed > 0.5f)
+        {
+            float shed = Mathf.Min(speed, drive * brake01 * dt);
+            vT -= curDir * shed;
+        }
+
         ApplyBoost(ref vT, planeNormal, curDir, desiredDir, speed01, dt);
 
         // ---- drag ----
@@ -285,8 +339,7 @@ public partial class PlayerPhysics : RigidBody3D
         // ---- slam commits downward; vertical is never touched by the locomotion cap ----
         if (_slamActive && !IsGrounded)
         {
-            float strength = _lastSlamPerfect ? _t.JumpSlam.PerfectApexSlamStrengthMultiplier : 1f;
-            vN -= _t.JumpSlam.SlamDownwardAcceleration * strength * dt;
+            vN -= _t.JumpSlam.SlamDownwardAcceleration * dt;
         }
 
         // ---- hard locomotion cap: clamp magnitude only, never rotate (03 §5, D-069) ----
@@ -307,7 +360,7 @@ public partial class PlayerPhysics : RigidBody3D
               : _slamActive ? MovementState.Slam
               : IsGrounded ? MovementState.Grounded
               : MovementState.Airborne;
-        ImpactPowerEstimate = v.Length() * (_lastSlamPerfect && _slamActive ? _t.JumpSlam.PerfectApexImpactMultiplier : 1f);
+        ImpactPowerEstimate = v.Length() * (_slamActive ? _t.JumpSlam.SlamImpactMultiplier : 1f);
         UpdateSpeedBand(locSpeed);
         UpdateBoostMeter(dt);
         UpdateCheckpoint(state, dt);
@@ -328,13 +381,14 @@ public partial class PlayerPhysics : RigidBody3D
 
         Velocity = Vector3.Zero;
         LocomotionSpeed = 0f;
+        _burstArmed = false;
+        _pendingBurst = false;
+        _sinceSlamLanding = float.PositiveInfinity;
+        _sinceSlamPress = float.PositiveInfinity;
         _isCharging = false;
         _chargeSeconds = 0f;
         _chargeGrace = 0f;
         _slamActive = false;
-        _lastSlamPerfect = false;
-        _jumpArcEligible = false;
-        _slamUsedThisArc = false;
         _jumpLockout = 0f;
         _groundStick = 0f;
         _capAllowance = 0f;
@@ -384,13 +438,22 @@ public partial class PlayerPhysics : RigidBody3D
 
         _landedThisTick = true;
         bool wasSlam = _slamActive;
-        bool wasPerfect = _slamActive && _lastSlamPerfect;
         _slamActive = false;
-        _jumpArcEligible = false;
-        _slamUsedThisArc = false;
 
-        if (wasPerfect) RefillBoost(_t.Boost.PerfectApexRefillAmount);   // active refill hook
-        Landed?.Invoke(Mathf.Abs(preVerticalSpeed), wasSlam, wasPerfect);
+        // Landing burst (D-077): every slam landing opens a short window. A press buffered
+        // during the slam counts if it was inside the same window before touchdown.
+        _burstArmed = wasSlam;
+        _sinceSlamLanding = wasSlam ? 0f : float.PositiveInfinity;
+        if (wasSlam && _sinceSlamPress <= _t.JumpSlam.LandingBurstWindowSeconds) FireBurst();
+        _sinceSlamPress = float.PositiveInfinity;
+
+        Landed?.Invoke(Mathf.Abs(preVerticalSpeed), wasSlam);
+    }
+
+    private void FireBurst()
+    {
+        _burstArmed = false;
+        _pendingBurst = true;
     }
 
     private void UpdateJumpInput(float dt, ref Vector3 v)
@@ -418,9 +481,16 @@ public partial class PlayerPhysics : RigidBody3D
             }
         }
 
+        if (_burstArmed && _sinceSlamLanding > js.LandingBurstWindowSeconds) _burstArmed = false;
+
         if (_jumpPressedEdge)
         {
-            if (_rawGrounded && !_isCharging)
+            if (_burstArmed && _sinceSlamLanding <= js.LandingBurstWindowSeconds)
+            {
+                // Landing burst (D-077): the press is consumed; it never starts a charge.
+                FireBurst();
+            }
+            else if (_rawGrounded && !_isCharging)
             {
                 // Charge begins only from a real ground contact; there is deliberately no
                 // airborne coyote charge, which keeps the airborne press unambiguously slam.
@@ -432,6 +502,11 @@ public partial class PlayerPhysics : RigidBody3D
             else if (!IsGrounded && !_isCharging && !_slamActive)
             {
                 StartSlam(ref v);
+            }
+            else if (_slamActive && !IsGrounded)
+            {
+                // Early burst press: remembered so a press just before touchdown still counts.
+                _sinceSlamPress = 0f;
             }
         }
 
@@ -448,10 +523,7 @@ public partial class PlayerPhysics : RigidBody3D
             _isCharging = false;
             _chargeSeconds = 0f;
             _chargeGrace = 0f;
-            _jumpArcEligible = true;      // only a released jump opens perfect-apex eligibility (D-070)
-            _slamUsedThisArc = false;
             _slamActive = false;
-            _lastSlamPerfect = false;
             _jumpLockout = JumpLockoutSeconds;
             _rawGrounded = false;
             IsGrounded = false;
@@ -464,24 +536,17 @@ public partial class PlayerPhysics : RigidBody3D
     private void StartSlam(ref Vector3 v)
     {
         var js = _t.JumpSlam;
-        bool perfect = _jumpArcEligible
-                       && !_slamUsedThisArc
-                       && Mathf.Abs(v.Y) <= PerfectApexVerticalSpeedThreshold;
-
         LastSlamVerticalSpeed = v.Y;
         _slamActive = true;
-        _slamUsedThisArc = true;
-        _lastSlamPerfect = perfect;
 
-        float strength = perfect ? js.PerfectApexSlamStrengthMultiplier : 1f;
         v.X *= js.SlamLateralRetention;
         v.Z *= js.SlamLateralRetention;
-        v.Y = Mathf.Min(v.Y, -js.SlamInitialDownwardSpeed * strength);
+        v.Y = Mathf.Min(v.Y, -js.SlamInitialDownwardSpeed);
 
-        Slammed?.Invoke(perfect);
+        Slammed?.Invoke();
     }
 
-    private Vector3 ComputeDesiredDirection(Vector3 planeNormal, Vector3 curDir)
+    private Vector3 ComputeDesiredDirection(Vector3 planeNormal, Vector3 curDir, Vector2 driveInput)
     {
         // While charging, propulsion follows the existing travel heading instead of
         // letting WASD redirect the ball (03 §4).
@@ -489,7 +554,7 @@ public partial class PlayerPhysics : RigidBody3D
 
         Vector3 fwd = CameraBasis?.FlatForward ?? Vector3.Forward;
         Vector3 right = CameraBasis?.FlatRight ?? Vector3.Right;
-        Vector3 desired = right * _moveInput.X + fwd * _moveInput.Y;
+        Vector3 desired = right * driveInput.X + fwd * driveInput.Y;
         desired -= planeNormal * desired.Dot(planeNormal);
         return desired.LengthSquared() > 1e-6f ? desired.Normalized() : Vector3.Zero;
     }

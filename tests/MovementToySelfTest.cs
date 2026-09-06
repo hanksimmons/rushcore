@@ -40,7 +40,7 @@ public partial class MovementToySelfTest : Node
     private int _checks;
     private bool _done;
 
-    private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount, _landedCount;
+    private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount, _landedCount, _burstCount;
     private bool _releaseJumpFromProcess;
     /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
     private Vector3? _worldDrive;
@@ -49,7 +49,6 @@ public partial class MovementToySelfTest : Node
     private int _groundViolations;
     private Vector3 _laneFwd = Vector3.Forward;
     private float _lastJumpCharge;
-    private bool _lastSlamPerfect;
 
     public MovementToySelfTest(IDebugActions debug) => _debug = debug;
 
@@ -71,9 +70,10 @@ public partial class MovementToySelfTest : Node
 
         _player.Jumped += c => { _jumpedCount++; _lastJumpCharge = c; };
         _player.JumpChargeCanceled += () => _chargeCanceledCount++;
-        _player.Slammed += p => { _slammedCount++; _lastSlamPerfect = p; };
+        _player.Slammed += () => _slammedCount++;
         _player.Recovered += () => _recoveredCount++;
-        _player.Landed += (_, _, _) => _landedCount++;
+        _player.Landed += (_, _) => _landedCount++;
+        _player.LandingBurst += _ => _burstCount++;
         _debug.World.BoostPickupCollected += _ => _pickupCount++;
 
         _script = Run();
@@ -366,7 +366,6 @@ public partial class MovementToySelfTest : Node
         Check("release performs the jump", _jumpedCount == jumpsBefore + 1);
         CheckNear("full hold produces max takeoff", _player.LastTakeoffVerticalSpeed, js.MaxJumpTakeoffVerticalSpeed, 0.05f);
         CheckNear("jump preserves horizontal momentum", FlatVel.Length(), flatBefore, 1.0f);
-        Check("jump opens perfect-apex eligibility", _player.JumpArcEligible);
 
         // ---- a fresh airborne press is slam, never a new charge ----
         foreach (var _ in Frames(6)) yield return null;
@@ -375,8 +374,6 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Act()) yield return null;
         Check("airborne press does not begin a new charge", !_player.IsCharging);
         Check("airborne press triggers slam", _slammedCount == slamsBefore + 1 && _player.SlamActive);
-        Check("early slam is not a perfect apex", !_lastSlamPerfect,
-            $"vy at slam={_player.LastSlamVerticalSpeed:0.##} threshold={_player.PerfectApexVerticalSpeedThreshold:0.##}");
         Input.ActionRelease(InputBootstrap.Jump);
 
         // ---- no double jump ----
@@ -421,23 +418,133 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Act()) yield return null;
         CheckNear("quick tap produces min takeoff (again, after off-tick case)", _player.LastTakeoffVerticalSpeed, js.MinJumpTakeoffVerticalSpeed, 0.6f);
 
-        // ---- perfect apex (from a full-charge arc: at the accepted 2 m/s a tap barely leaves the ground) ----
+        // ---- landing burst (D-077): Space at the slam touchdown ----
+        // (a) press just after touchdown, inside the window
         foreach (var _ in Seconds(2.0f)) yield return null;
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        foreach (var _ in Seconds(1.5f)) yield return null;
         Input.ActionPress(InputBootstrap.Jump, 1f);
         foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.1f)) yield return null;
         Input.ActionRelease(InputBootstrap.Jump);
+        foreach (var _ in Frames(10)) yield return null;
+        Input.ActionPress(InputBootstrap.Jump, 1f);                  // slam
         foreach (var _ in Act()) yield return null;
-        int apexFrames = 0;
-        while (_player.VerticalSpeed > _player.PerfectApexVerticalSpeedThreshold * 0.4f && apexFrames++ < 300) yield return null;
-        Check("apex window reached", apexFrames < 300, $"frames={apexFrames}");
+        Input.ActionRelease(InputBootstrap.Jump);
+        Check("slam started for the burst case", _player.SlamActive);
+        int landingsBefore = _landedCount, burstsBefore = _burstCount;
+        int guard = 0;
+        while (_landedCount == landingsBefore && guard++ < 600) yield return null;
+        Check("slam landed", _landedCount == landingsBefore + 1, $"guard={guard}");
+        Vector3 headingAtLanding = FlatVel.Normalized();
+        float speedAtLanding = _player.LocomotionSpeed;
+        Check("slam landing opens the burst window", _player.BurstWindowOpen,
+            $"remaining={_player.BurstWindowRemaining:0.###}");
+        Check("no burst without a press", _burstCount == burstsBefore);
+        foreach (var _ in Frames(1)) yield return null;
+        jumpsBefore = _jumpedCount;
         Input.ActionPress(InputBootstrap.Jump, 1f);
         foreach (var _ in Act()) yield return null;
         Input.ActionRelease(InputBootstrap.Jump);
-        Check("slam inside the apex window is a perfect apex", _lastSlamPerfect,
-            $"vy at slam={_player.LastSlamVerticalSpeed:0.###} threshold={_player.PerfectApexVerticalSpeedThreshold:0.##}");
+        foreach (var _ in Act()) yield return null;
+        Check("Space inside the window fires the landing burst", _burstCount == burstsBefore + 1,
+            $"bursts={_burstCount - burstsBefore}");
+        Check("the burst press never starts a charge or a jump", !_player.IsCharging && _jumpedCount == jumpsBefore);
+        CheckNear("burst sets the tuned fraction of the cap", _player.LocomotionSpeed,
+            js.LandingBurstSpeedFraction * m.HardMaxLocomotionSpeed, 2.5f);
+        Check("burst raised the speed", _player.LocomotionSpeed > speedAtLanding + 20f,
+            $"{speedAtLanding:0.0} -> {_player.LocomotionSpeed:0.0}");
+        float burstDrift = Mathf.RadToDeg(headingAtLanding.AngleTo(FlatVel.Normalized()));
+        Check("burst keeps the heading (seamless)", burstDrift < 3f, $"drift={burstDrift:0.00} deg");
+        Check("burst keeps the ball on the ground", _player.IsGrounded);
+        Check("burst is consumed: the window closes", !_player.BurstWindowOpen);
         ReleaseAll();
-        foreach (var _ in Seconds(2.0f)) yield return null;
+        foreach (var _ in Seconds(1.0f)) yield return null;
+
+        // (b) press after the window has closed is an ordinary charge
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        foreach (var _ in Seconds(1.0f)) yield return null;
+        Input.ActionPress(InputBootstrap.Jump, 1f);
+        foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.1f)) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        foreach (var _ in Frames(10)) yield return null;
+        Input.ActionPress(InputBootstrap.Jump, 1f);
+        foreach (var _ in Act()) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        landingsBefore = _landedCount; burstsBefore = _burstCount;
+        guard = 0;
+        while (_landedCount == landingsBefore && guard++ < 600) yield return null;
+        foreach (var _ in Seconds(js.LandingBurstWindowSeconds + 0.15f)) yield return null;
+        Check("the window has closed", !_player.BurstWindowOpen);
+        Input.ActionPress(InputBootstrap.Jump, 1f);
+        foreach (var _ in Act()) yield return null;
+        Check("Space after the window is an ordinary charge, not a burst",
+            _player.IsCharging && _burstCount == burstsBefore, $"charging={_player.IsCharging} bursts={_burstCount - burstsBefore}");
+        Input.ActionRelease(InputBootstrap.Jump);
+        ReleaseAll();
+        foreach (var _ in Seconds(2.5f)) yield return null;
+
+        // (c) press just before touchdown, during the slam, is buffered and counts
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 8f, 0.05f)) yield return null;
+        guard = 0;
+        while (_player.IsGrounded && guard++ < 60) yield return null;
+        Input.ActionPress(InputBootstrap.Jump, 1f);                  // slam from 8 m
+        foreach (var _ in Act()) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        Check("slam from a fall started", _player.SlamActive);
+        Input.ActionPress(InputBootstrap.Jump, 1f);                  // early burst press
+        foreach (var _ in Act()) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        landingsBefore = _landedCount; burstsBefore = _burstCount;
+        guard = 0;
+        while (_landedCount == landingsBefore && guard++ < 120) yield return null;
+        foreach (var _ in Act()) yield return null;
+        Check("a press just before touchdown fires the burst on landing", _burstCount == burstsBefore + 1,
+            $"bursts={_burstCount - burstsBefore} landed={_landedCount - landingsBefore}");
+        CheckNear("buffered burst also reaches the tuned speed", _player.LocomotionSpeed,
+            js.LandingBurstSpeedFraction * m.HardMaxLocomotionSpeed, 2.5f);
+        ReleaseAll();
+        foreach (var _ in Seconds(1.0f)) yield return null;
+
+        // (d) a plain fall (no slam) never opens the window: Space on landing is a charge
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 8f, 0.05f)) yield return null;
+        landingsBefore = _landedCount; burstsBefore = _burstCount;
+        guard = 0;
+        while (_landedCount == landingsBefore && guard++ < 120) yield return null;
+        Check("a plain landing does not open the burst window", !_player.BurstWindowOpen);
+        Input.ActionPress(InputBootstrap.Jump, 1f);
+        foreach (var _ in Act()) yield return null;
+        Check("Space after a plain landing is a charge, never a burst",
+            _player.IsCharging && _burstCount == burstsBefore, $"charging={_player.IsCharging}");
+        Input.ActionRelease(InputBootstrap.Jump);
+        ReleaseAll();
+        foreach (var _ in Seconds(2.5f)) yield return null;
+
+        // (e) the burst is a floor: a faster ball is never slowed and never turned
+        {
+            float savedFraction = js.LandingBurstSpeedFraction;
+            js.LandingBurstSpeedFraction = 0.05f;
+            foreach (var _ in Settle(PlatformCenter + Vector3.Up * 8f, 0.05f)) yield return null;
+            _player.LinearVelocity = Vector3.Right * 40f;
+            foreach (var _ in Frames(1)) yield return null;
+            Input.ActionPress(InputBootstrap.Jump, 1f);              // slam
+            foreach (var _ in Act()) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            Input.ActionPress(InputBootstrap.Jump, 1f);              // early burst press
+            foreach (var _ in Act()) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            landingsBefore = _landedCount; burstsBefore = _burstCount;
+            guard = 0;
+            while (_landedCount == landingsBefore && guard++ < 120) yield return null;
+            foreach (var _ in Act()) yield return null;
+            Check("burst fired for the floor case", _burstCount == burstsBefore + 1);
+            Check("burst never slows a faster ball", _player.Velocity.Dot(Vector3.Right) > 36f,
+                $"vel.x={_player.Velocity.X:0.0}");
+            js.LandingBurstSpeedFraction = savedFraction;
+            ReleaseAll();
+            foreach (var _ in Seconds(1.0f)) yield return null;
+        }
 
         // ---- slam preserves lateral momentum and commits downward ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
@@ -458,26 +565,6 @@ public partial class MovementToySelfTest : Node
             $"vy={_player.VerticalSpeed:0.0}");
         ReleaseAll();
         foreach (var _ in Seconds(2.5f)) yield return null;
-
-        // ---- a fall that was not a player jump can never be a perfect apex (D-070) ----
-        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 80f, 0.05f)) yield return null;
-        int guard = 0;
-        while (_player.IsGrounded && guard++ < 60) yield return null;
-        Check("arc from a fall is not apex-eligible", !_player.JumpArcEligible);
-        // Widen the window absurdly for this case so the ONLY thing that can deny the
-        // bonus is the missing jump arc (D-070), rather than the timing.
-        float savedWindow = js.PerfectApexWindowSeconds;
-        js.PerfectApexWindowSeconds = 100f;
-        Input.ActionPress(InputBootstrap.Jump, 1f);
-        foreach (var _ in Act()) yield return null;
-        Input.ActionRelease(InputBootstrap.Jump);
-        Check("the fall slam was well inside the (widened) apex window",
-            Mathf.Abs(_player.LastSlamVerticalSpeed) <= _player.PerfectApexVerticalSpeedThreshold,
-            $"vy at slam={_player.LastSlamVerticalSpeed:0.###}");
-        Check("fall without a jump cannot earn a perfect apex even inside the window", !_lastSlamPerfect);
-        js.PerfectApexWindowSeconds = savedWindow;
-        ReleaseAll();
-        foreach (var _ in Seconds(3.0f)) yield return null;
 
         // ---- charge release grace after losing ground ----
         foreach (var e in RunChargeGraceCase(true)) yield return e;
@@ -605,7 +692,7 @@ public partial class MovementToySelfTest : Node
         while (!_player.IsGrounded && landGuard++ < 1200) yield return null;     // land on the slope
         bool landed = landGuard < 1200;
         float prev = _player.LocomotionSpeed, worstDrop = 0f, peakOverCap = 0f;
-        int landingsBefore = _landedCount;
+        landingsBefore = _landedCount;
         foreach (var _ in Seconds(0.6f))
         {
             float now = _player.LocomotionSpeed;
@@ -653,11 +740,82 @@ public partial class MovementToySelfTest : Node
         Check("chase yaw converges on the travel heading",
             rig.FlatForward.Dot(Vector3.Right) > 0.96f,
             $"camFwd={rig.FlatForward} yaw={rig.YawDegreesCurrent:0.0}");
-        _worldDrive = Vector3.Left;                      // brake through zero and reverse
+        // ---- S is a brake (D-076): sheds speed along the heading, never reverses, never turns the view ----
+        float speedBeforeBrake = _player.LocomotionSpeed;
+        _worldDrive = Vector3.Left;                      // camera faces +X, so this is pure S
+        float minAlong = float.MaxValue, minCamDot = 1f;
+        foreach (var _ in Seconds(2.5f))
+        {
+            minAlong = Mathf.Min(minAlong, _player.Velocity.Dot(Vector3.Right));
+            minCamDot = Mathf.Min(minCamDot, rig.FlatForward.Dot(Vector3.Right));
+            yield return null;
+        }
+        Check("S brakes to a stop", speedBeforeBrake > 10f && _player.LocomotionSpeed < 1.5f,
+            $"before={speedBeforeBrake:0.0} after={_player.LocomotionSpeed:0.0}");
+        Check("S never drives backward", minAlong > -1f, $"min along heading={minAlong:0.0}");
+        Check("braking never turns the chase camera", minCamDot > 0.96f, $"min camFwd.x={minCamDot:0.00}");
+        ReleaseAll();
+
+        // ---- reversed heading with no forward input: the view swings behind the new travel direction ----
+        _player.LinearVelocity = Vector3.Left * 25f;
         foreach (var _ in Seconds(2.5f)) yield return null;
-        Check("reversing does not flip the chase camera",
-            rig.FlatForward.Dot(Vector3.Right) > 0.7f && _player.Velocity.Dot(Vector3.Right) < -2f,
+        Check("camera follows a reversal the player is not fighting",
+            rig.FlatForward.Dot(Vector3.Left) > 0.9f && _player.Velocity.Dot(Vector3.Left) > 5f,
             $"camFwd={rig.FlatForward} vel.x={_player.Velocity.X:0.0}");
+
+        // ---- W against a short reversal: yaw holds, the recovery never swings the view ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(Vector3.Right);
+        foreach (var _ in Frames(2)) yield return null;
+        _player.LinearVelocity = Vector3.Left * 20f;     // rolling toward the camera
+        Input.ActionPress(InputBootstrap.MoveForward, 1f); // raw W: push back the way the view faces
+        bool heldEarly = false;
+        minCamDot = 1f;
+        int tick = 0;
+        foreach (var _ in Seconds(1.5f))
+        {
+            if (tick++ == 12) heldEarly = rig.ReverseHoldActive && _player.Velocity.Dot(Vector3.Left) > 5f;
+            minCamDot = Mathf.Min(minCamDot, rig.FlatForward.Dot(Vector3.Right));
+            yield return null;
+        }
+        Check("W against a reversal holds the yaw", heldEarly, $"holdActive={rig.ReverseHoldActive}");
+        Check("a quick recovery never swings the view", minCamDot > 0.96f && _player.Velocity.Dot(Vector3.Right) > 5f,
+            $"min camFwd.x={minCamDot:0.00} vel.x={_player.Velocity.X:0.0}");
+        ReleaseAll();
+
+        // ---- W+A against a reversal is a deliberate hairpin, and it turns to the input side ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(Vector3.Right);                // view +X: A is camera-left = -Z
+        foreach (var _ in Frames(2)) yield return null;
+        _player.LinearVelocity = Vector3.Left * 20f;
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        Input.ActionPress(InputBootstrap.MoveLeft, 1f);
+        float maxSide = 0f, minSide = 0f;
+        foreach (var _ in Seconds(0.35f))
+        {
+            maxSide = Mathf.Max(maxSide, _player.Velocity.Z);
+            minSide = Mathf.Min(minSide, _player.Velocity.Z);
+            yield return null;
+        }
+        Check("a hairpin turns to the input side", minSide < -5f && maxSide < 1f,
+            $"vel.z range [{minSide:0.0}, {maxSide:0.0}] vel={_player.Velocity}");
+        ReleaseAll();
+
+        // ---- W against a long reversal: the hold is bounded, the camera still ends up behind the travel ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(Vector3.Right);
+        foreach (var _ in Frames(2)) yield return null;
+        _player.LinearVelocity = Vector3.Left * 60f;
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        foreach (var _ in Seconds(t.Camera.YawReverseHoldSeconds + 0.35f)) yield return null;
+        Check("the reverse hold is bounded",
+            !rig.ReverseHoldActive && rig.FlatForward.Dot(Vector3.Right) < 0.95f,
+            $"camFwd={rig.FlatForward} hold={rig.ReverseHoldActive} vel.x={_player.Velocity.X:0.0}");
+        foreach (var _ in Seconds(2.5f)) yield return null;
+        Vector3 travelDir = FlatVel.Length() > 1e-3f ? FlatVel.Normalized() : Vector3.Zero;
+        Check("camera ends up behind the direction of travel",
+            FlatVel.Length() > 5f && rig.FlatForward.Dot(travelDir) > 0.9f,
+            $"camFwd={rig.FlatForward} travel={travelDir} speed={FlatVel.Length():0.0}");
         ReleaseAll();
         t.Camera.FollowTrajectoryYaw = false;
         foreach (var _ in Seconds(2.5f)) yield return null;
@@ -766,7 +924,7 @@ public partial class MovementToySelfTest : Node
             _player.GlobalPosition.DistanceTo(PlatformCenter + Vector3.Up * 3f) < 4f,
             $"pos={_player.GlobalPosition}");
         Check("recovery clears transient movement state",
-            !_player.IsCharging && !_player.SlamActive && !_player.JumpArcEligible);
+            !_player.IsCharging && !_player.SlamActive && !_player.BurstWindowOpen);
         Check("recovery resets physics interpolation", _recoveredCount > recoveredBefore);
 
         foreach (var _ in Seconds(0.5f)) yield return null;

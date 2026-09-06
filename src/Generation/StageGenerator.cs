@@ -20,6 +20,7 @@ public sealed class StageGenerator
     {
         _speed = new RouteSpeedModel(movement);
         _routes = new RouteSkeletonBuilder(_speed);
+        _gravity = movement.Gravity;
     }
 
     public RouteSpeedModel SpeedModel => _speed;
@@ -41,6 +42,9 @@ public sealed class StageGenerator
         return fallback;
     }
 
+    /// <summary>One attempt without regeneration or fallback: seed tooling and tests inspect failures with it.</summary>
+    public StageDefinition BuildAttempt(StageGenerationRequest request, int attempt) => Build(request, request.RouteSeed(attempt), attempt + 1);
+
     private StageDefinition Build(StageGenerationRequest request, ulong routeSeed, int attempt, bool straight = false)
     {
         var report = new ValidationReport { Attempts = attempt };
@@ -49,17 +53,28 @@ public sealed class StageGenerator
         RouteSkeleton route = straight ? StraightRoute() : _routes.Build(routeSeed);
         report.Timings.Add(("route skeleton", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
+        // B–D: archetype relief and the stamped corridor become the one logical height source;
+        // the route polyline is then lifted onto it so every later check sees real geometry.
+        var field = new StageHeightField(route, request.StageSeed);
+        for (int i = 0; i < route.Vertices.Count; i++)
+        {
+            var v = route.Vertices[i];
+            v.Position.Y = field.Sample(v.Position.X, v.Position.Z);
+            route.Vertices[i] = v;
+        }
+        report.Timings.Add(("relief + corridor", sw.Elapsed.TotalMilliseconds)); sw.Restart();
+
         RouteSpeedProfile profile = _speed.Integrate(route.Polyline());
         report.Timings.Add(("speed profile", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
-        Validate(route, profile, report);
+        Validate(route, profile, field, report);
         report.Timings.Add(("validation", sw.Elapsed.TotalMilliseconds));
 
-        return new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed };
+        return new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed, HeightField = field };
     }
 
     /// <summary>Mandatory and secondary checks that apply to a skeleton (04 §12); more join with each slice.</summary>
-    private void Validate(RouteSkeleton route, RouteSpeedProfile profile, ValidationReport report)
+    private void Validate(RouteSkeleton route, RouteSpeedProfile profile, StageHeightField field, ValidationReport report)
     {
         var v = route.Vertices;
         float entryX = -WorldScale.FootprintLength * 0.5f + WorldScale.EntryMargin;
@@ -93,6 +108,57 @@ public sealed class StageGenerator
         report.Add("base-kit travel time near the stage target",
             profile.TotalTime >= WorldScale.TargetBaseKitSeconds * 0.7f && profile.TotalTime <= WorldScale.TargetBaseKitSeconds * 1.5f,
             $"{profile.TotalTime:0.0} s (target {WorldScale.TargetBaseKitSeconds:0} s)");
+
+        // ---- geometry checks on the stamped corridor (04 §10, §12) ----
+        float maxGrade = 0f, maxDelta = 0f, prevGrade = 0f;
+        for (int i = 1; i < v.Count; i++)
+        {
+            float ds = v[i].Distance - v[i - 1].Distance;
+            if (ds <= 1e-3f) continue;
+            float grade = (v[i].Position.Y - v[i - 1].Position.Y) / ds;
+            maxGrade = Mathf.Max(maxGrade, Mathf.Abs(grade));
+            if (i > 1) maxDelta = Mathf.Max(maxDelta, Mathf.Abs(grade - prevGrade));
+            prevGrade = grade;
+        }
+        report.Add("corridor grade within the route limit", maxGrade <= WorldScale.MaxRouteGrade, $"max grade {maxGrade:0.000} (limit {WorldScale.MaxRouteGrade:0.00})");
+        report.Add("no abrupt grade change along the corridor", maxDelta <= WorldScale.MaxGradeDeltaPerSample, $"max Δgrade/sample {maxDelta:0.000}");
+
+        report.Add("base relief keeps contact at the cap", field.SwellCurvature <= 1f / WorldScale.CruiseCrestRadius + 1e-6f,
+            $"swell crest radius ≥ {1f / Mathf.Max(1e-6f, field.SwellCurvature):0} m");
+
+        bool crestsClear = true;
+        string crestDetail = "";
+        foreach (var f in route.Features)
+        {
+            if (f.Kind != RouteFeatureKind.LaunchCrest) continue;
+            float speed = profile.SpeedAt(f.CentreDistance);
+            float crestRadius = RouteSpeedModel.CosineCrestRadius(f.Wavelength, f.Height);
+            f.IsLaunch = _speed.CrestIsLaunch(crestRadius, speed);
+            // Flight to fall the crest height on the far side at the arrival speed (04 §10).
+            f.LandingDistance = f.IsLaunch ? speed * Mathf.Sqrt(2f * f.Height / Mathf.Max(0.001f, _gravity)) : 0f;
+            float straightEnd = v[f.EndIndex].Distance;
+            bool ok = f.CentreDistance + f.Wavelength * 0.5f + f.LandingDistance <= straightEnd + 1e-3f;
+            crestsClear &= ok;
+            crestDetail += $" [{f.Wavelength:0}/{f.Height:0} at {f.CentreDistance:0} m: {speed:0} m/s {(f.IsLaunch ? "launch" : "roll")}, landing {f.LandingDistance:0} m{(ok ? "" : " OVERRUNS")}]";
+        }
+        report.Add("launch crests keep a straight landing run", crestsClear, $"{route.Features.Count} crests{crestDetail}");
+
+        float startFlat = PadFlatness(field, v[0].Position), exitFlat = PadFlatness(field, v[^1].Position);
+        report.Add("start and exit pads are flat", startFlat < 1.0f && exitFlat < 1.0f, $"height spread start {startFlat:0.00} m, exit {exitFlat:0.00} m");
+    }
+
+    private readonly float _gravity;
+
+    private static float PadFlatness(StageHeightField field, Vector3 centre)
+    {
+        float lo = float.MaxValue, hi = float.MinValue;
+        for (int a = 0; a < 8; a++)
+        {
+            float ang = a * Mathf.Tau / 8f;
+            float h = field.Sample(centre.X + Mathf.Cos(ang) * 30f, centre.Z + Mathf.Sin(ang) * 30f);
+            lo = Mathf.Min(lo, h); hi = Mathf.Max(hi, h);
+        }
+        return hi - lo;
     }
 
     private static RouteSkeleton StraightRoute()

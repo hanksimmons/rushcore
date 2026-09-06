@@ -33,6 +33,21 @@ public struct RouteVertex
     public RouteSegmentKind Kind;
 }
 
+public enum RouteFeatureKind { LaunchCrest }
+
+/// <summary>A reserved zone on the route (04 §5A): a straight long enough to host a feature and its landing.</summary>
+public sealed class RouteFeature
+{
+    public RouteFeatureKind Kind;
+    public int StartIndex, EndIndex;
+    /// <summary>Route distance of the feature centre (crest apex).</summary>
+    public float CentreDistance;
+    public float Wavelength, Height;
+    /// <summary>Filled by validation from the speed profile: straight run needed after the apex.</summary>
+    public float LandingDistance;
+    public bool IsLaunch;
+}
+
 public sealed class RouteBend
 {
     public int StartIndex, EndIndex;
@@ -46,9 +61,18 @@ public sealed class RouteSkeleton
 {
     public List<RouteVertex> Vertices { get; } = new();
     public List<RouteBend> Bends { get; } = new();
+    public List<RouteFeature> Features { get; } = new();
     public float Length => Vertices.Count > 0 ? Vertices[^1].Distance : 0f;
     public Vector3 Start => Vertices[0].Position;
     public Vector3 Exit => Vertices[^1].Position;
+
+    /// <summary>Index of the vertex at or just past a route distance (binary search).</summary>
+    public int IndexAtDistance(float distance)
+    {
+        int lo = 0, hi = Vertices.Count - 1;
+        while (lo < hi) { int mid = (lo + hi) >> 1; if (Vertices[mid].Distance < distance) lo = mid + 1; else hi = mid; }
+        return lo;
+    }
 
     public Vector3[] Polyline()
     {
@@ -92,6 +116,8 @@ public sealed class StageDefinition
     public RouteSkeleton PrimaryRoute { get; }
     public RouteSpeedProfile SpeedProfile { get; }
     public ValidationReport Report { get; }
+    /// <summary>The one logical height source for render and collision (04 §9); null only for skeleton-only builds.</summary>
+    public StageHeightField? HeightField { get; internal set; }
     public Vector3 StartPosition => PrimaryRoute.Start;
     public Vector3 StartFacing => new(Mathf.Cos(PrimaryRoute.Vertices[0].Heading), 0f, Mathf.Sin(PrimaryRoute.Vertices[0].Heading));
     public Vector3 ExitPosition => PrimaryRoute.Exit;

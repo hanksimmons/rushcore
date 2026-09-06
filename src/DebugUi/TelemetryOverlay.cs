@@ -161,7 +161,7 @@ public partial class TelemetryOverlay : Control
         Set(Row.Impact, $"{p.ImpactPowerEstimate:0.0}");
         Set(Row.Position, $"{pos.X,7:0.0} {pos.Y,7:0.0} {pos.Z,7:0.0}");
         Set(Row.Checkpoint, $"{cp.X,7:0.0} {cp.Y,7:0.0} {cp.Z,7:0.0}");
-        Set(Row.Seed, _debug.SeedText);
+        Set(Row.Seed, _debug.World.IsStage ? $"{_debug.SeedText}   {_debug.World.StageSummary}" : _debug.SeedText);
         int overrides = _debug.Tuning.OverrideCount;
         Set(Row.Tuning, overrides == 0 ? "compiled defaults" : $"OVERRIDE ({overrides} {(overrides == 1 ? "value differs" : "values differ")})");
 

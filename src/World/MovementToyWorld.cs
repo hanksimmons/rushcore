@@ -1,4 +1,5 @@
 using Godot;
+using Rushcore.Generation;
 using Rushcore.Player;
 using Rushcore.Tuning;
 
@@ -47,6 +48,19 @@ public partial class MovementToyWorld : Node3D
     public IHeightSource Field => _field;
     /// <summary>True while the Gate M1 scale strip is the active terrain.</summary>
     public bool IsStrip { get; private set; }
+    /// <summary>True while a generated stage (Phase 2) is the active terrain.</summary>
+    public bool IsStage { get; private set; }
+    /// <summary>The generated stage definition when <see cref="IsStage"/>; the debug views read it.</summary>
+    public StageDefinition? Stage { get; private set; }
+    /// <summary>One-line generation summary for the telemetry seed row.</summary>
+    public string StageSummary { get; private set; } = "";
+    /// <summary>True when the built terrain matches what the world tuning currently asks for.</summary>
+    public bool MatchesTuning()
+    {
+        bool wantStage = _t.World.GeneratedStage;
+        bool wantStrip = !wantStage && _t.World.CalibrationStrip;
+        return wantStage == IsStage && wantStrip == IsStrip;
+    }
     /// <summary>Half extents of the active terrain in metres.</summary>
     public float HalfX { get; private set; } = Extent * 0.5f;
     public float HalfZ { get; private set; } = Extent * 0.5f;
@@ -92,12 +106,30 @@ public partial class MovementToyWorld : Node3D
     public void Build()
     {
         ulong start = Time.GetTicksMsec();
-        IsStrip = _t.World.CalibrationStrip;
+        IsStage = _t.World.GeneratedStage;
+        IsStrip = !IsStage && _t.World.CalibrationStrip;
         CellSize = Mathf.Clamp(_t.World.CellSize, 1f, 16f);
         // Heights are stored pre-divided by CellSize so the shape can use a uniform
         // scale; a heightmap shape spans one unit per sample by definition.
         _terrainCollider.Scale = Vector3.One * CellSize;
-        _field = IsStrip ? new ScaleStripHeightField(_t.World) : new TerrainHeightField(Seed, _t.World);
+        Stage = null;
+        StageSummary = "";
+        if (IsStage)
+        {
+            var generator = new StageGenerator(_t.Movement);
+            Stage = generator.Generate(new StageGenerationRequest(Seed, 0));
+            _field = Stage.HeightField!;
+            var r = Stage.Report;
+            StageSummary = $"stage {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
+                           $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s, " +
+                           $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} crests, gen {r.TotalMillis:0.0} ms";
+            GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
+            foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
+        }
+        else
+        {
+            _field = IsStrip ? new ScaleStripHeightField(_t.World) : new TerrainHeightField(Seed, _t.World);
+        }
         HalfX = _field.SizeX * 0.5f;
         HalfZ = _field.SizeZ * 0.5f;
         _nx = Mathf.RoundToInt(_field.SizeX / CellSize) + 1;
@@ -133,7 +165,7 @@ public partial class MovementToyWorld : Node3D
 
         _dressing.Rebuild();
         BuildMillis = Time.GetTicksMsec() - start;
-        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
+        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
                  $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +
                  $"{Triangles / 1000f:0} k tris in {Tiles} tiles, heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");
     }

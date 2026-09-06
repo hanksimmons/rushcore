@@ -1,4 +1,5 @@
 using Godot;
+using Rushcore.Generation;
 using Rushcore.Player;
 using Rushcore.Tuning;
 
@@ -220,6 +221,11 @@ public partial class WorldDressing : Node3D
         };
         _content.AddChild(_colliders);
 
+        if (_world.IsStage)
+        {
+            BuildStageDressing();
+            return;
+        }
         if (_world.IsStrip)
         {
             BuildStripDressing();
@@ -231,6 +237,75 @@ public partial class WorldDressing : Node3D
         BuildFeaturePylons();
         BuildScatteredProps(IsClearOfInstruments, 500f, 500f, 1f, PlacementChance);
         BuildBoostPickups();
+    }
+
+    // ---------------------------------------------------------------- generated stage (Phase 2)
+
+    /// <summary>Start/exit marks, the route debug view (04 §16), corridor-clear scatter, boost rings on the line.</summary>
+    private void BuildStageDressing()
+    {
+        var stage = _world.Stage;
+        if (stage is null || stage.HeightField is null) return;
+        var route = stage.PrimaryRoute;
+        var field = stage.HeightField;
+
+        AddSign(_world.SurfacePoint(route.Start.X, route.Start.Z, 26f), "START", 10f);
+        AddSign(_world.SurfacePoint(route.Exit.X, route.Exit.Z, 26f), "EXIT", 10f);
+        foreach (var f in route.Features)
+        {
+            var c = route.Vertices[route.IndexAtDistance(f.CentreDistance)];
+            AddSign(_world.SurfacePoint(c.Position.X, c.Position.Z, 30f), f.IsLaunch ? "CREST ▲" : "crest", 7f);
+        }
+        BuildPillars(route.Start.X + 30f, route.Start.Z + 45f);
+
+        if (_t.World.RouteDebugLines) BuildRouteLines(route);
+
+        // Cosmetic scatter never enters the corridor (04 §5G): keep clear of the stamp and its falloff.
+        float clearance = StageHeightField.CorridorHalfWidth + StageHeightField.BendExtraHalfWidth + StageHeightField.FalloffWidth * 0.5f;
+        float area = (_world.HalfX * _world.HalfZ) / (MovementToyWorld.Extent * MovementToyWorld.Extent * 0.25f);
+        BuildScatteredProps(
+            (x, z) => _world.InBounds(x, z, 40f) && field.DistanceToRoute(x, z) > clearance,
+            _world.HalfX - 50f, _world.HalfZ - 50f, area, (_, _) => 1f);
+
+        // Boost rings on the line every ~1.2 km so the toy's boost loop stays exercised.
+        for (float d = 900f; d < route.Length - 400f; d += 1200f)
+        {
+            var v = route.Vertices[route.IndexAtDistance(d)];
+            AddPickup(v.Position.X, v.Position.Z, new Vector3(Mathf.Cos(v.Heading), 0f, Mathf.Sin(v.Heading)));
+        }
+    }
+
+    private static readonly Color RouteStraightColor = new(0.35f, 0.95f, 1.0f);
+    private static readonly Color RouteBendColor = new(1.0f, 0.62f, 0.2f);
+    private static readonly Color RouteCrestColor = new(1.0f, 0.3f, 0.85f);
+
+    /// <summary>Unshaded line strip 3 m above the route: cyan straights, orange bends, magenta crests.</summary>
+    private void BuildRouteLines(RouteSkeleton route)
+    {
+        var mesh = new ImmediateMesh();
+        mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
+        var crestRanges = route.Features.Select(f => (f.StartIndex, f.EndIndex)).ToArray();
+        for (int i = 0; i < route.Vertices.Count; i++)
+        {
+            var v = route.Vertices[i];
+            bool crest = false;
+            foreach (var (s, e) in crestRanges) if (i >= s && i <= e) { crest = true; break; }
+            mesh.SurfaceSetColor(crest ? RouteCrestColor : v.Kind == RouteSegmentKind.Bend ? RouteBendColor : RouteStraightColor);
+            mesh.SurfaceAddVertex(_world.SurfacePoint(v.Position.X, v.Position.Z, 3f));
+        }
+        mesh.SurfaceEnd();
+        _content.AddChild(new MeshInstance3D
+        {
+            Name = "RouteDebugLine",
+            Mesh = mesh,
+            MaterialOverride = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                VertexColorUseAsAlbedo = true,
+                NoDepthTest = false,
+            },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        });
     }
 
     // ---------------------------------------------------------------- scale strip (Gate M1)

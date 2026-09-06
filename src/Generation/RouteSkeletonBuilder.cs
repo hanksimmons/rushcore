@@ -6,7 +6,8 @@ namespace Rushcore.Generation;
 /// Route-first skeleton (04 §5A): the primary route as a chain of straights and circular bends
 /// from the stage entry to the exit, always progressing along +X, wandering inside the route
 /// band. Radii come from the bend ladder (D-082); the corner limit of each bend comes from the
-/// route speed model so the skeleton already knows its own speed shape. Deterministic in the seed.
+/// route speed model so the skeleton already knows its own speed shape. Some straights are
+/// reserved as feature zones long enough for a launch crest and its landing. Deterministic in the seed.
 /// </summary>
 public sealed class RouteSkeletonBuilder
 {
@@ -20,6 +21,9 @@ public sealed class RouteSkeletonBuilder
     /// <summary>Straights stop here; a bend can carry the route ≤ r·(1 − cos 45°) ≈ 47 m further.</summary>
     private const float HardBand = WorldScale.RouteBandHalfWidth - 120f;
     private const float FinalRunway = 200f;
+    // Launch-crest feature straights: approach, the crest itself, then a straight landing run.
+    private const float CrestApproach = 150f, CrestLanding = 300f;
+    private const float CrestChance = 0.5f;
 
     private readonly RouteSpeedModel _speed;
 
@@ -34,6 +38,7 @@ public sealed class RouteSkeletonBuilder
 
         var pos = new Vector2(entryX, 0f);
         float heading = 0f;
+        float lastCrestX = entryX;
         AddVertex(route, pos, heading, float.PositiveInfinity, RouteSegmentKind.Straight);
 
         // Leave room for the closing bend (≤ r·sin 45°) and a final straight before the exit.
@@ -41,7 +46,11 @@ public sealed class RouteSkeletonBuilder
 
         while (true)
         {
-            float length = rng.Range(StraightMin, StraightMax);
+            // A feature straight hosts a launch crest: approach + crest + landing (04 §10: no bend in the flight).
+            bool wantCrest = pos.X - lastCrestX >= WorldScale.LaunchCrestSpacing && rng.Chance(CrestChance);
+            float wavelength = rng.Range(WorldScale.LaunchCrestWavelengthMin, WorldScale.LaunchCrestWavelengthMax);
+            float crestHeight = wavelength * rng.Range(0.08f, 0.12f);   // requested; the height field trims it to the grade limit
+            float length = wantCrest ? CrestApproach + wavelength + CrestLanding : rng.Range(StraightMin, StraightMax);
             float sin = Mathf.Sin(heading);
             if (Mathf.Abs(sin) > 1e-4f)
             {
@@ -53,7 +62,24 @@ public sealed class RouteSkeletonBuilder
             float room = (closeX - pos.X) / Mathf.Cos(heading);
             if (room <= WorldScale.RouteSampleSpacing) break;
             if (length > room) length = room;
+
+            bool crest = wantCrest && length >= CrestApproach + wavelength + CrestLanding - 1e-3f;
+            int startIndex = route.Vertices.Count - 1;
+            float startDistance = route.Vertices[^1].Distance;
             pos = EmitStraight(route, pos, heading, length);
+            if (crest)
+            {
+                route.Features.Add(new RouteFeature
+                {
+                    Kind = RouteFeatureKind.LaunchCrest,
+                    StartIndex = startIndex,
+                    EndIndex = route.Vertices.Count - 1,
+                    CentreDistance = startDistance + CrestApproach + wavelength * 0.5f,
+                    Wavelength = wavelength,
+                    Height = crestHeight,
+                });
+                lastCrestX = pos.X;
+            }
             if (pos.X >= closeX - 1e-3f) break;
 
             float radius = PickRadius(ref rng);
@@ -89,12 +115,11 @@ public sealed class RouteSkeletonBuilder
     private static Vector2 EmitStraight(RouteSkeleton route, Vector2 from, float heading, float length)
     {
         var dir = new Vector2(Mathf.Cos(heading), Mathf.Sin(heading));
-        int steps = Mathf.Max(1, Mathf.CeilToInt(length / WorldScale.RouteSampleSpacing));
+        // Uniform spacing: a fractional last step would make the per-vertex corridor profile
+        // read as a cliff over a few centimetres.
+        int steps = Mathf.Max(1, Mathf.RoundToInt(length / WorldScale.RouteSampleSpacing));
         for (int i = 1; i <= steps; i++)
-        {
-            float d = Mathf.Min(length, i * WorldScale.RouteSampleSpacing);
-            AddVertex(route, from + dir * d, heading, float.PositiveInfinity, RouteSegmentKind.Straight);
-        }
+            AddVertex(route, from + dir * (length * i / steps), heading, float.PositiveInfinity, RouteSegmentKind.Straight);
         return from + dir * length;
     }
 
@@ -111,7 +136,7 @@ public sealed class RouteSkeletonBuilder
         Vector2 Left(float h) => new(-Mathf.Sin(h), Mathf.Cos(h));
         Vector2 centre = from + Left(heading) * radius * sign;
         float arcLength = radius * turn;
-        int steps = Mathf.Max(1, Mathf.CeilToInt(arcLength / WorldScale.RouteSampleSpacing));
+        int steps = Mathf.Max(1, Mathf.RoundToInt(arcLength / WorldScale.RouteSampleSpacing));
         Vector2 last = from;
         for (int i = 1; i <= steps; i++)
         {

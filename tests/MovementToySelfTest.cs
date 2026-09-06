@@ -983,6 +983,9 @@ public partial class MovementToySelfTest : Node
         // ---- route speed model (D-081): the generator's speed oracle must track the real ball ----
         foreach (var e in RunRouteSpeedModelCase()) yield return e;
 
+        // ---- Phase 2: a generated stage builds, spawns the player and is driveable along its route ----
+        foreach (var e in RunGeneratedStageCase()) yield return e;
+
         // ---- Phase 2 dependency (04 §9): NaN vertices in HeightMapShape3D are holes under Jolt ----
         {
             var body = new StaticBody3D { Name = "NaNHoleTest", Position = new Vector3(0f, PlatformY, -2200f) };
@@ -1364,10 +1367,69 @@ public partial class MovementToySelfTest : Node
         Check("route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
         Check("base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
-        Check("skeleton generation is cheap", msSum / Count < 25.0, $"{msSum / Count:0.00} ms avg");
+        Check("stage definition generation is cheap (pure data, before world sampling)", msSum / Count < 80.0, $"{msSum / Count:0.00} ms avg");
 
         // The fallback path itself must be valid: a straight axis route passes every skeleton check.
         var straight = gen.Generate(new StageGenerationRequest(RunSeed: int.MaxValue, StageIndex: 0));
         Check("generation report carries phase timings", straight.Report.Timings.Count >= 3 && straight.Report.TotalMillis >= 0.0);
+    }
+
+    // ---------------- Phase 2: generated stage in the toy (04 §9, §16; 08 §5) ----------------
+
+    private IEnumerable RunGeneratedStageCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        t.World.GeneratedStage = true;
+        _debug.RestartSameSeed();
+        foreach (var _ in Frames(3)) yield return null;
+        var world = _debug.World;
+        var stage = world.Stage;
+        Check("generated stage is the active terrain", world.IsStage && stage is not null && world.HalfX > 2900f, $"halfX={world.HalfX}");
+        if (stage is null) { t.World.GeneratedStage = false; _debug.RestartSameSeed(); yield break; }
+        GD.Print($"[SELFTEST] generated stage: build {world.BuildMillis} ms, {world.SampleCount / 1000} k samples, {world.Triangles / 1000} k tris, {world.Tiles} tiles; {world.StageSummary}");
+        Check("generated stage passed its own validation", stage.Report.Passed && !stage.Report.UsedFallback,
+            string.Join("; ", stage.Report.Failures.Select(f => f.Name + " " + f.Detail)));
+        Check("generated stage builds within the budget", world.BuildMillis < 8000, $"{world.BuildMillis} ms");
+        Check("collision and render come from the same source: route vertex heights match the world",
+            Mathf.Abs(world.SampleHeight(stage.PrimaryRoute.Vertices[100].Position.X, stage.PrimaryRoute.Vertices[100].Position.Z) - stage.PrimaryRoute.Vertices[100].Position.Y) < 1.5f);
+
+        foreach (var _ in Seconds(1.0f)) yield return null;
+        Check("player spawns grounded on the start pad facing the route",
+            _player.IsGrounded && Forward.Dot(stage.StartFacing) > 0.98f && _player.GlobalPosition.DistanceTo(stage.StartPosition) < 12f,
+            $"grounded={_player.IsGrounded} pos={_player.GlobalPosition} fwd={Forward}");
+
+        // Drive the route: steer at the vertex ~60 m ahead of the nearest one. A smoke test of the
+        // first kilometre, not an agent that plays stages (04 §12).
+        var verts = stage.PrimaryRoute.Vertices;
+        int ticks = 0, grounded = 0, nearest = 0;
+        float maxSpeed = 0f;
+        while (ticks++ < Engine.PhysicsTicksPerSecond * 14)
+        {
+            Vector3 p = _player.GlobalPosition;
+            float best = float.MaxValue;
+            for (int i = Mathf.Max(0, nearest - 5); i < Mathf.Min(verts.Count, nearest + 60); i++)
+            {
+                float d = new Vector2(verts[i].Position.X - p.X, verts[i].Position.Z - p.Z).LengthSquared();
+                if (d < best) { best = d; nearest = i; }
+            }
+            var target = verts[Mathf.Min(verts.Count - 1, nearest + 15)].Position;
+            _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
+            if (_player.IsGrounded) grounded++;
+            maxSpeed = Mathf.Max(maxSpeed, _player.LocomotionSpeed);
+            yield return null;
+        }
+        ReleaseAll();
+        float progressed = verts[nearest].Distance;
+        float groundedFrac = grounded / (float)ticks;
+        GD.Print($"[SELFTEST] generated stage drive: {progressed:0} m of route in 14 s, grounded {groundedFrac:P0}, max {maxSpeed:0.0} m/s, off-line {Mathf.Sqrt(Mathf.Max(0f, new Vector2(verts[nearest].Position.X - _player.GlobalPosition.X, verts[nearest].Position.Z - _player.GlobalPosition.Z).LengthSquared())):0} m");
+        Check("the ball drives the first kilometre of the generated route", progressed > 1000f, $"{progressed:0} m");
+        Check("the corridor keeps the ball grounded most of the way", groundedFrac > 0.6f, $"{groundedFrac:P0}");
+        Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
+
+        t.World.GeneratedStage = false;
+        _debug.RestartSameSeed();
+        foreach (var _ in Frames(3)) yield return null;
+        Check("lab restored after the generated stage", !_debug.World.IsStage && !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f));
     }
 }

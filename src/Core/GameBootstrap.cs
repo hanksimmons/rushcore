@@ -112,7 +112,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
         // World › Calibration Strip and Cell Size rebuild the whole terrain (Gate M1). The
         // toggle applies at once; the slider waits until it has stopped moving.
-        if (_tuning.World.CalibrationStrip != _world.IsStrip) RestartSameSeed();
+        if (!_world.MatchesTuning()) RestartSameSeed();
         else if (!Mathf.IsEqualApprox(_tuning.World.CellSize, _world.CellSize))
         {
             if (!Mathf.IsEqualApprox(_tuning.World.CellSize, _cellSizeSeen)) { _cellSizeSeen = _tuning.World.CellSize; _cellSizeDwell = 0f; }

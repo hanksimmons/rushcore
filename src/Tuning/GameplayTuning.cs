@@ -158,6 +158,10 @@ public sealed class WorldTuning
     public float PropDensity = 0.19f;
     /// <summary>Gate M1: replace the lab with the 6.4 km scale-calibration strip (rebuilds the world).</summary>
     public bool CalibrationStrip = false;
+    /// <summary>Phase 2: replace the lab with a generated Rolling Highlands stage from the current seed (rebuilds the world).</summary>
+    public bool GeneratedStage = false;
+    /// <summary>Phase 2 debug view (04 §16): draw the primary route, its bends and crests above the terrain.</summary>
+    public bool RouteDebugLines = true;
     /// <summary>Metres between height samples (= facet size). Rebuilds the world when the slider settles.
     /// The M1 budget choice: 4 m is the lab default; 8 m quarters the triangle count.</summary>
     public float CellSize = 4f;
@@ -279,6 +283,8 @@ public sealed class GameplayTuning
         F(CatWorld, "Terrain Wavelength", 0.3f, 3f, () => w.TerrainWavelength, v => w.TerrainWavelength = v);
         F(CatWorld, "Prop Density", 0f, 3f, () => w.PropDensity, v => w.PropDensity = v);
         B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
+        B(CatWorld, "Generated Stage (Phase 2)", () => w.GeneratedStage, v => w.GeneratedStage = v);
+        B(CatWorld, "Route Debug Lines", () => w.RouteDebugLines, v => w.RouteDebugLines = v);
         F(CatWorld, "Cell Size (m)", 2f, 8f, () => w.CellSize, v => w.CellSize = v);
         F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);
 

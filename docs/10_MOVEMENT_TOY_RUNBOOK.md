@@ -184,8 +184,33 @@ timings). The route skeleton is a chain of straights (250–600 m) and circular 
 the route seed is bumped (≤ 4 attempts) → the straight axis route is the known-safe fallback, flagged
 in the report. The harness generates 100 requests every run and asserts: all valid, no fallback,
 same request → same hash, distinct seeds → distinct stages, lengths and base-kit times in range,
-≈ 0.5 ms per stage. Measured over 1000 seeds (2026-09-05): 1000 valid, 0 fallbacks, 6.3–6.9 km,
+≈ 0.5 ms per stage skeleton. Measured over 1000 seeds (2026-09-05): 1000 valid, 0 fallbacks, 6.3–6.9 km,
 base-kit 46–53 s on the flat skeleton.
+
+### Generated stage in the toy (Phase 2, PR 2)
+
+`World › Generated Stage (Phase 2)` swaps the lab for a Rolling Highlands stage generated from the
+current seed (F5 = new seed, T = back to the start pad; the strip toggle is ignored while it is on).
+What you see: a 6.0 × 2.0 km footprint; a green **START** pad and blue **EXIT** pad 5.8 km apart along
++X; the stamped 150 m corridor (wider and banked on bends) as a lighter track; **CREST ▲** signs on
+launch-crest straights; boost rings on the line every 1.2 km; scatter kept out of the corridor.
+`World › Route Debug Lines` (04 §16) draws the primary route 3 m up: cyan straights, orange bends,
+magenta crest zones. The telemetry `seed` row shows the generation summary (valid / fallback,
+length, base-kit time, bends, crests, generation ms) and the log prints every validation check.
+Build: ≈ 3.6 s headless for 752 k samples / 1.5 M triangles / 48 tiles (world sampling dominates;
+the definition itself is ≈ 25 ms). The harness builds one stage every run and drives its first
+1.5 km with a route follower (a smoke test, not an agent): grounded ≥ 60% asserted, 92% measured.
+
+Relief rules (D-085): three long swells with summed crest curvature ≤ 0.7 / 560 m and summed slope
+≤ 0.18, micro relief inside the remaining curvature budget (≈ 0.9 m at λ 400), corridor profile =
+relief smoothed ± 150 m along the route, level across, 120 m falloff, banks 18/145 · r on the outer
+half of bends, crests λ 300–500 with height trimmed so crest + local slope ≤ 0.36, flat 60 m pads.
+
+**Deferred M1 feel verdicts to take here** (D-082): fog onset at the cap (`World › Fog End` /
+`Camera › Far Plane` are live); corridor width at the cap (150 m typical here; the 75 m minimum is
+still a strip question); whether the swells read as a landscape and the crests as intended launches;
+frame time at the cap with F2 (and again at Fog End 4000 / Far Plane 5000). Ramp and gap verdicts
+wait for the Phase 3 modules or the strip.
 
 ### Terrain budget (the other half of M1, D-080)
 

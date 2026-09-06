@@ -34,6 +34,8 @@ public static class WorldScale
     /// <summary>Crest radius a cruising ball needs to stay grounded: cap² / g at the frozen baseline.</summary>
     public const float CruiseCrestRadius = 560f;
     public const float MicroReliefMaxWavelength = 100f;
+    /// <summary>Summed slope of the swell layer (tan); keeps the corridor under the route grade limit with a crest on top.</summary>
+    public const float LongSwellMaxSlope = 0.18f;
 
     /// <summary>Largest height a relief component of wavelength λ may have without launching a
     /// cruising ball (04 §5C): λ² / (2π² · cruise crest radius).</summary>
@@ -61,6 +63,12 @@ public static class WorldScale
     public const float TypicalCorridorWidth = 150f;
     public const float MinCorridorWidth = 75f;           // primary-route minimum
     public const float TechnicalCorridorWidth = 40f;     // optional lines only
+
+    // ---- route constraints (04 §10) ----
+    public const float MaxRouteGrade = 0.40f;            // tan 22°; the drive still climbs it easily (drive/g = 0.71)
+    public const float MaxGradeDeltaPerSample = 0.08f;   // no abrupt kinks between 4 m samples
+    public const float PadRadius = 60f;                  // flat start/exit pads
+    public const float LaunchCrestSpacing = 1000f;       // at most one launch crest per this much route
 
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;

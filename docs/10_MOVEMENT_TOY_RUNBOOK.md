@@ -19,7 +19,7 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 
 | Input | Action |
 |---|---|
-| W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes/reverses**. Spawn faces down the lane (−X). |
+| W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes** (never reverses, D-076). Spawn faces down the lane (−X). |
 | Space / A | press on ground = charge; release = jump; new press in air = slam |
 | Shift / X | boost (ground and air) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
@@ -106,7 +106,10 @@ playtest:
   the camera in behind berms/mesa faces; disable to compare.
 - **Max Visual Roll = 3 rev/s** (`VFX`): visual-only spin cap so the ball does not strobe at speed.
 - **Chase camera** (`Camera › Follow Trajectory Yaw`, on): yaw tracks the flat velocity heading
-  (damping 3/s, ≤140°/s, holds below 3 m/s, never flips on reverse). Turning it off restores the
+  (damping 3/s, ≤140°/s, holds below 2 m/s). After a wall bounce or backward slide the view is
+  held only while you push W against it and at most `Yaw Reverse Hold Seconds` (1.0 s); release
+  or steer and it swings behind you at once. Telemetry's camera row shows `REV-HOLD` while the
+  hold is active. Turning it off restores the
   fixed 45° isometric-like composition for A/B. **This contradicts D-058/D-059, 03 §14 and 06 §11
   as written**; it is the playtest-directed baseline pending reconciliation at acceptance.
 - Clipping defence: focus floored above ground; two same-frame sphere casts (focus→camera and

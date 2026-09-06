@@ -653,11 +653,82 @@ public partial class MovementToySelfTest : Node
         Check("chase yaw converges on the travel heading",
             rig.FlatForward.Dot(Vector3.Right) > 0.96f,
             $"camFwd={rig.FlatForward} yaw={rig.YawDegreesCurrent:0.0}");
-        _worldDrive = Vector3.Left;                      // brake through zero and reverse
+        // ---- S is a brake (D-076): sheds speed along the heading, never reverses, never turns the view ----
+        float speedBeforeBrake = _player.LocomotionSpeed;
+        _worldDrive = Vector3.Left;                      // camera faces +X, so this is pure S
+        float minAlong = float.MaxValue, minCamDot = 1f;
+        foreach (var _ in Seconds(2.5f))
+        {
+            minAlong = Mathf.Min(minAlong, _player.Velocity.Dot(Vector3.Right));
+            minCamDot = Mathf.Min(minCamDot, rig.FlatForward.Dot(Vector3.Right));
+            yield return null;
+        }
+        Check("S brakes to a stop", speedBeforeBrake > 10f && _player.LocomotionSpeed < 1.5f,
+            $"before={speedBeforeBrake:0.0} after={_player.LocomotionSpeed:0.0}");
+        Check("S never drives backward", minAlong > -1f, $"min along heading={minAlong:0.0}");
+        Check("braking never turns the chase camera", minCamDot > 0.96f, $"min camFwd.x={minCamDot:0.00}");
+        ReleaseAll();
+
+        // ---- reversed heading with no forward input: the view swings behind the new travel direction ----
+        _player.LinearVelocity = Vector3.Left * 25f;
         foreach (var _ in Seconds(2.5f)) yield return null;
-        Check("reversing does not flip the chase camera",
-            rig.FlatForward.Dot(Vector3.Right) > 0.7f && _player.Velocity.Dot(Vector3.Right) < -2f,
+        Check("camera follows a reversal the player is not fighting",
+            rig.FlatForward.Dot(Vector3.Left) > 0.9f && _player.Velocity.Dot(Vector3.Left) > 5f,
             $"camFwd={rig.FlatForward} vel.x={_player.Velocity.X:0.0}");
+
+        // ---- W against a short reversal: yaw holds, the recovery never swings the view ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(Vector3.Right);
+        foreach (var _ in Frames(2)) yield return null;
+        _player.LinearVelocity = Vector3.Left * 20f;     // rolling toward the camera
+        Input.ActionPress(InputBootstrap.MoveForward, 1f); // raw W: push back the way the view faces
+        bool heldEarly = false;
+        minCamDot = 1f;
+        int tick = 0;
+        foreach (var _ in Seconds(1.5f))
+        {
+            if (tick++ == 12) heldEarly = rig.ReverseHoldActive && _player.Velocity.Dot(Vector3.Left) > 5f;
+            minCamDot = Mathf.Min(minCamDot, rig.FlatForward.Dot(Vector3.Right));
+            yield return null;
+        }
+        Check("W against a reversal holds the yaw", heldEarly, $"holdActive={rig.ReverseHoldActive}");
+        Check("a quick recovery never swings the view", minCamDot > 0.96f && _player.Velocity.Dot(Vector3.Right) > 5f,
+            $"min camFwd.x={minCamDot:0.00} vel.x={_player.Velocity.X:0.0}");
+        ReleaseAll();
+
+        // ---- W+A against a reversal is a deliberate hairpin, and it turns to the input side ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(Vector3.Right);                // view +X: A is camera-left = -Z
+        foreach (var _ in Frames(2)) yield return null;
+        _player.LinearVelocity = Vector3.Left * 20f;
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        Input.ActionPress(InputBootstrap.MoveLeft, 1f);
+        float maxSide = 0f, minSide = 0f;
+        foreach (var _ in Seconds(0.35f))
+        {
+            maxSide = Mathf.Max(maxSide, _player.Velocity.Z);
+            minSide = Mathf.Min(minSide, _player.Velocity.Z);
+            yield return null;
+        }
+        Check("a hairpin turns to the input side", minSide < -5f && maxSide < 1f,
+            $"vel.z range [{minSide:0.0}, {maxSide:0.0}] vel={_player.Velocity}");
+        ReleaseAll();
+
+        // ---- W against a long reversal: the hold is bounded, the camera still ends up behind the travel ----
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        rig.SnapYawToward(Vector3.Right);
+        foreach (var _ in Frames(2)) yield return null;
+        _player.LinearVelocity = Vector3.Left * 60f;
+        Input.ActionPress(InputBootstrap.MoveForward, 1f);
+        foreach (var _ in Seconds(t.Camera.YawReverseHoldSeconds + 0.35f)) yield return null;
+        Check("the reverse hold is bounded",
+            !rig.ReverseHoldActive && rig.FlatForward.Dot(Vector3.Right) < 0.95f,
+            $"camFwd={rig.FlatForward} hold={rig.ReverseHoldActive} vel.x={_player.Velocity.X:0.0}");
+        foreach (var _ in Seconds(2.5f)) yield return null;
+        Vector3 travelDir = FlatVel.Length() > 1e-3f ? FlatVel.Normalized() : Vector3.Zero;
+        Check("camera ends up behind the direction of travel",
+            FlatVel.Length() > 5f && rig.FlatForward.Dot(travelDir) > 0.9f,
+            $"camFwd={rig.FlatForward} travel={travelDir} speed={FlatVel.Length():0.0}");
         ReleaseAll();
         t.Camera.FollowTrajectoryYaw = false;
         foreach (var _ in Seconds(2.5f)) yield return null;

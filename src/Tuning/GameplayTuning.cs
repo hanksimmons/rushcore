@@ -102,6 +102,10 @@ public sealed class CameraTuning
     public float YawMaxTurnRate = 140f;
     /// <summary>Below this flat speed the yaw holds so a resting ball never spins the view.</summary>
     public float YawFollowMinSpeed = 2.035f;
+    /// <summary>After the travel heading reverses (wall bounce, backward slide) the yaw is held
+    /// only while the player pushes forward against it, and never longer than this. The camera
+    /// always ends up behind the direction of travel.</summary>
+    public float YawReverseHoldSeconds = 1.0f;
     /// <summary>Minimum height of the lens (and, +0.5, of the focus) above the heightfield.</summary>
     public float GroundClearance = 1.5f;
     public float HeightOffset = 3.0f;
@@ -229,6 +233,7 @@ public sealed class GameplayTuning
         F(CatCamera, "Yaw Follow Damping", 0.2f, 20f, () => k.YawFollowDamping, v => k.YawFollowDamping = v);
         F(CatCamera, "Yaw Max Turn Rate", 10f, 720f, () => k.YawMaxTurnRate, v => k.YawMaxTurnRate = v);
         F(CatCamera, "Yaw Follow Min Speed", 0f, 20f, () => k.YawFollowMinSpeed, v => k.YawFollowMinSpeed = v);
+        F(CatCamera, "Yaw Reverse Hold Seconds", 0f, 3f, () => k.YawReverseHoldSeconds, v => k.YawReverseHoldSeconds = v);
         F(CatCamera, "Fixed Yaw Degrees", -180f, 180f, () => k.YawDegrees, v => k.YawDegrees = v);
         F(CatCamera, "Ground Clearance", 0.2f, 6f, () => k.GroundClearance, v => k.GroundClearance = v);
         F(CatCamera, "Height Offset", -5f, 20f, () => k.HeightOffset, v => k.HeightOffset = v);

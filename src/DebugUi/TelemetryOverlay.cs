@@ -153,7 +153,7 @@ public partial class TelemetryOverlay : Control
         Set(Row.Arc, p.JumpArcEligible ? "apex-eligible" : "not eligible");
         Set(Row.Apex, $"|vy| <= {p.PerfectApexVerticalSpeedThreshold:0.00} m/s  (~{_debug.Tuning.JumpSlam.PerfectApexWindowSeconds * 1000f:0} ms)");
         if (p.CameraBasis is Rushcore.Camera.CameraRig rig)
-            Set(Row.Camera, $"dist {rig.CurrentDistance:0.0}  occl {rig.OcclusionFraction:0.00}  lookahead {rig.CurrentLookAhead:0.0}");
+            Set(Row.Camera, $"dist {rig.CurrentDistance:0.0}  occl {rig.OcclusionFraction:0.00}  lookahead {rig.CurrentLookAhead:0.0}{(rig.ReverseHoldActive ? "  REV-HOLD" : "")}");
         Set(Row.Slam, $"{(p.SlamActive ? "ACTIVE" : "idle")}   last perfect {YesNo(p.LastSlamWasPerfect)}");
         Set(Row.Boost, $"{p.BoostAmount,6:0.0} ({p.Boost01:0.00}) {(p.BoostActive ? "FIRING" : "")}");
         Set(Row.Steering, $"{p.SteeringAuthority:0.0} m/s2");

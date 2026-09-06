@@ -109,6 +109,9 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
         if (_screenshotFrame > 0) StepScreenshotCapture();
 
+        // World › Calibration Strip toggles the whole terrain (Gate M1); rebuild on change.
+        if (_tuning.World.CalibrationStrip != _world.IsStrip) RestartSameSeed();
+
         // Fall recovery: the toy must be hard to permanently break.
         if (!GetTree().Paused && _player.GlobalPosition.Y < _world.KillPlaneY) RecoverPlayer();
     }

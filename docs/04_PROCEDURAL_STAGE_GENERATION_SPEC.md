@@ -244,7 +244,7 @@ Calibration should explicitly compare known distances/features and speeds before
 The frozen movement baseline (03 §15, D-078) is the input: cap 148.5 m/s, full-charge jump
 2.03→58.21 m/s at g 39.38, and the landing burst (D-077), which can establish 80% of the cap from
 any slam landing. The calibration environment must be large enough to measure these at the cap;
-the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed.
+the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed, so the 6.4 km scale strip (`World › Calibration Strip (M1)`, D-079, runbook) is the M1 instrument.
 
 ## 9. Heightfield/render representation
 
@@ -264,7 +264,7 @@ True chasms/holes are compatible with the heightfield approach:
 - keep hole edges comfortably larger than the player/collision sampling scale,
 - validate mandatory landing/approach geometry around every required gap.
 
-Godot 4.7 supports `NaN` holes in `HeightMapShape3D` with Jolt Physics.
+Verified 2026-09-05: the Godot 4.7 `HeightMapShape3D` class reference states "Holes can be punched through the collision by assigning NAN to the height of the desired vertices (this is supported in both GodotPhysics3D and Jolt Physics)", and the harness drops the ball through a NaN block and rests it on the neighbouring cells (D-079).
 
 Special non-heightfield structures such as bridges/ramps/overhangs can use separate generated meshes/colliders.
 

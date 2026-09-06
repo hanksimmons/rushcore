@@ -62,7 +62,6 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
 | `technical-lines` | line craft: cap 50, sharper steering, small tank |
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
-| `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
 Accepted baseline (playtest 2026-09-05, final preset `boost-finetune-final` promoted to compiled
 defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5 m/s, steering
@@ -92,7 +91,6 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
 | `technical-lines` | line craft: cap 50, sharper steering, small tank |
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
-| `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:
@@ -106,12 +104,13 @@ playtest:
 - **Camera occlusion probe** (`Camera`, on by default): sphere-cast from focus to camera pulls
   the camera in behind berms/mesa faces; disable to compare.
 - **Max Visual Roll = 3 rev/s** (`VFX`): visual-only spin cap so the ball does not strobe at speed.
-- **Chase camera** (`Camera › Follow Trajectory Yaw`, on): yaw tracks the flat velocity heading
-  (damping 3/s, ≤140°/s, holds below 2 m/s). After a wall bounce or backward slide the view is
-  held only while you push W against it and at most `Yaw Reverse Hold Seconds` (1.0 s); release
-  or steer and it swings behind you at once. Telemetry's camera row shows `REV-HOLD` while the
-  hold is active. Turning it off restores the
-  fixed 45° isometric-like composition (D-058/D-059, superseded by D-072) for A/B only.
+- **Chase camera** (D-072): yaw tracks the flat velocity heading (damping 3/s, ≤140°/s, holds
+  below 2 m/s). After a wall bounce or backward slide the view is held only while you push W
+  against it and at most `Yaw Reverse Hold Seconds` (1.0 s); release or steer and it swings
+  behind you at once. Telemetry's camera row shows `REV-HOLD` while the hold is active. The
+  fixed-yaw A/B toggle and the `iso-classic` preset were removed once the baseline locked.
+- **Speed bands** (`Move › Rush / Crush Threshold` = 50 / 95 m/s, Overdrive 141.06): readability
+  and Flow hooks only, no physics reads them (V-004). Rush ≈ 1/3 of the cap, Crush ≈ 2/3.
 - Clipping defence: focus floored above ground; two same-frame sphere casts (focus→camera and
   ball→camera); shake bounded to the probe margin; lens floored above the heightfield
   (`Camera › Ground Clearance`).
@@ -133,3 +132,23 @@ Terrain spans ±512 m, 4 m facets. Spawn on the flat plain at (470, 380). `World
 | Banked hairpin | centre (330, 155), r 145, berm +18 m; boost rings on the line | high-speed banked turns |
 
 Rocks, crystals, pylons, posts and pillars are solid (thin-object / CCD targets).
+
+## Scale strip (Gate M1)
+
+`World › Calibration Strip (M1)` (F1, World tab) swaps the lab for a 6.4 km × 640 m straight
+run of stations, each a feature at a stated size, so world scale is measured at the cap instead
+of estimated (08 §4, D-079). It rebuilds the world on toggle; F5/T still work. Spawn at
+x = +3110 facing −X; distance s is metres from the spawn, on every 100 m post.
+
+| s (m) | Station | Measures |
+|---|---|---|
+| 0–1000 | Runway: flat, 100 m posts, 500 m gantries, boost rings 550–900 | 0→cap (394 m unboosted), braking, burst surge, boosted 0→cap |
+| 1000–2000 | Corridor widths 300 / 150 / 75 / 40 m, 250 m each, 30 m walls | minimum corridor width at speed |
+| 2000–4200 | Hills: wavelength/height 100/10, 200/20, 400/40, 800/80 m | wavelength, height, crest sightline, "monumental" scale |
+| 4200–5080 | Gaps 40 / 80 / 160 m, 150 m runways, 25° exit walls | mandatory/optional gap sizes vs jump range |
+| 5080–5700 | Ramps 11 / 19 / 27° with 20 m lips in lanes z −180 / 0 / +180 | launch sizes, landing distance |
+| 5700–6300 | Turn pad: flat, painted rings r 80 / 160 / 240 m | turn radius at chosen speeds (≈100 m at the cap) |
+
+Reference envelope at the frozen baseline: turn radius ≈ 100 m at the cap; full-charge jump
+43 m up, 2.96 s hang, ≈ 180 m range at 60 m/s and ≈ 440 m at the cap; 0→cap 5.3 s / 394 m
+unboosted; landing burst → 118.8 m/s from any slam touchdown.

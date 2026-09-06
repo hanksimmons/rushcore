@@ -384,8 +384,7 @@ Mechanically:
 - impact shake is short, bounded to the occlusion margin, and event-driven,
 - the camera never clips: focus and lens are floored above the heightfield, and same-frame
   sphere casts from both the focus and the ball toward the camera pull it in instantly and
-  ease it back out,
-- the original fixed 45° yaw remains as a tuning A/B toggle only.
+  ease it back out.
 
 Camera follows with damping from the player's interpolated transform; it is never parented to
 the raw physics transform. Teleports snap the camera and re-aim it along the spawn facing.
@@ -427,7 +426,7 @@ part of the same promotion.
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
 | Boost pickup refill | 35 | ACCEPTED (toy) |
-| Rush / Crush / Overdrive thresholds | 18 / 32 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush OPEN (V-004) |
+| Rush / Crush / Overdrive thresholds | 50 / 95 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush provisional ladder (V-004), readability/Flow hooks only |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 

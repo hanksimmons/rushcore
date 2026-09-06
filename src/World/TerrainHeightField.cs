@@ -29,7 +29,7 @@ namespace Rushcore.World;
 /// <item>Rolling hills — everything else, three octaves with a slow amplitude modulation.</item>
 /// </list>
 /// </summary>
-public sealed class TerrainHeightField
+public sealed class TerrainHeightField : IHeightSource
 {
     // ------------------------------------------------------------------ layout
 
@@ -120,6 +120,9 @@ public sealed class TerrainHeightField
         _p6 = rng.Randf() * Mathf.Tau;
         _p7 = rng.Randf() * Mathf.Tau;
     }
+
+    public float SizeX => 1024f;
+    public float SizeZ => 1024f;
 
     /// <summary>Where the player starts. Y is resolved from the terrain by the world.</summary>
     public Vector3 SpawnXZ { get; } = new(LaneStartX + 20f, 0f, LaneZ);
@@ -284,15 +287,13 @@ public sealed class TerrainHeightField
     private static readonly Color High = new(0.72f, 0.70f, 0.49f);
     private static readonly Color Rock = new(0.52f, 0.42f, 0.33f);
     private static readonly Color Cliff = new(0.33f, 0.30f, 0.31f);
-    private static readonly Color LaneSurface = new(0.19f, 0.22f, 0.27f);
-    private static readonly Color LaneSurfaceAlt = new(0.27f, 0.31f, 0.37f);
+    public static readonly Color LaneSurface = new(0.19f, 0.22f, 0.27f);
+    public static readonly Color LaneSurfaceAlt = new(0.27f, 0.31f, 0.37f);
     private static readonly Color TrackSurface = new(0.47f, 0.29f, 0.25f);
 
-    public Color SampleColor(Vector3 point, Vector3 normal)
+    /// <summary>Height ramp plus slope overlay shared by every calibration terrain.</summary>
+    public static Color BasePalette(float y, float slope)
     {
-        float y = point.Y;
-        float slope = 1f - Mathf.Clamp(normal.Y, 0f, 1f);
-
         Color c = Basin;
         c = c.Lerp(Low, Mathf.SmoothStep(-42f, -14f, y));
         c = c.Lerp(Mid, Mathf.SmoothStep(-10f, 6f, y));
@@ -301,6 +302,22 @@ public sealed class TerrainHeightField
         // Slope tint doubles as the gradient read-out across the calibration fan.
         c = c.Lerp(Rock, Mathf.SmoothStep(0.01f, 0.30f, slope));
         c = c.Lerp(Cliff, Mathf.SmoothStep(0.40f, 0.75f, slope));
+        return c;
+    }
+
+    /// <summary>Cheap per-facet value jitter so the flat-shaded triangles read individually.</summary>
+    public static Color FacetJitter(Color c, Vector3 point)
+    {
+        float n = Mathf.Sin(point.X * 12.9898f + point.Z * 78.233f) * 43758.5453f;
+        n -= Mathf.Floor(n);
+        float k = 0.94f + 0.12f * n;
+        return new Color(c.R * k, c.G * k, c.B * k);
+    }
+
+    public Color SampleColor(Vector3 point, Vector3 normal)
+    {
+        float slope = 1f - Mathf.Clamp(normal.Y, 0f, 1f);
+        Color c = BasePalette(point.Y, slope);
 
         // Painted calibration lane.
         float lane = (1f - Mathf.SmoothStep(LaneHalfWidth - 6f, LaneHalfWidth + 6f, Mathf.Abs(point.Z - LaneZ)))
@@ -316,11 +333,6 @@ public sealed class TerrainHeightField
         float track = (1f - Mathf.SmoothStep(HairpinHalfWidth - 10f, HairpinHalfWidth + 4f, hd))
                     * (1f - Mathf.SmoothStep(HairpinZ - 30f, HairpinZ + 30f, point.Z));
         c = c.Lerp(TrackSurface, track * 0.6f);
-
-        // Cheap per-facet value jitter so the flat-shaded triangles read individually.
-        float n = Mathf.Sin(point.X * 12.9898f + point.Z * 78.233f) * 43758.5453f;
-        n -= Mathf.Floor(n);
-        float k = 0.94f + 0.12f * n;
-        return new Color(c.R * k, c.G * k, c.B * k);
+        return FacetJitter(c, point);
     }
 }

@@ -47,8 +47,10 @@ public sealed class MovementTuning
     public float LandingCapBleed = 39.95f;
     /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
     public float MinGroundNormalDot = 0.499f;
-    public float RushThreshold = 18f;
-    public float CrushThreshold = 32f;
+    /// <summary>Speed bands are readability/Flow hooks only (02 §5); no physics reads them.
+    /// Ladder set against the accepted cap: Rush ~1/3, Crush ~2/3, Overdrive ~95% (V-004).</summary>
+    public float RushThreshold = 50f;
+    public float CrushThreshold = 95f;
     public float OverdriveThreshold = 141.06f;
     public float BallRadius = 2.125f;
 }
@@ -90,10 +92,6 @@ public sealed class CameraTuning
 {
     public float Distance = 26f;
     public float PitchDegrees = -34f;
-    /// <summary>Yaw used by the fixed-orientation A/B mode (D-058 pending reconciliation).</summary>
-    public float YawDegrees = 45f;
-    /// <summary>Chase camera: yaw follows the player's flat velocity heading.</summary>
-    public bool FollowTrajectoryYaw = true;
     public float YawFollowDamping = 3f;
     /// <summary>Degrees per second; caps how fast the view can swing.</summary>
     public float YawMaxTurnRate = 140f;
@@ -147,6 +145,8 @@ public sealed class WorldTuning
     public float TerrainAmplitude = 2.125f;
     public float TerrainWavelength = 1.005f;
     public float PropDensity = 0.19f;
+    /// <summary>Gate M1: replace the lab with the 6.4 km scale-calibration strip (rebuilds the world).</summary>
+    public bool CalibrationStrip = false;
 }
 
 /// <summary>
@@ -227,12 +227,10 @@ public sealed class GameplayTuning
         var k = Camera;
         F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);
         F(CatCamera, "Pitch Degrees", -85f, -5f, () => k.PitchDegrees, v => k.PitchDegrees = v);
-        B(CatCamera, "Follow Trajectory Yaw", () => k.FollowTrajectoryYaw, v => k.FollowTrajectoryYaw = v);
         F(CatCamera, "Yaw Follow Damping", 0.2f, 20f, () => k.YawFollowDamping, v => k.YawFollowDamping = v);
         F(CatCamera, "Yaw Max Turn Rate", 10f, 720f, () => k.YawMaxTurnRate, v => k.YawMaxTurnRate = v);
         F(CatCamera, "Yaw Follow Min Speed", 0f, 20f, () => k.YawFollowMinSpeed, v => k.YawFollowMinSpeed = v);
         F(CatCamera, "Yaw Reverse Hold Seconds", 0f, 3f, () => k.YawReverseHoldSeconds, v => k.YawReverseHoldSeconds = v);
-        F(CatCamera, "Fixed Yaw Degrees", -180f, 180f, () => k.YawDegrees, v => k.YawDegrees = v);
         F(CatCamera, "Ground Clearance", 0.2f, 6f, () => k.GroundClearance, v => k.GroundClearance = v);
         F(CatCamera, "Height Offset", -5f, 20f, () => k.HeightOffset, v => k.HeightOffset = v);
         F(CatCamera, "Look-Ahead Min", 0f, 40f, () => k.LookAheadMin, v => k.LookAheadMin = v);
@@ -263,6 +261,7 @@ public sealed class GameplayTuning
         F(CatWorld, "Terrain Amplitude", 0.1f, 3f, () => w.TerrainAmplitude, v => w.TerrainAmplitude = v);
         F(CatWorld, "Terrain Wavelength", 0.3f, 3f, () => w.TerrainWavelength, v => w.TerrainWavelength = v);
         F(CatWorld, "Prop Density", 0f, 3f, () => w.PropDensity, v => w.PropDensity = v);
+        B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
 
         foreach (var e in p) e.DefaultValue = e.Get();
         foreach (var e in t) e.DefaultValue = e.Get();

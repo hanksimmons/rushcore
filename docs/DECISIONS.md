@@ -91,7 +91,7 @@
 | D-056 | ACCEPTED | Normal gameplay does not require an exact numerical speedometer; raw m/s is debug telemetry. |
 | D-057 | ACCEPTED | Crushability/threat is communicated primarily through speed VFX, enemy silhouette/material, and interaction feedback. |
 | D-058 | SUPERSEDED by D-072 | ~~MVP camera orientation is fixed~~. Playtest showed the fixed yaw hid what was ahead. Bounded zoom stays; still no manual rotation. |
-| D-059 | SUPERSEDED by D-072 | ~~Isometric-like composition~~. The fixed 45° yaw remains available only as a tuning A/B toggle. |
+| D-059 | SUPERSEDED by D-072 | ~~Isometric-like composition~~. The fixed-yaw A/B toggle and the `iso-classic` preset were removed on 2026-09-05 once the baseline locked (D-078); the chase camera is the only camera. |
 | D-060 | ACCEPTED | Complexity should come from recombining existing verbs/systems, not adding more player actions. |
 
 ## Accepted engineering constraints
@@ -116,6 +116,7 @@
 | D-076 | ACCEPTED | `S` / stick-back is a brake, not a reverse drive: it sheds speed along the current heading and never pushes through zero. Input within ~30° of straight against the heading only brakes; a hairpin needs clear lateral intent (W+A/D). Rationale: reverse drive gave the chase camera a heading it could not follow, and the exact-opposition case turned the ball in a direction chosen by float noise. |
 | D-077 | ACCEPTED | Perfect-apex slam removed (supersedes D-016/D-017/D-070/D-073). Every slam landing is the **power impact** (impact ×1.35, strongest landing feedback). New **landing burst**: a fresh Space press within ±0.10 s of a slam touchdown (presses during the slam are buffered) fires blue sparks, a mini sonic boom with an air-parting ring, and sets locomotion speed to 80% of the hard cap along the current heading. The burst is a floor (never slows a faster ball), never changes direction, keeps the ball grounded, and the press never starts a charge. Charge jump is unchanged. |
 | D-078 | ACCEPTED | **Final movement baseline = the user's `boost-finetune-final` preset (2026-09-05), promoted verbatim to compiled defaults.** It is `manual-finetune-punchy` plus: boost acceleration 88.64 m/s², air control 0.308, Overdrive 141.06 m/s, camera follow damping 4.99/s. `docs/03 §15` is the authoritative register; the toy launches on it with no override (\"compiled defaults\"). Any later change goes through a saved preset → verbatim promotion → this log. |
+| D-079 | ACCEPTED | Gate M1 scale strip: `World › Calibration Strip (M1)` swaps the lab for a 6.4 km × 640 m seed-invariant run of stations (runway, corridor widths 300→40 m, hills λ/H 100/10→800/80 m, gaps 40→160 m, ramps 11/19/27° with 20 m lips, turn pad rings 80/160/240 m) so the world-scale family is measured at the cap. The harness checks it builds with its stated geometry and that `NaN` heightfield cells are holes under Jolt (04 §9 verified against the 4.7 class reference). |
 
 ## Empirical validation register
 
@@ -126,7 +127,7 @@ These are the only major gameplay/feel variables intentionally not frozen numeri
 | V-001 | RESOLVED | Lateral steering 151.25 m/s², rising to ×1.45 at the cap; turn radius still grows as v²/(a·mult), which satisfies D-002. |
 | V-002 | RESOLVED | Carve removed (see D-007). |
 | V-003 | RESOLVED (toy) | Boost 88.64 m/s² (D-078), blend 0.25, capacity 100, drain 30/s, passive 4/s, pickup +35 (the perfect-apex refill went with D-077). Active refill from combat is re-examined at Gate C0. |
-| V-004 | RESOLVED / OPEN | Cap 148.5 m/s and Overdrive 141.06 m/s (D-078) accepted. Rush/Crush (18/32) were left unchanged; revisit when Flow/combat give them a purpose. |
+| V-004 | RESOLVED (provisional bands) | Cap 148.5 m/s and Overdrive 141.06 m/s (D-078) accepted. Rush/Crush set to 50 / 95 m/s (≈ 1/3 and 2/3 of the cap) on 2026-09-05 so the ladder is meaningful under the locked cap; they are readability/Flow hooks only and no physics reads them. Re-judge when Flow lands (Phase 4). |
 | V-005 | RESOLVED | Ball radius 2.125 m (4.25 m diameter). The Movement Toy lab scenery amplitude is 2.125 (instruments keep their stated geometry); Gate M1 sizes generation features from the accepted speed/jump envelope. |
 | V-006 | RESOLVED | Chase camera (D-072): distance 26 m (+10 with speed), pitch −34°, height 3, look-ahead 2→22 m, follow 4.99/s (D-078), vertical 4/s, FOV 62→78, yaw damping 3/s ≤140°/s, yaw hold below 2.035 m/s, reverse hold ≤1.0 s, occlusion margin 0.6, ground clearance 1.5. |
 | V-007 | RESOLVED | 60 Hz. No high-speed instability was observed at the accepted cap with CCD; 120 Hz remains one hotkey (F4) away if evidence appears. |

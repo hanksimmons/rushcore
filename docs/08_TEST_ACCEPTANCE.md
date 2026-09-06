@@ -99,7 +99,7 @@ Toy contains only:
 
 Before freezing procedural dimensions:
 
-Create a calibration environment with known distances and representative terrain sizes.
+Create a calibration environment with known distances and representative terrain sizes: the 6.4 km scale strip (`World › Calibration Strip (M1)`, D-079) with stations at stated sizes for corridor width, hill wavelength/height, gaps, ramps and turn radius.
 
 Evaluate:
 

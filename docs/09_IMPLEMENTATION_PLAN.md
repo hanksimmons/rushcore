@@ -57,6 +57,8 @@ Use known distances/features to settle:
 - camera scale,
 - gap/ramp/bank sizes.
 
+Instrument: the scale strip (`World › Calibration Strip (M1)`, D-079). Movement is frozen (D-078); only world scale is decided here.
+
 Gate: **M1**.
 
 These tuned values become generation inputs.

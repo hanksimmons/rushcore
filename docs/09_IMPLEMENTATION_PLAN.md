@@ -67,7 +67,7 @@ These tuned values become generation inputs.
 
 Deliver, in this order:
 
-- **route speed model** (D-081): pure-data 1D integration of the frozen baseline along a polyline, calibrated by the harness against the real ball on the strip runway and the lab grade fan; every later validator reads it,
+- **route speed model** (D-081): pure-data 1D integration of the frozen baseline along a polyline, calibrated by the harness against the real ball on the strip runway and the lab grade fan; every later validator reads it — delivered 2026-09-05,
 - deterministic generation request/definition,
 - route-first skeleton,
 - Rolling Highlands,

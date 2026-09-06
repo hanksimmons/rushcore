@@ -142,7 +142,7 @@ x = +3110 facing −X; distance s is metres from the spawn, on every 100 m post.
 
 | s (m) | Station | Measures |
 |---|---|---|
-| 0–1000 | Runway: flat, 100 m posts, 500 m gantries, boost rings 550–900 | 0→cap (394 m unboosted), braking, burst surge, boosted 0→cap |
+| 0–1000 | Runway: flat, 100 m posts, 500 m gantries, boost rings 550–900 | 0→cap (≈ 580 m / 7.1 s unboosted, measured), braking, burst surge, boosted 0→cap |
 | 1000–2000 | Corridor widths 300 / 150 / 75 / 40 m, 250 m each, 30 m walls | minimum corridor width at speed |
 | 2000–4200 | Hills: wavelength/height 100/10, 200/20, 400/40, 800/80 m | wavelength, height, crest sightline, "monumental" scale |
 | 4200–5080 | Gaps 40 / 80 / 160 m, 150 m runways, 25° exit walls | mandatory/optional gap sizes vs jump range |
@@ -150,8 +150,28 @@ x = +3110 facing −X; distance s is metres from the spawn, on every 100 m post.
 | 5700–6300 | Turn pad: flat, painted rings r 80 / 160 / 240 m | turn radius at chosen speeds (≈100 m at the cap) |
 
 Reference envelope at the frozen baseline: turn radius ≈ 100 m at the cap; full-charge jump
-43 m up, 2.96 s hang, ≈ 180 m range at 60 m/s and ≈ 440 m at the cap; 0→cap 5.3 s / 394 m
-unboosted; landing burst → 118.8 m/s from any slam touchdown.
+43 m up, 2.96 s hang, ≈ 180 m range at 60 m/s and ≈ 440 m at the cap; 0→cap **7.1 s / ≈ 580 m**
+unboosted (measured by the harness on the runway; the earlier paper figure of 5.3 s / 394 m
+ignored drag); landing burst → 118.8 m/s from any slam touchdown.
+
+### Route speed model (D-081)
+
+`src/Generation/RouteSpeedModel.cs` is the generator's speed oracle: given a route polyline it
+integrates the frozen baseline at a fixed 60 Hz step (gravity × grade, drive held, the 0.02
+solver friction as a constant slip loss, drag, the hard cap) and clamps every bend to the
+steering envelope's corner speed (v² = r·a_lat(v)). No boost, no burst, no airborne phases;
+a vertex it cannot reach reads speed 0 / time ∞. It is pure data, deterministic (profiles
+hash), and the harness calibrates it every run:
+
+| Case | Real ball | Model | Error |
+|---|---|---|---|
+| Runway 0→cap, drive held | 7.1–7.2 s / 575–585 m | 7.06 s / 571 m | ≤ 0.8% at 50–500 m |
+| Grade fan 8° / 15° / 25° descents, drive held, at 25 / 50 / 75 m | 39–66 / 43–71 / 47–78 m/s | same to 0.3 m/s | ≤ 0.8% |
+
+Without the slip term the model ran ≈ 2% fast on the runway and 4.4% long to the cap: the
+controller re-slips the ball every tick, so the "negligible" friction is a steady 0.79 m/s²
+loss. The corner clamp is deliberately conservative (instant loss at the vertex, no brake
+distance modelled), so profiles under-predict speed after bends and never over-predict it.
 
 ### Terrain budget (the other half of M1, D-080)
 

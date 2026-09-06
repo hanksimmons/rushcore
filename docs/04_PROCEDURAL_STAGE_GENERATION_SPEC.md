@@ -341,7 +341,7 @@ deterministic **route speed model**: a 1D integration of the frozen movement bas
 along the primary-route polyline, metre by metre, assuming the base kit only:
 
 - drive held, no boost, no landing burst,
-- gravity times the local grade, drag, the hard cap,
+- gravity times the local grade, the solver friction as a constant slip loss, drag, the hard cap,
 - a conservative speed loss on bends from the steering envelope (turn radius = v²/(a·mult)),
 - a stage entry speed of zero unless the stage definition says otherwise.
 
@@ -350,10 +350,11 @@ Its outputs feed: mandatory-gap crossability (jump range at the arrival speed), 
 secondary travel-time check (V-009), and checkpoint headings. Boost and the landing burst are
 then optional-line multipliers on top of a conservative base, which is the intent of §2 and §11.
 
-The model is calibrated once against the real controller: the harness predicts the 0→cap
+The model is calibrated against the real controller: the harness predicts the 0→cap
 curve on the scale-strip runway and the descent speeds on the lab grade fan and asserts the
-model is within a few percent of what the ball does. It is pure data code with no scene
-dependency.
+model is within 5% of what the ball does (delivered 2026-09-05: runway within 0.8%; real 0→cap
+is 7.1 s / ≈ 580 m). It is pure data code with no scene dependency
+(`src/Generation/RouteSpeedModel.cs`).
 
 Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove the numeric checks plus the route speed model insufficient.
 

@@ -1,6 +1,7 @@
 using System.Collections;
 using Godot;
 using Rushcore.Core;
+using Rushcore.Generation;
 using Rushcore.Player;
 using Rushcore.Tuning;
 using Rushcore.World;
@@ -976,6 +977,9 @@ public partial class MovementToySelfTest : Node
                 && Mathf.IsEqualApprox(_debug.World.CellSize, MovementToyWorld.DefaultCellSize));
         }
 
+        // ---- route speed model (D-081): the generator's speed oracle must track the real ball ----
+        foreach (var e in RunRouteSpeedModelCase()) yield return e;
+
         // ---- Phase 2 dependency (04 §9): NaN vertices in HeightMapShape3D are holes under Jolt ----
         {
             var body = new StaticBody3D { Name = "NaNHoleTest", Position = new Vector3(0f, PlatformY, -2200f) };
@@ -1157,5 +1161,163 @@ public partial class MovementToySelfTest : Node
 
         ReleaseAll();
         foreach (var _ in Seconds(0.4f)) yield return null;
+    }
+
+    // ---------------- route speed model calibration (04 §12, 08 §5, D-081) ----------------
+
+    /// <summary>Real (arclength, speed) samples of one drive, one per physics tick.</summary>
+    private readonly List<(float s, float v)> _trace = new();
+
+    private static float TraceSpeedAt(List<(float s, float v)> trace, float s)
+    {
+        for (int i = 1; i < trace.Count; i++)
+        {
+            if (trace[i].s < s) continue;
+            float span = trace[i].s - trace[i - 1].s;
+            float f = span > 0f ? (s - trace[i - 1].s) / span : 1f;
+            return Mathf.Lerp(trace[i - 1].v, trace[i].v, f);
+        }
+        return float.NaN;
+    }
+
+    private IEnumerable RunRouteSpeedModelCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        var model = new RouteSpeedModel(m);
+        const float Tolerance = 0.05f;
+
+        // --- envelope helpers ---
+        CheckNear("corner limit at 100 m is the cap-scale turn radius", model.CornerSpeedLimit(100f), m.HardMaxLocomotionSpeed, 3f);
+        Check("corner limit tightens with radius", model.CornerSpeedLimit(25f) < model.CornerSpeedLimit(50f) && model.CornerSpeedLimit(50f) < model.CornerSpeedLimit(100f),
+            $"25={model.CornerSpeedLimit(25f):0.0} 50={model.CornerSpeedLimit(50f):0.0} 100={model.CornerSpeedLimit(100f):0.0}");
+        CheckNear("turn radius is the inverse of the corner limit", model.TurnRadius(model.CornerSpeedLimit(60f)), 60f, 0.5f);
+        CheckNear("crest launch radius at the cap", model.CrestLaunchRadius(m.HardMaxLocomotionSpeed), m.HardMaxLocomotionSpeed * m.HardMaxLocomotionSpeed / m.Gravity, 0.1f);
+        Check("800/80 cosine crest is a launch at the cap and a roll at 60 m/s",
+            model.CrestIsLaunch(RouteSpeedModel.CosineCrestRadius(800f, 80f), m.HardMaxLocomotionSpeed)
+            && !model.CrestIsLaunch(RouteSpeedModel.CosineCrestRadius(800f, 80f), 60f),
+            $"r={RouteSpeedModel.CosineCrestRadius(800f, 80f):0.0}");
+
+        // --- lab grade fan: drive held down each lane from wherever the ball is after settling ---
+        float[] lanes = { TerrainHeightField.Grade8X, TerrainHeightField.Grade15X, TerrainHeightField.Grade25X };
+        string[] laneNames = { "8 deg", "15 deg", "25 deg" };
+        float[] fanChecks = { 25f, 50f, 75f };
+        ulong firstHash = 0, secondHash = 0;
+        for (int lane = 0; lane < lanes.Length; lane++)
+        {
+            float x = lanes[lane];
+            foreach (var _ in Settle(_debug.World.SurfacePoint(x, 140f, m.BallRadius + 1.5f), 0.9f)) yield return null;
+            float z0 = _player.GlobalPosition.Z;
+            float v0 = _player.LocomotionSpeed;
+            var poly = new List<Vector3>();
+            for (float d = 0f; d <= 220f; d += 1f) poly.Add(_debug.World.SurfacePoint(x, z0 - d, m.BallRadius));
+            var profile = model.Integrate(poly, v0);
+            if (lane == 0) { firstHash = profile.Hash(); secondHash = model.Integrate(poly, v0).Hash(); }
+
+            _trace.Clear();
+            Vector3 prev = _player.GlobalPosition;
+            float arc = 0f;
+            _trace.Add((0f, v0));
+            _worldDrive = Vector3.Forward;                  // -Z is downhill on the fan; re-pressed every frame under the moving camera
+            int ticks = 0, groundedTicks = 0;
+            while (arc < fanChecks[^1] + 5f && ticks++ < Engine.PhysicsTicksPerSecond * 6)
+            {
+                yield return null;
+                if (_player.IsGrounded) groundedTicks++;
+                Vector3 pos = _player.GlobalPosition;
+                arc += pos.DistanceTo(prev);
+                prev = pos;
+                _trace.Add((arc, _player.LocomotionSpeed));
+            }
+            ReleaseAll();
+            float worst = 0f;
+            string detail = "";
+            foreach (float s in fanChecks)
+            {
+                float real = TraceSpeedAt(_trace, s), pred = profile.SpeedAt(s);
+                float err = float.IsNaN(real) ? 1f : Mathf.Abs(pred - real) / Mathf.Max(1f, real);
+                worst = Mathf.Max(worst, err);
+                detail += $" s={s:0}: real {real:0.0} model {pred:0.0} ({err:P1});";
+            }
+            GD.Print($"[SELFTEST] route speed model  fan {laneNames[lane]}: v0={v0:0.0} grounded={groundedTicks / (float)Mathf.Max(1, ticks):P0};{detail}");
+            Check($"speed model tracks the {laneNames[lane]} grade-fan descent within 5%", worst <= Tolerance,
+                $"v0={v0:0.0} grounded={groundedTicks / (float)Mathf.Max(1, ticks):P0};{detail}");
+        }
+        Check("speed model is deterministic (same polyline, same hash)", firstHash == secondHash && firstHash != 0, $"hash={firstHash:X}");
+
+        // --- strip runway: 0 -> cap with drive held on the flat ---
+        {
+            t.World.CalibrationStrip = true;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            var world = _debug.World;
+            foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.StartX, 0f, m.BallRadius + 0.4f), 1.2f)) yield return null;
+            float v0 = _player.LocomotionSpeed;
+            float x0 = _player.GlobalPosition.X;
+            var poly = RouteSpeedModel.StraightPolyline(_player.GlobalPosition, Vector3.Left, ScaleStripHeightField.RunwayEnd);
+            var profile = model.Integrate(poly, v0);
+            float modelCapS = float.NaN, modelCapT = float.NaN;
+            for (int i = 0; i < profile.Count; i++)
+                if (profile.Speed[i] >= m.HardMaxLocomotionSpeed - 0.5f) { modelCapS = profile.Distance[i]; modelCapT = profile.Time[i]; break; }
+
+            _trace.Clear();
+            _trace.Add((0f, v0));
+            Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            int ticks = 0;
+            float realCapS = float.NaN, realCapT = float.NaN;
+            while (ticks++ < Engine.PhysicsTicksPerSecond * 14)
+            {
+                yield return null;
+                float s = x0 - _player.GlobalPosition.X;
+                _trace.Add((s, _player.LocomotionSpeed));
+                if (float.IsNaN(realCapS) && _player.LocomotionSpeed >= m.HardMaxLocomotionSpeed - 0.5f)
+                {
+                    realCapS = s;
+                    realCapT = ticks / (float)Engine.PhysicsTicksPerSecond;
+                }
+                if (!float.IsNaN(realCapS) || s > ScaleStripHeightField.RunwayEnd - 10f) break;
+            }
+            ReleaseAll();
+            float[] checks = { 50f, 100f, 200f, 300f, 400f, 500f };
+            float worst = 0f;
+            string detail = "";
+            foreach (float s in checks)
+            {
+                if (!float.IsNaN(realCapS) && s > realCapS) break;
+                float real = TraceSpeedAt(_trace, s), pred = profile.SpeedAt(s);
+                float err = float.IsNaN(real) ? 1f : Mathf.Abs(pred - real) / Mathf.Max(1f, real);
+                worst = Mathf.Max(worst, err);
+                detail += $" s={s:0}: real {real:0.0} model {pred:0.0} ({err:P1});";
+            }
+            GD.Print($"[SELFTEST] route speed model  runway 0->cap: real {realCapT:0.00} s / {realCapS:0} m, model {modelCapT:0.00} s / {modelCapS:0} m;{detail}");
+            Check("speed model tracks the runway 0->cap curve within 5%", worst <= Tolerance, detail.Trim());
+            Check("speed model predicts the 0->cap distance within 5%",
+                !float.IsNaN(realCapS) && Mathf.Abs(modelCapS - realCapS) / realCapS <= Tolerance,
+                $"real {realCapS:0} m, model {modelCapS:0} m");
+            Check("speed model reaches and holds the cap", Mathf.IsEqualApprox(profile.Speed[^1], m.HardMaxLocomotionSpeed) && profile.MaxSpeed <= m.HardMaxLocomotionSpeed + 1e-3f,
+                $"end={profile.Speed[^1]:0.0} max={profile.MaxSpeed:0.0}");
+
+            // --- bends and stalls: the conservative rules do what the validators will lean on ---
+            var bend = new List<Vector3>();
+            Vector3 c = _player.GlobalPosition;
+            for (float d = 0f; d <= 600f; d += 1f) bend.Add(c + Vector3.Left * d);
+            const float R = 50f;
+            Vector3 centre = bend[^1] + Vector3.Forward * R;
+            for (float a = 0f; a <= Mathf.Pi * 0.5f; a += 1f / R)
+                bend.Add(centre + new Vector3(-Mathf.Sin(a) * R, 0f, Mathf.Cos(a) * R));   // quarter circle, entered heading -X
+            var bendProfile = model.Integrate(bend, 0f);
+            Check("a 50 m bend caps the arrival speed at its corner limit",
+                bendProfile.Speed[^1] <= model.CornerSpeedLimit(R) + 1f && bendProfile.Speed[^1] < profile.Speed[^1] - 10f,
+                $"exit={bendProfile.Speed[^1]:0.0} limit={model.CornerSpeedLimit(R):0.0}");
+            var uphill = new List<Vector3> { Vector3.Zero, new(0f, 30f, -40f), new(0f, 60f, -80f) };
+            var stalled = model.Integrate(uphill, 5f, driveHeld: false);
+            Check("a driverless ball stalls on a climb and the profile says so",
+                stalled.Stalled && float.IsPositiveInfinity(stalled.Time[^1]), $"stalled={stalled.Stalled} at {stalled.StallVertex}");
+            Check("with drive held the same climb is completed", !model.Integrate(uphill, 5f).Stalled);
+
+            t.World.CalibrationStrip = false;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+        }
     }
 }

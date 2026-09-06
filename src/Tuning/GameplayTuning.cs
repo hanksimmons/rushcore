@@ -53,6 +53,15 @@ public sealed class MovementTuning
     public float CrushThreshold = 95f;
     public float OverdriveThreshold = 141.06f;
     public float BallRadius = 2.125f;
+
+    /// <summary>
+    /// Solver friction for the player/terrain pair (both materials). The arcade controller
+    /// owns traction and resistance (03 §1), so this is kept near zero and
+    /// <see cref="DragCoefficient"/> is the single tunable resistance. Not a panel value: it
+    /// is part of the frozen baseline's physical setup, and the route speed model reads it
+    /// as a constant slip loss (the drive re-slips the rolling ball every tick).
+    /// </summary>
+    public const float SurfaceFriction = 0.02f;
 }
 
 public sealed class JumpSlamTuning

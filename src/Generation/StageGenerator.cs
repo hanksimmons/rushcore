@@ -56,21 +56,119 @@ public sealed class StageGenerator
         // B–D: archetype relief and the stamped corridor become the one logical height source;
         // the route polyline is then lifted onto it so every later check sees real geometry.
         var field = new StageHeightField(route, request.StageSeed);
-        for (int i = 0; i < route.Vertices.Count; i++)
-        {
-            var v = route.Vertices[i];
-            v.Position.Y = field.Sample(v.Position.X, v.Position.Z);
-            route.Vertices[i] = v;
-        }
-        report.Timings.Add(("relief + corridor", sw.Elapsed.TotalMilliseconds)); sw.Restart();
+        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed);
+        foreach (var line in optional) field.AddLine(line);
+        Lift(route, field);
+        foreach (var line in optional) Lift(line, field);
+        report.Timings.Add(("relief + corridors", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         RouteSpeedProfile profile = _speed.Integrate(route.Polyline());
-        report.Timings.Add(("speed profile", sw.Elapsed.TotalMilliseconds)); sw.Restart();
+        var def = new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed, HeightField = field };
+        foreach (var line in optional)
+        {
+            def.OptionalLines.Add(line);
+            def.OptionalProfiles.Add(_speed.Integrate(line.Polyline(), profile.Speed[line.JoinStart]));
+        }
+        report.Timings.Add(("speed profiles", sw.Elapsed.TotalMilliseconds)); sw.Restart();
+
+        PlaceCheckpoints(def);
+        report.Timings.Add(("checkpoints", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         Validate(route, profile, field, report);
+        ValidateOptionalLines(def, report);
+        ValidateCheckpoints(def, report);
         report.Timings.Add(("validation", sw.Elapsed.TotalMilliseconds));
+        return def;
+    }
 
-        return new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed, HeightField = field };
+    /// <summary>Puts a line's vertices on the stamped surface so every later check sees real geometry.</summary>
+    private static void Lift(RouteSkeleton line, StageHeightField field)
+    {
+        for (int i = 0; i < line.Vertices.Count; i++)
+        {
+            var v = line.Vertices[i];
+            v.Position.Y = field.Sample(v.Position.X, v.Position.Z);
+            line.Vertices[i] = v;
+        }
+    }
+
+    /// <summary>
+    /// Recovery anchors (04 §13): every checkpoint spacing along the primary, pushed past any launch
+    /// crest and its landing run so a restore is never placed just before or inside a flight.
+    /// </summary>
+    private static void PlaceCheckpoints(StageDefinition def)
+    {
+        var route = def.PrimaryRoute;
+        var v = route.Vertices;
+        float ballRadius = 2.125f;   // restore height uses the accepted ball radius (03 §15); the runtime re-floors it
+        for (float d = WorldScale.CheckpointSpacing; d < route.Length - WorldScale.PadRadius * 2f; d += WorldScale.CheckpointSpacing)
+        {
+            float place = d;
+            foreach (var f in route.Features)
+            {
+                float fs = v[f.StartIndex].Distance, fe = f.CentreDistance + f.Wavelength * 0.5f + f.LandingDistance;
+                if (place >= fs && place <= fe) place = fe + 20f;
+            }
+            if (place >= route.Length - WorldScale.PadRadius * 2f) break;
+            int i = route.IndexAtDistance(place);
+            // Level ground across the corridor: never anchor on a banked bend; step past it.
+            foreach (var b in route.Bends)
+                if (i >= b.StartIndex && i <= b.EndIndex) { i = Mathf.Min(v.Count - 1, b.EndIndex + 4); break; }
+            if (v[i].Distance >= route.Length - WorldScale.PadRadius * 2f) break;
+            def.Checkpoints.Add(new Checkpoint
+            {
+                Position = v[i].Position + Vector3.Up * (ballRadius + 0.6f),
+                Heading = v[i].Heading,
+                PrimaryIndex = i,
+                Distance = v[i].Distance,
+            });
+        }
+    }
+
+    private void ValidateOptionalLines(StageDefinition def, ValidationReport report)
+    {
+        var primary = def.PrimaryRoute.Vertices;
+        bool allOk = true;
+        string detail = "";
+        for (int k = 0; k < def.OptionalLines.Count; k++)
+        {
+            var line = def.OptionalLines[k];
+            var prof = def.OptionalProfiles[k];
+            var v = line.Vertices;
+            float maxGrade = 0f, rise = 0f;
+            for (int i = 1; i < v.Count; i++)
+            {
+                float ds = v[i].Distance - v[i - 1].Distance;
+                if (ds > 1e-3f) maxGrade = Mathf.Max(maxGrade, Mathf.Abs(v[i].Position.Y - v[i - 1].Position.Y) / ds);
+                int pi = Mathf.Clamp(line.JoinStart + i, 0, primary.Count - 1);
+                rise = Mathf.Max(rise, v[i].Position.Y - primary[pi].Position.Y);
+            }
+            float joinStart = Mathf.Abs(v[0].Position.Y - primary[line.JoinStart].Position.Y);
+            float joinEnd = Mathf.Abs(v[^1].Position.Y - primary[line.JoinEnd].Position.Y);
+            bool ok = !prof.Stalled && maxGrade <= WorldScale.MaxRouteGrade && rise >= 15f && joinStart < 2f && joinEnd < 2f;
+            allOk &= ok;
+            detail += $" [{line.Kind} {v[0].Distance:0}→{v[^1].Distance:0} m of {line.Length:0}, rise {rise:0} m, grade {maxGrade:0.00}, exit {prof.Speed[^1]:0} m/s{(ok ? "" : " FAIL")}]";
+        }
+        report.Add("optional lines are traversable, joined and distinct", allOk, $"{def.OptionalLines.Count} lines{detail}");
+    }
+
+    private static void ValidateCheckpoints(StageDefinition def, ValidationReport report)
+    {
+        var field = def.HeightField!;
+        bool clear = true;
+        float worst = 0f;
+        foreach (var c in def.Checkpoints)
+        {
+            // Stable, level ground across the corridor at the anchor (04 §13): heights ±30 m either side.
+            float lx = -Mathf.Sin(c.Heading), lz = Mathf.Cos(c.Heading);
+            float h0 = field.Sample(c.Position.X, c.Position.Z);
+            float spread = Mathf.Max(Mathf.Abs(field.Sample(c.Position.X + lx * 30f, c.Position.Z + lz * 30f) - h0),
+                                     Mathf.Abs(field.Sample(c.Position.X - lx * 30f, c.Position.Z - lz * 30f) - h0));
+            worst = Mathf.Max(worst, spread);
+            if (spread > 3f) clear = false;
+        }
+        report.Add("checkpoints exist along the progression", def.Checkpoints.Count >= 8, $"{def.Checkpoints.Count} anchors");
+        report.Add("checkpoints have clearance", clear, $"worst lateral height spread {worst:0.00} m");
     }
 
     /// <summary>Mandatory and secondary checks that apply to a skeleton (04 §12); more join with each slice.</summary>

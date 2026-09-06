@@ -74,11 +74,11 @@ Deliver, in this order:
 - heightfield pipeline — delivered (one height source feeds the existing tiled mesh and collider),
 - `ArrayMesh` — delivered (Phase 1 tiles reused),
 - `HeightMapShape3D` — delivered (Phase 1 collider reused),
-- guaranteed primary route — corridor stamped and grade-validated; landing-zone and clearance validators join with the optional line,
-- optional line/shortcut,
-- checkpoints,
-- validation,
-- same/new seed tooling.
+- guaranteed primary route — corridor stamped; grade, crest-landing, pad and anchor-clearance validators in place (landing zones for gaps arrive with the Phase 3 modules),
+- optional line/shortcut — delivered 2026-09-05 as ridge lines (D-086),
+- checkpoints — delivered 2026-09-05 (progression anchors, D-086),
+- validation — report per stage with attempts, timings, bounded regeneration and fallback; shown in the overlay and log,
+- same/new seed tooling — F5 / panel buttons / copy seed (Phase 1), plus the 100-seed harness batch.
 
 ## Phase 3 — Terrain Variety
 

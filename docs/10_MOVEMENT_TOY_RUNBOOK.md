@@ -206,6 +206,19 @@ Relief rules (D-085): three long swells with summed crest curvature ≤ 0.7 / 56
 relief smoothed ± 150 m along the route, level across, 120 m falloff, banks 18/145 · r on the outer
 half of bends, crests λ 300–500 with height trimmed so crest + local slope ≤ 0.36, flat 60 m pads.
 
+**Optional lines and checkpoints (PR 3, D-086).** Green route lines are ridge lines: they leave the
+primary on the outside of its bends, shift 200 m sideways over a 360 m S-transition, climb 25–40 m
+onto a plateau, and drop back to rejoin; corridor 75 m, no bank. They are distinct by elevation and
+exposure, not by distance (a 45°-bounded primary is already nearly straight, so chords save little;
+distance shortcuts arrive with the Phase 3 gap modules). Posts with a glowing cap are the recovery
+anchors, every 400 m of primary route on straights only, pushed past any crest and its landing run.
+On a generated stage the toy's rolling auto-checkpoint is off: R or a fall restores to the last anchor
+you legitimately passed (progress only advances while you are inside the corridor reach), the telemetry
+`stage` row shows clock, progress, armed anchor and the exit time once you cross the blue pad, and the
+log prints the exit time against the route speed model's base-kit prediction. Measured 2026-09-05 over
+1000 seeds: all valid, no fallback, 95% of seeds carry 1–3 ridge lines (1.5 avg), ≥ 15 anchors each,
+≈ 34 ms per definition; the harness drives the first ridge line of the built stage (≈ 70% grounded).
+
 **Deferred M1 feel verdicts to take here** (D-082): fog onset at the cap (`World › Fog End` /
 `Camera › Far Plane` are live); corridor width at the cap (150 m typical here; the 75 m minimum is
 still a strip question); whether the swells read as a landscape and the crests as intended launches;

@@ -1334,7 +1334,8 @@ public partial class MovementToySelfTest : Node
         var gen = new StageGenerator(_debug.Tuning.Movement);
         const int Count = 100;
         var hashes = new HashSet<ulong>();
-        int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0;
+        var fallbackReasons = new Dictionary<string, int>();
+        int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0, withLines = 0, linesTotal = 0, minAnchors = int.MaxValue;
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         double msSum = 0, msMax = 0;
         string firstFailure = "";
@@ -1345,7 +1346,15 @@ public partial class MovementToySelfTest : Node
             var def = gen.Generate(req);
             var again = gen.Generate(req);
             if (def.Report.Passed) passed++; else if (firstFailure == "") firstFailure = $"seed {req.RunSeed}/{req.StageIndex}: " + string.Join("; ", def.Report.Failures.Select(f => f.Name + " " + f.Detail));
-            if (def.Report.UsedFallback) { fallbacks++; if (fallbacks <= 3) GD.Print($"[SELFTEST] fallback seed {req.RunSeed}/{req.StageIndex}: " + string.Join("; ", def.Report.Checks.Where(c => c.Name.StartsWith("regeneration")).Select(c => c.Name + " " + c.Detail))); }
+            if (def.Report.UsedFallback)
+            {
+                fallbacks++;
+                foreach (var c in def.Report.Checks.Where(c => c.Name.StartsWith("regeneration")))
+                {
+                    fallbackReasons[c.Name] = fallbackReasons.GetValueOrDefault(c.Name) + 1;
+                    if (fallbacks <= 2) GD.Print($"[SELFTEST] fallback seed {req.RunSeed}/{req.StageIndex}: {c.Name} {c.Detail}");
+                }
+            }
             if (i == 0) GD.Print($"[SELFTEST] generation timings: " + string.Join(", ", def.Report.Timings.Select(t => $"{t.phase} {t.ms:0.00} ms")));
             if (def.Hash() == again.Hash()) deterministic++;
             hashes.Add(def.Hash());
@@ -1355,15 +1364,20 @@ public partial class MovementToySelfTest : Node
             lenMin = Mathf.Min(lenMin, len); lenMax = Mathf.Max(lenMax, len); lenSum += len;
             tMin = Mathf.Min(tMin, t); tMax = Mathf.Max(tMax, t); tSum += t;
             msSum += def.Report.TotalMillis; msMax = Math.Max(msMax, def.Report.TotalMillis);
+            if (def.OptionalLines.Count > 0) withLines++;
+            linesTotal += def.OptionalLines.Count;
+            minAnchors = Mathf.Min(minAnchors, def.Checkpoints.Count);
         }
         sw.Stop();
         GD.Print($"[SELFTEST] generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
-                 $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
+                 $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
         Check("every seed in the batch generates a valid primary route", passed == Count, $"{passed}/{Count}; first failure: {firstFailure}");
-        Check("no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}");
+        Check("no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}: " + string.Join(", ", fallbackReasons.Select(kv => $"{kv.Key} ×{kv.Value}")));
         Check("same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
         Check("different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
+        Check("most seeds carry at least one optional line", withLines >= Count * 0.9f, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
+        Check("every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
         Check("route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
         Check("base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
@@ -1426,6 +1440,51 @@ public partial class MovementToySelfTest : Node
         Check("the ball drives the first kilometre of the generated route", progressed > 1000f, $"{progressed:0} m");
         Check("the corridor keeps the ball grounded most of the way", groundedFrac > 0.6f, $"{groundedFrac:P0}");
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
+
+        // Progression anchors (04 §13): the drive armed checkpoints; a fall restores to the last one, not to the ball.
+        int armed = world.StageCheckpointIndex;
+        Check("progression anchors armed as the route was driven", armed >= 1 && world.StageProgressIndex > 200,
+            $"anchor {armed + 1}/{stage.Checkpoints.Count}, progress index {world.StageProgressIndex}");
+        Vector3 cpBefore = _player.CheckpointPosition;
+        _player.TeleportTo(_player.GlobalPosition + Vector3.Down * 3000f);
+        foreach (var _ in Frames(6)) yield return null;
+        _player.RequestRecovery();
+        foreach (var _ in Frames(30)) yield return null;
+        var anchorPos = armed >= 0 ? stage.Checkpoints[armed].Position : stage.StartPosition;
+        Check("fall recovery restores to the armed stage anchor",
+            new Vector2(_player.GlobalPosition.X - anchorPos.X, _player.GlobalPosition.Z - anchorPos.Z).Length() < 6f && _player.IsGrounded,
+            $"pos={_player.GlobalPosition} anchor={anchorPos} cp={cpBefore}");
+        Check("the anchor never moved backward with the fall", world.StageCheckpointIndex == armed);
+
+        // Optional line: drive the first ridge line from its join for a few seconds.
+        if (stage.OptionalLines.Count > 0)
+        {
+            var line = stage.OptionalLines[0];
+            var lv = line.Vertices;
+            foreach (var _ in Settle(world.SurfacePoint(lv[0].Position.X, lv[0].Position.Z, m.BallRadius + 0.5f), 0.6f)) yield return null;
+            _player.LinearVelocity = new Vector3(Mathf.Cos(lv[0].Heading), 0f, Mathf.Sin(lv[0].Heading)) * 60f;
+            int lt = 0, lg = 0, ln = 0;
+            while (lt++ < Engine.PhysicsTicksPerSecond * 10 && ln < lv.Count - 20)
+            {
+                Vector3 p = _player.GlobalPosition;
+                float best = float.MaxValue;
+                for (int i = Mathf.Max(0, ln - 5); i < Mathf.Min(lv.Count, ln + 60); i++)
+                {
+                    float d = new Vector2(lv[i].Position.X - p.X, lv[i].Position.Z - p.Z).LengthSquared();
+                    if (d < best) { best = d; ln = i; }
+                }
+                var target = lv[Mathf.Min(lv.Count - 1, ln + 15)].Position;
+                _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
+                if (_player.IsGrounded) lg++;
+                yield return null;
+            }
+            ReleaseAll();
+            float lineFrac = lg / (float)Mathf.Max(1, lt);
+            GD.Print($"[SELFTEST] optional line drive: {lv[ln].Distance:0} m of {line.Length:0} m (ridge {line.RidgeHeight:0} m), grounded {lineFrac:P0}");
+            Check("the ridge line is driveable to its rejoin", lv[ln].Distance > line.Length * 0.6f, $"{lv[ln].Distance:0} of {line.Length:0} m");
+            Check("the ridge corridor keeps the ball grounded", lineFrac > 0.5f, $"{lineFrac:P0}");
+        }
+        else Check("stage has an optional line to drive", false, "none generated for this seed");
 
         t.World.GeneratedStage = false;
         _debug.RestartSameSeed();

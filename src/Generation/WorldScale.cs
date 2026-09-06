@@ -70,6 +70,22 @@ public static class WorldScale
     public const float PadRadius = 60f;                  // flat start/exit pads
     public const float LaunchCrestSpacing = 1000f;       // at most one launch crest per this much route
 
+    // ---- optional lines and checkpoints (04 §2, §13) ----
+    public const int OptionalLinesMax = 3;
+    public const float OptionalLineSpacing = 700f;       // route distance between optional lines
+    public const float RidgeOffset = 200f;               // lateral offset of a ridge line from the primary
+    public const float RidgeHeightMin = 25f, RidgeHeightMax = 40f;
+    /// <summary>Length of each lateral S-transition: 200 m over 360 m is a 108 m radius, a fast bend.</summary>
+    public const float RidgeTransition = 360f;
+    public const float RidgeLength = 1300f;              // shadowed section: 2 transitions + 2 ramps + plateau
+    public const float RidgeRampLength = 200f;           // climb onto / descent off the plateau (40 m → grade 0.20)
+    /// <summary>An optional line stamps nothing while it is still inside the primary corridor and is fully its own beyond this offset.</summary>
+    public const float OptionalStampFadeStart = 60f, OptionalStampFadeEnd = 160f;
+    /// <summary>Inside a bend, an offset line needs this much radius left.</summary>
+    public const float InsideOffsetMargin = 30f;         // leaves a technical-radius bend on the line (D-082: optional only)
+    public const float OptionalBandHalfWidth = 800f;     // optional lines may use the scenery margin
+    public const float CheckpointSpacing = 400f;
+
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;
     /// <summary>Route polyline vertex spacing; equal to the cell size so relief and stamping see every facet.</summary>

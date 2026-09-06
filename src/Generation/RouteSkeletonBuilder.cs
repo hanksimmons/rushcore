@@ -24,6 +24,8 @@ public sealed class RouteSkeletonBuilder
     // Launch-crest feature straights: approach, the crest itself, then a straight landing run.
     private const float CrestApproach = 150f, CrestLanding = 300f;
     private const float CrestChance = 0.5f;
+    /// <summary>Chance a free bend keeps the previous turn sense: longer same-sense arcs give ridge lines room (04 §2).</summary>
+    private const float TurnPersistence = 0.7f;
 
     private readonly RouteSpeedModel _speed;
 
@@ -39,6 +41,7 @@ public sealed class RouteSkeletonBuilder
         var pos = new Vector2(entryX, 0f);
         float heading = 0f;
         float lastCrestX = entryX;
+        float lastSign = 0f;
         AddVertex(route, pos, heading, float.PositiveInfinity, RouteSegmentKind.Straight);
 
         // Leave room for the closing bend (≤ r·sin 45°) and a final straight before the exit.
@@ -85,7 +88,9 @@ public sealed class RouteSkeletonBuilder
             float radius = PickRadius(ref rng);
             float sign = Mathf.Abs(pos.Y) > SoftBand ? -Mathf.Sign(pos.Y)
                        : Mathf.Abs(heading) >= MaxHeading - 1e-3f ? -Mathf.Sign(heading)
+                       : lastSign != 0f && rng.Chance(TurnPersistence) ? lastSign
                        : rng.Sign();
+            lastSign = sign;
             float turn = rng.Range(BendMin, BendMax);
             // Near the band edge the bend must end heading back toward the axis, not merely less outward.
             if (Mathf.Abs(pos.Y) > SoftBand && Mathf.Sign(heading) == -sign) turn = Mathf.Max(turn, Mathf.Abs(heading) + BendMin);

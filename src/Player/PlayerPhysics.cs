@@ -179,6 +179,9 @@ public partial class PlayerPhysics : RigidBody3D
         _boost = Mathf.Clamp(_boost + amount, 0f, _t.Boost.BoostCapacity);
 
     public void SetCheckpoint(Vector3 position) => _checkpoint = position;
+    /// <summary>Toy behaviour: re-anchor to the ball every 0.75 s of ground contact. A generated
+    /// stage turns this off and supplies its own progression anchors (04 §13).</summary>
+    public bool AutoCheckpoint { get; set; } = true;
 
     public void RequestRecovery() => TeleportTo(_checkpoint);
 
@@ -601,6 +604,7 @@ public partial class PlayerPhysics : RigidBody3D
 
     private void UpdateCheckpoint(PhysicsDirectBodyState3D state, float dt)
     {
+        if (!AutoCheckpoint) return;
         _checkpointTimer -= dt;
         if (_checkpointTimer > 0f) return;
         _checkpointTimer = CheckpointIntervalSeconds;

@@ -116,6 +116,7 @@ Evaluate:
 Outcome:
 
 - freeze a coherent world-scale family for procedural generation,
+- freeze the terrain budget at that scale: cell size (with its contact measurement), stage footprint, samples/triangles/build time, draw distance versus sightline, and whether Phase 2 needs finer tiling than the default (D-080),
 - document the measured/tuned values.
 
 ## 5. Procedural Generation — Gate G0

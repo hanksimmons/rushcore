@@ -13,17 +13,19 @@ namespace Rushcore.World;
 /// </summary>
 public partial class MovementToyWorld : Node3D
 {
-    /// <summary>Metres between height samples. Also the size of one rendered facet.</summary>
-    public const float CellSize = 4f;
-    /// <summary>Lab samples per side. Extent = (Samples - 1) * CellSize metres.</summary>
+    /// <summary>Lab default: metres between height samples, also the size of one rendered facet.</summary>
+    public const float DefaultCellSize = 4f;
+    /// <summary>Lab samples per side at the default cell size. Extent = (Samples - 1) * DefaultCellSize.</summary>
     public const int Samples = 257;
-    public const float Extent = (Samples - 1) * CellSize;
+    public const float Extent = (Samples - 1) * DefaultCellSize;
+    /// <summary>Render tiles are this many cells square: bounded allocations, frustum culling per tile.</summary>
+    private const int TileCells = 128;
 
     private readonly GameplayTuning _t;
     private IHeightSource _field = null!;
     private int _nx = Samples, _nz = Samples;
     private WorldDressing _dressing = null!;
-    private MeshInstance3D _terrainMesh = null!;
+    private Node3D _terrainRoot = null!;
     private StaticBody3D _terrainBody = null!;
     private CollisionShape3D _terrainCollider = null!;
     private HeightMapShape3D _terrainShape = null!;
@@ -50,6 +52,13 @@ public partial class MovementToyWorld : Node3D
     public float HalfZ { get; private set; } = Extent * 0.5f;
     public bool InBounds(float x, float z, float margin = 8f)
         => Mathf.Abs(x) < HalfX - margin && Mathf.Abs(z) < HalfZ - margin;
+    /// <summary>Metres between height samples for the current build (World › Cell Size).</summary>
+    public float CellSize { get; private set; } = DefaultCellSize;
+    /// <summary>Budget readouts for the last build (Gate M1).</summary>
+    public int Triangles { get; private set; }
+    public int Tiles { get; private set; }
+    public int SampleCount => _heights.Length;
+    public ulong BuildMillis { get; private set; }
 
     /// <summary>Raised when the player collects a boost pickup; carries the refill amount.</summary>
     public event Action<float>? BoostPickupCollected;
@@ -66,14 +75,11 @@ public partial class MovementToyWorld : Node3D
         _terrainCollider = new CollisionShape3D { Name = "TerrainCollider" };
         _terrainShape = new HeightMapShape3D();
         _terrainCollider.Shape = _terrainShape;
-        // Heights are stored pre-divided by CellSize so the shape can use a uniform
-        // scale; a heightmap shape spans one unit per sample by definition.
-        _terrainCollider.Scale = Vector3.One * CellSize;
         _terrainBody.AddChild(_terrainCollider);
         AddChild(_terrainBody);
 
-        _terrainMesh = new MeshInstance3D { Name = "TerrainMesh", CastShadow = GeometryInstance3D.ShadowCastingSetting.On };
-        AddChild(_terrainMesh);
+        _terrainRoot = new Node3D { Name = "TerrainMesh" };
+        AddChild(_terrainRoot);
 
         _dressing = new WorldDressing(_t, this);
         AddChild(_dressing);
@@ -87,6 +93,10 @@ public partial class MovementToyWorld : Node3D
     {
         ulong start = Time.GetTicksMsec();
         IsStrip = _t.World.CalibrationStrip;
+        CellSize = Mathf.Clamp(_t.World.CellSize, 1f, 16f);
+        // Heights are stored pre-divided by CellSize so the shape can use a uniform
+        // scale; a heightmap shape spans one unit per sample by definition.
+        _terrainCollider.Scale = Vector3.One * CellSize;
         _field = IsStrip ? new ScaleStripHeightField(_t.World) : new TerrainHeightField(Seed, _t.World);
         HalfX = _field.SizeX * 0.5f;
         HalfZ = _field.SizeZ * 0.5f;
@@ -115,16 +125,17 @@ public partial class MovementToyWorld : Node3D
         _terrainShape.MapDepth = nz;
         _terrainShape.MapData = _heights;
 
-        _terrainMesh.Mesh = BuildTerrainMesh();
-        _terrainMesh.MaterialOverride = _dressing.CreateTerrainMaterial();
+        BuildTerrainTiles(_dressing.CreateTerrainMaterial());
 
         Bounds = new Aabb(new Vector3(-HalfX, _minHeight, -HalfZ), new Vector3(_field.SizeX, _maxHeight - _minHeight, _field.SizeZ));
         KillPlaneY = _minHeight - 120f;
         SpawnPoint = _field.SpawnXZ with { Y = SampleHeight(_field.SpawnXZ.X, _field.SpawnXZ.Z) + 4f };
 
         _dressing.Rebuild();
-        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStrip ? "SCALE STRIP" : "lab")} in {Time.GetTicksMsec() - start} ms " +
-                 $"({_field.SizeX:0} x {_field.SizeZ:0} m, height {_minHeight:0.0}..{_maxHeight:0.0} m)");
+        BuildMillis = Time.GetTicksMsec() - start;
+        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
+                 $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +
+                 $"{Triangles / 1000f:0} k tris in {Tiles} tiles, heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");
     }
 
     public void Regenerate(int seed)
@@ -148,20 +159,48 @@ public partial class MovementToyWorld : Node3D
 
     public Vector3 SurfacePoint(float x, float z, float above = 0f) => new(x, SampleHeight(x, z) + above, z);
 
-    private ArrayMesh BuildTerrainMesh()
+    /// <summary>One ArrayMesh per tile: each allocation is bounded (~4 MB at 128 cells) and the
+    /// renderer culls tiles the camera cannot see. Collision stays a single heightfield.</summary>
+    private void BuildTerrainTiles(Material material)
     {
-        int nx = _nx, nz = _nz;
-        int quads = (nx - 1) * (nz - 1);
-        int vertCount = quads * 6;                    // non-indexed: flat/faceted normals (06 §4)
+        foreach (Node child in _terrainRoot.GetChildren())
+        {
+            _terrainRoot.RemoveChild(child);
+            child.QueueFree();
+        }
+        Triangles = 0;
+        Tiles = 0;
+        for (int tz = 0; tz < _nz - 1; tz += TileCells)
+        {
+            for (int tx = 0; tx < _nx - 1; tx += TileCells)
+            {
+                int cx = Mathf.Min(TileCells, _nx - 1 - tx);
+                int cz = Mathf.Min(TileCells, _nz - 1 - tz);
+                _terrainRoot.AddChild(new MeshInstance3D
+                {
+                    Name = $"Tile_{tx}_{tz}",
+                    Mesh = BuildTile(tx, tz, cx, cz),
+                    MaterialOverride = material,
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+                });
+                Triangles += cx * cz * 2;
+                Tiles++;
+            }
+        }
+    }
+
+    private ArrayMesh BuildTile(int tx, int tz, int cx, int cz)
+    {
+        int nx = _nx;
+        int vertCount = cx * cz * 6;                  // non-indexed: flat/faceted normals (06 §4)
         var verts = new Vector3[vertCount];
         var norms = new Vector3[vertCount];
         var colors = new Color[vertCount];
-
         int w = 0;
 
-        for (int z = 0; z < nz - 1; z++)
+        for (int z = tz; z < tz + cz; z++)
         {
-            for (int x = 0; x < nx - 1; x++)
+            for (int x = tx; x < tx + cx; x++)
             {
                 float x0 = x * CellSize - HalfX, x1 = x0 + CellSize;
                 float z0 = z * CellSize - HalfZ, z1 = z0 + CellSize;

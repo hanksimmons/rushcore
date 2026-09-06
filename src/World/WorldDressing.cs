@@ -126,7 +126,20 @@ public partial class WorldDressing : Node3D
         env.SetGlowLevel(3, 1.0f);
         env.SetGlowLevel(4, 0.6f);
         env.SetGlowLevel(5, 0.3f);
+        _env = env;
+        ApplyFog();
         AddChild(new WorldEnvironment { Name = "WorldEnvironment", Environment = env });
+    }
+
+    private Godot.Environment _env = null!;
+
+    /// <summary>World › Fog End is a live sightline instrument (M1); begin tracks it at 16%.</summary>
+    private void ApplyFog()
+    {
+        float end = Mathf.Max(300f, _t.World.FogEnd);
+        if (Mathf.IsEqualApprox(_env.FogDepthEnd, end)) return;
+        _env.FogDepthEnd = end;
+        _env.FogDepthBegin = end * 0.16f;
     }
 
     /// <summary>
@@ -717,6 +730,7 @@ public partial class WorldDressing : Node3D
     {
         float dt = (float)delta;
         _clock += dt;
+        ApplyFog();
 
         for (int i = 0; i < _pickups.Count; i++)
         {

@@ -57,7 +57,7 @@ Use known distances/features to settle:
 - camera scale,
 - gap/ramp/bank sizes.
 
-Instrument: the scale strip (`World › Calibration Strip (M1)`, D-079). Movement is frozen (D-078); only world scale is decided here.
+Instrument: the scale strip (`World › Calibration Strip (M1)`, D-079). Movement is frozen (D-078); only world scale is decided here, together with its terrain budget (cell size, footprint, build/draw cost, D-080).
 
 Gate: **M1**.
 

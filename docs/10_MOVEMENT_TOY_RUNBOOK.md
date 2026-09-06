@@ -152,3 +152,38 @@ x = +3110 facing −X; distance s is metres from the spawn, on every 100 m post.
 Reference envelope at the frozen baseline: turn radius ≈ 100 m at the cap; full-charge jump
 43 m up, 2.96 s hang, ≈ 180 m range at 60 m/s and ≈ 440 m at the cap; 0→cap 5.3 s / 394 m
 unboosted; landing burst → 118.8 m/s from any slam touchdown.
+
+### Terrain budget (the other half of M1, D-080)
+
+Scale must be buildable and drawable as well as fun. Every build logs its budget
+(`World built ... k samples, k tris in N tiles, MB`), and three live knobs exist for it:
+`World › Cell Size (m)` (rebuilds when the slider settles), `World › Fog End (m)` and
+`Camera › Far Plane (m)` for the draw-distance-versus-sightline read. Render terrain is tiled
+(128 cells square, one ArrayMesh each, frustum-culled); collision stays one heightfield.
+
+Measured 2026-09-05 (Apple Silicon, headless build times, warm JIT):
+
+| World | Cells | Samples | Triangles | Tiles | Build |
+|---|---|---|---|---|---|
+| Lab 1.0 × 1.0 km | 4 m | 66 k | 131 k | 4 | ~130 ms |
+| Strip 6.4 × 0.64 km | 4 m | 258 k | 512 k | 26 | ~500 ms (950 cold) |
+| Strip 6.4 × 0.64 km | 8 m | 65 k | 128 k | 7 | ~280 ms |
+
+Model: samples ≈ L·W/c², triangles = 2·samples, build ≈ 2 µs per sample warm, heights 4 B per
+sample, each tile ≤ ~4 MB of vertex arrays. A 6 × 2 km stage at 4 m is ≈ 750 k samples,
+1.5 M triangles, ≈ 1.5 s; at 8 m a quarter of that.
+
+**Facet size is a feel cost, not only a draw cost.** The harness drives the 800 m / 80 m hill
+station with W held from 60 m/s: at 4 m cells the ball is grounded 99% of the way with 2 short
+hops; at 8 m it is grounded 86% with 8 hops. Judge cell size on contact first, then triangles.
+
+**Crest contact.** A ball leaves the ground at any crest whose radius is below v²/g:
+
+| Speed | 60 m/s | 100 m/s | 118.8 (burst) | 148.5 (cap) |
+|---|---|---|---|---|
+| Minimum crest radius to stay grounded | 91 m | 254 m | 358 m | 560 m |
+
+A cosine hill of wavelength λ and height H has crest radius λ²/(2π²H): the strip's 100/10,
+200/20, 400/40 and 800/80 stations keep contact only up to ≈ 45, 63, 89 and 126 m/s. Above
+that every crest is a launch, which is a generation input, not a bug (Rolling Highlands lists
+crest launches as a feature). Measure frame time at the cap on the strip with F2 open.

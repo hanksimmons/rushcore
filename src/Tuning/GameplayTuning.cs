@@ -121,6 +121,8 @@ public sealed class CameraTuning
     public float OcclusionMargin = 0.6f;
     /// <summary>How fast the camera eases back out once the line of sight clears (1/s).</summary>
     public float OcclusionRecoverSpeed = 4f;
+    /// <summary>Camera far plane in metres. 8 km sees the whole scale strip; a draw-distance instrument for M1.</summary>
+    public float FarPlane = 8000f;
 }
 
 public sealed class VfxTuning
@@ -147,6 +149,11 @@ public sealed class WorldTuning
     public float PropDensity = 0.19f;
     /// <summary>Gate M1: replace the lab with the 6.4 km scale-calibration strip (rebuilds the world).</summary>
     public bool CalibrationStrip = false;
+    /// <summary>Metres between height samples (= facet size). Rebuilds the world when the slider settles.
+    /// The M1 budget choice: 4 m is the lab default; 8 m quarters the triangle count.</summary>
+    public float CellSize = 4f;
+    /// <summary>Depth-fog end in metres; begin is 16% of it. A sightline instrument for M1.</summary>
+    public float FogEnd = 2400f;
 }
 
 /// <summary>
@@ -245,6 +252,7 @@ public sealed class GameplayTuning
         B(CatCamera, "Occlusion Probe", () => k.OcclusionProbe, v => k.OcclusionProbe = v);
         F(CatCamera, "Occlusion Margin", 0.1f, 3f, () => k.OcclusionMargin, v => k.OcclusionMargin = v);
         F(CatCamera, "Occlusion Recover Speed", 0.5f, 20f, () => k.OcclusionRecoverSpeed, v => k.OcclusionRecoverSpeed = v);
+        F(CatCamera, "Far Plane (m)", 1000f, 20000f, () => k.FarPlane, v => k.FarPlane = v);
 
         var x = Vfx;
         F(CatVfx, "Charge Effect", 0f, 3f, () => x.ChargeEffectStrength, v => x.ChargeEffectStrength = v);
@@ -262,6 +270,8 @@ public sealed class GameplayTuning
         F(CatWorld, "Terrain Wavelength", 0.3f, 3f, () => w.TerrainWavelength, v => w.TerrainWavelength = v);
         F(CatWorld, "Prop Density", 0f, 3f, () => w.PropDensity, v => w.PropDensity = v);
         B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
+        F(CatWorld, "Cell Size (m)", 2f, 8f, () => w.CellSize, v => w.CellSize = v);
+        F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);
 
         foreach (var e in p) e.DefaultValue = e.Get();
         foreach (var e in t) e.DefaultValue = e.Get();

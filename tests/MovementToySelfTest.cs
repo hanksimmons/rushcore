@@ -928,10 +928,52 @@ public partial class MovementToySelfTest : Node
             Check("player spawned on the strip, grounded, facing down it",
                 _player.IsGrounded && _player.GlobalPosition.X > 3000f && Forward.Dot(Vector3.Left) > 0.99f,
                 $"pos={_player.GlobalPosition} fwd={Forward}");
+            // ---- M1 budget: facet hops over the 800 m hill station, 4 m vs 8 m cells (W held from 60 m/s) ----
+            int[] hops = new int[2];
+            float[] groundedFrac = new float[2];
+            int[] tris = new int[2];
+            ulong[] buildMs = new ulong[2];
+            float[] cells = { 4f, 8f };
+            for (int k = 0; k < cells.Length; k++)
+            {
+                t.World.CellSize = cells[k];
+                _debug.RestartSameSeed();
+                foreach (var _ in Frames(3)) yield return null;
+                world = _debug.World;
+                tris[k] = world.Triangles;
+                buildMs[k] = world.BuildMillis;
+                foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.X(3400f), 0f, m.BallRadius + 0.4f), 0.6f)) yield return null;
+                _player.LinearVelocity = Vector3.Left * 60f;
+                Input.ActionPress(InputBootstrap.MoveForward, 1f);
+                int ticks = 0, airborne = 0, blips = 0, airStart = 0;
+                bool wasGrounded = true;
+                while (_player.GlobalPosition.X > ScaleStripHeightField.X(4200f) && ticks < Engine.PhysicsTicksPerSecond * 25)
+                {
+                    ticks++;
+                    bool g = _player.IsGrounded;
+                    if (!g) airborne++;
+                    if (wasGrounded && !g) airStart = ticks;
+                    if (!wasGrounded && g && ticks - airStart <= 9) blips++;   // <= 0.15 s: a facet hop, not a crest launch
+                    wasGrounded = g;
+                    yield return null;
+                }
+                ReleaseAll();
+                hops[k] = blips;
+                groundedFrac[k] = ticks > 0 ? 1f - airborne / (float)ticks : 0f;
+            }
+            GD.Print($"[SELFTEST] M1 budget  4 m: {tris[0] / 1000} k tris, build {buildMs[0]} ms, hops {hops[0]}, grounded {groundedFrac[0]:P0}   " +
+                     $"8 m: {tris[1] / 1000} k tris, build {buildMs[1]} ms, hops {hops[1]}, grounded {groundedFrac[1]:P0}");
+            Check("cell size is a live world parameter", Mathf.IsEqualApprox(_debug.World.CellSize, 8f), $"cell={_debug.World.CellSize}");
+            Check("8 m cells cut the triangle count to about a quarter", tris[1] < tris[0] * 0.3f, $"{tris[0]} -> {tris[1]}");
+            Check("4 m facets cause few short hops over the hill station", hops[0] <= 6, $"hops={hops[0]} grounded={groundedFrac[0]:P0}");
+            Check("hill station run completed", groundedFrac[0] > 0.3f && groundedFrac[1] > 0.3f, $"grounded {groundedFrac[0]:P0} / {groundedFrac[1]:P0}");
+
+            t.World.CellSize = MovementToyWorld.DefaultCellSize;
             t.World.CalibrationStrip = false;
             _debug.RestartSameSeed();
             foreach (var _ in Frames(3)) yield return null;
-            Check("lab terrain restored", !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f));
+            Check("lab terrain restored", !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f)
+                && Mathf.IsEqualApprox(_debug.World.CellSize, MovementToyWorld.DefaultCellSize));
         }
 
         // ---- Phase 2 dependency (04 §9): NaN vertices in HeightMapShape3D are holes under Jolt ----

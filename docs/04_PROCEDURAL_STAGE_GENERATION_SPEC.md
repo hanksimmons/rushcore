@@ -246,6 +246,17 @@ The frozen movement baseline (03 §15, D-078) is the input: cap 148.5 m/s, full-
 any slam landing. The calibration environment must be large enough to measure these at the cap;
 the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed, so the 6.4 km scale strip (`World › Calibration Strip (M1)`, D-079, runbook) is the M1 instrument.
 
+Scale is decided on two sides at once (D-080): feel, and the **terrain budget** at that scale
+(samples, triangles, build time, memory, draw distance). Cell size is a measured choice: it is
+also a ground-contact-stability choice (measured: 4 m keeps 99% contact on the gentlest strip
+hills, 8 m only 86%). Render terrain is tiled from the start; the budget model and measurements
+live in the runbook.
+
+Crest contact is a hard geometric input: a ball leaves the ground at any crest whose radius is
+below v²/g (91 m at 60 m/s, 358 m at the burst speed, 560 m at the cap). For a cosine hill the
+crest radius is λ²/(2π²H). Archetypes must place crests knowingly: below that radius a crest is
+a launch, above it a roll.
+
 ## 9. Heightfield/render representation
 
 Preferred MVP:

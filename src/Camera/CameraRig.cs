@@ -69,7 +69,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         // Repositioned every rendered frame; engine interpolation must not also smear it.
         PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off;
 
-        _camera = new Camera3D { Name = "Camera", Current = true, Near = 0.25f, Far = 4000f };
+        _camera = new Camera3D { Name = "Camera", Current = true, Near = 0.25f, Far = Mathf.Max(100f, _t.Camera.FarPlane) };
         AddChild(_camera);
 
         _rng.Randomize();
@@ -128,6 +128,8 @@ public partial class CameraRig : Node3D, ICameraBasis
             if (Input.IsActionJustPressed(InputBootstrap.ZoomIn)) SetZoom(_zoom - c.ZoomStep);
             if (Input.IsActionJustPressed(InputBootstrap.ZoomOut)) SetZoom(_zoom + c.ZoomStep);
         }
+
+        if (!Mathf.IsEqualApprox(_camera.Far, c.FarPlane)) _camera.Far = Mathf.Max(100f, c.FarPlane);
 
         Vector3 playerPos = _player.GetGlobalTransformInterpolated().Origin;
         Vector3 flatVel = new(_player.Velocity.X, 0f, _player.Velocity.Z);

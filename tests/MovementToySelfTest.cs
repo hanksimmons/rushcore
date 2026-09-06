@@ -216,6 +216,19 @@ public partial class MovementToySelfTest : Node
         Check(name, Mathf.Abs(actual - expected) <= tolerance,
             $"actual={actual:0.###} expected={expected:0.###} tol={tolerance:0.###}");
 
+    /// <summary>Every tuning value as text: generation and stage builds must leave it byte-identical (04 §7, 08 §5).</summary>
+    private string TuningSnapshot()
+    {
+        var t = _debug.Tuning;
+        return string.Join(";", t.Parameters.Select(p => p.Key + "=" + p.Get().ToString("R")))
+             + "|" + string.Join(";", t.Toggles.Select(x => x.Key + "=" + x.Get()));
+    }
+
+    /// <summary>The rigid body's hidden physics: an archetype may only change geometry, never these.</summary>
+    private string BodySnapshot() =>
+        $"g={_player.GravityScale:R} m={_player.Mass:R} ld={_player.LinearDamp:R} ad={_player.AngularDamp:R} ccd={_player.ContinuousCd} sleep={_player.CanSleep} " +
+        $"ci={_player.CustomIntegrator} friction={(_player.PhysicsMaterialOverride?.Friction ?? -1f):R} bounce={(_player.PhysicsMaterialOverride?.Bounce ?? -1f):R}";
+
     private static IEnumerable Frames(int n) { for (int i = 0; i < n; i++) yield return null; }
     private static IEnumerable Seconds(float s) => Frames(Mathf.Max(1, (int)(s * Engine.PhysicsTicksPerSecond)));
     private static IEnumerable Act() => Frames(EdgeFrames);
@@ -979,6 +992,7 @@ public partial class MovementToySelfTest : Node
 
         // ---- Phase 2 generation, pure data: route skeletons for a seed batch (04 §12, 08 §5) ----
         RunStageGenerationBatchCase();
+        RunRegressionSeedsCase();
 
         // ---- route speed model (D-081): the generator's speed oracle must track the real ball ----
         foreach (var e in RunRouteSpeedModelCase()) yield return e;
@@ -1339,6 +1353,7 @@ public partial class MovementToySelfTest : Node
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         double msSum = 0, msMax = 0;
         string firstFailure = "";
+        string tuningBefore = TuningSnapshot();
         var sw = System.Diagnostics.Stopwatch.StartNew();
         for (int i = 0; i < Count; i++)
         {
@@ -1382,10 +1397,33 @@ public partial class MovementToySelfTest : Node
             $"{lenMin:0}..{lenMax:0} m");
         Check("base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
         Check("stage definition generation is cheap (pure data, before world sampling)", msSum / Count < 80.0, $"{msSum / Count:0.00} ms avg");
+        Check("generation never writes to tuning (04 §7)", TuningSnapshot() == tuningBefore);
 
         // The fallback path itself must be valid: a straight axis route passes every skeleton check.
         var straight = gen.Generate(new StageGenerationRequest(RunSeed: int.MaxValue, StageIndex: 0));
         Check("generation report carries phase timings", straight.Report.Timings.Count >= 3 && straight.Report.TotalMillis >= 0.0);
+    }
+
+    // ---------------- regression seeds (08 §11): fixed failures stay fixed ----------------
+
+    private void RunRegressionSeedsCase()
+    {
+        var gen = new StageGenerator(_debug.Tuning.Movement);
+        foreach (var e in RegressionSeeds.All)
+        {
+            var req = new StageGenerationRequest(e.RunSeed, e.StageIndex);
+            var def = gen.Generate(req);
+            string firstAttempt = "";
+            if (def.Report.Attempts > 1)
+            {
+                var a = gen.BuildAttempt(req, 0);
+                firstAttempt = "; attempt 1 failed: " + string.Join("; ", a.Report.Failures.Select(f => f.Name + " " + f.Detail));
+            }
+            GD.Print($"[SELFTEST] regression seed {e.RunSeed}/{e.StageIndex} ({e.Why}): attempts {def.Report.Attempts}, {def.PrimaryRoute.Length:0} m, " +
+                     $"base-kit {def.SpeedProfile.TotalTime:0.0} s, {def.PrimaryRoute.Features.Count} crests, {def.OptionalLines.Count} lines, {def.Checkpoints.Count} anchors, hash {def.Hash():X}{firstAttempt}");
+            Check($"regression seed {e.RunSeed}/{e.StageIndex} generates a valid stage without fallback", def.Report.Passed && !def.Report.UsedFallback,
+                string.Join("; ", def.Report.Failures.Select(f => f.Name + " " + f.Detail)));
+        }
     }
 
     // ---------------- Phase 2: generated stage in the toy (04 §9, §16; 08 §5) ----------------
@@ -1394,7 +1432,10 @@ public partial class MovementToySelfTest : Node
     {
         var t = _debug.Tuning;
         var m = t.Movement;
+        string bodyLab = BodySnapshot();
+        int nodesLab = GetTree().GetNodeCount();
         t.World.GeneratedStage = true;
+        string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
         var world = _debug.World;
@@ -1408,18 +1449,39 @@ public partial class MovementToySelfTest : Node
         Check("collision and render come from the same source: route vertex heights match the world",
             Mathf.Abs(world.SampleHeight(stage.PrimaryRoute.Vertices[100].Position.X, stage.PrimaryRoute.Vertices[100].Position.Z) - stage.PrimaryRoute.Vertices[100].Position.Y) < 1.5f);
 
+        // Corridor not blocked (08 §5): no solid prop stands inside any line's corridor.
+        {
+            int solids = 0, inside = 0;
+            float closest = float.MaxValue;
+            foreach (var shape in world.FindChildren("*", "CollisionShape3D", recursive: true, owned: false))
+            {
+                if (shape is not CollisionShape3D cs || cs.GetParent() is not StaticBody3D body || body.Name != "PropColliders") continue;
+                solids++;
+                Vector3 g = cs.GlobalPosition;
+                float d = stage.HeightField!.DistanceToRoute(g.X, g.Z);
+                closest = Mathf.Min(closest, d);
+                if (d < StageHeightField.CorridorHalfWidth) inside++;
+            }
+            Check("no solid prop stands inside a route corridor", solids > 0 && inside == 0, $"{inside} of {solids} colliders inside; closest {closest:0} m from a line");
+        }
+
         foreach (var _ in Seconds(1.0f)) yield return null;
         Check("player spawns grounded on the start pad facing the route",
             _player.IsGrounded && Forward.Dot(stage.StartFacing) > 0.98f && _player.GlobalPosition.DistanceTo(stage.StartPosition) < 12f,
             $"grounded={_player.IsGrounded} pos={_player.GlobalPosition} fwd={Forward}");
 
-        // Drive the route: steer at the vertex ~60 m ahead of the nearest one. A smoke test of the
-        // first kilometre, not an agent that plays stages (04 §12).
+        // Drive the whole primary route: steer at the vertex ~60 m ahead of the nearest one. A smoke
+        // test of one seed against the route speed model, not an agent that plays stages (04 §12).
         var verts = stage.PrimaryRoute.Vertices;
-        int ticks = 0, grounded = 0, nearest = 0;
-        float maxSpeed = 0f;
-        while (ticks++ < Engine.PhysicsTicksPerSecond * 14)
+        var profile = stage.SpeedProfile;
+        int ticks = 0, grounded = 0, nearest = 0, exitTick = -1;
+        int maxTicks = Engine.PhysicsTicksPerSecond * 100;
+        float maxSpeed = 0f, maxOffLine = 0f, nextMark = 1000f, worstMark = 0f;
+        int markTicks = 0, markGrounded = 0;
+        string marks = "";
+        while (ticks < maxTicks)
         {
+            ticks++;
             Vector3 p = _player.GlobalPosition;
             float best = float.MaxValue;
             for (int i = Mathf.Max(0, nearest - 5); i < Mathf.Min(verts.Count, nearest + 60); i++)
@@ -1427,23 +1489,44 @@ public partial class MovementToySelfTest : Node
                 float d = new Vector2(verts[i].Position.X - p.X, verts[i].Position.Z - p.Z).LengthSquared();
                 if (d < best) { best = d; nearest = i; }
             }
+            maxOffLine = Mathf.Max(maxOffLine, Mathf.Sqrt(best));
+            if (verts[nearest].Distance >= nextMark)
+            {
+                float ballT = ticks / (float)Engine.PhysicsTicksPerSecond, modelT = profile.TimeAt(verts[nearest].Distance);
+                float err = Mathf.Abs(ballT - modelT) / Mathf.Max(1f, modelT);
+                worstMark = Mathf.Max(worstMark, err);
+                marks += $" {nextMark:0} m: ball {ballT:0.0} s model {modelT:0.0} s ({_player.LocomotionSpeed:0} vs {profile.SpeedAt(verts[nearest].Distance):0} m/s, grounded {markGrounded / (float)Mathf.Max(1, markTicks):P0});";
+                nextMark += 1000f;
+                markTicks = 0; markGrounded = 0;
+            }
+            markTicks++;
+            if (_player.IsGrounded) markGrounded++;
+            if (nearest >= verts.Count - 2) { exitTick = ticks; break; }
             var target = verts[Mathf.Min(verts.Count - 1, nearest + 15)].Position;
             _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
             if (_player.IsGrounded) grounded++;
             maxSpeed = Mathf.Max(maxSpeed, _player.LocomotionSpeed);
             yield return null;
         }
+        int armed = world.StageCheckpointIndex;
         ReleaseAll();
         float progressed = verts[nearest].Distance;
-        float groundedFrac = grounded / (float)ticks;
-        GD.Print($"[SELFTEST] generated stage drive: {progressed:0} m of route in 14 s, grounded {groundedFrac:P0}, max {maxSpeed:0.0} m/s, off-line {Mathf.Sqrt(Mathf.Max(0f, new Vector2(verts[nearest].Position.X - _player.GlobalPosition.X, verts[nearest].Position.Z - _player.GlobalPosition.Z).LengthSquared())):0} m");
-        Check("the ball drives the first kilometre of the generated route", progressed > 1000f, $"{progressed:0} m");
+        float groundedFrac = grounded / (float)Mathf.Max(1, ticks);
+        float ballTime = exitTick > 0 ? exitTick / (float)Engine.PhysicsTicksPerSecond : float.NaN;
+        float timeErr = exitTick > 0 ? Mathf.Abs(ballTime - profile.TotalTime) / profile.TotalTime : 1f;
+        GD.Print($"[SELFTEST] generated stage drive: {progressed:0} of {stage.PrimaryRoute.Length:0} m in {ticks / (float)Engine.PhysicsTicksPerSecond:0.0} s " +
+                 $"(model {profile.TotalTime:0.0} s, {timeErr:P1}), grounded {groundedFrac:P0}, max {maxSpeed:0.0} m/s, off-line ≤ {maxOffLine:0} m, stage clock {world.StageClock:0.0} s;{marks}");
+        Check("the ball drives the whole generated route to the exit pad", exitTick > 0, $"{progressed:0} of {stage.PrimaryRoute.Length:0} m");
+        Check("route speed model predicts the whole-route base-kit time within 10% (08 §5)", exitTick > 0 && timeErr <= 0.10f,
+            $"ball {ballTime:0.0} s, model {profile.TotalTime:0.0} s ({timeErr:P1}); marks:{marks}");
+        Check("the follower stays inside the corridor for the whole route", maxOffLine < StageHeightField.CorridorHalfWidth, $"off-line ≤ {maxOffLine:0} m");
         Check("the corridor keeps the ball grounded most of the way", groundedFrac > 0.6f, $"{groundedFrac:P0}");
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
+        Check("archetype geometry left the rigid body's hidden physics untouched (04 §7)", BodySnapshot() == bodyLab, BodySnapshot());
+        Check("building and driving a stage never writes to tuning (04 §7)", TuningSnapshot() == tuningStage);
 
         // Progression anchors (04 §13): the drive armed checkpoints; a fall restores to the last one, not to the ball.
-        int armed = world.StageCheckpointIndex;
-        Check("progression anchors armed as the route was driven", armed >= 1 && world.StageProgressIndex > 200,
+        Check("every progression anchor was armed by the drive", armed == stage.Checkpoints.Count - 1 && world.StageProgressIndex > 200,
             $"anchor {armed + 1}/{stage.Checkpoints.Count}, progress index {world.StageProgressIndex}");
         Vector3 cpBefore = _player.CheckpointPosition;
         _player.TeleportTo(_player.GlobalPosition + Vector3.Down * 3000f);
@@ -1486,9 +1569,29 @@ public partial class MovementToySelfTest : Node
         }
         else Check("stage has an optional line to drive", false, "none generated for this seed");
 
+        // Node growth (08 §10): three regenerations of the same stage leave the tree the same size.
+        {
+            foreach (var _ in Frames(3)) yield return null;
+            int nodesStage = GetTree().GetNodeCount();
+            double orphansStage = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
+            var counts = new List<int>();
+            for (int r = 0; r < 3; r++)
+            {
+                _debug.RestartSameSeed();
+                foreach (var _ in Frames(3)) yield return null;
+                counts.Add(GetTree().GetNodeCount());
+            }
+            double orphansAfter = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
+            GD.Print($"[SELFTEST] node growth: lab {nodesLab}, stage {nodesStage}, after regenerations {string.Join("/", counts)}; orphans {orphansStage} -> {orphansAfter}");
+            Check("SceneTree node count is flat across three stage regenerations", counts.All(c => c == nodesStage), $"{nodesStage} -> {string.Join("/", counts)}");
+            Check("no orphan nodes accumulate across stage regenerations", orphansAfter <= orphansStage, $"{orphansStage} -> {orphansAfter}");
+            Check("three regenerations never write to tuning", TuningSnapshot() == tuningStage);
+        }
+
         t.World.GeneratedStage = false;
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
         Check("lab restored after the generated stage", !_debug.World.IsStage && !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f));
+        Check("lab node count returns to its pre-stage value", GetTree().GetNodeCount() == nodesLab, $"{nodesLab} -> {GetTree().GetNodeCount()}");
     }
 }

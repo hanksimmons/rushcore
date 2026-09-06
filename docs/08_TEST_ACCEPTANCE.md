@@ -147,6 +147,15 @@ Manual sample:
 - terrain is not noise soup,
 - high-speed lines exist.
 
+**Result (Rolling Highlands):** objective checks passed 2026-09-06 (D-087). The harness generates 100
+requests plus the regression list every run (all valid, deterministic hashes, no fallback), drives the
+whole primary route of the built stage with its follower and holds the route speed model's base-kit
+time within 10% (measured 4.3%: ball 49.9 s, model 47.8 s), verifies no solid prop stands inside a
+corridor, every anchor arms and restores, the SceneTree node count is flat across three regenerations,
+and neither generation nor a stage build writes to tuning or the rigid body. Mandatory jumps do not
+exist yet (the Phase 3 gap modules bring them and their envelope check). The gate is re-run per
+archetype as Phase 3 adds Canyon Run and Dune Sea; the manual sample is the user's.
+
 ## 6. Combat — Gate C0
 
 Objective:
@@ -234,6 +243,11 @@ Physics tick rate starts at 60. Test 120 only if collision/feel evidence justifi
 Maintain known problematic seeds once discovered.
 
 Every meaningful procedural bug should become reproducible where possible.
+
+The list is `tests/RegressionSeeds.cs`: one entry per stage request (run seed / stage index, as the
+telemetry seed row shows them) with the reason it is there. The harness generates every entry on every
+run and asserts it is valid without the known-safe fallback, so a fixed failure stays fixed. Add the
+seed when the bug is reproduced, before the fix; never remove one.
 
 ## 12. Definition of Done per task
 

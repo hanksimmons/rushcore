@@ -246,6 +246,8 @@ After coding:
 
 Until the implementation plan advances:
 
-> **Phase 2 — Procedural Terrain Core** (Movement Toy accepted 2026-09-05; Gate M0 passed).
+> **Phase 2 — Procedural Terrain Core** (Movement Toy accepted 2026-09-05; Gate M0 passed; Gate G0
+> objective checks for Rolling Highlands passed 2026-09-06, D-087). Phase 3 (Terrain Variety) opens
+> when the user accepts the G0 manual sample.
 
 The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-078: the user's `boost-finetune-final` preset, promoted verbatim) is frozen input to generation. Do not retune it while building Phase 2; a change only enters through a saved preset that the user names final, promoted verbatim and logged.

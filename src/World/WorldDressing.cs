@@ -256,7 +256,8 @@ public partial class WorldDressing : Node3D
             var c = route.Vertices[route.IndexAtDistance(f.CentreDistance)];
             AddSign(_world.SurfacePoint(c.Position.X, c.Position.Z, 30f), f.IsLaunch ? "CREST ▲" : "crest", 7f);
         }
-        BuildPillars(route.Start.X + 30f, route.Start.Z + 45f);
+        // Scale pillars are solid: they stand just outside the corridor, never inside it (04 §5G).
+        BuildPillars(route.Start.X + 30f, route.Start.Z + StageHeightField.CorridorHalfWidth + 12f);
 
         if (_t.World.RouteDebugLines)
         {

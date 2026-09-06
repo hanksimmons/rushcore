@@ -130,7 +130,7 @@ Each module defines:
 
 - entrance assumptions,
 - geometry stamp,
-- expected speed/skill context,
+- expected speed/skill context (read from the route speed model, §12, never guessed),
 - required vs optional status,
 - landing/recovery zone,
 - reward opportunity,
@@ -334,7 +334,28 @@ landing (D-077).
 - enemy density in range,
 - cosmetic props do not compromise corridor/readability.
 
-Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove numeric construction checks insufficient.
+### Route speed model (D-081)
+
+Every guarantee above is a speed-at-a-point question, so validation reads one shared,
+deterministic **route speed model**: a 1D integration of the frozen movement baseline (03 §15)
+along the primary-route polyline, metre by metre, assuming the base kit only:
+
+- drive held, no boost, no landing burst,
+- gravity times the local grade, drag, the hard cap,
+- a conservative speed loss on bends from the steering envelope (turn radius = v²/(a·mult)),
+- a stage entry speed of zero unless the stage definition says otherwise.
+
+Its outputs feed: mandatory-gap crossability (jump range at the arrival speed), module
+"expected speed" preconditions, crest placement (a crest is a launch below r = v²/g), the
+secondary travel-time check (V-009), and checkpoint headings. Boost and the landing burst are
+then optional-line multipliers on top of a conservative base, which is the intent of §2 and §11.
+
+The model is calibrated once against the real controller: the harness predicts the 0→cap
+curve on the scale-strip runway and the descent speeds on the lab grade fan and asserts the
+model is within a few percent of what the ball does. It is pure data code with no scene
+dependency.
+
+Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove the numeric checks plus the route speed model insufficient.
 
 ## 13. Recovery checkpoints
 

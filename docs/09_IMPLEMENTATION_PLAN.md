@@ -65,8 +65,9 @@ These tuned values become generation inputs.
 
 ## Phase 2 — Procedural Terrain Core
 
-Deliver:
+Deliver, in this order:
 
+- **route speed model** (D-081): pure-data 1D integration of the frozen baseline along a polyline, calibrated by the harness against the real ball on the strip runway and the lab grade fan; every later validator reads it,
 - deterministic generation request/definition,
 - route-first skeleton,
 - Rolling Highlands,

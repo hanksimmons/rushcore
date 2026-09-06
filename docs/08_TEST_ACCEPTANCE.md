@@ -125,6 +125,7 @@ For each initial archetype, generate a meaningful deterministic seed sample (tar
 
 Required:
 
+- route speed model matches the real controller within 5% on the strip runway (0→cap) and the lab grade fan (descent speeds), and it is deterministic (D-081),
 - start/exit valid,
 - deterministic same-request summary/hash,
 - primary route validation passes after bounded regeneration/fallback,

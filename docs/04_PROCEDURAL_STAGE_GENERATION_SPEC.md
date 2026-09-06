@@ -107,7 +107,10 @@ Apply structured analytic functions that establish strategic identity:
 
 Use seeded noise/domain warping sparingly.
 
-Noise amplitude/frequency is bounded so it cannot erase route readability.
+Noise amplitude/frequency is bounded so it cannot erase route readability. The concrete bound (D-082):
+micro relief must keep every crest radius at or above the cap's contact radius (v²/g = 560 m), so a
+component of wavelength λ has height H ≤ λ² / (2π² · 560). Below 100 m wavelength that is under a metre;
+such noise is decoration only.
 
 ### D — Guaranteed corridor stamping
 
@@ -257,6 +260,10 @@ below v²/g (91 m at 60 m/s, 358 m at the burst speed, 560 m at the cap). For a 
 crest radius is λ²/(2π²H). Archetypes must place crests knowingly: below that radius a crest is
 a launch, above it a roll.
 
+**Accepted family (Gate M1, D-082):** `docs/11_WORLD_SCALE_PROPOSAL_M1.md` §3 holds the frozen
+generation inputs (bend ladder, hill roles, gap / ramp / corridor sizes, footprint, cell size), with
+the feel verdicts re-judged on the first generated stage. Code reads them from one `WorldScale` class.
+
 ## 9. Heightfield/render representation
 
 Preferred MVP:
@@ -291,7 +298,10 @@ Primary route segments expose tunable constraints:
 - curvature appropriate to expected speed,
 - minimum landing area after mandatory jumps,
 - no unmarked hard obstacle,
-- no mandatory traversal dependent on boost availability.
+- no mandatory traversal dependent on boost availability,
+- no bend inside a launch's flight: after any crest or ramp the route speed model classifies as a
+  launch, the route stays straight (radius ≥ the cruise bend) for the landing distance at the arrival
+  speed, because an airborne ball cannot brake to a corner limit.
 
 Challenge modules may intentionally exceed ordinary safe constraints when their validator understands the exception.
 

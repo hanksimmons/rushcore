@@ -1,7 +1,9 @@
 # 11 — World-Scale Family Proposal (Gate M1)
 
-**Status:** PROPOSAL — awaiting the user's acceptance. No authority until accepted; on acceptance the
-family is logged as a decision, V-005 / V-008 / V-009 are resolved, and `04 §8` references this document.
+**Status:** PROVISIONALLY ACCEPTED 2026-09-05 (D-082). The derived values in §3 are the generation inputs.
+The five **FEEL** verdicts (fog onset, corridor minimum, monumental hill, committed ring, 27° ramp) and the
+frame-time reading are deferred to the first generated-stage playtest (Phase 2, PR 2), where they are judged
+on real terrain; the fog / far-plane change in §3h is not applied until then. V-009 is re-measured at S0.
 **Owner of the inputs:** `docs/03 §15` (frozen movement baseline, D-078), `docs/10` (scale strip D-079,
 terrain budget D-080, route speed model D-081).
 

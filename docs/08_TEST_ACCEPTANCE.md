@@ -119,6 +119,10 @@ Outcome:
 - freeze the terrain budget at that scale: cell size (with its contact measurement), stage footprint, samples/triangles/build time, draw distance versus sightline, and whether Phase 2 needs finer tiling than the default (D-080),
 - document the measured/tuned values.
 
+**Result:** M1 passed provisionally 2026-09-05 (D-082, `docs/11`): the family is derived from the frozen
+envelope and the strip/budget measurements; the feel verdicts and the frame-time reading are taken on the
+first generated stage instead of the strip.
+
 ## 5. Procedural Generation — Gate G0
 
 For each initial archetype, generate a meaningful deterministic seed sample (target at least 100 automated requests).

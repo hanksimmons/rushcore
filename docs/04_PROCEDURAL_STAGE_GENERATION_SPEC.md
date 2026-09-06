@@ -291,9 +291,9 @@ Optional shortcuts/rewards may demand:
 - stronger charge timing,
 - boost,
 - higher entry speed,
-- more precise apex/landing control.
+- more precise landing control.
 
-Do not require perfect-apex slam timing for mandatory progression.
+Do not require landing-burst timing for mandatory progression.
 
 ## 12. Validation
 

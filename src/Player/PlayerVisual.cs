@@ -6,8 +6,8 @@ namespace Rushcore.Player;
 /// <summary>
 /// Presentation-only ball (06 §5, 03 §13). Roll is derived from travelled distance
 /// rather than the rigid body's angular simulation, and every deformation is visual:
-/// the sphere collider is never touched. Charge commitment and the perfect-apex slam
-/// get unmistakable player-local cues.
+/// the sphere collider is never touched. Charge commitment, the slam power impact and
+/// the landing burst (D-077) get unmistakable player-local cues.
 /// </summary>
 public partial class PlayerVisual : Node3D
 {
@@ -20,7 +20,10 @@ public partial class PlayerVisual : Node3D
 
     private static readonly Color ChargeColor = new(1.00f, 0.92f, 0.60f);
     private static readonly Color SlamColor = new(0.42f, 0.48f, 1.00f);
-    private static readonly Color ApexColor = new(1.00f, 0.96f, 0.80f);
+    /// <summary>Slam-landing power impact: hot white-gold.</summary>
+    private static readonly Color PowerColor = new(1.00f, 0.96f, 0.80f);
+    /// <summary>Landing burst: electric blue, matching the sparks.</summary>
+    private static readonly Color BurstColor = new(0.45f, 0.80f, 1.00f);
 
     // Which of the 20 icosahedron base faces gets which palette entry. Subdivided
     // triangles inherit their parent face, so the ball reads as 20 big flat patches
@@ -51,6 +54,8 @@ public partial class PlayerVisual : Node3D
     private float _vertVel;
     private float _boostBlend;
     private float _flash;
+    private Color _flashColor = PowerColor;
+    private float _burstStretch;
     private float _time;
 
     private Color _bandColor = FacePrimary;
@@ -108,6 +113,7 @@ public partial class PlayerVisual : Node3D
         _player.Jumped += OnJumped;
         _player.Slammed += OnSlammed;
         _player.Landed += OnLanded;
+        _player.LandingBurst += OnLandingBurst;
         _player.SpeedBandChanged += OnSpeedBandChanged;
     }
 
@@ -116,6 +122,7 @@ public partial class PlayerVisual : Node3D
         _player.Jumped -= OnJumped;
         _player.Slammed -= OnSlammed;
         _player.Landed -= OnLanded;
+        _player.LandingBurst -= OnLandingBurst;
         _player.SpeedBandChanged -= OnSpeedBandChanged;
     }
 
@@ -124,18 +131,29 @@ public partial class PlayerVisual : Node3D
     private void OnJumped(float charge01)
         => _vertVel += (3.5f + 10f * charge01) * Str(_t.Vfx.JumpReleaseStrength) * Str(_t.Vfx.SquashStretchStrength);
 
-    private void OnSlammed(bool perfect)
-    {
-        _vertVel += (perfect ? 7f : 2.5f) * Str(_t.Vfx.SlamEffectStrength) * Str(_t.Vfx.SquashStretchStrength);
-        if (perfect) _flash = 1f;
-    }
+    private void OnSlammed()
+        => _vertVel += 4f * Str(_t.Vfx.SlamEffectStrength) * Str(_t.Vfx.SquashStretchStrength);
 
-    private void OnLanded(float impactSpeed, bool wasSlam, bool wasPerfectApexSlam)
+    private void OnLanded(float impactSpeed, bool wasSlam)
     {
         float impact = Mathf.Min(impactSpeed / 18f, 2f);
-        float mult = wasPerfectApexSlam ? 1.9f : wasSlam ? 1.4f : 1f;
+        // Every slam landing is the power impact (D-077): harder squash and the white-out.
+        float mult = wasSlam ? 1.9f : 1f;
         _vertVel -= (2f + 7f * impact) * mult * Str(_t.Vfx.ImpactEffectStrength) * Str(_t.Vfx.SquashStretchStrength);
-        if (wasPerfectApexSlam) _flash = 1f;
+        if (wasSlam)
+        {
+            _flash = 1f;
+            _flashColor = PowerColor;
+        }
+    }
+
+    private void OnLandingBurst(float speed)
+    {
+        // Blue flash overrides the landing white-out, plus a stretch along travel.
+        _flash = 1f;
+        _flashColor = BurstColor;
+        _burstStretch = 1f;
+        _vertVel += 5f * Str(_t.Vfx.BurstEffectStrength) * Str(_t.Vfx.SquashStretchStrength);
     }
 
     private void OnSpeedBandChanged(SpeedBand band)
@@ -176,14 +194,13 @@ public partial class PlayerVisual : Node3D
         bool charging = _player.IsCharging;
         float charge01 = _player.Charge01;
         bool slam = _player.SlamActive;
-        bool perfectSlam = slam && _player.LastSlamWasPerfect;
         float chargeStrength = Str(vfx.ChargeEffectStrength);
         float slamStrength = Str(vfx.SlamEffectStrength);
 
         // ---- vertical spring: charge compresses, slam stretches, impulses ring it ----
         float target = 0f;
         if (charging) target = -(0.22f + 0.34f * charge01) * chargeStrength;
-        else if (slam) target = (perfectSlam ? 0.70f : 0.42f) * slamStrength;
+        else if (slam) target = 0.42f * slamStrength;
         target = Mathf.Clamp(target * squash, -0.65f, 1.4f);
 
         _vertVel += (SpringStiffness * (target - _vert) - SpringDamping * _vertVel) * dt;
@@ -192,14 +209,15 @@ public partial class PlayerVisual : Node3D
 
         // ---- horizontal stretch along travel: boost and raw speed ----
         _boostBlend = Mathf.Lerp(_boostBlend, _player.BoostActive ? 1f : 0f, 1f - Mathf.Exp(-9f * dt));
-        float along = Mathf.Clamp((0.30f * _boostBlend + 0.10f * speed01) * squash, 0f, 1.2f);
+        _burstStretch = Mathf.Max(0f, _burstStretch - dt * FlashDecayPerSecond);
+        float along = Mathf.Clamp((0.30f * _boostBlend + 0.10f * speed01 + 0.55f * _burstStretch * Str(vfx.BurstEffectStrength)) * squash, 0f, 1.2f);
 
         _flash = Mathf.Max(0f, _flash - dt * FlashDecayPerSecond);
 
         Basis deform = BuildDeformBasis(along);
         _mesh.Basis = deform * _roll.Orthonormalized().Scaled(new Vector3(r, r, r));
 
-        UpdateEmission(dt, charging, charge01, slam, perfectSlam, chargeStrength, slamStrength);
+        UpdateEmission(dt, charging, charge01, slam, chargeStrength, slamStrength);
         UpdateShell(deform, r, charging, charge01, chargeStrength);
     }
 
@@ -227,7 +245,7 @@ public partial class PlayerVisual : Node3D
         return vertical * travel;
     }
 
-    private void UpdateEmission(float dt, bool charging, float charge01, bool slam, bool perfectSlam,
+    private void UpdateEmission(float dt, bool charging, float charge01, bool slam,
                                 float chargeStrength, float slamStrength)
     {
         (Color bandColor, float bandEnergy) = BandLook(_player.Band);
@@ -251,14 +269,14 @@ public partial class PlayerVisual : Node3D
 
         if (slam)
         {
-            col = col.Lerp(perfectSlam ? ApexColor : SlamColor, 0.85f);
-            energy += (perfectSlam ? 2.6f : 0.9f) * slamStrength;
+            col = col.Lerp(SlamColor, 0.85f);
+            energy += 0.9f * slamStrength;
         }
 
         if (_flash > 0f)
         {
-            col = col.Lerp(Colors.White, _flash);
-            energy += 9f * _flash * _flash;    // a hard white-out no normal slam produces
+            col = col.Lerp(_flashColor.Lerp(Colors.White, 0.5f), _flash);
+            energy += 9f * _flash * _flash;    // a hard flash no rolling state produces
         }
 
         _material.Emission = col;
@@ -286,7 +304,7 @@ public partial class PlayerVisual : Node3D
         {
             alpha = Mathf.Max(alpha, _flash);
             grow = Mathf.Max(grow, 0.95f * _flash);      // expanding halo burst
-            color = ApexColor;
+            color = _flashColor;
         }
 
         alpha = Mathf.Clamp(alpha, 0f, 1f);

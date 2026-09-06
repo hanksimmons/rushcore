@@ -230,7 +230,7 @@ Goals:
 
 Use the same general desired-direction idea with a separate authority multiplier.
 
-## 9. Slam and perfect-apex timing
+## 9. Slam, power impact and landing burst
 
 ### Base slam
 
@@ -251,38 +251,35 @@ Traversal use is first-class:
 
 The base slam does not require a large AoE; that remains an item/upgrade hook.
 
-### Perfect-apex slam
+### Power impact
 
-A slam initiated near the apex of a **player-triggered charge-jump arc** receives a clear bonus.
+Every slam landing is the **power impact** (D-077): the impact-power multiplier, the strongest
+landing feedback and the hot flash on the ball. There is no separate "perfect" tier; the
+perfect-apex mechanic was prototyped and removed after playtest.
 
-Eligibility stays intentionally small:
+### Landing burst
 
-- a jump was actually released/performed during the current airborne arc,
-- slam has not already begun/resolved,
-- the player is still in that same airborne arc.
+A **fresh `Space` press at the slam touchdown** fires the landing burst:
 
-Simply rolling/falling off a cliff, being launched by an external impulse, or otherwise becoming airborne without performing the jump does **not** create perfect-apex eligibility.
+- a short tunable window either side of the touchdown instant; a press during the slam is
+  buffered and counts if it was inside the window when the ball lands,
+- the press is consumed: it never starts a charge and never jumps,
+- locomotion speed is set to a tunable fraction of the hard cap **along the current heading**,
+- it is a floor: a faster ball is never slowed, direction is never rewritten, the ball stays
+  grounded, and the normal drive/steer/cap pipeline continues on the same tick, so the burst reads
+  as a seamless surge out of the landing rather than a launch,
+- feedback: electric-blue sparks, a mini sonic boom (ground shock ring plus an air-parting bow
+  ring ahead of the ball), blue flash and a stretch along travel.
 
 Keep timing detection KISS:
 
 ```text
-isPerfectApex =
-    jumpArcEligible
-    && abs(verticalVelocity) <= PerfectApexVerticalSpeedThreshold
+burst =
+    slamLandedThisWindow
+    && (freshSpacePress || bufferedSlamPressAge <= window)
 ```
 
-The threshold is deliberately forgiving and tunable; the mechanic should reward timing rather than a single exact physics frame.
-
-A perfect-apex slam may apply:
-
-- stronger immediate downward slam velocity/acceleration,
-- higher slam impact multiplier,
-- distinct snappy visual feedback,
-- small Flow reward.
-
 Do **not** build a separate combo/timing subsystem.
-
-**VALIDATE:** apex threshold and bonus strength.
 
 ## 10. Boost
 
@@ -362,7 +359,8 @@ The physical collider remains spherical.
 - boost stretch,
 - landing squash,
 - slam streak,
-- perfect-apex flash,
+- slam-landing power flash,
+- landing-burst flash, sparks and boom rings,
 - impact flash.
 
 Never deform collision to match squash/stretch.
@@ -420,13 +418,13 @@ hold below 2.035 m/s and terrain wavelength 1.005 are part of the same promotion
 | Slam downward acceleration | 141.1 m/s² | ACCEPTED |
 | Slam steering multiplier | 0.25 | ACCEPTED |
 | Slam lateral retention | 1.0 | ACCEPTED |
-| Perfect-apex window | 0.618 s total (threshold = g·window/2) | ACCEPTED (V-011, D-073) |
-| Perfect-apex slam strength multiplier | 1.35 | ACCEPTED |
-| Perfect-apex impact multiplier | 1.35 | ACCEPTED |
+| Slam impact multiplier | 1.35 on every slam landing | ACCEPTED (D-077) |
+| Landing-burst window | ±0.10 s around the slam touchdown | ACCEPTED (D-077) |
+| Landing-burst speed | 80% of the cap along the current heading (floor only) | ACCEPTED (D-077) |
 | Boost acceleration | 48 m/s² | ACCEPTED (V-003) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
-| Boost pickup refill / perfect-apex refill | 35 / 20 | ACCEPTED (toy) |
+| Boost pickup refill | 35 | ACCEPTED (toy) |
 | Rush / Crush / Overdrive thresholds | 18 / 32 / 131.34 m/s | Overdrive ACCEPTED; Rush/Crush OPEN (V-004) |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
@@ -445,7 +443,7 @@ Expose:
 - jump charge seconds/normalized charge,
 - computed jump takeoff speed,
 - slam active,
-- perfect-apex eligibility/result,
+- burst window state/result,
 - boost amount,
 - input vector,
 - current steering authority,
@@ -466,7 +464,7 @@ Before progression systems:
 - jump release preserves momentum,
 - air control corrects rather than rewrites trajectory,
 - normal slam feels immediate/powerful,
-- perfect-apex slam is learnable, forgiving, and noticeably stronger,
+- the landing burst is learnable and reads as a seamless surge,
 - boost increases route possibility,
 - mistakes are recoverable,
 - high-speed collisions are stable with CCD enabled and do not routinely tunnel through valid collision geometry.

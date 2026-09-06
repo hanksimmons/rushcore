@@ -29,7 +29,7 @@ Anything not required to prove that proposition is deferred.
   - steering is disabled while charging.
 - Air steering.
 - Ground slam triggered by a new jump/slam press while airborne.
-- Bonus “perfect apex slam” when slam begins near the jump apex.
+- Every slam landing is a power impact; a Space press at the slam touchdown fires a landing burst (speed surge to a tuned fraction of the cap along the current heading).
 - Boost with finite/refillable meter, including slow emergency passive regeneration plus active refill sources.
 - Boost usable in air.
 - Boost direction blended between current travel direction and desired input, with current trajectory dominating at high speed.
@@ -91,7 +91,7 @@ Terrain archetypes do not secretly change player physics.
 - Relative closing impact determines crush vs harmful collision.
 - Successful crushes preserve almost all useful forward momentum.
 - Underpowered contacts cause velocity loss, bounded deflection, health damage, and brief damage invulnerability.
-- Slam provides an offensive context; perfect-apex slam is stronger.
+- Slam provides an offensive context; every slam landing is a power impact.
 - Four baseline enemy archetypes:
   - Pylon,
   - Bulwark,
@@ -161,7 +161,7 @@ Terrain archetypes do not secretly change player physics.
 ### Debug/developer tooling
 
 - Toggleable runtime tuning panel.
-- Runtime controls for core movement, charge jump, apex slam, boost, camera, combat, generation, and VFX parameters.
+- Runtime controls for core movement, charge jump, slam / landing burst, boost, camera, combat, generation, and VFX parameters.
 - Same-seed restart.
 - New-seed restart.
 - Seed display/copy.
@@ -237,7 +237,7 @@ It must pass `08_TEST_ACCEPTANCE.md`, especially:
 
 - movement remains fun without progression,
 - charge-jump constraint creates useful risk/reward,
-- apex slam is learnable and satisfying,
+- the landing burst is learnable and satisfying,
 - stage seeds are deterministic,
 - generated primary routes are valid,
 - combat outcomes are readable,

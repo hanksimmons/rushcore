@@ -101,7 +101,7 @@ The MVP should make the player feel:
 2. **In control** — tight low-speed control and learnable high-speed turn radii.
 3. **Committed** — charging a jump or taking a fast line creates meaningful temporary constraints.
 4. **Physically grounded** — slopes, gravity, jumps, impacts, and landings have clear consequences.
-5. **Skillful** — better lines, charge timing, apex-slam timing, and momentum management visibly improve outcomes.
+5. **Skillful** — better lines, charge timing, landing-burst timing, and momentum management visibly improve outcomes.
 6. **Greedy** — optional rewards/shortcuts tempt the player away from safer lines.
 7. **Build-aware** — upgrades change how existing verbs interact without replacing mechanical mastery.
 8. **Eager to retry** — death creates a clear recap and a reason to try a different route/build.

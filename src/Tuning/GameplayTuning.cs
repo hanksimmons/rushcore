@@ -65,15 +65,14 @@ public sealed class JumpSlamTuning
     public float SlamSteeringMultiplier = 0.25f;
     /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
     public float SlamLateralRetention = 1.0f;
-    /// <summary>
-    /// Total duration of the perfect-apex window, centred on the apex. The detection
-    /// itself stays a vertical-speed test (D-017): threshold = gravity * window / 2.
-    /// Expressed in seconds so retuning gravity does not silently shrink the window.
-    /// Accepted at 0.62 s (V-011).
-    /// </summary>
-    public float PerfectApexWindowSeconds = 0.618f;
-    public float PerfectApexSlamStrengthMultiplier = 1.35f;
-    public float PerfectApexImpactMultiplier = 1.35f;
+    /// <summary>Every slam landing is a power impact (D-077): impact-power multiplier over a plain fall.</summary>
+    public float SlamImpactMultiplier = 1.35f;
+    /// <summary>Landing burst (D-077): a fresh Space press within this many seconds either side
+    /// of a slam touchdown fires the burst. Presses during the slam are buffered.</summary>
+    public float LandingBurstWindowSeconds = 0.10f;
+    /// <summary>The burst sets locomotion speed to this fraction of the hard cap along the
+    /// current heading; it never slows a faster ball and never changes direction.</summary>
+    public float LandingBurstSpeedFraction = 0.8f;
 }
 
 public sealed class BoostTuning
@@ -85,8 +84,6 @@ public sealed class BoostTuning
     public float BoostDrainRate = 30f;
     public float PassiveBoostRegen = 4f;
     public float PickupRefillAmount = 35f;
-    /// <summary>Active-refill hook exercised by perfect-apex slams in the Movement Toy.</summary>
-    public float PerfectApexRefillAmount = 20f;
 }
 
 public sealed class CameraTuning
@@ -136,6 +133,8 @@ public sealed class VfxTuning
     public float DustIntensity = 1f;
     public float SlamEffectStrength = 1f;
     public float ImpactEffectStrength = 1f;
+    /// <summary>Landing burst sparks, boom rings and flash (D-077).</summary>
+    public float BurstEffectStrength = 1f;
     public float SquashStretchStrength = 1f;
     /// <summary>Visual-only cap on the ball's spin: a real 1 m ball at 60 m/s turns 9.5
     /// rev/s, which strobes at 60 fps. Collision is unaffected.</summary>
@@ -213,9 +212,9 @@ public sealed class GameplayTuning
         F(CatJumpSlam, "Slam Downward Accel", 0f, 250f, () => j.SlamDownwardAcceleration, v => j.SlamDownwardAcceleration = v);
         F(CatJumpSlam, "Slam Steering Mult", 0f, 1.5f, () => j.SlamSteeringMultiplier, v => j.SlamSteeringMultiplier = v);
         F(CatJumpSlam, "Slam Lateral Retention", 0.3f, 1f, () => j.SlamLateralRetention, v => j.SlamLateralRetention = v);
-        F(CatJumpSlam, "Apex Window (s)", 0.02f, 1.0f, () => j.PerfectApexWindowSeconds, v => j.PerfectApexWindowSeconds = v);
-        F(CatJumpSlam, "Apex Slam Strength Mult", 1f, 4f, () => j.PerfectApexSlamStrengthMultiplier, v => j.PerfectApexSlamStrengthMultiplier = v);
-        F(CatJumpSlam, "Apex Impact Mult", 1f, 4f, () => j.PerfectApexImpactMultiplier, v => j.PerfectApexImpactMultiplier = v);
+        F(CatJumpSlam, "Slam Impact Mult", 1f, 4f, () => j.SlamImpactMultiplier, v => j.SlamImpactMultiplier = v);
+        F(CatJumpSlam, "Burst Window (s)", 0.02f, 0.5f, () => j.LandingBurstWindowSeconds, v => j.LandingBurstWindowSeconds = v);
+        F(CatJumpSlam, "Burst Speed Fraction", 0f, 1f, () => j.LandingBurstSpeedFraction, v => j.LandingBurstSpeedFraction = v);
 
         var b = Boost;
         F(CatBoost, "Boost Acceleration", 0f, 200f, () => b.BoostAcceleration, v => b.BoostAcceleration = v);
@@ -224,7 +223,6 @@ public sealed class GameplayTuning
         F(CatBoost, "Drain Rate", 0f, 150f, () => b.BoostDrainRate, v => b.BoostDrainRate = v);
         F(CatBoost, "Passive Regen", 0f, 60f, () => b.PassiveBoostRegen, v => b.PassiveBoostRegen = v);
         F(CatBoost, "Pickup Refill", 0f, 200f, () => b.PickupRefillAmount, v => b.PickupRefillAmount = v);
-        F(CatBoost, "Perfect-Apex Refill", 0f, 200f, () => b.PerfectApexRefillAmount, v => b.PerfectApexRefillAmount = v);
 
         var k = Camera;
         F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);
@@ -257,6 +255,7 @@ public sealed class GameplayTuning
         F(CatVfx, "Dust Intensity", 0f, 3f, () => x.DustIntensity, v => x.DustIntensity = v);
         F(CatVfx, "Slam Effect", 0f, 3f, () => x.SlamEffectStrength, v => x.SlamEffectStrength = v);
         F(CatVfx, "Impact Effect", 0f, 3f, () => x.ImpactEffectStrength, v => x.ImpactEffectStrength = v);
+        F(CatVfx, "Burst Effect", 0f, 3f, () => x.BurstEffectStrength, v => x.BurstEffectStrength = v);
         F(CatVfx, "Squash / Stretch", 0f, 3f, () => x.SquashStretchStrength, v => x.SquashStretchStrength = v);
         F(CatVfx, "Max Visual Roll (rev/s)", 0.5f, 12f, () => x.MaxVisualRollRevPerSecond, v => x.MaxVisualRollRevPerSecond = v);
 

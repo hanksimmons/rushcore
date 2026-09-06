@@ -111,7 +111,7 @@ Keep hidden factors few and explainable.
 Attack context may include:
 
 - slam,
-- perfect-apex slam,
+- slam power impact / landing burst,
 - active boost if later justified,
 - item/upgrade effects.
 
@@ -175,7 +175,7 @@ Flow measures **quality and continuity of execution**, not velocity itself.
 - large/risky jumps,
 - good landings,
 - well-timed slam continuation,
-- perfect-apex slam,
+- landing burst,
 - challenge lines,
 - optional shortcuts,
 - selected pickups.
@@ -334,7 +334,7 @@ Track at minimum:
 - enemies/elites defeated,
 - peak speed,
 - highest Flow,
-- perfect-apex slams,
+- landing bursts,
 - damage taken,
 - falls/recoveries,
 - currency earned/spent,

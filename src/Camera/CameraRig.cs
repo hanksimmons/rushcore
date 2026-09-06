@@ -84,6 +84,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         ApplyTransform(FullDistance(0f), 0f);
         _player.Landed += OnLanded;
         _player.Slammed += OnSlammed;
+        _player.LandingBurst += OnLandingBurst;
         _player.Recovered += SnapToPlayer;
     }
 
@@ -91,6 +92,7 @@ public partial class CameraRig : Node3D, ICameraBasis
     {
         _player.Landed -= OnLanded;
         _player.Slammed -= OnSlammed;
+        _player.LandingBurst -= OnLandingBurst;
         _player.Recovered -= SnapToPlayer;
     }
 
@@ -315,13 +317,14 @@ public partial class CameraRig : Node3D, ICameraBasis
 
     private void SetZoom(float value) => _zoom = Mathf.Clamp(value, _t.Camera.ZoomMin, _t.Camera.ZoomMax);
 
-    private void OnLanded(float impactSpeed, bool wasSlam, bool wasPerfect)
+    private void OnLanded(float impactSpeed, bool wasSlam)
     {
         float baseShake = Mathf.Clamp(impactSpeed / 40f, 0f, 1f) * 0.35f;
-        if (wasSlam) baseShake += 0.35f;
-        if (wasPerfect) baseShake += 0.35f;
+        if (wasSlam) baseShake += 0.60f;          // every slam landing is the power impact (D-077)
         AddShake(baseShake);
     }
 
-    private void OnSlammed(bool perfect) => AddShake(perfect ? 0.30f : 0.15f);
+    private void OnSlammed() => AddShake(0.15f);
+
+    private void OnLandingBurst(float speed) => AddShake(0.45f);
 }

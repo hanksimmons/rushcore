@@ -98,7 +98,7 @@ Owns:
 - charge state,
 - jump release,
 - air control,
-- slam/apex timing,
+- slam / landing-burst timing,
 - boost,
 - bounded collision response.
 
@@ -202,7 +202,7 @@ Any discontinuous reposition of the player/camera-owned interpolated branch—ch
 
 Hard playable locomotion speed is owned by the movement spec and must be enforced consistently.
 
-## 11. Charge jump/apex slam implementation constraint
+## 11. Charge jump / landing burst implementation constraint
 
 The mechanic must remain maintainable.
 
@@ -214,10 +214,10 @@ Minimum state/data required:
 - max charge duration,
 - vertical velocity,
 - slam state,
-- `jumpArcEligibleForPerfectApex` (or equivalent single boolean),
-- apex threshold.
+- seconds since slam touchdown and since the last in-slam press,
+- burst window / speed fraction.
 
-Perfect-apex detection should remain a local movement calculation combining same-jump-arc eligibility with a forgiving vertical-velocity threshold. Do not create:
+Landing-burst detection should remain a local movement calculation: a press inside a short window either side of a slam touchdown. Do not create:
 
 - rhythm subsystem,
 - combo timing framework,
@@ -320,7 +320,7 @@ Useful semantic events include:
 - JumpChargeChanged only if needed for presentation,
 - PlayerJumped,
 - PlayerSlammed,
-- PerfectApexSlam,
+- LandingBurst,
 - PlayerLanded,
 - BoostStarted/Stopped,
 - EnemyCrushed,

@@ -71,9 +71,10 @@ The Movement Toy must implement these accepted behaviors:
 - no double jump,
 - new Space press while airborne slams,
 - slam preserves lateral momentum and commits downward,
-- slam near vertical apex receives a stronger perfect-apex bonus only when the current airborne arc was created by the player's jump,
-- generic falls/external launches are not perfect-apex eligible,
-- perfect-apex logic stays simple and local,
+- every slam landing is the power impact (stronger impact and feedback than a plain fall),
+- a fresh Space press at the slam touchdown, inside a short tunable window (early presses during the slam are buffered), fires the **landing burst**: blue sparks, a mini sonic boom with an air-parting ring, and locomotion speed set to a tunable fraction of the cap along the current heading; it is a floor (never slows a faster ball), never changes direction, and the press never starts a charge,
+- there is no perfect-apex mechanic: it was prototyped and removed after playtest (D-077),
+- landing-burst logic stays simple and local (two timers, one window),
 - boost works in air,
 - boost direction blends current travel and desired input,
 - slow emergency passive boost refill plus active refill hooks,
@@ -93,9 +94,9 @@ Do not add:
 - rhythm/combo subsystem,
 - complicated jump-curve framework,
 - multiple charge stages/classes,
-- separate “perfect slam manager.”
+- separate “landing-burst manager.”
 
-Perfect apex can be detected from the player's vertical velocity against a forgiving tunable threshold.
+The landing burst is detected from time since slam touchdown and the age of a press buffered during the slam; nothing more.
 
 ## Programmatic-content rule
 
@@ -198,7 +199,7 @@ Placeholder art must still be:
 - coherent,
 - efficient.
 
-Charge state and perfect-apex slam require clear player-local visual feedback.
+Charge state, the slam power impact and the landing burst require clear player-local visual feedback.
 
 Normal HUD does not need raw m/s; debug overlay does.
 
@@ -210,8 +211,8 @@ Expose important charge/slam parameters:
 
 - min/max jump takeoff,
 - charge duration,
-- apex threshold,
-- apex slam strength/impact,
+- burst window / burst speed fraction,
+- slam impact multiplier,
 - speed cap,
 - steering curve,
 - boost values.

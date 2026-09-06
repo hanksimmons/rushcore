@@ -65,9 +65,10 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `iso-classic` | the original fixed 45° isometric camera (D-058/D-059) for A/B |
 
 Accepted baseline (playtest 2026-09-05, preset `manual-finetune-punchy` promoted to compiled
-defaults): cap 148.5 m/s, steering 151 m/s² rising ×1.45 at the cap, gravity 39.4, ball radius
-2.125 m, jump 2→58.2 m/s over 0.45 s, slam 43 m/s + 141 m/s², apex window 0.62 s, Overdrive at
-131 m/s, chase camera.
+defaults verbatim, so the preset shows as "compiled defaults"): cap 148.5 m/s, steering
+151.25 m/s² rising ×1.45 at the cap, gravity 39.38, ball radius 2.125 m, jump 2.03→58.21 m/s
+over 0.445 s, slam 42.95 m/s + 141.1 m/s², apex window 0.618 s, Overdrive at 131.34 m/s, chase
+camera.
 Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.
@@ -95,10 +96,10 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 Deliberate deviations from the `03 §15` placeholders, made at gap closure and to be judged in
 playtest:
 
-- **Apex window is 0.20 s** (`Jump › Apex Window (s)`), i.e. |vY| ≤ 2.80 m/s at g = 28. The
+- **Apex window is 0.618 s** (`Jump › Apex Window (s)`), i.e. |vY| ≤ 12.2 m/s at g = 39.38. The
   detection is still a vertical-speed threshold (D-017); the knob is in seconds so retuning
   gravity cannot silently shrink the window. The spec placeholder 1.25 m/s equals 0.089 s.
-- **Landing Cap Bleed = 40 m/s²** (new, `Move`). Landing on a slope at the cap makes tangent
+- **Landing Cap Bleed = 39.95 m/s²** (new, `Move`). Landing on a slope at the cap makes tangent
   speed exceed the cap by 1/cos(slope) (D-069); the excess now bleeds over ~0.2 s instead of
   clipping in one tick. Set very high to restore the instant clamp.
 - **Camera occlusion probe** (`Camera`, on by default): sphere-cast from focus to camera pulls

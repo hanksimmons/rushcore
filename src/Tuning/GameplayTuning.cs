@@ -28,40 +28,40 @@ public sealed class TuningToggle
 
 public sealed class MovementTuning
 {
-    public float Gravity = 39.4f;
-    public float GroundDriveAcceleration = 28f;
-    public float GroundSteeringLateralAccel = 151f;
+    public float Gravity = 39.38f;
+    public float GroundDriveAcceleration = 27.99f;
+    public float GroundSteeringLateralAccel = 151.25f;
     /// <summary>Steering-authority multiplier reached at the hard speed cap (lerped from 1.0
     /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.45
     /// (V-001): turn radius still grows as v^2 / (lateralAccel * mult), which satisfies D-002.</summary>
     public float HighSpeedSteeringMultiplier = 1.45f;
     public float AirControlMultiplier = 0.35f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
-    public float DragCoefficient = 0.08f;
+    public float DragCoefficient = 0.077f;
     public float HardMaxLocomotionSpeed = 148.5f;
     /// <summary>
     /// Landing on a slope at the cap makes ground-tangent speed exceed the cap by
     /// 1/cos(slope) (D-069). That excess is bled at this rate (m/s^2) instead of being
     /// clipped in one tick, so the cap reads as feel rather than a wall (03 §5).
     /// </summary>
-    public float LandingCapBleed = 40f;
+    public float LandingCapBleed = 39.95f;
     /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
-    public float MinGroundNormalDot = 0.50f;
+    public float MinGroundNormalDot = 0.499f;
     public float RushThreshold = 18f;
     public float CrushThreshold = 32f;
-    public float OverdriveThreshold = 131f;
+    public float OverdriveThreshold = 131.34f;
     public float BallRadius = 2.125f;
 }
 
 public sealed class JumpSlamTuning
 {
-    public float MinJumpTakeoffVerticalSpeed = 2f;
-    public float MaxJumpTakeoffVerticalSpeed = 58.2f;
-    public float MaxJumpChargeSeconds = 0.45f;
+    public float MinJumpTakeoffVerticalSpeed = 2.03f;
+    public float MaxJumpTakeoffVerticalSpeed = 58.21f;
+    public float MaxJumpChargeSeconds = 0.445f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
-    public float SlamInitialDownwardSpeed = 43f;
-    public float SlamDownwardAcceleration = 141f;
+    public float SlamInitialDownwardSpeed = 42.95f;
+    public float SlamDownwardAcceleration = 141.1f;
     public float SlamSteeringMultiplier = 0.25f;
     /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
     public float SlamLateralRetention = 1.0f;
@@ -71,7 +71,7 @@ public sealed class JumpSlamTuning
     /// Expressed in seconds so retuning gravity does not silently shrink the window.
     /// Accepted at 0.62 s (V-011).
     /// </summary>
-    public float PerfectApexWindowSeconds = 0.62f;
+    public float PerfectApexWindowSeconds = 0.618f;
     public float PerfectApexSlamStrengthMultiplier = 1.35f;
     public float PerfectApexImpactMultiplier = 1.35f;
 }
@@ -101,7 +101,7 @@ public sealed class CameraTuning
     /// <summary>Degrees per second; caps how fast the view can swing.</summary>
     public float YawMaxTurnRate = 140f;
     /// <summary>Below this flat speed the yaw holds so a resting ball never spins the view.</summary>
-    public float YawFollowMinSpeed = 2f;
+    public float YawFollowMinSpeed = 2.035f;
     /// <summary>Minimum height of the lens (and, +0.5, of the focus) above the heightfield.</summary>
     public float GroundClearance = 1.5f;
     public float HeightOffset = 3.0f;
@@ -142,7 +142,7 @@ public sealed class VfxTuning
 public sealed class WorldTuning
 {
     public float TerrainAmplitude = 2.125f;
-    public float TerrainWavelength = 1.0f;
+    public float TerrainWavelength = 1.005f;
     public float PropDensity = 0.19f;
 }
 
@@ -426,7 +426,7 @@ public sealed class GameplayTuning
             if (values.TryGetValue(e.Key, out var v)) { e.Set((bool)v); applied++; }
 
         BulkChanged?.Invoke();
-        GD.Print($"[RUSHCORE] Loaded tuning override: {applied} values applied.");
+        GD.Print($"[RUSHCORE] Loaded tuning override: {applied} values applied; {OverrideCount} differ from compiled defaults.");
         return applied;
     }
 }

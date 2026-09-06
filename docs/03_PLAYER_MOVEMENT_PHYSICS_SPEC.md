@@ -384,37 +384,40 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 
 ## 15. Tuning schema
 
-**Accepted baseline** (Movement Toy playtest, 2026-09-05). These are the compiled defaults in
-`GameplayTuning`; the runtime panel edits the same values and persists overrides (D-075).
+**Accepted baseline** (Movement Toy playtest, 2026-09-05; the user's `manual-finetune-punchy`
+preset promoted verbatim, sub-percent slider values included, so the preset reads as
+"compiled defaults"). These are the compiled defaults in `GameplayTuning`; the runtime panel
+edits the same values and persists overrides (D-075). Min ground-normal dot 0.499, camera yaw
+hold below 2.035 m/s and terrain wavelength 1.005 are part of the same promotion.
 
 | Parameter | Accepted | Status |
 |---|---:|---|
 | Physics tick rate | 60 Hz | ACCEPTED (V-007) |
-| Gravity | 39.4 m/s² | ACCEPTED |
-| Ground drive accel | 28 m/s² | ACCEPTED |
-| Ground steering lateral accel | 151 m/s² | ACCEPTED (V-001) |
+| Gravity | 39.38 m/s² | ACCEPTED |
+| Ground drive accel | 27.99 m/s² | ACCEPTED |
+| Ground steering lateral accel | 151.25 m/s² | ACCEPTED (V-001) |
 | High-speed steering multiplier | 1.45 at the cap (authority rises with speed; radius = v²/(a·mult)) | ACCEPTED (V-001) |
 | Hard max locomotion speed | 148.5 m/s | ACCEPTED (V-004) |
-| Landing cap bleed | 40 m/s² | ACCEPTED (D-074) |
-| Drag coefficient | 0.08 | ACCEPTED |
+| Landing cap bleed | 39.95 m/s² | ACCEPTED (D-074) |
+| Drag coefficient | 0.077 | ACCEPTED |
 | Air control multiplier | 0.35 | ACCEPTED |
 | Ball radius | 2.125 m | ACCEPTED (V-005) |
-| Min jump takeoff vertical speed | 2 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
-| Max jump takeoff vertical speed | 58.2 m/s | ACCEPTED (V-010) |
-| Max jump charge seconds | 0.45 s, linear | ACCEPTED (V-010) |
+| Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
+| Max jump takeoff vertical speed | 58.21 m/s | ACCEPTED (V-010) |
+| Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |
 | Charge release grace | 0.10 s | ACCEPTED |
-| Slam initial downward speed | 43 m/s | ACCEPTED |
-| Slam downward acceleration | 141 m/s² | ACCEPTED |
+| Slam initial downward speed | 42.95 m/s | ACCEPTED |
+| Slam downward acceleration | 141.1 m/s² | ACCEPTED |
 | Slam steering multiplier | 0.25 | ACCEPTED |
 | Slam lateral retention | 1.0 | ACCEPTED |
-| Perfect-apex window | 0.62 s total (threshold = g·window/2) | ACCEPTED (V-011, D-073) |
+| Perfect-apex window | 0.618 s total (threshold = g·window/2) | ACCEPTED (V-011, D-073) |
 | Perfect-apex slam strength multiplier | 1.35 | ACCEPTED |
 | Perfect-apex impact multiplier | 1.35 | ACCEPTED |
 | Boost acceleration | 48 m/s² | ACCEPTED (V-003) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
 | Boost pickup refill / perfect-apex refill | 35 / 20 | ACCEPTED (toy) |
-| Rush / Crush / Overdrive thresholds | 18 / 32 / 131 m/s | Overdrive ACCEPTED; Rush/Crush OPEN (V-004) |
+| Rush / Crush / Overdrive thresholds | 18 / 32 / 131.34 m/s | Overdrive ACCEPTED; Rush/Crush OPEN (V-004) |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 

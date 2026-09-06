@@ -25,10 +25,17 @@ public partial class PlayerVfx : Node3D
     private GpuParticles3D _dust = null!, _trail = null!, _charge = null!;
     private GpuParticles3D _slam = null!;
     private GpuParticles3D _jumpBurst = null!, _landBurst = null!, _sparks = null!;
+    private GpuParticles3D _carveRocks = null!, _carveSpray = null!;
 
     private ParticleProcessMaterial _dustPm = null!, _trailPm = null!, _chargePm = null!;
     private ParticleProcessMaterial _slamPm = null!;
     private ParticleProcessMaterial _jumpPm = null!, _landPm = null!, _sparksPm = null!;
+    private ParticleProcessMaterial _carveRocksPm = null!, _carveSprayPm = null!;
+    private static readonly Color RockColor = new(0.50f, 0.45f, 0.39f);
+    private static readonly Color SprayColor = new(0.72f, 0.66f, 0.55f);
+
+    /// <summary>True while the carve debris is being thrown (the harness reads it).</summary>
+    public bool CarveDebrisActive { get; private set; }
 
     // Sonic-boom rings (mesh, not particles, so the shape stays a clean ring at speed).
     private MeshInstance3D _boomRing = null!, _bowRing = null!;
@@ -77,6 +84,7 @@ public partial class PlayerVfx : Node3D
         BuildJumpBurst(softMix);
         BuildLandBurst(softMix);
         BuildBurst(chunkAdd);
+        BuildCarve(chunkMix, softMix);
 
         ApplyRadius(Mathf.Max(0.05f, _t.Movement.BallRadius));
 
@@ -158,8 +166,52 @@ public partial class PlayerVfx : Node3D
         // slam streak while committed downward
         Emit(_slam, _player.SlamActive && slamI > 0.01f);
 
+        UpdateCarveDebris(r, speed);
+
         FirePendingBursts(r);
         AnimateBurst(dt, r);
+    }
+
+    /// <summary>
+    /// Carve debris (03 §11, 06 §7, D-089): while the ball slides, rocks and a spray of ground
+    /// are thrown from the contact point toward the OUTSIDE of the corner (the side the ball is
+    /// skidding toward, away from where it faces), trailing back and up. Rate and speed rise with
+    /// the carve angle and the ball's speed, so a hot, deep carve reads from far away.
+    /// </summary>
+    private void UpdateCarveDebris(float r, float speed)
+    {
+        float s = Str(_t.Vfx.CarveEffectStrength);
+        bool on = _player.IsCarving && _player.IsGrounded && s > 0.01f && speed > 1f;
+        Vector3 facing = new(_player.Facing.X, 0f, _player.Facing.Z);
+        Vector3 outward = Vector3.Zero;
+        if (on && facing.LengthSquared() > 1e-6f)
+        {
+            facing = facing.Normalized();
+            outward = _travelDir - facing * _travelDir.Dot(facing);      // travel's component across the facing: the skid side
+            if (outward.LengthSquared() < 1e-4f) on = false;              // no angle yet: nothing to throw
+            else outward = outward.Normalized();
+        }
+        CarveDebrisActive = on;
+        Emit(_carveRocks, on);
+        Emit(_carveSpray, on);
+        if (!on) return;
+
+        float angle01 = Mathf.Clamp(_player.CarveAngleDegrees / 45f, 0f, 1f);
+        Vector3 dir = (outward * 1.0f - _travelDir * 0.45f + Vector3.Up * 0.55f).Normalized();
+        Basis aim = Basis.LookingAt(dir, Vector3.Up);                     // -Z = throw direction
+        Vector3 origin = new Vector3(0f, -r * 0.85f, 0f) + outward * r * 0.7f;
+
+        _carveRocks.Basis = aim;
+        _carveRocks.Position = origin;
+        _carveRocksPm.InitialVelocityMin = 4f + 0.12f * speed;
+        _carveRocksPm.InitialVelocityMax = 10f + 0.30f * speed;
+        _carveRocks.AmountRatio = Mathf.Clamp((0.35f + 0.65f * angle01) * s, 0.15f, 1f);
+
+        _carveSpray.Basis = aim;
+        _carveSpray.Position = origin;
+        _carveSprayPm.InitialVelocityMin = 6f + 0.15f * speed;
+        _carveSprayPm.InitialVelocityMax = 14f + 0.35f * speed;
+        _carveSpray.AmountRatio = Mathf.Clamp((0.4f + 0.6f * angle01) * s, 0.15f, 1f);
     }
 
     private void FirePendingBursts(float r)
@@ -297,6 +349,13 @@ public partial class PlayerVfx : Node3D
         _landPm.ScaleMin = 0.16f * r;
         _landPm.ScaleMax = 0.42f * r;
 
+        _carveRocksPm.EmissionSphereRadius = r * 0.45f;
+        _carveRocksPm.ScaleMin = 0.14f * r;
+        _carveRocksPm.ScaleMax = 0.40f * r;
+        _carveSprayPm.EmissionSphereRadius = r * 0.6f;
+        _carveSprayPm.ScaleMin = 0.30f * r;
+        _carveSprayPm.ScaleMax = 0.80f * r;
+
         _sparks.Position = contact;
         _sparksPm.EmissionRingRadius = r * 0.8f;
         _sparksPm.EmissionRingInnerRadius = r * 0.2f;
@@ -365,6 +424,23 @@ public partial class PlayerVfx : Node3D
         _landPm.DampingMin = 3f;
         _landPm.DampingMax = 7f;
         _landBurst = Emitter("LandBurst", 96, 0.38f, true, _landPm, _quad, draw);
+    }
+
+    /// <summary>Carve debris (D-089): rock chunks and a dust spray, re-aimed every frame toward the outside of the corner.</summary>
+    private void BuildCarve(Material rockDraw, Material sprayDraw)
+    {
+        // Emitter basis is re-aimed every frame with -Z = throw direction (Basis.LookingAt).
+        _carveRocksPm = Sphere(new Vector3(0f, 0f, -1f), 24f, 6f, 16f, new Vector3(0f, -32f, 0f), Ramp(RockColor, 1.0f));
+        _carveRocksPm.DampingMin = 0.5f;
+        _carveRocksPm.DampingMax = 1.5f;
+        _carveRocksPm.AngularVelocityMin = -540f;
+        _carveRocksPm.AngularVelocityMax = 540f;
+        _carveRocks = Emitter("CarveRocks", 140, 0.85f, false, _carveRocksPm, _chunk, rockDraw);
+
+        _carveSprayPm = Sphere(new Vector3(0f, 0f, -1f), 34f, 8f, 20f, new Vector3(0f, -6f, 0f), Ramp(SprayColor, 0.75f));
+        _carveSprayPm.DampingMin = 2f;
+        _carveSprayPm.DampingMax = 4f;
+        _carveSpray = Emitter("CarveSpray", 120, 0.60f, false, _carveSprayPm, _quad, sprayDraw);
     }
 
     /// <summary>Landing burst (D-077): electric-blue sparks plus two boom rings.</summary>

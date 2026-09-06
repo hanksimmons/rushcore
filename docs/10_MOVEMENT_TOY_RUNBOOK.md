@@ -105,7 +105,8 @@ playtest:
 - **Carve** (`Carve` panel category, D-089): hold Alt above 15 m/s and steer; the `carve` row shows
   the facing's angle off travel and the entry speed. Facing swings at 220°/s, the velocity keeps
   25% of its steering authority (`Understeer`), release re-aims at max(entry, current) speed. A
-  carve that turned ≥ 30° grants 0.10 Flow. Try it on the turn pad rings of the strip: enter the
+  carve that turned ≥ 30° grants 0.10 Flow. Rocks and spray fly to the outside of the corner while you
+  slide (`VFX › Carve Effect` scales them). Try it on the turn pad rings of the strip: enter the
   160 m ring at the cap, hold, release when the facing points down the exit.
 - **Flow headroom** (`Flow` panel category, D-088): the `flow` telemetry row shows Flow 0..1, the
   Flow cap (base 148.5 × (1 + Flow × `Headroom` 0.33) → 197.5 at full Flow), seconds since the last

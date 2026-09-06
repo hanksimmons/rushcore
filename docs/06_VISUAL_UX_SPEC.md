@@ -108,7 +108,9 @@ Do not show a large timing minigame or QTE indicator.
 
 Players should learn the timing from motion and feedback.
 
-A carve (D-089) reads through the ball: it rolls about the facing while sliding, the roll dust runs at
+A carve (D-089) must read from far away: **rocks and a spray of ground are thrown from the contact
+point toward the outside of the corner** (the skid side, away from the facing), trailing back and up,
+rising with carve angle and speed; the ball rolls about the facing while sliding, the roll dust runs at
 full, and the camera stays behind the facing. Release should read as a bite, not a launch.
 
 Speed above the base cap (Flow headroom, D-088) must read as more speed: camera distance and FOV

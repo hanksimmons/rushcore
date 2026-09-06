@@ -84,6 +84,7 @@ Do not expose every internal constant.
 - dust,
 - slam effect,
 - landing-burst effect,
+- carve debris effect,
 - impact effect,
 - motion-effect intensity.
 

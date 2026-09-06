@@ -1426,6 +1426,8 @@ public partial class MovementToySelfTest : Node
         Check("the velocity understeers: it turns far less than the facing", travelTurn < facingTurn * 0.6f, $"travel {travelTurn:0}° vs facing {facingTurn:0}°");
         Check("the camera tracks behind the facing during the carve", camToFacing > 0.6f, $"dot={camToFacing:0.00}");
         Check("the ball stays grounded through the carve", _player.IsGrounded && _player.IsCarving);
+        var vfx = _player.GetNodeOrNull<PlayerVfx>("PlayerVfx");
+        Check("carve debris is thrown while carving", vfx is not null && vfx.CarveDebrisActive, $"vfx={(vfx is null ? "missing" : vfx.CarveDebrisActive.ToString())}");
         Input.ActionRelease(InputBootstrap.Carve);
         foreach (var _ in Frames(2)) yield return null;
         float exitOff = Mathf.RadToDeg(FlatVel.Normalized().AngleTo(facing));

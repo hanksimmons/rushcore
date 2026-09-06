@@ -189,6 +189,8 @@ public sealed class VfxTuning
     public float ImpactEffectStrength = 1f;
     /// <summary>Landing burst sparks, boom rings and flash (D-077).</summary>
     public float BurstEffectStrength = 1f;
+    /// <summary>Carve debris (D-089): rocks and spray thrown to the outside of the corner.</summary>
+    public float CarveEffectStrength = 1f;
     public float SquashStretchStrength = 1f;
     /// <summary>Visual-only cap on the ball's spin: a real 1 m ball at 60 m/s turns 9.5
     /// rev/s, which strobes at 60 fps. Collision is unaffected.</summary>
@@ -344,6 +346,7 @@ public sealed class GameplayTuning
         F(CatVfx, "Slam Effect", 0f, 3f, () => x.SlamEffectStrength, v => x.SlamEffectStrength = v);
         F(CatVfx, "Impact Effect", 0f, 3f, () => x.ImpactEffectStrength, v => x.ImpactEffectStrength = v);
         F(CatVfx, "Burst Effect", 0f, 3f, () => x.BurstEffectStrength, v => x.BurstEffectStrength = v);
+        F(CatVfx, "Carve Effect", 0f, 3f, () => x.CarveEffectStrength, v => x.CarveEffectStrength = v);
         F(CatVfx, "Squash / Stretch", 0f, 3f, () => x.SquashStretchStrength, v => x.SquashStretchStrength = v);
         F(CatVfx, "Max Visual Roll (rev/s)", 0.5f, 12f, () => x.MaxVisualRollRevPerSecond, v => x.MaxVisualRollRevPerSecond = v);
 

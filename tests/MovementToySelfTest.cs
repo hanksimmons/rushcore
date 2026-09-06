@@ -114,8 +114,7 @@ public partial class MovementToySelfTest : Node
         if (_player.CameraBasis is not Rushcore.Camera.CameraRig rig) return;
         var world = _debug.World;
         Vector3 cam = rig.Camera.GlobalPosition;
-        float half = MovementToyWorld.Extent * 0.5f - 8f;
-        if (Mathf.Abs(cam.X) < half && Mathf.Abs(cam.Z) < half && cam.Y < world.Bounds.End.Y + 50f)
+        if (world.InBounds(cam.X, cam.Z) && cam.Y < world.Bounds.End.Y + 50f)
         {
             if (cam.Y < world.SampleHeight(cam.X, cam.Z) + _debug.Tuning.Camera.GroundClearance - 0.15f)
                 _groundViolations++;
@@ -733,7 +732,6 @@ public partial class MovementToySelfTest : Node
 
         // ---- chase camera: yaw follows the trajectory, never flips on reverse ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
-        t.Camera.FollowTrajectoryYaw = true;
         rig.SnapYawToward(Vector3.Forward);
         _worldDrive = Vector3.Right;
         foreach (var _ in Seconds(3.0f)) yield return null;
@@ -817,11 +815,6 @@ public partial class MovementToySelfTest : Node
             FlatVel.Length() > 5f && rig.FlatForward.Dot(travelDir) > 0.9f,
             $"camFwd={rig.FlatForward} travel={travelDir} speed={FlatVel.Length():0.0}");
         ReleaseAll();
-        t.Camera.FollowTrajectoryYaw = false;
-        foreach (var _ in Seconds(2.5f)) yield return null;
-        float fixedErr = Mathf.Abs(Mathf.Wrap(rig.YawDegreesCurrent - t.Camera.YawDegrees, -180f, 180f));
-        Check("fixed-yaw A/B mode returns to the configured yaw", fixedErr < 3f, $"err={fixedErr:0.0} deg");
-        t.Camera.FollowTrajectoryYaw = true;
 
         // ---- real terrain crest run: climb, mesa lip, ramp, drop, chasms at speed ----
         foreach (var _ in Settle(_debug.World.SurfacePoint(TerrainHeightField.Ramp1X, 210f, m.BallRadius + 1.5f), 0.8f)) yield return null;
@@ -879,7 +872,7 @@ public partial class MovementToySelfTest : Node
         // ---- named presets: save, list, load, delete ----
         {
             var installed = GameplayTuning.ListPresets();
-            Check("bundled starter presets were installed", installed.Contains("baseline") && installed.Contains("iso-classic"),
+            Check("bundled starter presets were installed", installed.Contains("baseline") && installed.Contains("arcade-snap"),
                 $"presets={string.Join(",", installed)}");
             // Validate what ships in the repo, not whatever else the developer has stashed locally.
             var bundled = new List<string>();
@@ -910,6 +903,100 @@ public partial class MovementToySelfTest : Node
                 t.LoadPreset(name) == 1 && Mathf.IsEqualApprox(m.GroundDriveAcceleration, driveDefault + 3f));
             t.ResetAll();
             Check("preset deletes", GameplayTuning.DeletePreset(name) && !GameplayTuning.PresetExists(name));
+        }
+
+        // ---- Gate M1 scale strip: builds, and its instruments have their stated geometry ----
+        {
+            t.World.CalibrationStrip = true;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            var world = _debug.World;
+            Check("scale strip is the active terrain", world.IsStrip && world.HalfX > 3000f, $"halfX={world.HalfX}");
+            CheckNear("runway is flat", world.SampleHeight(ScaleStripHeightField.X(500f), 0f), 0f, 0.05f);
+            float wall = world.SampleHeight(ScaleStripHeightField.X(1875f), 60f);
+            Check("40 m corridor walls stand beside the lane", wall > 25f, $"h={wall:0.0}");
+            CheckNear("40 m corridor floor is flat", world.SampleHeight(ScaleStripHeightField.X(1875f), 0f), 0f, 0.05f);
+            CheckNear("800 m hill station crests at 80 m", world.SampleHeight(ScaleStripHeightField.X(3800f), 0f), 80f, 1.0f);
+            CheckNear("80 m gap floor is 20 m deep",
+                world.SampleHeight(ScaleStripHeightField.X(ScaleStripHeightField.GapRimS[1] + 20f), 0f), -20f, 1.0f);
+            float lip = 0f;
+            for (float d = 12f; d >= 0f; d -= 4f)
+                lip = Mathf.Max(lip, world.SampleHeight(ScaleStripHeightField.X(ScaleStripHeightField.RampLipS(2) - d), 180f));
+            CheckNear("27 deg ramp lip stands 20 m", lip, ScaleStripHeightField.RampRise, 1.5f);
+            CheckNear("turn pad is flat", world.SampleHeight(ScaleStripHeightField.X(ScaleStripHeightField.PadCentreS), 100f), 0f, 0.05f);
+            foreach (var _ in Seconds(1.0f)) yield return null;
+            Check("player spawned on the strip, grounded, facing down it",
+                _player.IsGrounded && _player.GlobalPosition.X > 3000f && Forward.Dot(Vector3.Left) > 0.99f,
+                $"pos={_player.GlobalPosition} fwd={Forward}");
+            // ---- M1 budget: facet hops over the 800 m hill station, 4 m vs 8 m cells (W held from 60 m/s) ----
+            int[] hops = new int[2];
+            float[] groundedFrac = new float[2];
+            int[] tris = new int[2];
+            ulong[] buildMs = new ulong[2];
+            float[] cells = { 4f, 8f };
+            for (int k = 0; k < cells.Length; k++)
+            {
+                t.World.CellSize = cells[k];
+                _debug.RestartSameSeed();
+                foreach (var _ in Frames(3)) yield return null;
+                world = _debug.World;
+                tris[k] = world.Triangles;
+                buildMs[k] = world.BuildMillis;
+                foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.X(3400f), 0f, m.BallRadius + 0.4f), 0.6f)) yield return null;
+                _player.LinearVelocity = Vector3.Left * 60f;
+                Input.ActionPress(InputBootstrap.MoveForward, 1f);
+                int ticks = 0, airborne = 0, blips = 0, airStart = 0;
+                bool wasGrounded = true;
+                while (_player.GlobalPosition.X > ScaleStripHeightField.X(4200f) && ticks < Engine.PhysicsTicksPerSecond * 25)
+                {
+                    ticks++;
+                    bool g = _player.IsGrounded;
+                    if (!g) airborne++;
+                    if (wasGrounded && !g) airStart = ticks;
+                    if (!wasGrounded && g && ticks - airStart <= 9) blips++;   // <= 0.15 s: a facet hop, not a crest launch
+                    wasGrounded = g;
+                    yield return null;
+                }
+                ReleaseAll();
+                hops[k] = blips;
+                groundedFrac[k] = ticks > 0 ? 1f - airborne / (float)ticks : 0f;
+            }
+            GD.Print($"[SELFTEST] M1 budget  4 m: {tris[0] / 1000} k tris, build {buildMs[0]} ms, hops {hops[0]}, grounded {groundedFrac[0]:P0}   " +
+                     $"8 m: {tris[1] / 1000} k tris, build {buildMs[1]} ms, hops {hops[1]}, grounded {groundedFrac[1]:P0}");
+            Check("cell size is a live world parameter", Mathf.IsEqualApprox(_debug.World.CellSize, 8f), $"cell={_debug.World.CellSize}");
+            Check("8 m cells cut the triangle count to about a quarter", tris[1] < tris[0] * 0.3f, $"{tris[0]} -> {tris[1]}");
+            Check("4 m facets cause few short hops over the hill station", hops[0] <= 6, $"hops={hops[0]} grounded={groundedFrac[0]:P0}");
+            Check("hill station run completed", groundedFrac[0] > 0.3f && groundedFrac[1] > 0.3f, $"grounded {groundedFrac[0]:P0} / {groundedFrac[1]:P0}");
+
+            t.World.CellSize = MovementToyWorld.DefaultCellSize;
+            t.World.CalibrationStrip = false;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            Check("lab terrain restored", !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f)
+                && Mathf.IsEqualApprox(_debug.World.CellSize, MovementToyWorld.DefaultCellSize));
+        }
+
+        // ---- Phase 2 dependency (04 §9): NaN vertices in HeightMapShape3D are holes under Jolt ----
+        {
+            var body = new StaticBody3D { Name = "NaNHoleTest", Position = new Vector3(0f, PlatformY, -2200f) };
+            var shape = new HeightMapShape3D { MapWidth = 9, MapDepth = 9 };
+            var data = new float[81];
+            for (int zi = 3; zi <= 5; zi++)
+                for (int xi = 3; xi <= 5; xi++)
+                    data[zi * 9 + xi] = float.NaN;
+            shape.MapData = data;
+            body.AddChild(new CollisionShape3D { Shape = shape, Scale = Vector3.One * 4f });
+            AddChild(body);
+            foreach (var _ in Frames(2)) yield return null;
+            foreach (var _ in Settle(new Vector3(0f, PlatformY + 3f, -2200f), 0.6f)) yield return null;
+            Check("NaN cells in a HeightMapShape3D are holes: the ball falls through",
+                !_player.IsGrounded && _player.GlobalPosition.Y < PlatformY - 3f, $"y={_player.GlobalPosition.Y:0.0} grounded={_player.IsGrounded}");
+            foreach (var _ in Settle(new Vector3(12f, PlatformY + 3f, -2200f), 1.0f)) yield return null;
+            Check("cells beside the hole still collide",
+                _player.IsGrounded && Mathf.Abs(_player.GlobalPosition.Y - (PlatformY + m.BallRadius)) < 0.8f,
+                $"y={_player.GlobalPosition.Y:0.0} grounded={_player.IsGrounded}");
+            body.QueueFree();
+            foreach (var _ in Frames(2)) yield return null;
         }
 
         // ---- fall recovery ----

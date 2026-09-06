@@ -7,21 +7,25 @@ namespace Rushcore.World;
 /// <summary>
 /// The Movement Toy laboratory: one deterministic heightfield used as the single
 /// logical height source for both the rendered <see cref="ArrayMesh"/> and the
-/// <see cref="HeightMapShape3D"/> collision (D-061). Layout/appearance live in
-/// <see cref="TerrainHeightField"/> and <see cref="WorldDressing"/>.
+/// <see cref="HeightMapShape3D"/> collision (D-061). Layout/appearance live in the
+/// active <see cref="IHeightSource"/> (<see cref="TerrainHeightField"/> lab, or the
+/// <see cref="ScaleStripHeightField"/> for Gate M1) and <see cref="WorldDressing"/>.
 /// </summary>
 public partial class MovementToyWorld : Node3D
 {
-    /// <summary>Metres between height samples. Also the size of one rendered facet.</summary>
-    public const float CellSize = 4f;
-    /// <summary>Samples per side. Extent = (Samples - 1) * CellSize metres.</summary>
+    /// <summary>Lab default: metres between height samples, also the size of one rendered facet.</summary>
+    public const float DefaultCellSize = 4f;
+    /// <summary>Lab samples per side at the default cell size. Extent = (Samples - 1) * DefaultCellSize.</summary>
     public const int Samples = 257;
-    public const float Extent = (Samples - 1) * CellSize;
+    public const float Extent = (Samples - 1) * DefaultCellSize;
+    /// <summary>Render tiles are this many cells square: bounded allocations, frustum culling per tile.</summary>
+    private const int TileCells = 128;
 
     private readonly GameplayTuning _t;
-    private TerrainHeightField _field = null!;
+    private IHeightSource _field = null!;
+    private int _nx = Samples, _nz = Samples;
     private WorldDressing _dressing = null!;
-    private MeshInstance3D _terrainMesh = null!;
+    private Node3D _terrainRoot = null!;
     private StaticBody3D _terrainBody = null!;
     private CollisionShape3D _terrainCollider = null!;
     private HeightMapShape3D _terrainShape = null!;
@@ -40,7 +44,21 @@ public partial class MovementToyWorld : Node3D
     public Vector3 SpawnFacing => _field.SpawnFacing;
     public float KillPlaneY { get; private set; }
     public Aabb Bounds { get; private set; }
-    public TerrainHeightField Field => _field;
+    public IHeightSource Field => _field;
+    /// <summary>True while the Gate M1 scale strip is the active terrain.</summary>
+    public bool IsStrip { get; private set; }
+    /// <summary>Half extents of the active terrain in metres.</summary>
+    public float HalfX { get; private set; } = Extent * 0.5f;
+    public float HalfZ { get; private set; } = Extent * 0.5f;
+    public bool InBounds(float x, float z, float margin = 8f)
+        => Mathf.Abs(x) < HalfX - margin && Mathf.Abs(z) < HalfZ - margin;
+    /// <summary>Metres between height samples for the current build (World › Cell Size).</summary>
+    public float CellSize { get; private set; } = DefaultCellSize;
+    /// <summary>Budget readouts for the last build (Gate M1).</summary>
+    public int Triangles { get; private set; }
+    public int Tiles { get; private set; }
+    public int SampleCount => _heights.Length;
+    public ulong BuildMillis { get; private set; }
 
     /// <summary>Raised when the player collects a boost pickup; carries the refill amount.</summary>
     public event Action<float>? BoostPickupCollected;
@@ -57,14 +75,11 @@ public partial class MovementToyWorld : Node3D
         _terrainCollider = new CollisionShape3D { Name = "TerrainCollider" };
         _terrainShape = new HeightMapShape3D();
         _terrainCollider.Shape = _terrainShape;
-        // Heights are stored pre-divided by CellSize so the shape can use a uniform
-        // scale; a heightmap shape spans one unit per sample by definition.
-        _terrainCollider.Scale = Vector3.One * CellSize;
         _terrainBody.AddChild(_terrainCollider);
         AddChild(_terrainBody);
 
-        _terrainMesh = new MeshInstance3D { Name = "TerrainMesh", CastShadow = GeometryInstance3D.ShadowCastingSetting.On };
-        AddChild(_terrainMesh);
+        _terrainRoot = new Node3D { Name = "TerrainMesh" };
+        AddChild(_terrainRoot);
 
         _dressing = new WorldDressing(_t, this);
         AddChild(_dressing);
@@ -77,41 +92,50 @@ public partial class MovementToyWorld : Node3D
     public void Build()
     {
         ulong start = Time.GetTicksMsec();
-        _field = new TerrainHeightField(Seed, _t.World);
+        IsStrip = _t.World.CalibrationStrip;
+        CellSize = Mathf.Clamp(_t.World.CellSize, 1f, 16f);
+        // Heights are stored pre-divided by CellSize so the shape can use a uniform
+        // scale; a heightmap shape spans one unit per sample by definition.
+        _terrainCollider.Scale = Vector3.One * CellSize;
+        _field = IsStrip ? new ScaleStripHeightField(_t.World) : new TerrainHeightField(Seed, _t.World);
+        HalfX = _field.SizeX * 0.5f;
+        HalfZ = _field.SizeZ * 0.5f;
+        _nx = Mathf.RoundToInt(_field.SizeX / CellSize) + 1;
+        _nz = Mathf.RoundToInt(_field.SizeZ / CellSize) + 1;
 
-        int n = Samples;
-        if (_heights.Length != n * n) _heights = new float[n * n];
+        int nx = _nx, nz = _nz;
+        if (_heights.Length != nx * nz) _heights = new float[nx * nz];
         _minHeight = float.MaxValue;
         _maxHeight = float.MinValue;
 
-        float half = Extent * 0.5f;
-        for (int z = 0; z < n; z++)
+        for (int z = 0; z < nz; z++)
         {
-            float wz = z * CellSize - half;
-            for (int x = 0; x < n; x++)
+            float wz = z * CellSize - HalfZ;
+            for (int x = 0; x < nx; x++)
             {
-                float wx = x * CellSize - half;
+                float wx = x * CellSize - HalfX;
                 float h = _field.Sample(wx, wz);
-                _heights[z * n + x] = h / CellSize;   // shape space
+                _heights[z * nx + x] = h / CellSize;   // shape space
                 if (h < _minHeight) _minHeight = h;
                 if (h > _maxHeight) _maxHeight = h;
             }
         }
 
-        _terrainShape.MapWidth = n;
-        _terrainShape.MapDepth = n;
+        _terrainShape.MapWidth = nx;
+        _terrainShape.MapDepth = nz;
         _terrainShape.MapData = _heights;
 
-        _terrainMesh.Mesh = BuildTerrainMesh();
-        _terrainMesh.MaterialOverride = _dressing.CreateTerrainMaterial();
+        BuildTerrainTiles(_dressing.CreateTerrainMaterial());
 
-        Bounds = new Aabb(new Vector3(-half, _minHeight, -half), new Vector3(Extent, _maxHeight - _minHeight, Extent));
+        Bounds = new Aabb(new Vector3(-HalfX, _minHeight, -HalfZ), new Vector3(_field.SizeX, _maxHeight - _minHeight, _field.SizeZ));
         KillPlaneY = _minHeight - 120f;
         SpawnPoint = _field.SpawnXZ with { Y = SampleHeight(_field.SpawnXZ.X, _field.SpawnXZ.Z) + 4f };
 
         _dressing.Rebuild();
-        GD.Print($"[RUSHCORE] World built seed={Seed} in {Time.GetTicksMsec() - start} ms " +
-                 $"({Extent:0} m across, height {_minHeight:0.0}..{_maxHeight:0.0} m)");
+        BuildMillis = Time.GetTicksMsec() - start;
+        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
+                 $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +
+                 $"{Triangles / 1000f:0} k tris in {Tiles} tiles, heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");
     }
 
     public void Regenerate(int seed)
@@ -123,42 +147,67 @@ public partial class MovementToyWorld : Node3D
     /// <summary>Authoritative height source. Bilinear over the same grid the collider uses.</summary>
     public float SampleHeight(float x, float z)
     {
-        float half = Extent * 0.5f;
-        float fx = Mathf.Clamp((x + half) / CellSize, 0f, Samples - 1.001f);
-        float fz = Mathf.Clamp((z + half) / CellSize, 0f, Samples - 1.001f);
+        float fx = Mathf.Clamp((x + HalfX) / CellSize, 0f, _nx - 1.001f);
+        float fz = Mathf.Clamp((z + HalfZ) / CellSize, 0f, _nz - 1.001f);
         int x0 = (int)fx, z0 = (int)fz;
-        int x1 = Mathf.Min(x0 + 1, Samples - 1), z1 = Mathf.Min(z0 + 1, Samples - 1);
+        int x1 = Mathf.Min(x0 + 1, _nx - 1), z1 = Mathf.Min(z0 + 1, _nz - 1);
         float tx = fx - x0, tz = fz - z0;
-        float h00 = _heights[z0 * Samples + x0], h10 = _heights[z0 * Samples + x1];
-        float h01 = _heights[z1 * Samples + x0], h11 = _heights[z1 * Samples + x1];
+        float h00 = _heights[z0 * _nx + x0], h10 = _heights[z0 * _nx + x1];
+        float h01 = _heights[z1 * _nx + x0], h11 = _heights[z1 * _nx + x1];
         return Mathf.Lerp(Mathf.Lerp(h00, h10, tx), Mathf.Lerp(h01, h11, tx), tz) * CellSize;
     }
 
     public Vector3 SurfacePoint(float x, float z, float above = 0f) => new(x, SampleHeight(x, z) + above, z);
 
-    private ArrayMesh BuildTerrainMesh()
+    /// <summary>One ArrayMesh per tile: each allocation is bounded (~4 MB at 128 cells) and the
+    /// renderer culls tiles the camera cannot see. Collision stays a single heightfield.</summary>
+    private void BuildTerrainTiles(Material material)
     {
-        int n = Samples;
-        int quads = (n - 1) * (n - 1);
-        int vertCount = quads * 6;                    // non-indexed: flat/faceted normals (06 §4)
+        foreach (Node child in _terrainRoot.GetChildren())
+        {
+            _terrainRoot.RemoveChild(child);
+            child.QueueFree();
+        }
+        Triangles = 0;
+        Tiles = 0;
+        for (int tz = 0; tz < _nz - 1; tz += TileCells)
+        {
+            for (int tx = 0; tx < _nx - 1; tx += TileCells)
+            {
+                int cx = Mathf.Min(TileCells, _nx - 1 - tx);
+                int cz = Mathf.Min(TileCells, _nz - 1 - tz);
+                _terrainRoot.AddChild(new MeshInstance3D
+                {
+                    Name = $"Tile_{tx}_{tz}",
+                    Mesh = BuildTile(tx, tz, cx, cz),
+                    MaterialOverride = material,
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+                });
+                Triangles += cx * cz * 2;
+                Tiles++;
+            }
+        }
+    }
+
+    private ArrayMesh BuildTile(int tx, int tz, int cx, int cz)
+    {
+        int nx = _nx;
+        int vertCount = cx * cz * 6;                  // non-indexed: flat/faceted normals (06 §4)
         var verts = new Vector3[vertCount];
         var norms = new Vector3[vertCount];
         var colors = new Color[vertCount];
-
-        float half = Extent * 0.5f;
         int w = 0;
-        Span<Vector3> tri = stackalloc Vector3[3];
 
-        for (int z = 0; z < n - 1; z++)
+        for (int z = tz; z < tz + cz; z++)
         {
-            for (int x = 0; x < n - 1; x++)
+            for (int x = tx; x < tx + cx; x++)
             {
-                float x0 = x * CellSize - half, x1 = x0 + CellSize;
-                float z0 = z * CellSize - half, z1 = z0 + CellSize;
-                Vector3 a = new(x0, _heights[z * n + x] * CellSize, z0);
-                Vector3 b = new(x1, _heights[z * n + x + 1] * CellSize, z0);
-                Vector3 c = new(x0, _heights[(z + 1) * n + x] * CellSize, z1);
-                Vector3 d = new(x1, _heights[(z + 1) * n + x + 1] * CellSize, z1);
+                float x0 = x * CellSize - HalfX, x1 = x0 + CellSize;
+                float z0 = z * CellSize - HalfZ, z1 = z0 + CellSize;
+                Vector3 a = new(x0, _heights[z * nx + x] * CellSize, z0);
+                Vector3 b = new(x1, _heights[z * nx + x + 1] * CellSize, z0);
+                Vector3 c = new(x0, _heights[(z + 1) * nx + x] * CellSize, z1);
+                Vector3 d = new(x1, _heights[(z + 1) * nx + x + 1] * CellSize, z1);
 
                 // Godot front faces are CLOCKWISE (unlike OpenGL). Seen from above,
                 // a->b->c and b->d->c are clockwise, so the surface faces the sky

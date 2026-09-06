@@ -7,7 +7,7 @@ namespace Rushcore.Camera;
 
 /// <summary>
 /// Follow rig. Accepted 2026-09-05 (D-072): yaw tracks the player's trajectory (chase
-/// camera); the fixed-yaw composition of D-058/D-059 remains as an A/B toggle. Reads the
+/// camera); the fixed-yaw A/B toggle was removed once the baseline locked. Reads the
 /// player's interpolated transform every rendered frame and applies its own damping, so it
 /// never inherits raw physics-step jitter. The yaw always converges on the direction of
 /// travel: the only holds are below the minimum speed and a bounded, intent-gated hold
@@ -69,7 +69,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         // Repositioned every rendered frame; engine interpolation must not also smear it.
         PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off;
 
-        _camera = new Camera3D { Name = "Camera", Current = true, Near = 0.25f, Far = 4000f };
+        _camera = new Camera3D { Name = "Camera", Current = true, Near = 0.25f, Far = Mathf.Max(100f, _t.Camera.FarPlane) };
         AddChild(_camera);
 
         _rng.Randomize();
@@ -78,7 +78,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         _probe.CollideWithAreas = false;
         _probe.CollideWithBodies = true;
 
-        _yaw = Mathf.DegToRad(_t.Camera.YawDegrees);
+        _yaw = 0f;                       // the bootstrap snaps it to the spawn facing
         UpdateOrientation();
         _focus = _player.GlobalPosition + Vector3.Up * _t.Camera.HeightOffset;
         ApplyTransform(FullDistance(0f), 0f);
@@ -129,6 +129,8 @@ public partial class CameraRig : Node3D, ICameraBasis
             if (Input.IsActionJustPressed(InputBootstrap.ZoomOut)) SetZoom(_zoom + c.ZoomStep);
         }
 
+        if (!Mathf.IsEqualApprox(_camera.Far, c.FarPlane)) _camera.Far = Mathf.Max(100f, c.FarPlane);
+
         Vector3 playerPos = _player.GetGlobalTransformInterpolated().Origin;
         Vector3 flatVel = new(_player.Velocity.X, 0f, _player.Velocity.Z);
         float speed = flatVel.Length();
@@ -172,37 +174,30 @@ public partial class CameraRig : Node3D, ICameraBasis
         float targetYaw = _yaw;
         float gain = 1f;
         ReverseHoldActive = false;
-        if (c.FollowTrajectoryYaw)
+        float minSpeed = Mathf.Max(0.1f, c.YawFollowMinSpeed);
+        // Follow gain ramps in with speed: near-stationary lateral residuals must
+        // not be allowed to steer the view.
+        gain = Mathf.Clamp((speed - minSpeed) / (2f * minSpeed), 0f, 1f);
+        if (gain > 0f)
         {
-            float minSpeed = Mathf.Max(0.1f, c.YawFollowMinSpeed);
-            // Follow gain ramps in with speed: near-stationary lateral residuals must
-            // not be allowed to steer the view.
-            gain = Mathf.Clamp((speed - minSpeed) / (2f * minSpeed), 0f, 1f);
-            if (gain > 0f)
+            Vector3 dir = flatVel / speed;
+            bool reversed = dir.Dot(FlatForward) < ReverseCone;
+            // A reversed heading (wall bounce, backward slide) is held only while the
+            // player pushes forward against it, and only for a bounded time, so a quick
+            // recovery does not swing the view twice yet the camera always ends up
+            // behind the direction of travel. S is a brake and cannot reverse (D-076),
+            // so there is no reverse-drive case to hold for.
+            bool fighting = _player.InputVector.Y > 0.2f;
+            if (reversed && fighting && _reverseHold < c.YawReverseHoldSeconds)
             {
-                Vector3 dir = flatVel / speed;
-                bool reversed = dir.Dot(FlatForward) < ReverseCone;
-                // A reversed heading (wall bounce, backward slide) is held only while the
-                // player pushes forward against it, and only for a bounded time, so a quick
-                // recovery does not swing the view twice yet the camera always ends up
-                // behind the direction of travel. S is a brake and cannot reverse (D-076),
-                // so there is no reverse-drive case to hold for.
-                bool fighting = _player.InputVector.Y > 0.2f;
-                if (reversed && fighting && _reverseHold < c.YawReverseHoldSeconds)
-                {
-                    _reverseHold += dt;
-                    ReverseHoldActive = true;
-                }
-                else
-                {
-                    targetYaw = YawFor(dir);
-                }
-                if (!reversed) _reverseHold = 0f;
+                _reverseHold += dt;
+                ReverseHoldActive = true;
             }
-        }
-        else
-        {
-            targetYaw = Mathf.DegToRad(c.YawDegrees);
+            else
+            {
+                targetYaw = YawFor(dir);
+            }
+            if (!reversed) _reverseHold = 0f;
         }
 
         float diff = Mathf.Wrap(targetYaw - _yaw, -Mathf.Pi, Mathf.Pi);

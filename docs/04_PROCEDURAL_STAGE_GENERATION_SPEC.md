@@ -130,7 +130,7 @@ Each module defines:
 
 - entrance assumptions,
 - geometry stamp,
-- expected speed/skill context,
+- expected speed/skill context (read from the route speed model, §12, never guessed),
 - required vs optional status,
 - landing/recovery zone,
 - reward opportunity,
@@ -244,7 +244,18 @@ Calibration should explicitly compare known distances/features and speeds before
 The frozen movement baseline (03 §15, D-078) is the input: cap 148.5 m/s, full-charge jump
 2.03→58.21 m/s at g 39.38, and the landing burst (D-077), which can establish 80% of the cap from
 any slam landing. The calibration environment must be large enough to measure these at the cap;
-the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed.
+the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed, so the 6.4 km scale strip (`World › Calibration Strip (M1)`, D-079, runbook) is the M1 instrument.
+
+Scale is decided on two sides at once (D-080): feel, and the **terrain budget** at that scale
+(samples, triangles, build time, memory, draw distance). Cell size is a measured choice: it is
+also a ground-contact-stability choice (measured: 4 m keeps 99% contact on the gentlest strip
+hills, 8 m only 86%). Render terrain is tiled from the start; the budget model and measurements
+live in the runbook.
+
+Crest contact is a hard geometric input: a ball leaves the ground at any crest whose radius is
+below v²/g (91 m at 60 m/s, 358 m at the burst speed, 560 m at the cap). For a cosine hill the
+crest radius is λ²/(2π²H). Archetypes must place crests knowingly: below that radius a crest is
+a launch, above it a roll.
 
 ## 9. Heightfield/render representation
 
@@ -264,7 +275,7 @@ True chasms/holes are compatible with the heightfield approach:
 - keep hole edges comfortably larger than the player/collision sampling scale,
 - validate mandatory landing/approach geometry around every required gap.
 
-Godot 4.7 supports `NaN` holes in `HeightMapShape3D` with Jolt Physics.
+Verified 2026-09-05: the Godot 4.7 `HeightMapShape3D` class reference states "Holes can be punched through the collision by assigning NAN to the height of the desired vertices (this is supported in both GodotPhysics3D and Jolt Physics)", and the harness drops the ball through a NaN block and rests it on the neighbouring cells (D-079).
 
 Special non-heightfield structures such as bridges/ramps/overhangs can use separate generated meshes/colliders.
 
@@ -323,7 +334,28 @@ landing (D-077).
 - enemy density in range,
 - cosmetic props do not compromise corridor/readability.
 
-Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove numeric construction checks insufficient.
+### Route speed model (D-081)
+
+Every guarantee above is a speed-at-a-point question, so validation reads one shared,
+deterministic **route speed model**: a 1D integration of the frozen movement baseline (03 §15)
+along the primary-route polyline, metre by metre, assuming the base kit only:
+
+- drive held, no boost, no landing burst,
+- gravity times the local grade, drag, the hard cap,
+- a conservative speed loss on bends from the steering envelope (turn radius = v²/(a·mult)),
+- a stage entry speed of zero unless the stage definition says otherwise.
+
+Its outputs feed: mandatory-gap crossability (jump range at the arrival speed), module
+"expected speed" preconditions, crest placement (a crest is a launch below r = v²/g), the
+secondary travel-time check (V-009), and checkpoint headings. Boost and the landing burst are
+then optional-line multipliers on top of a conservative base, which is the intent of §2 and §11.
+
+The model is calibrated once against the real controller: the harness predicts the 0→cap
+curve on the scale-strip runway and the descent speeds on the lab grade fan and asserts the
+model is within a few percent of what the ball does. It is pure data code with no scene
+dependency.
+
+Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove the numeric checks plus the route speed model insufficient.
 
 ## 13. Recovery checkpoints
 

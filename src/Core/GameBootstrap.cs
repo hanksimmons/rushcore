@@ -23,6 +23,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private TuningPanel _tuningPanel = null!;
     private TelemetryOverlay _telemetry = null!;
     private int _seed = DefaultSeed;
+    private float _cellSizeSeen, _cellSizeDwell;
 
     public GameplayTuning Tuning => _tuning;
     public PlayerPhysics Player => _player;
@@ -108,6 +109,16 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (!InputBootstrap.IsTextEntryFocused(GetViewport())) HandleDebugHotkeys();
 
         if (_screenshotFrame > 0) StepScreenshotCapture();
+
+        // World › Calibration Strip and Cell Size rebuild the whole terrain (Gate M1). The
+        // toggle applies at once; the slider waits until it has stopped moving.
+        if (_tuning.World.CalibrationStrip != _world.IsStrip) RestartSameSeed();
+        else if (!Mathf.IsEqualApprox(_tuning.World.CellSize, _world.CellSize))
+        {
+            if (!Mathf.IsEqualApprox(_tuning.World.CellSize, _cellSizeSeen)) { _cellSizeSeen = _tuning.World.CellSize; _cellSizeDwell = 0f; }
+            _cellSizeDwell += (float)delta;
+            if (_cellSizeDwell > 0.5f) RestartSameSeed();
+        }
 
         // Fall recovery: the toy must be hard to permanently break.
         if (!GetTree().Paused && _player.GlobalPosition.Y < _world.KillPlaneY) RecoverPlayer();

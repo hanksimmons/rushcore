@@ -99,7 +99,7 @@ Toy contains only:
 
 Before freezing procedural dimensions:
 
-Create a calibration environment with known distances and representative terrain sizes.
+Create a calibration environment with known distances and representative terrain sizes: the 6.4 km scale strip (`World › Calibration Strip (M1)`, D-079) with stations at stated sizes for corridor width, hill wavelength/height, gaps, ramps and turn radius.
 
 Evaluate:
 
@@ -116,6 +116,7 @@ Evaluate:
 Outcome:
 
 - freeze a coherent world-scale family for procedural generation,
+- freeze the terrain budget at that scale: cell size (with its contact measurement), stage footprint, samples/triangles/build time, draw distance versus sightline, and whether Phase 2 needs finer tiling than the default (D-080),
 - document the measured/tuned values.
 
 ## 5. Procedural Generation — Gate G0
@@ -124,6 +125,7 @@ For each initial archetype, generate a meaningful deterministic seed sample (tar
 
 Required:
 
+- route speed model matches the real controller within 5% on the strip runway (0→cap) and the lab grade fan (descent speeds), and it is deterministic (D-081),
 - start/exit valid,
 - deterministic same-request summary/hash,
 - primary route validation passes after bounded regeneration/fallback,

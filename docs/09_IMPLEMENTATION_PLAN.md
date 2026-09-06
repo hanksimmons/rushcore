@@ -57,14 +57,17 @@ Use known distances/features to settle:
 - camera scale,
 - gap/ramp/bank sizes.
 
+Instrument: the scale strip (`World › Calibration Strip (M1)`, D-079). Movement is frozen (D-078); only world scale is decided here, together with its terrain budget (cell size, footprint, build/draw cost, D-080).
+
 Gate: **M1**.
 
 These tuned values become generation inputs.
 
 ## Phase 2 — Procedural Terrain Core
 
-Deliver:
+Deliver, in this order:
 
+- **route speed model** (D-081): pure-data 1D integration of the frozen baseline along a polyline, calibrated by the harness against the real ball on the strip runway and the lab grade fan; every later validator reads it,
 - deterministic generation request/definition,
 - route-first skeleton,
 - Rolling Highlands,

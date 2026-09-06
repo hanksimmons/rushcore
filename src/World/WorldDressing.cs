@@ -126,7 +126,20 @@ public partial class WorldDressing : Node3D
         env.SetGlowLevel(3, 1.0f);
         env.SetGlowLevel(4, 0.6f);
         env.SetGlowLevel(5, 0.3f);
+        _env = env;
+        ApplyFog();
         AddChild(new WorldEnvironment { Name = "WorldEnvironment", Environment = env });
+    }
+
+    private Godot.Environment _env = null!;
+
+    /// <summary>World › Fog End is a live sightline instrument (M1); begin tracks it at 16%.</summary>
+    private void ApplyFog()
+    {
+        float end = Mathf.Max(300f, _t.World.FogEnd);
+        if (Mathf.IsEqualApprox(_env.FogDepthEnd, end)) return;
+        _env.FogDepthEnd = end;
+        _env.FogDepthBegin = end * 0.16f;
     }
 
     /// <summary>
@@ -207,11 +220,118 @@ public partial class WorldDressing : Node3D
         };
         _content.AddChild(_colliders);
 
+        if (_world.IsStrip)
+        {
+            BuildStripDressing();
+            return;
+        }
+
         BuildLaneMarkers();
-        BuildSpawnPillars();
+        BuildPillars(TerrainHeightField.LaneStartX - 10f, TerrainHeightField.LaneZ + 62f);
         BuildFeaturePylons();
-        BuildScatteredProps();
+        BuildScatteredProps(IsClearOfInstruments, 500f, 500f, 1f, PlacementChance);
         BuildBoostPickups();
+    }
+
+    // ---------------------------------------------------------------- scale strip (Gate M1)
+
+    /// <summary>Rulers, signs and markers for the 6.4 km scale strip. Instruments, not scenery.</summary>
+    private void BuildStripDressing()
+    {
+        // Distance rulers the whole length: 100 m posts, 500 m gantries, every post labelled.
+        float offset = ScaleStripHeightField.LaneHalfWidth + 14f;
+        for (float sd = 0f; sd <= ScaleStripHeightField.PadEnd + 0.5f; sd += 100f)
+        {
+            float x = ScaleStripHeightField.X(sd);
+            bool five = Mathf.PosMod(sd, 500f) < 1f;
+            float height = five ? 12f : 6f;
+            var mat = five ? _matGantry : _matPost;
+            AddPost(x, -offset, height, mat);
+            AddPost(x, offset, height, mat);
+            float y = Mathf.Max(_world.SampleHeight(x, -offset), _world.SampleHeight(x, offset)) + height + 0.6f;
+            if (five)
+            {
+                _content.AddChild(new MeshInstance3D
+                {
+                    Mesh = _barMesh,
+                    MaterialOverride = _matGantry,
+                    Position = new Vector3(x, y, 0f),
+                    Scale = new Vector3(1.6f, 1.4f, offset * 2f),
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+                });
+            }
+            AddSign(new Vector3(x, y + (five ? 7f : 3.5f), 0f), $"{sd:0} m", five ? 9f : 4.5f);
+        }
+
+        // Station signs: what is being measured, at its stated size.
+        AddStationSign(0f, "RUNWAY  0->cap, brake, burst");
+        float seg = (ScaleStripHeightField.CorridorEnd - ScaleStripHeightField.RunwayEnd) / ScaleStripHeightField.CorridorWidths.Length;
+        for (int i = 0; i < ScaleStripHeightField.CorridorWidths.Length; i++)
+            AddStationSign(ScaleStripHeightField.RunwayEnd + i * seg, $"CORRIDOR {ScaleStripHeightField.CorridorWidths[i]:0} m");
+        float s0 = ScaleStripHeightField.CorridorEnd;
+        for (int i = 0; i < ScaleStripHeightField.HillWavelengths.Length; i++)
+        {
+            AddStationSign(s0, $"HILLS  wavelength {ScaleStripHeightField.HillWavelengths[i]:0} m  height {ScaleStripHeightField.HillHeights[i]:0} m");
+            s0 += ScaleStripHeightField.HillStationLengths[i];
+        }
+        for (int i = 0; i < ScaleStripHeightField.GapRimS.Length; i++)
+            AddStationSign(ScaleStripHeightField.GapRimS[i] - 70f, $"GAP {ScaleStripHeightField.GapOpenings[i]:0} m");
+        for (int i = 0; i < ScaleStripHeightField.RampLaneZ.Length; i++)
+        {
+            float deg = Mathf.RadToDeg(Mathf.Atan(ScaleStripHeightField.RampSlopes[i]));
+            AddSign(_world.SurfacePoint(ScaleStripHeightField.X(ScaleStripHeightField.RampsStart - 90f), ScaleStripHeightField.RampLaneZ[i], 14f),
+                $"RAMP {deg:0} deg  lip {ScaleStripHeightField.RampRise:0} m", 6f);
+        }
+        AddStationSign(ScaleStripHeightField.RampsEnd, "TURN PAD  rings r 80 / 160 / 240 m");
+
+        BuildPillars(ScaleStripHeightField.StartX - 20f, 90f);
+
+        // Pylons: gap take-off rims, ramp lips, corridor wall starts.
+        var pylons = new List<Transform3D>();
+        var colors = new List<Color>();
+        var warn = new Color(0.95f, 0.32f, 0.22f);
+        var lipColor = new Color(0.98f, 0.82f, 0.30f);
+        var wallColor = new Color(0.30f, 0.80f, 0.90f);
+        for (int i = 0; i < ScaleStripHeightField.GapRimS.Length; i++)
+            for (float z = -ScaleStripHeightField.LaneHalfWidth - 60f; z <= ScaleStripHeightField.LaneHalfWidth + 60f; z += 30f)
+                AddPylon(pylons, colors, ScaleStripHeightField.X(ScaleStripHeightField.GapRimS[i] - 8f), z, 9f, 1.2f, warn);
+        for (int i = 0; i < ScaleStripHeightField.RampLaneZ.Length; i++)
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+                AddPylon(pylons, colors, ScaleStripHeightField.X(ScaleStripHeightField.RampLipS(i)),
+                    ScaleStripHeightField.RampLaneZ[i] + sgn * (ScaleStripHeightField.RampHalfWidth + 6f), 10f, 1.3f, lipColor);
+        for (int i = 0; i < ScaleStripHeightField.CorridorWidths.Length; i++)
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+                AddPylon(pylons, colors, ScaleStripHeightField.X(ScaleStripHeightField.RunwayEnd + i * seg + 8f),
+                    sgn * (ScaleStripHeightField.CorridorWidths[i] * 0.5f - 6f), 12f, 1.4f, wallColor);
+        AddMultiMesh("StripPylons", _pylonMesh, pylons, colors);
+
+        // Boost line on the runway for the boosted 0->cap read.
+        for (int i = 0; i < 8; i++)
+            AddPickup(ScaleStripHeightField.X(550f + i * 50f), 0f, Vector3.Left);
+
+        // Scenery only on the shoulders, never in the measured corridor.
+        BuildScatteredProps(
+            (x, z) => _world.InBounds(x, z, 40f) && Mathf.Abs(z) > 150f && Mathf.Abs(z) < 290f,
+            _world.HalfX - 50f, _world.HalfZ - 20f, 3.5f, (_, _) => 1f);
+    }
+
+    private void AddStationSign(float sd, string text)
+        => AddSign(_world.SurfacePoint(ScaleStripHeightField.X(sd), 0f, 24f), text, 8f);
+
+    /// <summary>Billboarded world text, sized in metres of glyph height.</summary>
+    private void AddSign(Vector3 position, string text, float glyphMetres)
+    {
+        _content.AddChild(new Label3D
+        {
+            Text = text,
+            FontSize = 64,
+            PixelSize = glyphMetres / 64f,
+            OutlineSize = 14,
+            Modulate = new Color(0.96f, 0.96f, 0.92f),
+            OutlineModulate = new Color(0.05f, 0.05f, 0.07f),
+            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+            Position = position,
+        });
     }
 
     /// <summary>Distance markers along the flat calibration lane: 50 m posts, 100 m gantries.</summary>
@@ -261,13 +381,12 @@ public partial class WorldDressing : Node3D
     /// Known-height banded pillars beside the spawn. Each band is exactly 5 m, so the
     /// 2 m ball, the camera distance and every terrain feature have a physical yardstick.
     /// </summary>
-    private void BuildSpawnPillars()
+    private void BuildPillars(float xStart, float z)
     {
         ReadOnlySpan<float> heights = stackalloc float[] { 5f, 10f, 20f, 40f };
         for (int i = 0; i < heights.Length; i++)
         {
-            float x = TerrainHeightField.LaneStartX - 10f - i * 42f;
-            float z = TerrainHeightField.LaneZ + 62f;
+            float x = xStart - i * 42f;
             float baseY = _world.SampleHeight(x, z);
             int segments = Mathf.RoundToInt(heights[i] / 5f);
 
@@ -360,7 +479,7 @@ public partial class WorldDressing : Node3D
     private void AddPylon(List<Transform3D> transforms, List<Color> colors,
                           float x, float z, float height, float radius, Color color)
     {
-        if (!InBounds(x, z)) return;
+        if (!_world.InBounds(x, z)) return;
         var basis = Basis.Identity.Scaled(new Vector3(radius, height, radius));
         transforms.Add(new Transform3D(basis, _world.SurfacePoint(x, z, height * 0.5f - 0.5f)));
         colors.Add(color);
@@ -370,7 +489,8 @@ public partial class WorldDressing : Node3D
     /// Seeded scenery scatter. Density rises with distance from the calibration lane and
     /// every instrument corridor is excluded, so nothing ever blocks a measured line.
     /// </summary>
-    private void BuildScatteredProps()
+    private void BuildScatteredProps(Func<float, float, bool> clear, float rangeX, float rangeZ,
+                                     float attemptsScale, Func<float, float, float> chance)
     {
         float density = Mathf.Clamp(_t.World.PropDensity, 0f, 3f);
         if (density <= 0f) return;
@@ -383,19 +503,19 @@ public partial class WorldDressing : Node3D
         var pylonColors = new List<Color>(160);
 
         var rng = new RandomNumberGenerator { Seed = (ulong)(uint)_world.Seed ^ 0x5BF03635UL };
-        int attempts = Mathf.RoundToInt(1600f * density);
+        int attempts = Mathf.RoundToInt(1600f * density * attemptsScale);
 
         for (int i = 0; i < attempts; i++)
         {
-            float x = rng.RandfRange(-500f, 500f);
-            float z = rng.RandfRange(-500f, 500f);
+            float x = rng.RandfRange(-rangeX, rangeX);
+            float z = rng.RandfRange(-rangeZ, rangeZ);
             float roll = rng.Randf();
             float yaw = rng.Randf() * Mathf.Tau;
             float size = rng.RandfRange(0.7f, 1.0f);
             float tint = rng.RandfRange(-0.06f, 0.06f);
 
-            if (!IsClearOfInstruments(x, z)) continue;
-            if (rng.Randf() > PlacementChance(x, z)) continue;
+            if (!clear(x, z)) continue;
+            if (rng.Randf() > chance(x, z)) continue;
             if (Steepness(x, z) > 0.8f) continue;
 
             if (roll < 0.62f)
@@ -439,13 +559,10 @@ public partial class WorldDressing : Node3D
     private static Color Shift(Color c, float d) => new(
         Mathf.Clamp(c.R + d, 0f, 1f), Mathf.Clamp(c.G + d, 0f, 1f), Mathf.Clamp(c.B + d, 0f, 1f));
 
-    private static bool InBounds(float x, float z)
-        => Mathf.Abs(x) < MovementToyWorld.Extent * 0.5f - 8f && Mathf.Abs(z) < MovementToyWorld.Extent * 0.5f - 8f;
-
     /// <summary>Keeps scenery out of the calibration lane, the ramps and the banked turn.</summary>
-    private static bool IsClearOfInstruments(float x, float z)
+    private bool IsClearOfInstruments(float x, float z)
     {
-        if (!InBounds(x, z)) return false;
+        if (!_world.InBounds(x, z)) return false;
 
         // Calibration lane corridor plus turnaround room at both ends.
         if (Mathf.Abs(z - TerrainHeightField.LaneZ) < 55f
@@ -562,7 +679,7 @@ public partial class WorldDressing : Node3D
 
     private void AddPickup(float x, float z, Vector3 facing)
     {
-        if (!InBounds(x, z)) return;
+        if (!_world.InBounds(x, z)) return;
 
         var holder = new Node3D { Name = "BoostRing", Position = _world.SurfacePoint(x, z, 3.6f) };
         _content.AddChild(holder);
@@ -613,6 +730,7 @@ public partial class WorldDressing : Node3D
     {
         float dt = (float)delta;
         _clock += dt;
+        ApplyFog();
 
         for (int i = 0; i < _pickups.Count; i++)
         {

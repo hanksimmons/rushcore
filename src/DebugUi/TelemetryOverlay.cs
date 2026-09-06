@@ -29,7 +29,7 @@ public partial class TelemetryOverlay : Control
     {
         Frame, Physics, State, Band, Ground, Normal, Velocity, Locomotion, Vertical,
         Charge, Takeoff, Slam, Burst, Boost, Steering, Input, Impact,
-        Position, Checkpoint, Camera, Seed, Tuning, Count,
+        Position, Checkpoint, Camera, Seed, Stage, Tuning, Count,
     }
 
     private readonly IDebugActions _debug;
@@ -92,6 +92,7 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Checkpoint, "checkpoint");
         AddRow(Row.Camera, "camera");
         AddRow(Row.Seed, "seed");
+        AddRow(Row.Stage, "stage");
         AddRow(Row.Tuning, "tuning");
     }
 
@@ -162,6 +163,12 @@ public partial class TelemetryOverlay : Control
         Set(Row.Position, $"{pos.X,7:0.0} {pos.Y,7:0.0} {pos.Z,7:0.0}");
         Set(Row.Checkpoint, $"{cp.X,7:0.0} {cp.Y,7:0.0} {cp.Z,7:0.0}");
         Set(Row.Seed, _debug.World.IsStage ? $"{_debug.SeedText}   {_debug.World.StageSummary}" : _debug.SeedText);
+        var w = _debug.World;
+        Set(Row.Stage, w.IsStage && w.Stage is { } st
+            ? $"clock {w.StageClock,6:0.0} s   progress {st.PrimaryRoute.Vertices[w.StageProgressIndex].Distance,5:0} / {st.PrimaryRoute.Length:0} m   anchor {w.StageCheckpointIndex + 1}/{st.Checkpoints.Count}" +
+              (w.StageExitTime > 0f ? $"   EXIT {w.StageExitTime:0.0} s" : "") +
+              (st.Report.Passed ? "" : "   INVALID: " + string.Join("; ", st.Report.Failures.Select(f => f.Name)))
+            : "-");
         int overrides = _debug.Tuning.OverrideCount;
         Set(Row.Tuning, overrides == 0 ? "compiled defaults" : $"OVERRIDE ({overrides} {(overrides == 1 ? "value differs" : "values differ")})");
 

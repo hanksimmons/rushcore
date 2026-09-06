@@ -120,6 +120,11 @@ public partial class GameBootstrap : Node3D, IDebugActions
             if (_cellSizeDwell > 0.5f) RestartSameSeed();
         }
 
+        // Generated stage: progression anchors replace the toy's rolling auto-checkpoint (04 §13).
+        _player.AutoCheckpoint = !_world.IsStage;
+        if (_world.IsStage && !GetTree().Paused && _world.UpdateStageProgress(_player.GlobalPosition, (float)delta) is { } anchor)
+            _player.SetCheckpoint(anchor);
+
         // Fall recovery: the toy must be hard to permanently break.
         if (!GetTree().Paused && _player.GlobalPosition.Y < _world.KillPlaneY) RecoverPlayer();
     }
@@ -231,6 +236,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
     public void TeleportToStart()
     {
+        _world.ResetStageProgress();
         _player.SetCheckpoint(_world.SpawnPoint);
         _camera.SnapYawToward(_world.SpawnFacing);   // face down the lane, not the old heading
         _player.TeleportTo(_world.SpawnPoint);

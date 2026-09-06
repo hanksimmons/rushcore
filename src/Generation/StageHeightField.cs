@@ -34,15 +34,113 @@ public sealed class StageHeightField : IHeightSource
     private readonly ulong _noiseSeedA, _noiseSeedB;
     private readonly float _noiseAmpA, _noiseAmpB;
 
-    // Route, flattened for tight sampling loops.
-    private readonly int _n;
-    private readonly float[] _rx, _rz, _rh, _rheading, _bankHeight, _bankSide;
-    private readonly bool[] _bend;
-    private readonly float _startH, _exitH;
+    /// <summary>One stamped line: flattened route arrays, its corridor profile, banks and a coarse nearest map.</summary>
+    private sealed class StampedLine
+    {
+        public readonly int N;
+        public readonly float[] X, Z, H, Heading, BankHeight, BankSide;
+        /// <summary>Stamp strength per vertex: 1 for the primary; optional lines fade in as they leave the primary corridor.</summary>
+        public readonly float[] Strength;
+        public readonly bool[] Bend;
+        public readonly float HalfWidth;
+        public readonly int Cx, Cz;
+        public readonly int[] Coarse;
 
-    // Coarse nearest-vertex map over the footprint.
-    private readonly int _cx, _cz;
-    private readonly int[] _coarse;
+        public StampedLine(RouteSkeleton route, float[] profile, float sizeX, float sizeZ)
+        {
+            var v = route.Vertices;
+            N = v.Count;
+            X = new float[N]; Z = new float[N]; H = profile; Heading = new float[N];
+            BankHeight = new float[N]; BankSide = new float[N]; Bend = new bool[N];
+            Strength = new float[N];
+            Array.Fill(Strength, 1f);
+            HalfWidth = route.CorridorHalfWidth;
+            for (int i = 0; i < N; i++)
+            {
+                X[i] = v[i].Position.X; Z[i] = v[i].Position.Z; Heading[i] = v[i].Heading;
+                Bend[i] = v[i].Kind == RouteSegmentKind.Bend;
+            }
+            foreach (var b in route.Bends)
+            {
+                float height = WorldScale.BankHeightPerRadius * b.Radius;
+                float side = -Mathf.Sign(b.TurnAngle);                    // outward is opposite the turn
+                float startD = v[b.StartIndex].Distance, endD = v[b.EndIndex].Distance;
+                for (int i = b.StartIndex; i <= b.EndIndex; i++)
+                {
+                    float d = v[i].Distance;
+                    float fade = Mathf.Min(Mathf.SmoothStep(0f, BankFade, d - startD), Mathf.SmoothStep(0f, BankFade, endD - d));
+                    BankHeight[i] = height * fade;
+                    BankSide[i] = side;
+                }
+            }
+
+            // Coarse nearest map: X is monotonic along every line, so each cell scans a window of X.
+            Cx = Mathf.CeilToInt(sizeX / CoarseCell) + 1;
+            Cz = Mathf.CeilToInt(sizeZ / CoarseCell) + 1;
+            Coarse = new int[Cx * Cz];
+            float reach = HalfWidth + BendExtraHalfWidth + FalloffWidth + CoarseCell * 2f;
+            for (int cz = 0; cz < Cz; cz++)
+            {
+                float z = cz * CoarseCell - sizeZ * 0.5f;
+                for (int cx = 0; cx < Cx; cx++)
+                {
+                    float x = cx * CoarseCell - sizeX * 0.5f;
+                    int lo = LowerBoundX(x - reach), hi = LowerBoundX(x + reach);
+                    int best = -1; float bestD = float.MaxValue;
+                    for (int i = lo; i < hi; i++)
+                    {
+                        float dx = X[i] - x, dz = Z[i] - z, dd = dx * dx + dz * dz;
+                        if (dd < bestD) { bestD = dd; best = i; }
+                    }
+                    Coarse[cz * Cx + cx] = best;
+                }
+            }
+        }
+
+        private int LowerBoundX(float x)
+        {
+            int lo = 0, hi = N;
+            while (lo < hi) { int mid = (lo + hi) >> 1; if (X[mid] < x) lo = mid + 1; else hi = mid; }
+            return lo;
+        }
+
+        public int Nearest(float x, float z, float sizeX, float sizeZ, out float distance)
+        {
+            int cx = Mathf.Clamp((int)((x + sizeX * 0.5f) / CoarseCell + 0.5f), 0, Cx - 1);
+            int cz = Mathf.Clamp((int)((z + sizeZ * 0.5f) / CoarseCell + 0.5f), 0, Cz - 1);
+            int seed = Coarse[cz * Cx + cx];
+            if (seed < 0) { distance = float.MaxValue; return -1; }
+            int best = -1; float bestD = float.MaxValue;
+            int lo = Mathf.Max(0, seed - RefineSpan), hi = Mathf.Min(N - 1, seed + RefineSpan);
+            for (int i = lo; i <= hi; i++)
+            {
+                float dx = X[i] - x, dz = Z[i] - z, dd = dx * dx + dz * dz;
+                if (dd < bestD) { bestD = dd; best = i; }
+            }
+            distance = Mathf.Sqrt(bestD);
+            return best;
+        }
+
+        public float Width(int i) => HalfWidth + (Bend[i] ? BendExtraHalfWidth : 0f);
+
+        /// <summary>Corridor height at a point near vertex i: level across, plus the outer-half bank.</summary>
+        public float Height(int i, float x, float z)
+        {
+            float h = H[i];
+            if (BankHeight[i] > 0f)
+            {
+                float lx = -Mathf.Sin(Heading[i]), lz = Mathf.Cos(Heading[i]);
+                float lateral = ((x - X[i]) * lx + (z - Z[i]) * lz) * BankSide[i];
+                h += BankHeight[i] * Mathf.Clamp(lateral / Width(i), 0f, 1f);
+            }
+            return h;
+        }
+    }
+
+    private readonly StampedLine _primary;
+    private readonly List<StampedLine> _lines = new();
+    private readonly float[] _primaryProfile;
+    private readonly RouteSkeleton _primaryRoute;
 
     public float SizeX => WorldScale.FootprintLength;
     public float SizeZ => WorldScale.FootprintWidth;
@@ -85,28 +183,20 @@ public sealed class StageHeightField : IHeightSource
         _noiseAmpA = 0.6f * remaining / (1.5f * Mathf.Pow(Mathf.Tau / 400f, 2f));   // ≈ 0.9 m at λ 400
         _noiseAmpB = 0.4f * remaining / (1.5f * Mathf.Pow(Mathf.Tau / 120f, 2f));   // ≈ 0.05 m at λ 120
 
-        // ---- route arrays ----
-        var v = route.Vertices;
-        _n = v.Count;
-        _rx = new float[_n]; _rz = new float[_n]; _rh = new float[_n]; _rheading = new float[_n];
-        _bankHeight = new float[_n]; _bankSide = new float[_n];
-        _bend = new bool[_n];
-        for (int i = 0; i < _n; i++)
-        {
-            _rx[i] = v[i].Position.X; _rz[i] = v[i].Position.Z; _rheading[i] = v[i].Heading;
-            _bend[i] = v[i].Kind == RouteSegmentKind.Bend;
-        }
-
         // ---- D: corridor profile = relief along the route, smoothed, plus crests and pads ----
-        var raw = new float[_n];
-        for (int i = 0; i < _n; i++) raw[i] = Relief(_rx[i], _rz[i]);
+        _primaryRoute = route;
+        var v = route.Vertices;
+        int n = v.Count;
+        var raw = new float[n];
+        for (int i = 0; i < n; i++) raw[i] = Relief(v[i].Position.X, v[i].Position.Z);
+        var rh = new float[n];
         int window = Mathf.Max(1, Mathf.RoundToInt(SmoothingHalfWindow / WorldScale.RouteSampleSpacing));
-        var prefix = new float[_n + 1];
-        for (int i = 0; i < _n; i++) prefix[i + 1] = prefix[i] + raw[i];
-        for (int i = 0; i < _n; i++)
+        var prefix = new float[n + 1];
+        for (int i = 0; i < n; i++) prefix[i + 1] = prefix[i] + raw[i];
+        for (int i = 0; i < n; i++)
         {
-            int lo = Mathf.Max(0, i - window), hi = Mathf.Min(_n - 1, i + window);
-            _rh[i] = (prefix[hi + 1] - prefix[lo]) / (hi - lo + 1);
+            int lo = Mathf.Max(0, i - window), hi = Mathf.Min(n - 1, i + window);
+            rh[i] = (prefix[hi + 1] - prefix[lo]) / (hi - lo + 1);
         }
         foreach (var f in route.Features)
         {
@@ -116,7 +206,7 @@ public sealed class StageHeightField : IHeightSource
             for (int i = f.StartIndex + 1; i <= f.EndIndex; i++)
             {
                 float ds = v[i].Distance - v[i - 1].Distance;
-                if (ds > 1e-3f) localSlope = Mathf.Max(localSlope, Mathf.Abs(_rh[i] - _rh[i - 1]) / ds);
+                if (ds > 1e-3f) localSlope = Mathf.Max(localSlope, Mathf.Abs(rh[i] - rh[i - 1]) / ds);
             }
             float maxHeight = Mathf.Max(0f, (WorldScale.MaxRouteGrade * 0.9f - localSlope) * f.Wavelength / Mathf.Pi);
             f.Height = Mathf.Min(f.Height, maxHeight);
@@ -124,90 +214,69 @@ public sealed class StageHeightField : IHeightSource
             {
                 float d = v[i].Distance - f.CentreDistance;
                 if (Mathf.Abs(d) <= f.Wavelength * 0.5f)
-                    _rh[i] += f.Height * 0.5f * (1f + Mathf.Cos(Mathf.Tau * d / f.Wavelength));
+                    rh[i] += f.Height * 0.5f * (1f + Mathf.Cos(Mathf.Tau * d / f.Wavelength));
             }
         }
-        _startH = _rh[0];
-        _exitH = _rh[_n - 1];
-        float total = v[_n - 1].Distance;
-        for (int i = 0; i < _n; i++)
+        float startH = rh[0], exitH = rh[n - 1];
+        float total = v[n - 1].Distance;
+        for (int i = 0; i < n; i++)
         {
             float d = v[i].Distance;
             float wStart = Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, d);
             float wExit = Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, total - d);
-            _rh[i] = Mathf.Lerp(_startH, _rh[i], wStart);
-            _rh[i] = Mathf.Lerp(_exitH, _rh[i], wExit);
+            rh[i] = Mathf.Lerp(startH, rh[i], wStart);
+            rh[i] = Mathf.Lerp(exitH, rh[i], wExit);
         }
+        _primaryProfile = rh;
+        _primary = new StampedLine(route, rh, SizeX, SizeZ);
+        _lines.Add(_primary);
 
-        // Banks: the outer half of a bend rises linearly with radius, faded in and out.
-        foreach (var b in route.Bends)
-        {
-            float height = WorldScale.BankHeightPerRadius * b.Radius;
-            float side = -Mathf.Sign(b.TurnAngle);                    // outward is opposite the turn
-            float startD = v[b.StartIndex].Distance, endD = v[b.EndIndex].Distance;
-            for (int i = b.StartIndex; i <= b.EndIndex; i++)
-            {
-                float d = v[i].Distance;
-                float fade = Mathf.Min(Mathf.SmoothStep(0f, BankFade, d - startD), Mathf.SmoothStep(0f, BankFade, endD - d));
-                _bankHeight[i] = height * fade;
-                _bankSide[i] = side;
-            }
-        }
-
-        SpawnXZ = new Vector3(_rx[0], 0f, _rz[0]);
-        SpawnFacing = new Vector3(Mathf.Cos(_rheading[0]), 0f, Mathf.Sin(_rheading[0]));
-
-        // ---- coarse nearest map: X is monotonic along the route, so each cell scans a window of X ----
-        _cx = Mathf.CeilToInt(SizeX / CoarseCell) + 1;
-        _cz = Mathf.CeilToInt(SizeZ / CoarseCell) + 1;
-        _coarse = new int[_cx * _cz];
-        float reach = CorridorHalfWidth + BendExtraHalfWidth + FalloffWidth + CoarseCell * 2f;
-        for (int cz = 0; cz < _cz; cz++)
-        {
-            float z = cz * CoarseCell - SizeZ * 0.5f;
-            for (int cx = 0; cx < _cx; cx++)
-            {
-                float x = cx * CoarseCell - SizeX * 0.5f;
-                int lo = LowerBoundX(x - reach), hi = LowerBoundX(x + reach);
-                int best = -1; float bestD = float.MaxValue;
-                for (int i = lo; i < hi; i++)
-                {
-                    float dx = _rx[i] - x, dz = _rz[i] - z, dd = dx * dx + dz * dz;
-                    if (dd < bestD) { bestD = dd; best = i; }
-                }
-                _coarse[cz * _cx + cx] = best;
-            }
-        }
+        SpawnXZ = new Vector3(v[0].Position.X, 0f, v[0].Position.Z);
+        SpawnFacing = new Vector3(Mathf.Cos(v[0].Heading), 0f, Mathf.Sin(v[0].Heading));
     }
 
-    private int LowerBoundX(float x)
+    /// <summary>Corridor centreline height of the primary route at a vertex.</summary>
+    public float PrimaryHeight(int index) => _primaryProfile[index];
+
+    /// <summary>
+    /// Stamps an optional line. A ridge line rides the primary's profile between its joins, raised
+    /// onto a plateau by its ridge height, so both ends meet the primary exactly.
+    /// </summary>
+    public void AddLine(RouteSkeleton line)
     {
-        int lo = 0, hi = _n;
-        while (lo < hi) { int mid = (lo + hi) >> 1; if (_rx[mid] < x) lo = mid + 1; else hi = mid; }
-        return lo;
+        var v = line.Vertices;
+        var profile = new float[v.Count];
+        float span = Mathf.Max(1f, v[^1].Distance);
+        for (int i = 0; i < v.Count; i++)
+        {
+            int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
+            profile[i] = _primaryProfile[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(v[i].Distance, span);
+        }
+        var stamped = new StampedLine(line, profile, SizeX, SizeZ);
+        for (int i = 0; i < v.Count; i++)
+        {
+            _primary.Nearest(v[i].Position.X, v[i].Position.Z, SizeX, SizeZ, out float away);
+            stamped.Strength[i] = Mathf.SmoothStep(WorldScale.OptionalStampFadeStart, WorldScale.OptionalStampFadeEnd, away);
+        }
+        _lines.Add(stamped);
     }
 
-    /// <summary>Nearest route vertex and its distance; −1 when nothing lies within the corridor reach.</summary>
-    public int Nearest(float x, float z, out float distance)
+    /// <summary>Nearest primary-route vertex and its distance; −1 when nothing lies within the corridor reach.</summary>
+    public int Nearest(float x, float z, out float distance) => _primary.Nearest(x, z, SizeX, SizeZ, out distance);
+
+    /// <summary>Distance to the nearest stamped line (primary or optional).</summary>
+    public float DistanceToRoute(float x, float z)
     {
-        int cx = Mathf.Clamp((int)((x + SizeX * 0.5f) / CoarseCell + 0.5f), 0, _cx - 1);
-        int cz = Mathf.Clamp((int)((z + SizeZ * 0.5f) / CoarseCell + 0.5f), 0, _cz - 1);
-        int seed = _coarse[cz * _cx + cx];
-        if (seed < 0) { distance = float.MaxValue; return -1; }
-        int best = -1; float bestD = float.MaxValue;
-        int lo = Mathf.Max(0, seed - RefineSpan), hi = Mathf.Min(_n - 1, seed + RefineSpan);
-        for (int i = lo; i <= hi; i++)
+        float best = float.MaxValue;
+        foreach (var line in _lines)
         {
-            float dx = _rx[i] - x, dz = _rz[i] - z, dd = dx * dx + dz * dz;
-            if (dd < bestD) { bestD = dd; best = i; }
+            line.Nearest(x, z, SizeX, SizeZ, out float d);
+            best = Mathf.Min(best, d);
         }
-        distance = Mathf.Sqrt(bestD);
         return best;
     }
 
-    public float DistanceToRoute(float x, float z) { Nearest(x, z, out float d); return d; }
-
-    /// <summary>Base landscape without the corridor: swells plus micro relief.</summary>
+    /// <summary>Base landscape without the corridors: swells plus micro relief.</summary>
     public float Relief(float x, float z)
     {
         float h = 0f;
@@ -221,33 +290,35 @@ public sealed class StageHeightField : IHeightSource
         return h;
     }
 
-    /// <summary>Corridor weight at a point: 1 inside the corridor, 0 beyond the falloff.</summary>
+    /// <summary>Combined corridor weight at a point: 1 inside any corridor, 0 beyond every falloff.</summary>
     public float CorridorWeight(float x, float z)
     {
-        int i = Nearest(x, z, out float d);
-        if (i < 0) return 0f;
-        float hw = CorridorHalfWidth + (_bend[i] ? BendExtraHalfWidth : 0f);
-        return 1f - Mathf.SmoothStep(hw, hw + FalloffWidth, d);
+        float w = 0f;
+        foreach (var line in _lines)
+        {
+            int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
+            if (i < 0) continue;
+            float hw = line.Width(i);
+            w = Mathf.Max(w, 1f - Mathf.SmoothStep(hw, hw + FalloffWidth, d));
+        }
+        return w;
     }
 
     public float Sample(float x, float z)
     {
-        float relief = Relief(x, z);
-        int i = Nearest(x, z, out float d);
-        if (i < 0) return relief;
-        float hw = CorridorHalfWidth + (_bend[i] ? BendExtraHalfWidth : 0f);
-        float w = 1f - Mathf.SmoothStep(hw, hw + FalloffWidth, d);
-        if (w <= 0f) return relief;
-
-        float corridor = _rh[i];
-        if (_bankHeight[i] > 0f)
+        float h = Relief(x, z);
+        // Lines stamp in order (primary first); an optional line's profile meets the primary at its
+        // joins, so where their falloffs overlap the blend is continuous.
+        foreach (var line in _lines)
         {
-            // Signed lateral offset toward the outside of the bend, as a fraction of the half-width.
-            float lx = -Mathf.Sin(_rheading[i]), lz = Mathf.Cos(_rheading[i]);
-            float lateral = ((x - _rx[i]) * lx + (z - _rz[i]) * lz) * _bankSide[i];
-            corridor += _bankHeight[i] * Mathf.Clamp(lateral / hw, 0f, 1f);
+            int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
+            if (i < 0) continue;
+            float hw = line.Width(i);
+            float w = (1f - Mathf.SmoothStep(hw, hw + FalloffWidth, d)) * line.Strength[i];
+            if (w <= 0f) continue;
+            h = Mathf.Lerp(h, line.Height(i, x, z), w);
         }
-        return Mathf.Lerp(relief, corridor, w);
+        return h;
     }
 
     private static readonly Color Track = new(0.50f, 0.44f, 0.36f);
@@ -258,17 +329,19 @@ public sealed class StageHeightField : IHeightSource
     {
         float slope = 1f - Mathf.Clamp(normal.Y, 0f, 1f);
         Color c = TerrainHeightField.BasePalette(point.Y * 0.45f, slope);
-        int i = Nearest(point.X, point.Z, out float d);
-        if (i >= 0)
+        float track = 0f;
+        foreach (var line in _lines)
         {
-            float hw = CorridorHalfWidth + (_bend[i] ? BendExtraHalfWidth : 0f);
-            float w = 1f - Mathf.SmoothStep(hw - 8f, hw + 8f, d);
-            c = c.Lerp(Track, w * 0.45f);
-            float dStart = point.DistanceTo(new Vector3(_rx[0], point.Y, _rz[0]));
-            float dExit = point.DistanceTo(new Vector3(_rx[_n - 1], point.Y, _rz[_n - 1]));
-            c = c.Lerp(StartPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dStart)));
-            c = c.Lerp(ExitPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dExit)));
+            int i = line.Nearest(point.X, point.Z, SizeX, SizeZ, out float d);
+            if (i < 0) continue;
+            float hw = line.Width(i);
+            track = Mathf.Max(track, 1f - Mathf.SmoothStep(hw - 8f, hw + 8f, d));
         }
+        c = c.Lerp(Track, track * 0.45f);
+        float dStart = point.DistanceTo(new Vector3(_primary.X[0], point.Y, _primary.Z[0]));
+        float dExit = point.DistanceTo(new Vector3(_primary.X[_primary.N - 1], point.Y, _primary.Z[_primary.N - 1]));
+        c = c.Lerp(StartPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dStart)));
+        c = c.Lerp(ExitPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dExit)));
         return TerrainHeightField.FacetJitter(c, point);
     }
 

@@ -56,9 +56,19 @@ public sealed class RouteBend
     public float CornerLimit;
 }
 
-/// <summary>Macro route skeleton (04 §5A): the primary route as arcs and straights, sampled.</summary>
+public enum RouteLineKind { Primary, Ridge }
+
+/// <summary>Macro route skeleton (04 §5A): a route as arcs and straights, sampled. Optional lines
+/// are skeletons too, joined to the primary at two of its vertices.</summary>
 public sealed class RouteSkeleton
 {
+    public RouteLineKind Kind = RouteLineKind.Primary;
+    /// <summary>Primary-route vertex indices where an optional line leaves and rejoins.</summary>
+    public int JoinStart = -1, JoinEnd = -1;
+    /// <summary>Stamped corridor half-width for this line.</summary>
+    public float CorridorHalfWidth = WorldScale.TypicalCorridorWidth * 0.5f;
+    /// <summary>Ridge lines: extra height above the primary profile at the plateau.</summary>
+    public float RidgeHeight;
     public List<RouteVertex> Vertices { get; } = new();
     public List<RouteBend> Bends { get; } = new();
     public List<RouteFeature> Features { get; } = new();
@@ -105,6 +115,15 @@ public sealed class ValidationReport
     public IEnumerable<ValidationCheck> Failures => Checks.Where(c => !c.Passed);
 }
 
+/// <summary>Invisible recovery anchor on the primary progression (04 §13).</summary>
+public struct Checkpoint
+{
+    public Vector3 Position;       // ball centre when restored
+    public float Heading;          // continuation heading, radians from +X toward +Z
+    public int PrimaryIndex;
+    public float Distance;
+}
+
 /// <summary>
 /// Pure data describing one stage (04 §3). Phase 2 fills it in slices: the skeleton and its
 /// speed profile now; heightfield samples, optional lines and checkpoints as they are built.
@@ -115,6 +134,9 @@ public sealed class StageDefinition
     public ulong RouteSeedUsed;
     public RouteSkeleton PrimaryRoute { get; }
     public RouteSpeedProfile SpeedProfile { get; }
+    public List<RouteSkeleton> OptionalLines { get; } = new();
+    public List<RouteSpeedProfile> OptionalProfiles { get; } = new();
+    public List<Checkpoint> Checkpoints { get; } = new();
     public ValidationReport Report { get; }
     /// <summary>The one logical height source for render and collision (04 §9); null only for skeleton-only builds.</summary>
     public StageHeightField? HeightField { get; internal set; }
@@ -140,6 +162,9 @@ public sealed class StageDefinition
             for (int i = 0; i < 4; i++) { h ^= (bits >> (8 * i)) & 0xFF; h *= 1099511628211UL; }
         }
         foreach (var v in PrimaryRoute.Vertices) { Mix(v.Position.X); Mix(v.Position.Y); Mix(v.Position.Z); }
+        foreach (var line in OptionalLines)
+            foreach (var v in line.Vertices) { Mix(v.Position.X); Mix(v.Position.Y); Mix(v.Position.Z); }
+        foreach (var c in Checkpoints) { Mix(c.Position.X); Mix(c.Position.Y); Mix(c.Position.Z); }
         return h;
     }
 }

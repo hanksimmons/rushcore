@@ -258,7 +258,12 @@ public partial class WorldDressing : Node3D
         }
         BuildPillars(route.Start.X + 30f, route.Start.Z + 45f);
 
-        if (_t.World.RouteDebugLines) BuildRouteLines(route);
+        if (_t.World.RouteDebugLines)
+        {
+            BuildRouteLines(route);
+            foreach (var line in stage.OptionalLines) BuildRouteLines(line, RouteOptionalColor);
+            foreach (var cp in stage.Checkpoints) AddCheckpointPost(cp.Position);
+        }
 
         // Cosmetic scatter never enters the corridor (04 §5G): keep clear of the stamp and its falloff.
         float clearance = StageHeightField.CorridorHalfWidth + StageHeightField.BendExtraHalfWidth + StageHeightField.FalloffWidth * 0.5f;
@@ -278,9 +283,10 @@ public partial class WorldDressing : Node3D
     private static readonly Color RouteStraightColor = new(0.35f, 0.95f, 1.0f);
     private static readonly Color RouteBendColor = new(1.0f, 0.62f, 0.2f);
     private static readonly Color RouteCrestColor = new(1.0f, 0.3f, 0.85f);
+    private static readonly Color RouteOptionalColor = new(0.45f, 1.0f, 0.4f);
 
     /// <summary>Unshaded line strip 3 m above the route: cyan straights, orange bends, magenta crests.</summary>
-    private void BuildRouteLines(RouteSkeleton route)
+    private void BuildRouteLines(RouteSkeleton route, Color? fixedColor = null)
     {
         var mesh = new ImmediateMesh();
         mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
@@ -290,7 +296,7 @@ public partial class WorldDressing : Node3D
             var v = route.Vertices[i];
             bool crest = false;
             foreach (var (s, e) in crestRanges) if (i >= s && i <= e) { crest = true; break; }
-            mesh.SurfaceSetColor(crest ? RouteCrestColor : v.Kind == RouteSegmentKind.Bend ? RouteBendColor : RouteStraightColor);
+            mesh.SurfaceSetColor(fixedColor ?? (crest ? RouteCrestColor : v.Kind == RouteSegmentKind.Bend ? RouteBendColor : RouteStraightColor));
             mesh.SurfaceAddVertex(_world.SurfacePoint(v.Position.X, v.Position.Z, 3f));
         }
         mesh.SurfaceEnd();
@@ -305,6 +311,26 @@ public partial class WorldDressing : Node3D
                 NoDepthTest = false,
             },
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        });
+    }
+
+    /// <summary>A recovery anchor: a short post with a cap, so progression checkpoints can be seen in the debug view.</summary>
+    private void AddCheckpointPost(Vector3 anchor)
+    {
+        Vector3 basePos = _world.SurfacePoint(anchor.X, anchor.Z);
+        _content.AddChild(new MeshInstance3D
+        {
+            Mesh = _postMesh,
+            MaterialOverride = _matGantry,
+            Position = basePos + Vector3.Up * 4f,
+            Scale = new Vector3(1.2f, 4f, 1.2f),
+        });
+        _content.AddChild(new MeshInstance3D
+        {
+            Mesh = _capMesh,
+            MaterialOverride = _matPickup,
+            Position = basePos + Vector3.Up * 8.6f,
+            Scale = Vector3.One * 1.6f,
         });
     }
 

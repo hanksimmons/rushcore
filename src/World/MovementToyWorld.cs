@@ -54,6 +54,58 @@ public partial class MovementToyWorld : Node3D
     public StageDefinition? Stage { get; private set; }
     /// <summary>One-line generation summary for the telemetry seed row.</summary>
     public string StageSummary { get; private set; } = "";
+    /// <summary>Furthest primary-route vertex the player has reached on a generated stage.</summary>
+    public int StageProgressIndex { get; private set; }
+    /// <summary>Index into <c>Stage.Checkpoints</c> of the anchor currently armed; −1 = start pad.</summary>
+    public int StageCheckpointIndex { get; private set; } = -1;
+    /// <summary>Seconds since the last start/teleport on a generated stage.</summary>
+    public float StageClock { get; private set; }
+    /// <summary>Clock reading when the player first reached the exit pad this attempt; 0 = not yet.</summary>
+    public float StageExitTime { get; private set; }
+
+    public void ResetStageProgress()
+    {
+        StageProgressIndex = 0;
+        StageCheckpointIndex = -1;
+        StageClock = 0f;
+        StageExitTime = 0f;
+    }
+
+    /// <summary>
+    /// Tracks legitimate progress along the primary route (04 §13): the nearest vertex is searched
+    /// only ahead of the last one, so falling back or cutting across never advances it. Returns
+    /// the anchor to arm when a new checkpoint has been passed, else null.
+    /// </summary>
+    public Vector3? UpdateStageProgress(Vector3 playerPos, float dt)
+    {
+        if (Stage is null) return null;
+        StageClock += dt;
+        var v = Stage.PrimaryRoute.Vertices;
+        int best = StageProgressIndex;
+        float bestD = float.MaxValue;
+        int hi = Mathf.Min(v.Count - 1, StageProgressIndex + 60);
+        for (int i = Mathf.Max(0, StageProgressIndex - 5); i <= hi; i++)
+        {
+            float d = new Vector2(v[i].Position.X - playerPos.X, v[i].Position.Z - playerPos.Z).LengthSquared();
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        // Only count it as progress while the ball is inside the corridor reach of that vertex.
+        if (best > StageProgressIndex && bestD < 150f * 150f) StageProgressIndex = best;
+
+        if (StageExitTime <= 0f && new Vector2(Stage.ExitPosition.X - playerPos.X, Stage.ExitPosition.Z - playerPos.Z).Length() < WorldScale.PadRadius)
+        {
+            StageExitTime = StageClock;
+            GD.Print($"[RUSHCORE] Stage exit reached in {StageExitTime:0.0} s (route speed model: {Stage.SpeedProfile.TotalTime:0.0} s base kit)");
+        }
+
+        var cps = Stage.Checkpoints;
+        int next = StageCheckpointIndex;
+        while (next + 1 < cps.Count && cps[next + 1].PrimaryIndex <= StageProgressIndex) next++;
+        if (next == StageCheckpointIndex) return null;
+        StageCheckpointIndex = next;
+        var cp = cps[next];
+        return SurfacePoint(cp.Position.X, cp.Position.Z, _t.Movement.BallRadius + 0.6f);
+    }
     /// <summary>True when the built terrain matches what the world tuning currently asks for.</summary>
     public bool MatchesTuning()
     {
@@ -114,6 +166,7 @@ public partial class MovementToyWorld : Node3D
         _terrainCollider.Scale = Vector3.One * CellSize;
         Stage = null;
         StageSummary = "";
+        ResetStageProgress();
         if (IsStage)
         {
             var generator = new StageGenerator(_t.Movement);
@@ -122,7 +175,8 @@ public partial class MovementToyWorld : Node3D
             var r = Stage.Report;
             StageSummary = $"stage {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s, " +
-                           $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} crests, gen {r.TotalMillis:0.0} ms";
+                           $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} crests, " +
+                           $"{Stage.OptionalLines.Count} lines, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
             GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
             foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
         }

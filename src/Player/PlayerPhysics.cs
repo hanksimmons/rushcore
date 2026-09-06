@@ -53,13 +53,8 @@ public partial class PlayerPhysics : RigidBody3D
     private Vector3 _teleportPos;
     private bool _needsInterpolationReset;
 
-    /// <summary>
-    /// Solver friction for the player/terrain pair. The arcade controller owns traction
-    /// and resistance (03 §1), so this is kept near zero and <c>DragCoefficient</c> is the
-    /// single tunable resistance. Higher values silently tax slope acceleration (D-005)
-    /// without appearing in the tuning panel.
-    /// </summary>
-    public const float ArcadeSurfaceFriction = 0.02f;
+    /// <summary>Solver friction for the player/terrain pair; owned by the tuning layer.</summary>
+    public const float ArcadeSurfaceFriction = MovementTuning.SurfaceFriction;
 
     /// <summary>Ground grace used for locomotion only. Charge start still requires a raw contact.</summary>
     private const float GroundStickSeconds = 0.05f;

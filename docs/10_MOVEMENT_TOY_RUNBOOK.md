@@ -8,6 +8,7 @@
 ```sh
 dotnet build                                                    # offline: Godot nupkgs from the app bundle
 /Applications/Godot_mono.app/Contents/MacOS/godot --path .      # play (or open in the Godot editor and press Play)
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 34     # play a named world seed (stage 34/0)
 /Applications/Godot_mono.app/Contents/MacOS/godot --headless --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
@@ -192,7 +193,7 @@ and asserts valid without fallback: the toy default seed (20260905/0, the first 
 seeds that exercise the second route attempt (8/0, 15/5, 57/5), no ridge line (4/8), three lines or no
 crest (34/6, 13/5) and the slowest/longest and fastest stages of the 1000-seed scan (90/5, 7/4). To add
 one: read the seed from the telemetry `seed` row (or the log line `Stage generated seed=N/0`), append
-`new(N, 0, "why")`, and keep it there once the bug is fixed. The log prints each entry's attempts, length,
+`new(N, 0, "why")`, and keep it there once the bug is fixed; `-- --seed N` launches the toy on it. The log prints each entry's attempts, length,
 base-kit time, crests, lines, anchors and hash, and for a second-attempt seed the reason attempt 1 failed.
 
 ### Generated stage in the toy (Phase 2, PR 2)

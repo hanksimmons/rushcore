@@ -37,6 +37,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         // the panel toggle must keep working in that state.
         ProcessMode = ProcessModeEnum.Always;
         GD.Print("[RUSHCORE] Bootstrapping Movement Toy on Godot ", Engine.GetVersionInfo()["string"]);
+        if (SeedFromArgs() is { } seed) { _seed = seed; GD.Print("[RUSHCORE] Seed from command line ", _seed); }
 
         InputBootstrap.Register();
 
@@ -96,6 +97,15 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
     private const string ScreenshotFlag = "--rushcore-screenshot";
     private int _screenshotFrame;
+
+    /// <summary>`-- --seed N` launches on a named world seed (regression seeds, the G0 manual sample).</summary>
+    private static int? SeedFromArgs()
+    {
+        string[] args = OS.GetCmdlineUserArgs();
+        for (int i = 0; i + 1 < args.Length; i++)
+            if (args[i] == "--seed" && int.TryParse(args[i + 1], out int seed)) return seed;
+        return null;
+    }
 
     private static bool HasFlag(string flag)
     {

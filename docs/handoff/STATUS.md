@@ -15,8 +15,10 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 ## Baseline at handoff
 
 - `develop` a793dbe (2026-09-07): Phase 3 complete (D-097..D-104), sample-stage selector merged. Full harness 303/303.
-- Main-track reservations: D-105 branching exits; Phase 4 impact model and Flow integration; Sky Terraces second cut;
-  Dune Sea optional line; spiral ramp; Phase 6 run and route generation.
+- D-105 branching exits delivered on `feature/branching-exits` (e5ab011, 2026-09-07): `StageDefinition.Exits`, any pad ends
+  the stage (`MovementToyWorld.StageExitIndex`). T1 reads the list, not a single exit.
+- Main-track reservations: Phase 4 impact model and Flow integration; Sky Terraces second cut; Dune Sea optional line;
+  spiral ramp; Phase 6 run and route generation (the route cards on the fork signs, the next-stage seed from the exit taken).
 
 ## Needs main track (collected)
 

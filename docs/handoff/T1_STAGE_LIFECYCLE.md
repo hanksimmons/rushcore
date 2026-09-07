@@ -16,10 +16,11 @@ index become explicit runtime state instead of the hard-coded stage 0.
 - `src/Core/GameBootstrap.cs` `_Ready` builds world, player, camera, UI; `_seed` is one `int`; `RestartSameSeed` /
   `RestartNewSeed` / `TeleportToStart` are the only lifecycle actions; the kill plane check at line 163 calls
   `RecoverPlayer()`; `--seed N`, `--canyon`, `--dunes`, `--sky` flags; the sample-stage block in `_Process`.
-- `src/World/MovementToyWorld.cs` `Build()` (line 167) generates `new StageGenerationRequest(Seed, 0, Archetype)` at
-  line 183: the stage index is always 0. `UpdateStageProgress` (line 83) sets `StageExitTime` once when the ball is
-  within `WorldScale.PadRadius` of `Stage.ExitPosition` and prints; nothing else happens. `ResetStageProgress`,
-  `StageClock`, `StageCheckpointIndex`. `Regenerate(seed)` rebuilds terrain and dressing; `_dressing.Rebuild()`.
+- `src/World/MovementToyWorld.cs` `Build()` generates `new StageGenerationRequest(Seed, 0, Archetype)`: the stage index
+  is always 0. `UpdateStageProgress` sets `StageExitTime` and `StageExitIndex` once when the ball is within
+  `WorldScale.PadRadius` of any pad in `Stage.Exits` (D-105: index 0 is the primary's, A; the rest are terminal lines'
+  pads, B and C) and prints; nothing else happens. `ResetStageProgress`, `StageClock`, `StageCheckpointIndex`.
+  `Regenerate(seed)` rebuilds terrain and dressing; `_dressing.Rebuild()`.
 - `src/Generation/StageData.cs` `StageGenerationRequest(RunSeed, StageIndex, Archetype, DifficultyScalar)` with
   `StageSeed = SeedChain.Derive(RunSeed, "stage", StageIndex)`: the seed chain already supports a stage index.
 - `src/Player/PlayerPhysics.cs` `TeleportTo`, `SetCheckpoint`, `RequestRecovery`, `Recovered` event; `Flow`;
@@ -47,7 +48,8 @@ Keep it to three pieces.
    - exit feedback: pulse the `EXIT` sign (scale or emissive) and fire one `PlayerVfx`-style burst at the pad
      (06 §10 "exit"). Reuse `PlayerVfx` materials if the burst lives there; otherwise a tiny one-shot node.
    - fade: a full-screen `ColorRect` on `UiRoot` (below the tuning panel) driven by a timer.
-   - rebuild: `RunDirector.Advance()`, `world.Regenerate(director.Request(world.WantedArchetype))`,
+   - rebuild: `RunDirector.Advance()` (record which exit index was taken; Phase 6 will hash it into the next request),
+     `world.Regenerate(director.Request(world.WantedArchetype))`,
      `TeleportToStart()` (which already resets progress, checkpoint, camera yaw and teleports; confirm it resets
      physics interpolation per 05 §10, add it if not), Flow → 0, boost carried (P-001), fade in, unlock.
    - timings are three floats in a new `RunTuning` category (`Run › Outro`, `Fade Out`, `Fade In`), defaults per
@@ -57,8 +59,8 @@ Keep it to three pieces.
    route heading, with zero velocity; sets the checkpoint there.
 5. **Instrumentation:** `[RUSHCORE] Stage N/i complete in X s (model Y s); next build Z ms` on the transition.
 
-Read the exit through `Stage.ExitPosition` in exactly one method. D-105 (main track) will turn the exit into a list of
-exits with an index; keep the trigger local so that change is one method.
+The trigger already reads `Stage.Exits` (D-105); `StageExitIndex` says which pad ended the stage. Carry that index on
+the completion event so Phase 6 can seed the next stage from it.
 
 ## Pre-answered choices
 
@@ -81,7 +83,9 @@ Use these defaults; if you deviate, write the P-entry and say why in the Deliver
 
 Add to the generated-stage case, after the existing full-route drive:
 
-- `StageCompleted` fired exactly once on reaching the exit; re-entering the pad after the outro does not fire again.
+- `StageCompleted` fired exactly once on reaching an exit, carrying the exit index; re-entering the pad after the outro
+  does not fire again. On a seed with a terminal line (sample stage 6, Highlands seed 4), reaching exit B fires it with
+  index 1.
 - During the outro, injected Space and W do nothing (no charge started, no drive change), and the ball keeps rolling
   (speed at outro end ≥ 50% of speed at the trigger, or grounded and slowing on the pad; state the rule you used).
 - After the transition: `StageIndex == 1`, the stage hash differs from stage 0's, `StageClock == 0`,

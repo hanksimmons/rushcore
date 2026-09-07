@@ -130,9 +130,9 @@ bullets early and are reconciled into this plan by the main track (`docs/handoff
 the run seed / stage index (Phase 5 "start/exit", "completion transition", "clean stage lifecycle"), the HUD
 (Phase 5) with the health value (Phase 4), enemy and pickup visuals with the reward burst and combat VFX (Phase 4
 presentation only), prop scatter (Phase 3's last bullet), the generation measurements behind D-100..D-103's open gaps,
-and presentation fixes from the G0 manual sample. The main track keeps: branching stage exits (reserved D-105, a change
-to 02 §3/§4 pending the user's confirmation), the impact model and its Flow integration, the Sky Terraces second cut,
-the Dune Sea optional line, the spiral ramp, and Phase 6 run and route generation.
+and presentation fixes from the G0 manual sample. The main track keeps: the impact model and its Flow integration, the Sky Terraces second cut, the Dune Sea optional
+line, the spiral ramp, and Phase 6 run and route generation (the route cards on the fork signs and the next-stage seed
+from the exit taken; branching exits themselves are delivered, D-105, on `feature/branching-exits`).
 
 ## Phase 4 — Movement Combat
 

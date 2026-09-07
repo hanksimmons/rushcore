@@ -269,7 +269,8 @@ Until the implementation plan advances:
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation
-measurements, sample-stage fixes) on `opus/` branches. Its contract, boundaries and reconciliation protocol are in
+measurements, sample-stage fixes) on `opus/` branches. D-105 is delivered on `feature/branching-exits`;
+`StageDefinition.Exits` is the list a stage's completion reads. Its contract, boundaries and reconciliation protocol are in
 `docs/handoff/README.md`; its state is `docs/handoff/STATUS.md`; it writes P-numbers, never D-numbers, and never edits
 this paragraph, `docs/09` or `DECISIONS.md`. On return the main track reconciles per that README §8.
 

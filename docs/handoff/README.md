@@ -6,8 +6,8 @@
 
 ## 1. Why this directory exists
 
-The main track is between Phase 3 (delivered, D-097..D-104, merged to `develop` at a793dbe) and two pieces the user has
-reserved for it: branching stage exits (reserved as **D-105**) and the impact-combat core of Phase 4. For a few days a second
+The main track is between Phase 3 (delivered, D-097..D-105; D-105 branching exits is on `feature/branching-exits`) and
+the impact-combat core of Phase 4, which the user has reserved for it. For a few days a second
 agent (Opus 5) works ahead on slices that are well specified, self-contained, harness-checkable, and never touch route
 topology, generator rules or the frozen movement baseline.
 
@@ -71,7 +71,7 @@ validator in `StageGenerator.cs` (T5 may add *reporting* there, never a verdict 
 `src/Player/PlayerPhysics.cs` (T2 may add a health value holder; nothing that reads or writes velocity), any compiled
 default in Movement / Boost / Camera / Flow / Carve / VFX tuning, `docs/02`, `docs/03`, `docs/04` behaviour text.
 
-**Reserved numbers:** D-105 (branching exits) belongs to the main track. The parallel track writes P-numbers only.
+**Reserved numbers:** D-numbers belong to the main track (D-105 is taken by branching exits). The parallel track writes P-numbers only.
 
 ## 6. Harness
 

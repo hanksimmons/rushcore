@@ -35,6 +35,13 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 
 Falling below the kill plane recovers automatically. Recovery resets physics interpolation.
 
+**Ground follow** (`Movement › Ground Follow`, snap 0.5 m; D-092): the controller reads the terrain
+grid under the ball each tick and keeps it on the surface wherever the surface could physically carry
+it (v²κ below gravity), so the collider's flat facets never hop it and a charge held over a rolling
+crest survives; a launch crest, ramp lip or cliff is still left to real physics. The telemetry
+`grounded` row shows `follow on` while it carries the ball. Off = the contact-only D-091 controller,
+for A/B only.
+
 ## Tuning baseline rule
 
 Compiled defaults in `src/Tuning/GameplayTuning.cs` mirror `03 §15` and are the comparison
@@ -269,13 +276,18 @@ stay inside the corridor (off-line ≤ 15 m measured), keep contact ≥ 60% of t
 of the route speed model's base-kit time (Gate G0, D-087: ball 49.9 s vs model 47.8 s, 4.3%; the log prints
 ball vs model time and speed every kilometre with the contact fraction over that kilometre: 90 / 94 / 58 /
 87 / 76 / 22% on the default seed, the low values on the two launch-crest kilometres; after the second
-crest at the cap the ball skips for most of the last kilometre and reaches the exit at 119 m/s). The same case
+crest at the cap the ball skips for most of the last kilometre and reaches the exit at 119 m/s). With the
+ground follow (D-092) the same drive reads 8.5% (ball 51.4 s, model 47.4 s) and raw contact 100 / 100 / 68 /
+100 / 99 / 72%: every kilometre without a launch crest must keep ≥ 97% raw contact, and each launch crest
+is logged with its radius, apex speed and v²/gr and must be left exactly when that ratio exceeds 1 (never
+glued, never faked). `RUSHCORE_CELL_SIZE=8` (or 16) in the environment builds and drives this one stage at
+that cell size; the cell re-measurement below came from it. The same case
 asserts no solid prop inside a corridor, that the SceneTree node count is flat across three regenerations
 and that neither generation nor the build writes to tuning or the rigid body (04 §7).
 
 Relief rules (D-085): three long swells with summed crest curvature ≤ 0.7 / 560 m and summed slope
 ≤ 0.18, micro relief inside the remaining curvature budget (≈ 0.9 m at λ 400), corridor profile =
-relief smoothed ± 150 m along the route, level across, 120 m falloff, banks 18/145 · r on the outer
+relief smoothed ± 150 m along the route and interpolated between route samples (D-093), level across, 120 m falloff, banks 18/145 · r on the outer
 half of bends, crests λ 300–500 with height trimmed so crest + local slope ≤ 0.36, flat 60 m pads.
 
 **Optional lines and checkpoints (PR 3, D-086).** Green route lines are ridge lines: they leave the
@@ -317,9 +329,39 @@ Model: samples ≈ L·W/c², triangles = 2·samples, build ≈ 2 µs per sample 
 sample, each tile ≤ ~4 MB of vertex arrays. A 6 × 2 km stage at 4 m is ≈ 750 k samples,
 1.5 M triangles, ≈ 1.5 s; at 8 m a quarter of that.
 
-**Facet size is a feel cost, not only a draw cost.** The harness drives the 800 m / 80 m hill
-station with W held from 60 m/s: at 4 m cells the ball is grounded 99% of the way with 2 short
-hops; at 8 m it is grounded 86% with 8 hops. Judge cell size on contact first, then triangles.
+**Facet size was a feel cost, not only a draw cost.** The harness drives the 800 m / 80 m hill
+station with W held from 60 m/s: at 4 m cells the ball was grounded 99% of the way with 2 short
+hops; at 8 m it was grounded 86% with 8 hops. Since the ground follow (D-092) the same drive keeps
+100% raw contact with no hop at 4, 8 and 16 m, and a charge held from 100 m before the apex jumps
+at it at every cell size; with the follow off at 16 m the ball hops 4 times, keeps 84% raw contact,
+arrives 20 m/s slower (airborne ticks have no drive) and loses the charge. Cell size is now judged on
+draw cost, silhouette and validator resolution (the route is sampled every 4 m; a coarser grid aliases
+its grade checks), not on contact:
+
+| Strip hill station (D-092 run) | 4 m | 8 m | 16 m | 16 m, follow off |
+|---|---|---|---|---|
+| Triangles | 512 k | 128 k | 32 k | 32 k |
+| Build | 474 ms | 264 ms | 109 ms | 82 ms |
+| Hops / raw contact | 0 / 100% | 0 / 100% | 0 / 100% | 4 / 84% |
+| Apex speed, charge | 118 m/s, held | 117, held | 117, held | 95, lost |
+
+The same sweep on the generated stage (default seed, `RUSHCORE_CELL_SIZE`, whole-route follower drive,
+follow on):
+
+| Stage 6.0 × 2.0 km (D-092 / D-093 run) | 4 m | 8 m | 16 m |
+|---|---|---|---|
+| Samples / heights | 752 k / 3.0 MB | 188 k / 0.8 MB | 47 k / 0.2 MB |
+| Triangles / tiles | 1500 k / 48 | 375 k / 12 | 93 k / 3 |
+| Build (headless, warm) | 3340 ms | 1465 ms | 1012 ms |
+| Raw contact per km | 100 / 100 / 67 / 100 / 100 / 75% | 100 / 100 / 67 / 100 / 100 / 75% | 100 / 100 / 65 / 100 / 100 / 75% |
+| Whole route vs model | 47.2 s (0.5%) | 47.3 s (0.3%) | 47.3 s (0.2%) |
+| Second crest apex speed | 147 m/s | 147 m/s | 147 m/s |
+
+Contact and speed are identical at every cell size, and the two launch crests leave the ground at the
+same v²/gr (2.4 and 1.9) at all three. Before D-093 the 4 m column read 8.5% and a second-crest apex of
+131 m/s: the corridor stamp's nearest-sample height was a 4 m staircase, which only a 4 m grid resolved
+(flat treads and double-grade risers: a tread on a descent threw the ball 50 m, a riser on the climb cost
+13 m/s in one tick). The remaining 0.3–0.5% is the model's missing airborne phase at the two crests.
 
 **Crest contact.** A ball leaves the ground at any crest whose radius is below v²/g:
 

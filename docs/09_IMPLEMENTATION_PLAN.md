@@ -94,7 +94,10 @@ route, so the speed-regaining verbs had nothing to buy. Deliver, in this order:
   panel category, camera extrapolation; harness checks — delivered 2026-09-06,
 - the carve as a speed-preserving drift on Left Alt / LB (03 §11, D-089) — delivered 2026-09-06,
 - the user tunes headroom, burst multiplier and the Flow values on the lab and strip, names a preset
-  final; promoted verbatim (D-078 procedure),
+  final; promoted verbatim (D-078 procedure) — delivered 2026-09-06 (D-091),
+- the analytic ground follow (03 §3, D-092), so the collider's facets stop hopping the ball and a
+  charge survives a crest approach; cells re-measured at 4 / 8 / 16 m with it on, which exposed and
+  removed the corridor stamp's 4 m staircase (D-093) — delivered 2026-09-06,
 - the ceiling addendum: strip measurements at the ceiling, route speed model airborne-and-landing
   phase, `WorldScale` ceiling constants, two-speed validators, chainable-line check, seconds below
   the base cap in every report (08 §4 addendum),

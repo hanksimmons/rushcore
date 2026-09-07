@@ -123,15 +123,29 @@ public sealed class StageHeightField : IHeightSource
 
         public float Width(int i) => HalfWidth + (Bend[i] ? BendExtraHalfWidth : 0f);
 
-        /// <summary>Corridor height at a point near vertex i: level across, plus the outer-half bank.</summary>
+        /// <summary>Corridor height at a point near vertex i: the profile interpolated along the route
+        /// toward whichever neighbour the point lies toward (D-093: a nearest-vertex height was a 4 m
+        /// staircase that a 4 m grid resolves into flat treads and double-grade risers), level across,
+        /// plus the outer-half bank.</summary>
         public float Height(int i, float x, float z)
         {
-            float h = H[i];
-            if (BankHeight[i] > 0f)
+            float dx = x - X[i], dz = z - Z[i];
+            int j = i + 1 < N ? i + 1 : i - 1;
+            if (j == i + 1 && i > 0 && dx * (X[j] - X[i]) + dz * (Z[j] - Z[i]) < 0f) j = i - 1;
+            float t = 0f;
+            if (j >= 0)
+            {
+                float ex = X[j] - X[i], ez = Z[j] - Z[i], len2 = ex * ex + ez * ez;
+                if (len2 > 1e-6f) t = Mathf.Clamp((dx * ex + dz * ez) / len2, 0f, 1f);
+            }
+            else j = i;
+            float h = Mathf.Lerp(H[i], H[j], t);
+            float bank = Mathf.Lerp(BankHeight[i], BankHeight[j], t);
+            if (bank > 0f)
             {
                 float lx = -Mathf.Sin(Heading[i]), lz = Mathf.Cos(Heading[i]);
-                float lateral = ((x - X[i]) * lx + (z - Z[i]) * lz) * BankSide[i];
-                h += BankHeight[i] * Mathf.Clamp(lateral / Width(i), 0f, 1f);
+                float lateral = (dx * lx + dz * lz) * (BankSide[i] != 0f ? BankSide[i] : BankSide[j]);
+                h += bank * Mathf.Clamp(lateral / Width(i), 0f, 1f);
             }
             return h;
         }

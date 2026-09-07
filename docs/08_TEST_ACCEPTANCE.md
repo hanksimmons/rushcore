@@ -332,6 +332,11 @@ telemetry seed row shows them) with the reason it is there. The harness generate
 run and asserts it is valid without the known-safe fallback, so a fixed failure stays fixed. Add the
 seed when the bug is reproduced, before the fix; never remove one.
 
+`tests/GoldenHashes.cs` pins the hash of every sample stage (docs/10): the harness regenerates each sample data-only
+and asserts the hash is unchanged, so any change to generation fails the run at once. An intended generator change
+updates the table in the same commit and names it in its decision; a branch that must not touch generation
+(`docs/handoff`) never edits it.
+
 ## 12. Definition of Done per task
 
 Done means:

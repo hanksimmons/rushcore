@@ -327,6 +327,7 @@ public partial class MovementToySelfTest : Node
         {
             RunStageGenerationBatchCase();
             RunRegressionSeedsCase();
+            RunGoldenHashCase();
             RunSpeedModelDataChecks();
             yield break;
         }
@@ -1191,6 +1192,7 @@ public partial class MovementToySelfTest : Node
         // ---- Phase 2 generation, pure data: route skeletons for a seed batch (04 §12, 08 §5) ----
         RunStageGenerationBatchCase();
         RunRegressionSeedsCase();
+        RunGoldenHashCase();
 
         // ---- route speed model (D-081): the generator's speed oracle must track the real ball ----
         foreach (var e in RunRouteSpeedModelCase()) yield return e;
@@ -2027,6 +2029,24 @@ public partial class MovementToySelfTest : Node
             Check($"regression seed {e.RunSeed}/{e.StageIndex} generates a valid stage without fallback", def.Report.Passed && !def.Report.UsedFallback,
                 string.Join("; ", def.Report.Failures.Select(f => f.Name + " " + f.Detail)));
         }
+    }
+
+    // ---------------- golden hashes (08 §11): the sample stages generate exactly what they did ----------------
+
+    private void RunGoldenHashCase()
+    {
+        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
+        bool allMatch = true; string detail = "";
+        foreach (var e in SampleStages.All)
+        {
+            string hash = gen.Generate(new StageGenerationRequest(e.Seed, 0, e.Archetype)).Hash().ToString("X");
+            bool known = GoldenHashes.BySample.TryGetValue(e.Name, out var golden);
+            bool match = known && golden == hash;
+            allMatch &= match;
+            detail += $" [{e.Name}: {hash}{(match ? "" : known ? $" ≠ golden {golden}" : " (not recorded)")}]";
+        }
+        GD.Print("[SELFTEST] golden hashes:" + detail);
+        Check("every sample stage generates its golden hash (tests/GoldenHashes.cs; a change is a generator change)", allMatch, detail);
     }
 
     // ---------------- Phase 2: generated stage in the toy (04 §9, §16; 08 §5) ----------------

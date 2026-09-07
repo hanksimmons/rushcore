@@ -44,7 +44,7 @@ public partial class MovementToySelfTest : Node
     private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount, _landedCount, _burstCount;
     private bool _frameCheck;
     private int _frameSamples, _frameOut;
-    private float _frameWorst;
+    private float _frameWorst, _frameSideWorst;
     private bool _releaseJumpFromProcess;
     /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
     private Vector3? _worldDrive;
@@ -129,11 +129,15 @@ public partial class MovementToySelfTest : Node
         if (!rig.FlooredThisFrame && _frameCheck)
         {
             float angle = rig.FrameAngleTo(_player.GlobalPosition);
+            float side = rig.FrameSideAngleTo(_player.GlobalPosition);
             float ballAngle = Mathf.RadToDeg(Mathf.Atan(_debug.Tuning.Movement.BallRadius / Mathf.Max(0.5f, rig.Camera.GlobalPosition.DistanceTo(_player.GlobalPosition))));
             float halfFov = rig.Camera.Fov * 0.5f;
+            var vp = rig.Camera.GetViewport().GetVisibleRect().Size;
+            float halfFovH = Mathf.RadToDeg(Mathf.Atan(Mathf.Tan(Mathf.DegToRad(halfFov)) * Mathf.Max(0.5f, vp.X / Mathf.Max(1f, vp.Y))));
             _frameSamples++;
-            if (float.IsNaN(angle) || Mathf.Abs(angle) + ballAngle > halfFov) _frameOut++;
+            if (float.IsNaN(angle) || Mathf.Abs(angle) + ballAngle > halfFov || Mathf.Abs(side) + ballAngle > halfFovH) _frameOut++;
             if (!float.IsNaN(angle)) _frameWorst = Mathf.Max(_frameWorst, Mathf.Abs(angle));
+            if (!float.IsNaN(side)) _frameSideWorst = Mathf.Max(_frameSideWorst, Mathf.Abs(side));
         }
 
         if (!_visCheck) return;
@@ -802,7 +806,7 @@ public partial class MovementToySelfTest : Node
         // ---- framing pivot (03 §14, D-090): the ball never leaves the frame on a jump, a dive or at the cap ----
         {
             foreach (var _ in Settle(PlatformCenter - Forward * 600f + Vector3.Up * 3f)) yield return null;
-            _frameCheck = true; _frameSamples = 0; _frameOut = 0; _frameWorst = 0f;
+            _frameCheck = true; _frameSamples = 0; _frameOut = 0; _frameWorst = 0f; _frameSideWorst = 0f;
             Input.ActionPress(InputBootstrap.Jump, 1f);                          // full charge, straight up
             foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.05f)) yield return null;
             Input.ActionRelease(InputBootstrap.Jump);
@@ -826,7 +830,37 @@ public partial class MovementToySelfTest : Node
                 yield return null;
             }
             ReleaseAll();
+            // A held carve at the cap with a close lens (the user's 6 m preset): the ball slides across
+            // the screen, the sideways pivot must engage, and the ball must park inside the frame.
+            int runwayOut = _frameOut, runwaySamples = _frameSamples;
+            float savedDistance = t.Camera.Distance, savedLookMax = t.Camera.LookAheadMax;
+            t.Camera.Distance = 6f; t.Camera.LookAheadMax = 5.8f;
+            foreach (var _ in Settle(PlatformCenter - Forward * 600f + Vector3.Up * 3f)) yield return null;
+            _player.RefillBoost(t.Boost.BoostCapacity);
+            _worldDrive = Forward;
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            foreach (var _ in Seconds(2.0f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Boost);
+            Vector3 carveEntry = FlatVel.Normalized();
+            _worldDrive = carveEntry.Rotated(Vector3.Up, Mathf.Pi * 0.5f);     // aim a left turn and hold the carve
+            Input.ActionPress(InputBootstrap.Carve, 1f);
+            int carveStart = _frameSamples, carveOutStart = _frameOut;
+            float sideBefore = _frameSideWorst;
+            _frameSideWorst = 0f;
+            foreach (var _ in Seconds(1.2f)) yield return null;
+            bool carved = _player.IsCarving;
+            float carveAngle = _player.CarveAngleDegrees;
+            ReleaseAll();
+            foreach (var _ in Seconds(0.3f)) yield return null;
             _frameCheck = false;
+            float sideWorstCarve = _frameSideWorst;
+            GD.Print($"[SELFTEST] framing carve: carving={carved} angle {carveAngle:0}°, {_frameOut - carveOutStart}/{_frameSamples - carveStart} ticks out, worst side {sideWorstCarve:0.0}° (band {t.Camera.FrameBandHorizontalDegrees:0}°), frame yaw {rig.FrameYawDegrees:0.0}°");
+            Check("a held carve slides the ball sideways but never out of frame", carved && carveAngle > 45f && _frameOut - carveOutStart == 0,
+                $"carving={carved} angle {carveAngle:0}° out {_frameOut - carveOutStart}");
+            Check("the sideways pivot engages and parks the ball on the horizontal band", sideWorstCarve <= t.Camera.FrameBandHorizontalDegrees + 6f && sideWorstCarve >= t.Camera.FrameBandHorizontalDegrees - 3f,
+                $"worst side {sideWorstCarve:0.0}° vs band {t.Camera.FrameBandHorizontalDegrees:0}°");
+            t.Camera.Distance = savedDistance; t.Camera.LookAheadMax = savedLookMax;
+            _frameOut = runwayOut; _frameSamples = runwaySamples; _frameSideWorst = sideBefore;
             GD.Print($"[SELFTEST] framing: jump+dive {jumpOut}/{jumpSamples} ticks out of frame (worst {jumpWorst:0.0}°), runway {_frameOut - jumpOut}/{_frameSamples - jumpSamples} out (worst {_frameWorst:0.0}°), band {t.Camera.FrameBandDegrees:0}°, look-ahead over reach {lookWorst:0.00} m, frame pitch {rig.FramePitchDegrees:0.0}°");
             Check("the ball stays in frame through a full jump and a slam dive", jumpOut == 0, $"{jumpOut}/{jumpSamples} ticks out, worst {jumpWorst:0.0}°");
             Check("the ball stays in frame at the cap on the runway", _frameOut - jumpOut == 0, $"{_frameOut - jumpOut} ticks out, worst {_frameWorst:0.0}°");

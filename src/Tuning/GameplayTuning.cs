@@ -166,6 +166,9 @@ public sealed class CameraTuning
     /// above or below the screen centre. Beyond it the lens pitches at once to hold the ball on
     /// the band edge; inside it the pitch eases back to the base pitch.</summary>
     public float FrameBandDegrees = 22f;
+    /// <summary>Horizontal twin (D-090): the ball is never further than this many degrees left or
+    /// right of the screen centre; a carve slide parks the ball on this edge instead of leaving.</summary>
+    public float FrameBandHorizontalDegrees = 30f;
     /// <summary>How fast the framing pitch eases back once the ball is inside the band (1/s).</summary>
     public float PitchReleaseDamping = 6f;
     public float FovMin = 62f;
@@ -335,6 +338,7 @@ public sealed class GameplayTuning
         F(CatCamera, "Follow Damping", 0.5f, 30f, () => k.FollowDamping, v => k.FollowDamping = v);
         F(CatCamera, "Vertical Damping", 0.2f, 30f, () => k.VerticalDamping, v => k.VerticalDamping = v);
         F(CatCamera, "Frame Band (deg)", 2f, 60f, () => k.FrameBandDegrees, v => k.FrameBandDegrees = v);
+        F(CatCamera, "Frame Band H (deg)", 2f, 70f, () => k.FrameBandHorizontalDegrees, v => k.FrameBandHorizontalDegrees = v);
         F(CatCamera, "Pitch Release Damping", 0.5f, 40f, () => k.PitchReleaseDamping, v => k.PitchReleaseDamping = v);
         F(CatCamera, "FOV Min", 30f, 110f, () => k.FovMin, v => k.FovMin = v);
         F(CatCamera, "FOV Max", 30f, 120f, () => k.FovMax, v => k.FovMax = v);

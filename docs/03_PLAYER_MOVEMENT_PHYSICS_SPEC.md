@@ -421,10 +421,10 @@ Mechanically:
   therefore never swings the view twice, yet the camera always ends up behind the direction
   of travel. There is no reverse-drive hold because `S` cannot reverse (D-076),
 - a fixed **base pitch** frames the road; no manual rotation; player may adjust baseline zoom within limits,
-- **framing pivot** (D-090): the lens itself pitches up or down the instant the ball would leave a
-  band of ± a tunable angle around the screen centre (a jump to the top, a dive off the bottom),
-  holding it on the band edge, and eases back to the base pitch once it is inside again; steering
-  stays relative to the rig, not the tilted lens,
+- **framing pivot** (D-090): the lens itself pitches or yaws the instant the ball would leave a
+  band of ± a tunable angle around the screen centre, vertically (a jump to the top, a dive off the
+  bottom) or sideways (a carve slide, §11), holding it on the band edge, and eases back once it is
+  inside again; steering stays relative to the rig, not the turned lens,
 - focus/look target leads along useful velocity; look-ahead grows with speed and is bounded, and
   is never more than 70% of the lens's horizontal reach (occluded distance included), so the
   camera can never be ahead of the ball whatever the tuning says,

@@ -133,8 +133,9 @@ playtest:
   ball→camera); shake bounded to the probe margin; lens floored above the heightfield
   (`Camera › Ground Clearance`).
 - **Framing pivot** (D-090): `Camera › Frame Band (deg)` (22) is how far above or below the screen
-  centre the ball may go before the lens pitches to hold it there; `Pitch Release Damping` (6/s) is
-  how fast it eases back. The look-ahead is clamped to 70% of the lens's horizontal reach, so a large
+  centre the ball may go before the lens pitches to hold it there, `Frame Band H (deg)` (30) the same
+  left and right, which is where a carve slide parks the ball; `Pitch Release Damping` (6/s) is how
+  fast both ease back. The look-ahead is clamped to 70% of the lens's horizontal reach, so a large
   `Look-Ahead Max` with a short `Distance` can no longer put the camera ahead of the ball. For a
   small ball scale `Ground Clearance` and `Occlusion Margin` with the radius (0.66 m ball → 0.5 / 0.2)
   or the focus floor overrides a negative `Height Offset` on flat ground.

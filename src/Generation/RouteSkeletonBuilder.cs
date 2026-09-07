@@ -28,8 +28,25 @@ public sealed class RouteSkeletonBuilder
     private const float TurnPersistence = 0.7f;
 
     private readonly RouteSpeedModel _speed;
+    private readonly RouteSpeedModel? _ceiling;
 
-    public RouteSkeletonBuilder(RouteSpeedModel speed) => _speed = speed;
+    /// <summary>With a ceiling model the feature straights also hold the ceiling flight off their crest
+    /// plus the landing run (two speeds, 04 §12, D-094).</summary>
+    public RouteSkeletonBuilder(RouteSpeedModel speed, RouteSpeedModel? ceiling = null)
+    {
+        _speed = speed;
+        _ceiling = ceiling;
+    }
+
+    /// <summary>Landing run a crest needs: the accepted 300 m, or the ceiling flight plus its run when longer.</summary>
+    private float CrestLandingFor(float wavelength, float height)
+    {
+        if (_ceiling is null) return CrestLanding;
+        // The height field trims crests to the grade limit, so the requested height is the upper bound; the
+        // swell under the crest may fall away at its steepest past the apex, so the flight is sized over that.
+        float flight = _ceiling.CrestFlightLength(wavelength, height, _ceiling.Cap, WorldScale.LongSwellMaxSlope);
+        return Mathf.Max(CrestLanding, flight - wavelength * 0.5f + WorldScale.LandingRunAfterFlight);
+    }
 
     public RouteSkeleton Build(ulong routeSeed)
     {
@@ -53,7 +70,8 @@ public sealed class RouteSkeletonBuilder
             bool wantCrest = pos.X - lastCrestX >= WorldScale.LaunchCrestSpacing && rng.Chance(CrestChance);
             float wavelength = rng.Range(WorldScale.LaunchCrestWavelengthMin, WorldScale.LaunchCrestWavelengthMax);
             float crestHeight = wavelength * rng.Range(0.08f, 0.12f);   // requested; the height field trims it to the grade limit
-            float length = wantCrest ? CrestApproach + wavelength + CrestLanding : rng.Range(StraightMin, StraightMax);
+            float crestLanding = wantCrest ? CrestLandingFor(wavelength, crestHeight) : CrestLanding;
+            float length = wantCrest ? CrestApproach + wavelength + crestLanding : rng.Range(StraightMin, StraightMax);
             float sin = Mathf.Sin(heading);
             if (Mathf.Abs(sin) > 1e-4f)
             {
@@ -66,7 +84,7 @@ public sealed class RouteSkeletonBuilder
             if (room <= WorldScale.RouteSampleSpacing) break;
             if (length > room) length = room;
 
-            bool crest = wantCrest && length >= CrestApproach + wavelength + CrestLanding - 1e-3f;
+            bool crest = wantCrest && length >= CrestApproach + wavelength + crestLanding - 1e-3f;
             int startIndex = route.Vertices.Count - 1;
             float startDistance = route.Vertices[^1].Distance;
             pos = EmitStraight(route, pos, heading, length);

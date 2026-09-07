@@ -14,16 +14,23 @@ public sealed class StageGenerator
     public const int MaxAttempts = 4;
 
     private readonly RouteSpeedModel _speed;
+    private readonly RouteSpeedModel _ceiling;
     private readonly RouteSkeletonBuilder _routes;
+    private readonly FlowTuning _flow;
 
-    public StageGenerator(MovementTuning movement)
+    /// <summary>Two speeds (04 §12, D-094): the base kit decides crossability and time, the Flow ceiling
+    /// (base cap × (1 + headroom)) decides safety. Both read the frozen tuning; nothing is duplicated.</summary>
+    public StageGenerator(MovementTuning movement, FlowTuning flow)
     {
         _speed = new RouteSpeedModel(movement);
-        _routes = new RouteSkeletonBuilder(_speed);
+        _ceiling = new RouteSpeedModel(movement, flow.Headroom);
+        _routes = new RouteSkeletonBuilder(_speed, _ceiling);
         _gravity = movement.Gravity;
+        _flow = flow;
     }
 
     public RouteSpeedModel SpeedModel => _speed;
+    public RouteSpeedModel CeilingModel => _ceiling;
 
     public StageDefinition Generate(StageGenerationRequest request)
     {
@@ -63,7 +70,9 @@ public sealed class StageGenerator
         report.Timings.Add(("relief + corridors", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         RouteSpeedProfile profile = _speed.Integrate(route.Polyline());
-        var def = new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed, HeightField = field };
+        // The ceiling profile: a standing start, then a full chain held wherever the bends allow (04 §12).
+        RouteSpeedProfile ceiling = _ceiling.Integrate(route.Polyline(), chainFromBaseCap: true);
+        var def = new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed, HeightField = field, CeilingProfile = ceiling };
         foreach (var line in optional)
         {
             def.OptionalLines.Add(line);
@@ -75,6 +84,7 @@ public sealed class StageGenerator
         report.Timings.Add(("checkpoints", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         Validate(route, profile, field, report);
+        def.WidestFlowGap = ValidateTwoSpeeds(route, profile, ceiling, report);
         ValidateOptionalLines(def, report);
         ValidateCheckpoints(def, report);
         report.Timings.Add(("validation", sw.Elapsed.TotalMilliseconds));
@@ -232,8 +242,13 @@ public sealed class StageGenerator
             float speed = profile.SpeedAt(f.CentreDistance);
             float crestRadius = RouteSpeedModel.CosineCrestRadius(f.Wavelength, f.Height);
             f.IsLaunch = _speed.CrestIsLaunch(crestRadius, speed);
-            // Flight to fall the crest height on the far side at the arrival speed (04 §10).
+            // Flight to fall the crest height on the far side at the arrival speed (04 §10), or the
+            // model's own flight off this crest when it integrated one (D-094), whichever lands later.
             f.LandingDistance = f.IsLaunch ? speed * Mathf.Sqrt(2f * f.Height / Mathf.Max(0.001f, _gravity)) : 0f;
+            float crestStart = f.CentreDistance - f.Wavelength * 0.5f;
+            foreach (var fl in profile.Flights)
+                if (fl.LaunchDistance >= crestStart && fl.LaunchDistance <= f.CentreDistance + f.Wavelength * 0.5f)
+                    f.LandingDistance = Mathf.Max(f.LandingDistance, fl.LandingDistance - f.CentreDistance - f.Wavelength * 0.5f);
             float straightEnd = v[f.EndIndex].Distance;
             bool ok = f.CentreDistance + f.Wavelength * 0.5f + f.LandingDistance <= straightEnd + 1e-3f;
             crestsClear &= ok;
@@ -246,6 +261,72 @@ public sealed class StageGenerator
     }
 
     private readonly float _gravity;
+
+    /// <summary>
+    /// Two speeds (04 §12, D-094). The base-kit profile carries the figure every report must show
+    /// (seconds below the base cap). Safety reads the ceiling profile: no bend may sit inside a flight
+    /// or its landing run at either speed, and the primary must offer a chainable line (consecutive
+    /// Flow opportunities never further apart than the chain window at the ceiling speed).
+    /// </summary>
+    private float ValidateTwoSpeeds(RouteSkeleton route, RouteSpeedProfile profile, RouteSpeedProfile ceiling, ValidationReport report)
+    {
+        var v = route.Vertices;
+        float baseCap = _speed.Cap, ceilingSpeed = _ceiling.Cap;
+
+        float below = profile.SecondsBelow(baseCap * 0.98f), start = profile.TimeToReach(baseCap * 0.98f);
+        report.Note("seconds below the base cap",
+            $"{below:0.0} s of {profile.TotalTime:0.0} s ({start:0.0} s standing start); {profile.Flights.Count} flights, {profile.AirborneSeconds:0.0} s airborne");
+
+        // A flying ball goes straight: it may not leave the ground inside a bend nor fly across a bend's
+        // start. It may land into a bend's approach only if that bend holds the speed it lands with,
+        // because the landing run is too short to shed any.
+        (bool ok, string detail) FlightsClear(RouteSpeedProfile p, RouteSpeedModel model)
+        {
+            bool clear = true; string d = "";
+            foreach (var f in p.Flights)
+            {
+                float runEnd = f.LandingDistance + WorldScale.LandingRunAfterFlight;
+                string fault = "";
+                foreach (var b in route.Bends)
+                {
+                    float bs = v[b.StartIndex].Distance, be = v[b.EndIndex].Distance;
+                    // A straight flight of length L inside an arc of radius r drifts L² / 2r off the line; a
+                    // short skim stays in the corridor, a real flight does not.
+                    float inBend = Mathf.Max(0f, Mathf.Min(f.LandingDistance, be) - Mathf.Max(f.LaunchDistance, bs));
+                    bool drifts = inBend * inBend / (2f * b.Radius) > WorldScale.FlightDriftTolerance;
+                    if (drifts && f.LaunchDistance >= bs && f.LaunchDistance <= be) { fault = " LAUNCHES IN A BEND"; break; }
+                    if (drifts && f.LaunchDistance < bs && f.LandingDistance > bs) { fault = " FLIES ACROSS A BEND"; break; }
+                    // Between touchdown and the bend the brake can shed drive × (run / speed); the rest must fit the bend.
+                    float limit = model.CornerSpeedLimit(b.Radius);
+                    float shed = model.BrakeDeceleration * Mathf.Max(0f, bs - f.LandingDistance) / Mathf.Max(1f, f.LandingSpeed);
+                    if (bs > f.LandingDistance && bs <= runEnd && f.LandingSpeed - shed > limit + 1f) { fault = $" LANDS TOO FAST FOR THE r{b.Radius:0} BEND ({limit:0} m/s after braking {shed:0})"; break; }
+                }
+                clear &= fault == "";
+                d += $" [{f.LaunchDistance:0}→{f.LandingDistance:0} m at {f.LaunchSpeed:0} m/s, {f.Seconds:0.0} s, lands {f.LandingVerticalSpeed:0} m/s down → {f.LandingSpeed:0} m/s{fault}]";
+            }
+            return (clear, $"{p.Flights.Count} flights, {p.AirborneSeconds:0.0} s airborne{d}");
+        }
+        var baseFlights = FlightsClear(profile, _speed);
+        var ceilFlights = FlightsClear(ceiling, _ceiling);
+        report.Add("flights stay clear of bends at the base cap (none launched in or across a bend; landings hold the next bend)", baseFlights.ok, baseFlights.detail);
+        report.Add("flights stay clear of bends at the ceiling (none launched in or across a bend; landings hold the next bend)", ceilFlights.ok, $"{ceilingSpeed:0} m/s: {ceilFlights.detail}");
+        int hardLandings = ceiling.Flights.Count(f => f.LandingVerticalSpeed >= _flow.PlainLandingSpeed);
+        report.Note("ceiling profile", $"{ceilingSpeed:0} m/s: {ceiling.TotalTime:0.0} s, max {ceiling.MaxSpeed:0} m/s, " +
+            $"{ceiling.Flights.Count} flights ({hardLandings} land above the {_flow.PlainLandingSpeed:0} m/s plain-landing loss: slam or lose Flow)");
+
+        // Chainable line: crest apexes and real bends are the Flow opportunities the primary offers today.
+        var opportunities = new List<float>();
+        foreach (var f in route.Features) if (f.Kind == RouteFeatureKind.LaunchCrest) opportunities.Add(f.CentreDistance);
+        foreach (var b in route.Bends) if (Mathf.Abs(Mathf.RadToDeg(b.TurnAngle)) >= WorldScale.FlowBendMinDegrees) opportunities.Add(v[b.StartIndex].Distance);
+        opportunities.Sort();
+        float window = _flow.ChainWindowSeconds * ceilingSpeed, maxGap = 0f;
+        for (int i = 1; i < opportunities.Count; i++) maxGap = Mathf.Max(maxGap, opportunities[i] - opportunities[i - 1]);
+        // The known-safe straight fallback has neither bends nor crests: nothing to chain, nothing to fail.
+        bool chainable = route.Bends.Count == 0 && route.Features.Count == 0 || opportunities.Count >= 2 && maxGap <= window;
+        report.Add("a chainable line exists on the primary (Flow opportunities inside the chain window at the ceiling)", chainable,
+            $"{opportunities.Count} opportunities, widest gap {maxGap:0} m (window {_flow.ChainWindowSeconds:0} s × {ceilingSpeed:0} m/s = {window:0} m)");
+        return maxGap;
+    }
 
     private static float PadFlatness(StageHeightField field, Vector3 centre)
     {

@@ -112,6 +112,9 @@ public sealed class ValidationReport
     public void Add(string name, bool passed, string detail = "") =>
         Checks.Add(new ValidationCheck { Name = name, Passed = passed, Detail = detail });
 
+    /// <summary>A figure every report carries (04 §12); printed like a check, never fails.</summary>
+    public void Note(string name, string detail) => Add(name, true, detail);
+
     public IEnumerable<ValidationCheck> Failures => Checks.Where(c => !c.Passed);
 }
 
@@ -134,6 +137,10 @@ public sealed class StageDefinition
     public ulong RouteSeedUsed;
     public RouteSkeleton PrimaryRoute { get; }
     public RouteSpeedProfile SpeedProfile { get; }
+    /// <summary>The same route at the Flow ceiling (04 §12, D-094): safety reads this, crossability the base profile.</summary>
+    public RouteSpeedProfile? CeilingProfile { get; internal set; }
+    /// <summary>Widest route distance between consecutive Flow opportunities on the primary (the chainable-line figure).</summary>
+    public float WidestFlowGap { get; internal set; }
     public List<RouteSkeleton> OptionalLines { get; } = new();
     public List<RouteSpeedProfile> OptionalProfiles { get; } = new();
     public List<Checkpoint> Checkpoints { get; } = new();

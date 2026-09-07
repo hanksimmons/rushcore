@@ -307,10 +307,20 @@ public partial class MovementToySelfTest : Node
 
         // ---- the locked preset is the compiled baseline, verbatim (D-078 procedure, D-091) ----
         {
-            int applied = t.LoadOverride("res://tuning/presets/manual-small-2.json");
-            Check("the locked preset manual-small-2 loads as compiled defaults (verbatim promotion)", applied > 0 && t.OverrideCount == 0,
+            int applied = t.LoadOverride("res://tuning/presets/manual-small-3.json");
+            Check("the locked preset manual-small-3 loads as compiled defaults (verbatim promotion)", applied > 0 && t.OverrideCount == 0,
                 $"applied={applied} overrides={t.OverrideCount}: " + string.Join(", ", t.Parameters.Where(GameplayTuning.IsModified).Select(x => $"{x.Key}={x.Get():R} vs {x.DefaultValue:R}")));
             t.ResetAll();
+        }
+
+        // RUSHCORE_SELFTEST_DATA_ONLY=1: only the pure-data cases (generation batch, regression seeds,
+        // the speed model's closed-form checks) in under a minute, for generation work.
+        if (System.Environment.GetEnvironmentVariable("RUSHCORE_SELFTEST_DATA_ONLY") == "1")
+        {
+            RunStageGenerationBatchCase();
+            RunRegressionSeedsCase();
+            RunSpeedModelDataChecks();
+            yield break;
         }
 
         // ---- body configuration invariants ----
@@ -1377,13 +1387,12 @@ public partial class MovementToySelfTest : Node
         return float.NaN;
     }
 
-    private IEnumerable RunRouteSpeedModelCase()
+    /// <summary>The route speed model's closed-form checks: envelope helpers, the ceiling model, the airborne phase (D-094).</summary>
+    private void RunSpeedModelDataChecks()
     {
         var t = _debug.Tuning;
         var m = t.Movement;
         var model = new RouteSpeedModel(m);
-        const float Tolerance = 0.05f;
-
         // --- envelope helpers ---
         CheckNear("corner limit at 100 m is the cap-scale turn radius", model.CornerSpeedLimit(100f), m.HardMaxLocomotionSpeed, 3f);
         Check("corner limit tightens with radius", model.CornerSpeedLimit(25f) < model.CornerSpeedLimit(50f) && model.CornerSpeedLimit(50f) < model.CornerSpeedLimit(100f),
@@ -1394,6 +1403,60 @@ public partial class MovementToySelfTest : Node
             model.CrestIsLaunch(RouteSpeedModel.CosineCrestRadius(800f, 80f), m.HardMaxLocomotionSpeed)
             && !model.CrestIsLaunch(RouteSpeedModel.CosineCrestRadius(800f, 80f), 60f),
             $"r={RouteSpeedModel.CosineCrestRadius(800f, 80f):0.0}");
+
+        // --- the ceiling model (04 §12, D-094): capped at base × (1 + headroom), steering saturated at the base cap ---
+        {
+            var ceil = new RouteSpeedModel(m, t.Flow.Headroom);
+            float ceiling = m.HardMaxLocomotionSpeed * (1f + t.Flow.Headroom);
+            CheckNear("ceiling model caps at base × (1 + headroom)", ceil.Cap, ceiling, 0.01f);
+            Check("steering authority saturates at the base cap in the ceiling model",
+                Mathf.IsEqualApprox(ceil.LateralAuthority(ceiling), model.LateralAuthority(m.HardMaxLocomotionSpeed)),
+                $"{ceil.LateralAuthority(ceiling):0.0} vs {model.LateralAuthority(m.HardMaxLocomotionSpeed):0.0}");
+            CheckNear("the ceiling bend radius holds the ceiling", ceil.CornerSpeedLimit(WorldScale.CeilingBendRadius), ceiling, 3f);
+            CheckNear("below the base cap the ceiling model's corner limits are the base kit's", ceil.CornerSpeedLimit(50f), model.CornerSpeedLimit(50f), 0.01f);
+            CheckNear("the cruise bend holds the base cap with margin at D-091", model.CornerSpeedLimit(WorldScale.CruiseBendRadius), m.HardMaxLocomotionSpeed, 0.01f);
+            GD.Print($"[SELFTEST] bend ladder at D-091: " + string.Join(", ", new[] { 15f, 25f, 35f, 50f, 70f, 100f, 160f, 200f }.Select(r => $"r{r:0} → {ceil.CornerSpeedLimit(r):0} m/s")) +
+                     $"; base cap held from r {m.HardMaxLocomotionSpeed * m.HardMaxLocomotionSpeed / model.LateralAuthority(m.HardMaxLocomotionSpeed):0} m, ceiling from r {ceiling * ceiling / ceil.LateralAuthority(ceiling):0} m");
+
+            // Airborne phase: a 100 m/s ball off a 50 m cliff with a 45° face falls 50 m in √(2h/g) and lands on the floor.
+            var cliff = new List<Vector3>();
+            for (float d = 0f; d <= 400f; d += 4f) cliff.Add(new Vector3(-d, 0f, 0f));
+            for (float d = 4f; d <= 50f; d += 4f) cliff.Add(new Vector3(-400f - d, -d, 0f));
+            for (float d = 4f; d <= 600f; d += 4f) cliff.Add(new Vector3(-450f - d, -50f, 0f));
+            var drop = model.Integrate(cliff, 100f);
+            float fall = Mathf.Sqrt(2f * 50f / m.Gravity);
+            var fl = drop.Flights.Count > 0 ? drop.Flights[0] : null;
+            float expectHorizontal = (fl?.LaunchSpeed ?? 100f) * fall, expectVy = m.Gravity * fall;   // drive holds the ball at the cap by the lip
+            float horizontal = fl is null ? 0f : fl.LandingDistance - fl.LaunchDistance - (Mathf.Sqrt(2f) - 1f) * 50f;   // route distance minus the face's extra arclength
+            Check("the model flies a ball off a cliff and lands it where ballistics say (±10%)",
+                fl is not null && drop.Flights.Count == 1 && Mathf.Abs(horizontal - expectHorizontal) <= expectHorizontal * 0.10f
+                && Mathf.Abs(fl.LandingVerticalSpeed - expectVy) <= expectVy * 0.10f && fl.LaunchDistance >= 385f && fl.LaunchDistance <= 410f,
+                fl is null ? "no flight" : $"launch {fl.LaunchDistance:0} m, horizontal {horizontal:0} m (expect {expectHorizontal:0}), {fl.Seconds:0.00} s (expect {fall:0.00}), lands {fl.LandingVerticalSpeed:0} m/s down (expect {expectVy:0}), keeps {fl.LandingSpeed:0} m/s");
+            // A cosine roller: a roll at 60 m/s, a launch before the apex at the cap.
+            var hill = new List<Vector3>();
+            for (float d = 0f; d <= 1400f; d += 4f)
+            {
+                float h = d >= 300f && d <= 1100f ? 40f * (1f - Mathf.Cos(Mathf.Tau * (d - 300f) / 800f)) : 0f;
+                hill.Add(new Vector3(-d, h, 0f));
+            }
+            var slow = model.Integrate(hill, 60f, driveHeld: false);
+            var fast = model.Integrate(hill, m.HardMaxLocomotionSpeed);
+            Check("the model rolls the 800/80 hill at 60 m/s and launches it before the apex at the cap",
+                slow.Flights.Count == 0 && fast.Flights.Count == 1 && fast.Flights[0].LaunchDistance < 700f && fast.Flights[0].LaunchDistance > 500f && fast.Flights[0].LandingDistance > 700f,
+                $"slow flights {slow.Flights.Count}; fast: " + (fast.Flights.Count > 0 ? $"launch {fast.Flights[0].LaunchDistance:0} → land {fast.Flights[0].LandingDistance:0} m, {fast.Flights[0].LandingVerticalSpeed:0} m/s down" : "none"));
+            Check("seconds below the base cap counts the standing start", model.Integrate(RouteSpeedModel.StraightPolyline(Vector3.Zero, Vector3.Left, 2000f, 4f)).SecondsBelow(m.HardMaxLocomotionSpeed * 0.98f) is > 5f and < 9f);
+        }
+
+    }
+
+    private IEnumerable RunRouteSpeedModelCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        var model = new RouteSpeedModel(m);
+        const float Tolerance = 0.05f;
+
+        RunSpeedModelDataChecks();
 
         // --- lab grade fan: drive held down each lane from wherever the ball is after settling ---
         float[] lanes = { TerrainHeightField.Grade8X, TerrainHeightField.Grade15X, TerrainHeightField.Grade25X };
@@ -1494,6 +1557,78 @@ public partial class MovementToySelfTest : Node
             Check("speed model reaches and holds the cap", Mathf.IsEqualApprox(profile.Speed[^1], m.HardMaxLocomotionSpeed) && profile.MaxSpeed <= m.HardMaxLocomotionSpeed + 1e-3f,
                 $"end={profile.Speed[^1]:0.0} max={profile.MaxSpeed:0.0}");
 
+            // --- the ceiling on the strip (08 §4 addendum, D-094): the harness stands in for full Flow by
+            // raising the hard cap to base × (1 + headroom), restored exactly below. The comparison model is
+            // built on a fresh MovementTuning so its base cap (steering saturation) stays the frozen one. ---
+            {
+                float savedCap = m.HardMaxLocomotionSpeed;
+                float ceiling = savedCap * (1f + t.Flow.Headroom);
+                var ceilModel = new RouteSpeedModel(new MovementTuning(), t.Flow.Headroom);
+                m.HardMaxLocomotionSpeed = ceiling;
+
+                // Turn radius: the heading rate at full lateral input is a_lat / v, so r = v / ω.
+                foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.X(5750f), -120f, m.BallRadius + 0.4f), 0.6f)) yield return null;
+                _player.LinearVelocity = Vector3.Left * ceiling;
+                foreach (var _ in Frames(2)) yield return null;
+                _worldDrive = Vector3.Back;                       // +Z: a quarter turn to the left of −X travel
+                Vector3 h0 = FlatVel.Normalized();
+                float vTurn = _player.LocomotionSpeed, arcLen = 0f;
+                Vector3 prevP = _player.GlobalPosition;
+                foreach (var _ in Seconds(0.4f)) { yield return null; arcLen += new Vector2(_player.GlobalPosition.X - prevP.X, _player.GlobalPosition.Z - prevP.Z).Length(); prevP = _player.GlobalPosition; }
+                float turned = h0.AngleTo(FlatVel.Normalized());
+                float measuredRadius = turned > 1e-3f ? arcLen / turned : float.PositiveInfinity;
+                float expectRadius = ceiling * ceiling / ceilModel.LateralAuthority(ceiling);
+                ReleaseAll();
+                GD.Print($"[SELFTEST] ceiling turn: {vTurn:0} m/s, {Mathf.RadToDeg(turned):0.0}° over {arcLen:0} m → r {measuredRadius:0} m (model {expectRadius:0} m)");
+                Check("turn radius at the ceiling matches the saturated steering envelope (±15%)",
+                    vTurn > ceiling - 8f && Mathf.Abs(measuredRadius - expectRadius) <= expectRadius * 0.15f,
+                    $"v={vTurn:0} r={measuredRadius:0} expect {expectRadius:0}");
+
+                // Hills at the ceiling: every station launches; flights and landings against the model over the same centreline.
+                var strip = new List<Vector3>();
+                for (float sd = 1900f; sd <= 4300f; sd += 4f) strip.Add(new Vector3(ScaleStripHeightField.X(sd), world.SampleHeight(ScaleStripHeightField.X(sd), 0f), 0f));
+                var stripProfile = ceilModel.Integrate(strip, ceiling);
+                foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.X(1900f), 0f, m.BallRadius + 0.4f), 0.6f)) yield return null;
+                _player.LinearVelocity = Vector3.Left * ceiling;
+                _worldDrive = Vector3.Left;
+                var flights = new List<(float launch, float land, float vy, float after)>();
+                bool air = false; float launchS = 0f, minVy = 0f; int guard = 0;
+                while (ScaleStripHeightField.S(_player.GlobalPosition.X) < 4300f && guard++ < Engine.PhysicsTicksPerSecond * 20)
+                {
+                    float sNow = ScaleStripHeightField.S(_player.GlobalPosition.X);
+                    bool g = _player.IsGrounded;
+                    if (!air && !g) { air = true; launchS = sNow; minVy = 0f; }
+                    if (air) minVy = Mathf.Min(minVy, _player.Velocity.Y);
+                    if (air && g) { air = false; flights.Add((launchS, sNow, -minVy, _player.LocomotionSpeed)); }
+                    yield return null;
+                }
+                ReleaseAll();
+                string real = string.Join("", flights.Select(f => $" [{f.launch:0}→{f.land:0} m, {f.vy:0} m/s down → {f.after:0}]"));
+                string pred = string.Join("", stripProfile.Flights.Select(f => $" [{f.LaunchDistance + 1900f:0}→{f.LandingDistance + 1900f:0} m, {f.LandingVerticalSpeed:0} m/s down → {f.LandingSpeed:0}]"));
+                GD.Print($"[SELFTEST] ceiling hills at {ceiling:0} m/s: real{real}; model{pred}");
+                // Compare the flights that ended inside the window in both.
+                var realDone = flights.Where(f => f.land < 4250f).ToList();
+                var predDone = stripProfile.Flights.Where(f => f.LandingDistance + 1900f < 4250f).ToList();
+                bool countOk = realDone.Count == predDone.Count && realDone.Count >= 1;
+                // Each flight is judged on its own length and landing. Measured 2026-09-06 (D-094): the ball keeps
+                // 7–9% less speed through a landing than the tangent rule and leaves the next facet a little later
+                // and lower, so chained flights at the ceiling run up to 27% long in the model (the safe direction
+                // for the validators); landing vertical speeds within 15%; the stage's launch crest matches within 3%.
+                float worstLen = 0f, worstVy = 0f;
+                for (int i = 0; countOk && i < realDone.Count; i++)
+                {
+                    float len = Mathf.Max(50f, realDone[i].land - realDone[i].launch);
+                    worstLen = Mathf.Max(worstLen, Mathf.Abs(predDone[i].Length - len) / len);
+                    worstVy = Mathf.Max(worstVy, Mathf.Abs(predDone[i].LandingVerticalSpeed - realDone[i].vy) / Mathf.Max(10f, realDone[i].vy));
+                }
+                Check("the model's airborne phase flies the ceiling hills as the ball does (each flight's length within 35%, landing vertical speed within 20%)",
+                    countOk && worstLen <= 0.35f && worstVy <= 0.20f,
+                    $"real {realDone.Count} / model {predDone.Count} flights; worst length error {worstLen:P0}, worst vertical {worstVy:P0}; real{real}; model{pred}");
+
+                m.HardMaxLocomotionSpeed = savedCap;
+                foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.StartX, 0f, m.BallRadius + 0.4f), 0.6f)) yield return null;
+            }
+
             // --- bends and stalls: the conservative rules do what the validators will lean on ---
             var bend = new List<Vector3>();
             Vector3 c = _player.GlobalPosition;
@@ -1560,7 +1695,9 @@ public partial class MovementToySelfTest : Node
         float camToFacing = Forward.Dot(facing);
         GD.Print($"[SELFTEST] carve: entry {entrySpeed:0.0} m/s, facing swung {facingTurn:0}°, travel turned {travelTurn:0}° (max off {maxOff:0}°), camera·facing {camToFacing:0.00}, min speed during {minSpeedDuring:0.0}");
         Check("the facing swings toward the input at the yaw rate", facingTurn > 60f, $"{facingTurn:0}°");
-        Check("the velocity understeers: it turns far less than the facing", travelTurn < facingTurn * 0.6f, $"travel {travelTurn:0}° vs facing {facingTurn:0}°");
+        // At the D-095 yaw rate (84°/s) the hold lasts over a second, so the understeering velocity catches up
+        // further than at 190°/s (measured travel 65° against facing 91°); the ratio still shows the lag.
+        Check("the velocity understeers: it turns less than the facing", travelTurn < facingTurn * 0.85f, $"travel {travelTurn:0}° vs facing {facingTurn:0}°");
         Check("the camera tracks behind the facing during the carve", camToFacing > 0.6f, $"dot={camToFacing:0.00}");
         Check("the ball stays grounded through the carve", _player.IsGrounded && _player.IsCarving);
         var vfx = _player.GetNodeOrNull<PlayerVfx>("PlayerVfx");
@@ -1663,12 +1800,13 @@ public partial class MovementToySelfTest : Node
 
     private void RunStageGenerationBatchCase()
     {
-        var gen = new StageGenerator(_debug.Tuning.Movement);
+        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow);
         const int Count = 100;
         var hashes = new HashSet<ulong>();
         var fallbackReasons = new Dictionary<string, int>();
         int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0, withLines = 0, linesTotal = 0, minAnchors = int.MaxValue;
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
+        float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
         double msSum = 0, msMax = 0;
         string firstFailure = "";
         string tuningBefore = TuningSnapshot();
@@ -1700,8 +1838,13 @@ public partial class MovementToySelfTest : Node
             if (def.OptionalLines.Count > 0) withLines++;
             linesTotal += def.OptionalLines.Count;
             minAnchors = Mathf.Min(minAnchors, def.Checkpoints.Count);
+            belowSum += def.SpeedProfile.SecondsBelow(_debug.Tuning.Movement.HardMaxLocomotionSpeed * 0.98f);
+            ceilFlights += def.CeilingProfile?.Flights.Count ?? 0;
+            ceilAir += def.CeilingProfile?.AirborneSeconds ?? 0f;
+            widestGap = Mathf.Max(widestGap, def.WidestFlowGap);
         }
         sw.Stop();
+        GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
         GD.Print($"[SELFTEST] generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
                  $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
@@ -1726,7 +1869,7 @@ public partial class MovementToySelfTest : Node
 
     private void RunRegressionSeedsCase()
     {
-        var gen = new StageGenerator(_debug.Tuning.Movement);
+        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow);
         foreach (var e in RegressionSeeds.All)
         {
             var req = new StageGenerationRequest(e.RunSeed, e.StageIndex);
@@ -1810,6 +1953,8 @@ public partial class MovementToySelfTest : Node
         foreach (var f in crests) { int km = (int)(f.CentreDistance / 1000f); crestKm.Add(km); crestKm.Add(km + 1); }
         var crestApexSpeed = new float[crests.Count];
         var crestLeft = new bool[crests.Count];
+        var crestLaunchS = new float[crests.Count];
+        var crestLandS = new float[crests.Count];
         var quietKm = new List<(int km, float raw)>();
         while (ticks < maxTicks)
         {
@@ -1828,6 +1973,11 @@ public partial class MovementToySelfTest : Node
                 float rel = along - crests[c].CentreDistance;
                 if (crestApexSpeed[c] == 0f && rel >= 0f) crestApexSpeed[c] = _player.LocomotionSpeed;
                 if (rel >= 0f && rel <= crests[c].Wavelength * 0.5f + 60f && !_player.IsGrounded) crestLeft[c] = true;
+                if (rel >= -crests[c].Wavelength * 0.5f && rel <= 900f)
+                {
+                    if (!_player.IsGrounded) { if (crestLaunchS[c] == 0f) crestLaunchS[c] = along; crestLandS[c] = 0f; }
+                    else if (crestLaunchS[c] > 0f && crestLandS[c] == 0f) crestLandS[c] = along;
+                }
             }
             if (along >= nextMark)
             {
@@ -1880,6 +2030,20 @@ public partial class MovementToySelfTest : Node
             }
             GD.Print($"[SELFTEST] launch crests:{crestDetail}");
             Check("launch crests stay real: the ball leaves when v² > g·r and rolls when it does not", decided > 0 && consistent, crestDetail);
+            // The base profile's airborne phase (D-094) against the measured flight at each crest.
+            string flightDetail = ""; bool flightsOk = true; int compared = 0;
+            for (int c = 0; c < crests.Count; c++)
+            {
+                if (crestLaunchS[c] <= 0f || crestLandS[c] <= 0f) continue;
+                var fl = profile.Flights.FirstOrDefault(f => Mathf.Abs(f.LaunchDistance - crestLaunchS[c]) < crests[c].Wavelength);
+                float len = Mathf.Max(50f, crestLandS[c] - crestLaunchS[c]);
+                float err = fl is null ? 1f : Mathf.Abs(fl.LandingDistance - crestLandS[c]) / len;
+                compared++;
+                flightsOk &= fl is not null && err <= 0.20f;
+                flightDetail += $" crest {c + 1}: ball {crestLaunchS[c]:0}→{crestLandS[c]:0} m, model {(fl is null ? "no flight" : $"{fl.LaunchDistance:0}→{fl.LandingDistance:0} m, lands {fl.LandingVerticalSpeed:0} m/s down → {fl.LandingSpeed:0} m/s")} ({err:P0} of the flight);";
+            }
+            GD.Print($"[SELFTEST] crest flights vs model:{flightDetail}");
+            Check("the route speed model's flights land within 20% of the ball's at every launch crest", compared > 0 && flightsOk, flightDetail);
         }
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
         Check("archetype geometry left the rigid body's hidden physics untouched (04 §7)", BodySnapshot() == bodyLab, BodySnapshot());

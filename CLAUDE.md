@@ -249,9 +249,9 @@ After coding:
 Until the implementation plan advances:
 
 > **Phase 2C — Flow headroom** (D-088), inserted after Gate G0's objective closure (D-087) and before
-> Phase 3. The preset is locked (D-091: headroom 0.715, ball 0.66 m, steering 222.66, jump 84.63,
-> carve, camera) and the analytic ground follow is in (D-092). Next: the ceiling addendum (08 §4)
-> re-derives the safety side of the world scale at these values. Phase 3 opens at Gate F0 with the G0
-> manual sample played with Flow on.
+> Phase 3. The preset is locked (D-091 + D-095: headroom 0.715, ball 0.66 m, steering 222.66, jump
+> 84.63, slam 90 + 250, carve 84°/s, camera), the analytic ground follow is in (D-092) and the ceiling addendum
+> (D-094: two-speed generation, the model's airborne phase, `docs/11 §6`) is delivered. Phase 3 opens at
+> Gate F0 with the G0 manual sample played with Flow on.
 
-The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-091: the user's `manual-small-2` preset, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.
+The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-095: the user's `manual-small-3` preset, D-091 plus the slam and VFX overrides, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

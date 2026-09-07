@@ -169,12 +169,13 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         ResetStageProgress();
         if (IsStage)
         {
-            var generator = new StageGenerator(_t.Movement);
+            var generator = new StageGenerator(_t.Movement, _t.Flow);
             Stage = generator.Generate(new StageGenerationRequest(Seed, 0));
             _field = Stage.HeightField!;
             var r = Stage.Report;
             StageSummary = $"stage {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
-                           $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s, " +
+                           $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
+                           $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} crests, " +
                            $"{Stage.OptionalLines.Count} lines, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
             GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");

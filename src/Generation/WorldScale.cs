@@ -18,11 +18,11 @@ public static class WorldScale
     public const float TargetBaseKitSeconds = 60f;
 
     // ---- bend ladder (docs/11 §3a) ----
-    public const float CruiseBendRadius = 160f;          // holds the cap
-    public const float FastBendRadius = 100f;            // 148 m/s
-    public const float CommittedBendRadius = 50f;        // 99 m/s; primary-route minimum
-    public const float TechnicalBendRadius = 25f;        // optional lines only
-    public const float HairpinRadius = 15f;              // modules only
+    public const float CruiseBendRadius = 160f;          // holds the cap (D-091: 250 m/s)
+    public const float FastBendRadius = 100f;            // D-082: 148 m/s; D-091: 187 m/s
+    public const float CommittedBendRadius = 50f;        // D-082: 99 m/s; D-091: 124 m/s; primary-route minimum
+    public const float TechnicalBendRadius = 25f;        // optional lines only (84 m/s at D-091)
+    public const float HairpinRadius = 15f;              // modules only (63 m/s at D-091)
     public const float BankHeightPerRadius = 18f / 145f; // lab hairpin reference: 18 m berm at r 145
 
     // ---- hills (docs/11 §3b) ----
@@ -85,6 +85,18 @@ public static class WorldScale
     public const float InsideOffsetMargin = 30f;         // leaves a technical-radius bend on the line (D-082: optional only)
     public const float OptionalBandHalfWidth = 800f;     // optional lines may use the scenery margin
     public const float CheckpointSpacing = 400f;
+
+    // ---- Flow ceiling (04 §12, D-094; derived at D-091: 148.5 × 1.715 = 254.7 m/s, steering saturated at 322.9 m/s²) ----
+    // Generation computes the live values from tuning; these are the family's reference numbers.
+    public const float CeilingSpeedReference = 254.7f;
+    public const float CeilingCrestRadius = 1647f;         // v²/g at the ceiling: every swell launches a full-chain ball
+    public const float CeilingBendRadius = 201f;           // holds the ceiling; 68 m holds the base cap at D-091
+    /// <summary>Straight route required past any touchdown (base kit or ceiling) before a bend may start.</summary>
+    public const float LandingRunAfterFlight = 100f;
+    /// <summary>Every emitted bend (≥ 10°) invites the carve that grants Flow (03 §11: the facing swings, not the road).</summary>
+    public const float FlowBendMinDegrees = 10f;
+    /// <summary>Metres a straight flight may drift off a bend's arc before it counts as flying the bend.</summary>
+    public const float FlightDriftTolerance = 10f;
 
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;

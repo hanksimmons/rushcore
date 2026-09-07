@@ -205,3 +205,66 @@ defaults (4 m cells, Fog End 2400, Far Plane 8000): `____ ms` on the runway, `__
   (not before), the single home for these numbers; the tuning panel does not expose them.
 - Runbook: the fog/far-plane defaults change only if the user accepts 3h's proposal (D-078 does not
   cover them, but the toy's "0 override values" launch state must stay true).
+
+## 6. Ceiling addendum at the D-091 baseline (D-094)
+
+Written 2026-09-06 after the baseline lock (steering 222.66 rising ×1.45, max jump 84.63, Flow
+headroom 0.715 → ceiling 254.7 m/s, ball 0.66 m). The family's radii and sizes above stand; what
+changed is which speed each one holds, and every safety figure now has a second, ceiling value.
+Generation computes the live numbers from tuning (`RouteSpeedModel` with a headroom); `WorldScale`
+carries the reference constants.
+
+### 6a. Bend ladder re-derived
+
+| Bend radius | 15 m | 25 m | 35 m | 50 m | 70 m | 100 m | 160 m | 201 m |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| D-082 (steering 151.25) | 51 | 68 | 81 | 99 | 120 | 148 | cap | cap |
+| **D-091 (steering 222.66)** | 63 | 84 | 101 | 124 | 151 | 187 | 250 | **254.7 = ceiling** |
+
+Steering saturates at the base cap (a_lat = 322.9 m/s²), so 68 m holds the base cap and 201 m holds
+the ceiling (`WorldScale.CeilingBendRadius`). Consequence for §2: at D-091 bends throttle a base-kit
+ball only below 68 m; the committed 50 m bend holds 124 m/s (was 99), so on the primary route the
+throttle is now the launch crests and their landings, and bends price the *ceiling* player instead
+(a 160 m cruise bend costs 5 m/s of Flow headroom, a 100 m bend 68 m/s). Bank heights unchanged.
+
+### 6b. Crest ladder and jump envelope at the ceiling
+
+| | 60 m/s | 100 m/s | 148.5 (base cap) | 254.7 (ceiling) |
+|---|---:|---:|---:|---:|
+| Minimum crest radius to stay grounded (v²/g) | 91 m | 254 m | 560 m | **1647 m** |
+| Full-charge jump range (84.63 m/s up, 4.30 s hang, 91 m high) | 258 m | 430 m | 638 m | 1094 m |
+| Half-charge jump range (43.3 m/s up, 2.20 s hang, 24 m high) | 132 m | 220 m | 327 m | 560 m |
+| 20 m lane change needs | — | — | 52 m | 90 m |
+
+Every long swell (crest radius 630–1620 m) launches a ceiling ball; the roller (405 m) and the launch
+crests (76–210 m) launch it far earlier on their up-slopes. A ceiling flight off a swell is long
+(the strip's 800/80 roller at 254.7 m/s flies 317 m and lands 67 m/s down) and its landing is hard: the route speed model's airborne phase (D-094) reports the
+landing vertical speed, and any landing at or above the plain-landing threshold (30 m/s) costs Flow
+unless it is a slam. That is the intended loop: the ceiling is held by slamming every landing, and a
+missed slam prices the chain back down without ever dropping the ball below the base cap's reach.
+
+### 6c. Gaps and ramps at the new jump
+
+The full-charge range at 60 m/s grew from 177 to 258 m, so the mandatory gap band (40–120 m, ≤ 0.7 ×
+range at 60 m/s) is now crossable half-charged from 55 m/s (132 m). Optional gaps (160–320 m) fit a
+full charge from 100 m/s (430 m) or a half charge from the cap (327 m); set-piece gaps up to 400 m a
+full charge from 100 m/s. The 27° ramp still adds nothing at the cap; the 11° ramp's charge reward is
+now larger (lip speed 84.6 m/s of vertical from a full charge against 27 m/s from the ramp alone).
+Landing zones: 200 m past the far rim still covers the half-to-full spread at 100 m/s (220 → 430 m
+minus the gap itself) for the mandatory band; the 300 m spread at the cap is why optional gaps stay
+optional.
+
+### 6d. Sightline and corridor at the ceiling
+
+Fog end 2400 m is 9.4 s at the ceiling (16 s at the base cap); the 3 s read horizon becomes 764 m,
+which a 150 m corridor tolerates at a 5.6° heading error and the 75 m minimum at 2.8°. The
+corridor width verdict stays a feel question for Gate F0 with Flow on. The camera's look-ahead and
+framing bands do not change with speed above the base cap; the lens only widens (D-088).
+
+### 6e. What the harness measures (08 §4 addendum)
+
+Every run: the ceiling model's corner limits and saturation; a cliff flight against closed-form
+ballistics; the turn radius at the ceiling on the turn pad (204 m measured against 201 m predicted (28.1° over 100 m at 254 m/s)); the hill stations at the
+ceiling, flights and landings against the model over the same centreline (four flights in both, real [2048→2757 m, 53 m/s down → 198 m/s] [2777→3132, 41 → 166] [3151→3523, 53 → 134] [3735→4052, 67 → 151] against model [2029→2811, 56 → 212] [2815→3102, 47 → 181] [3148→3601, 52 → 141] [3763→4128, 72 → 153]: the ball keeps 7–9% less speed through each landing than the tangent rule and leaves the next facet later and lower, so the model's chained flights run up to 27% long (the safe direction for the validators), landing vertical speeds within 15%); on the
+generated stage the base-kit flights at each launch crest against the ball (ball 2456→2752 m, model 2457→2760 m (3%), landing 50 m/s down → 138 m/s); and over
+the 100-seed batch the two-speed figures (100 seeds: 100 valid, 0 fallbacks; seconds below the base cap 11.0 s average; 2.4 ceiling flights per stage, 3.7 s airborne; widest opportunity gap 1516 m against the 1528 m window).

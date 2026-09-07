@@ -13,7 +13,7 @@ public static class RegressionSeeds
 
     public static readonly Entry[] All =
     {
-        new(20260905, 0, "toy default seed: the first playtested stage (2 ridge lines, 2 crests)"),
+        new(20260905, 0, "toy default seed: the first playtested stage (2 ridge lines; 2 crests before the D-094 ceiling reservations, 1 after)"),
         new(8, 0, "route attempt 1 failed; regeneration path (D-084) must recover on attempt 2"),
         new(15, 5, "route attempt 1 failed; regeneration path (D-084) must recover on attempt 2"),
         new(57, 5, "attempt 2 with four committed 50 m bends"),

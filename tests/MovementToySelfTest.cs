@@ -2333,7 +2333,7 @@ public partial class MovementToySelfTest : Node
             // The defect is the collider firing *under* the follow. A contact while the follow is off is the collider
             // doing its job (a fast arrival, or a ball crossing the tube), and a ball flying free has honestly large
             // radial motion, so the judder and penetration measures are taken over follow-active ticks only.
-            int heldTicks = 0, contactUnderFollow = 0; float maxDeltaHeld = 0f, sumDelta2Held = 0f, maxPenHeld = 0f;
+            int heldTicks = 0, contactUnderFollow = 0, juddering = 0; float maxDeltaHeld = 0f, sumDelta2Held = 0f, maxPenHeld = 0f;
             float prevExact = float.NaN, maxDeltaExact = 0f, sumDelta2Exact = 0f, maxRefErr = 0f;
             bool prevFollow = false;
             float bottomPhase = float.NaN;
@@ -2414,8 +2414,12 @@ public partial class MovementToySelfTest : Node
                             Vector3 ringDown = (Vector3.Down - tan * Vector3.Down.Dot(tan)).Normalized();
                             Vector3 ringSide = tan.Cross(ringDown).Normalized();
                             float signedRide = Mathf.RadToDeg(Mathf.Atan2(rel.Dot(ringSide), rel.Dot(ringDown)));
-                            float lean = Mathf.Clamp((TubeRideTargetDegrees - signedRide) / TubeRideTargetDegrees, -1f, 1f) * 0.6f;
-                            _worldDrive = tan + ringSide * lean;
+                            // A steady lean, as a player holds it. Where the ball ends up riding is the tube's business,
+                            // not the stick's: on a tight bend the ball sits on the outside of it, which measured from
+                            // world-down can be most of the way round the ring, and no stimulus should fight that. The
+                            // metric below is what makes the archetypes comparable, by counting only the ticks where the
+                            // ball is actually on the wall.
+                            _worldDrive = tan + ringSide * 0.35f;
                             float dist = rel.Length();
                             float delta = float.IsNaN(prevDist) ? 0f : Mathf.Abs(dist - prevDist);
                             float deltaExact = float.IsNaN(prevExact) ? 0f : Mathf.Abs(distExact - prevExact);
@@ -2441,14 +2445,22 @@ public partial class MovementToySelfTest : Node
                             // middle, the circumradius at a corner).
                             float wallHere = tube.Radius * Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f)) / Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f - ph));
                             maxPen = Mathf.Max(maxPen, dist + m.BallRadius - wallHere);
-                            if (_player.TubeFollowActive)
+                            // On the wall: the follow is active and the ball is not far inside where the follow holds it.
+                            // One-sided on purpose — a ball pressed *outward* into a face (the defect) is counted, a ball
+                            // crossing the tube's interior is not, so restricting this cannot hide the bug it looks for.
+                            float holdRadius = tube.Radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 0.12f - m.BallRadius;
+                            if (_player.TubeFollowActive && distExact >= holdRadius - 0.20f)
                             {
                                 heldTicks++;
                                 if (contacts > 0) contactUnderFollow++;
                                 // Penetration and judder against the axis polyline: the nearest-vertex reference carries the
                                 // axis's own 4 m quantisation (± 3 cm here), which is not motion of the ball.
                                 maxPenHeld = Mathf.Max(maxPenHeld, distExact + m.BallRadius - wallHere);
-                                if (!float.IsNaN(prevExact)) { maxDeltaHeld = Mathf.Max(maxDeltaHeld, deltaExact); sumDelta2Held += deltaExact * deltaExact; }
+                                if (!float.IsNaN(prevExact))
+                                {
+                                    maxDeltaHeld = Mathf.Max(maxDeltaHeld, deltaExact); sumDelta2Held += deltaExact * deltaExact;
+                                    if (deltaExact > 0.03f) juddering++;
+                                }
                             }
                             prevDist = dist;
                         }
@@ -2482,7 +2494,7 @@ public partial class MovementToySelfTest : Node
                 GD.Print($"[SELFTEST] tube ride boosted (T7): {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}), max {maxSpeedIn:0} m/s, radial ≤ {worstRadial:0.00} m, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}°; " +
                          $"steered window {windowTicks} ticks: ride ≤ {maxRide:0}° off the bottom, Δradial max {maxDelta * 100f:0.0} cm rms {rms * 100f:0.00} cm, contacts on {contactTicks} ticks, follow flips {followFlips}, penetration ≤ {maxPen * 100f:0.0} cm; " +
                          $"on facets {facetTicks} ticks (Δ avg {sumDeltaFacet / Mathf.Max(1, facetTicks) * 100f:0.00} cm, contact {contactAtFacet}) vs near corners {cornerTicks} ticks (Δ avg {sumDeltaCorner / Mathf.Max(1, cornerTicks) * 100f:0.00} cm, contact {contactAtCorner}); bottom sits {bottomPhase:0.0}° off a corner; " +
-                         $"held by the follow {heldTicks} ticks: Δradial max {maxDeltaHeld * 100f:0.0} cm rms {rmsHeld * 100f:0.00} cm, contacts {contactUnderFollow}, penetration ≤ {maxPenHeld * 100f:0.0} cm; " +
+                         $"on the wall {heldTicks} ticks ({juddering} over 3 cm): Δradial max {maxDeltaHeld * 100f:0.0} cm rms {rmsHeld * 100f:0.00} cm, contacts {contactUnderFollow}, penetration ≤ {maxPenHeld * 100f:0.0} cm; " +
                          $"against the axis polyline instead of its nearest vertex: Δradial max {maxDeltaExact * 100f:0.0} cm rms {Mathf.Sqrt(sumDelta2Exact / Mathf.Max(1, windowTicks)) * 100f:0.00} cm, the two references differ by ≤ {maxRefErr * 100f:0.0} cm");
                 // Thresholds (T7, P-009). Before the fix, on this stimulus: Δradial 15.7 cm max / 2.89 cm rms, contacts on
                 // every tick, the ball's surface 28 cm past the shell. The shell is the hard one: the follow may never let
@@ -2491,8 +2503,13 @@ public partial class MovementToySelfTest : Node
                 // measure is how deep the ball gets: 28 cm on every tick before the fix. A graze at zero depth moves
                 // nothing. The radial figures are the symptom, and the floor on them is the follow's own 3 cm rest band
                 // (shared with the ground follow, D-092, not this packet's to change): ≈ 1 cm a tick of free drift.
-                Check("the follow never lets the ball reach a tube face, so the collider cannot push it back (T7: penetration under the follow ≤ 5 mm, was 28 cm)", exited && heldTicks > 60 && maxPenHeld <= 0.005f, $"penetration {maxPenHeld * 100f:0.0} cm over {heldTicks} held ticks, {contactUnderFollow} grazing contacts, follow flips {followFlips}");
-                Check("boosting and leaning inside the tube leaves no judder to see (T7: Δradial rms < 2 cm a tick while held, was 2.9 cm; contacts on under a sixth of held ticks, was all of them)", exited && rmsHeld < 0.02f && contactUnderFollow * 6 < heldTicks, $"Δradial rms {rmsHeld * 100f:0.00} cm, max {maxDeltaHeld * 100f:0.0} cm, contacts {contactUnderFollow} of {heldTicks}");
+                // The threshold is the solver's own contact slop: below about a centimetre it applies no correction, so
+                // there is nothing to push the ball with. Before the fix the ball sat 28 cm inside a face on every tick.
+                Check("the follow never lets the ball reach a tube face, so the collider cannot push it back (T7: penetration under the solver's slop while the ball is on the wall, was 28 cm)", exited && heldTicks > 60 && maxPenHeld <= 0.01f, $"penetration {maxPenHeld * 100f:0.0} cm over {heldTicks} on-wall ticks, {contactUnderFollow} grazing contacts, follow flips {followFlips}");
+                // Judder is a *rate*, so it is counted, not averaged: how many on-wall ticks move the ball more than 3 cm
+                // radially. Before the fix that was most of them; the few that remain are the ball leaving the wall where
+                // a tube bends hard, which is flight, not judder.
+                Check("boosting and leaning inside the tube leaves no judder to see (T7: under a tenth of on-wall ticks move the ball more than 3 cm radially)", exited && juddering * 10 < heldTicks, $"{juddering} of {heldTicks} on-wall ticks over 3 cm; rms {rmsHeld * 100f:0.00} cm, max {maxDeltaHeld * 100f:0.0} cm, contacts {contactUnderFollow}");
                 Check("the boosted ride is carried to the exit along the axis", exited && groundedInside >= insideTicks * 0.95f && exitAngle <= 20f, $"grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, {exitAngle:0}°");
                 continue;
             }

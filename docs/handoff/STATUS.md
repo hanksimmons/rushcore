@@ -11,7 +11,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | not started | — | — | — | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
-| T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | in progress (main track: reproduced, fix applied, after-run pending; Opus continues via the T7 handover prompt) | see branch | before 311/313 (2 expected) | P-009 | — |
+| T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | pushed (awaiting the user's play verdict) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
 
 ## Baseline at handoff
 
@@ -31,4 +31,10 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 Items the parallel track could not close inside its boundaries. Copied here from the packets' Delivery records so the
 reconciliation sees them in one place.
 
-- (none yet)
+- **T7:** `TubeDefinition.Nearest` / `MovementToyWorld.Nearest` answer with the nearest axis *sample* and its tangent
+  rather than the nearest point on the axis. Measured error against the axis polyline: 1.4 cm (Dune Sea tube), 3.5 cm
+  (Highlands), **21 cm** (Sky, which climbs steeply). The tube follow has to hold the ball clear of that error, so the
+  ball floats ≈ 12 cm off the glass instead of ≈ 4 cm, and Sky's ride is the least precise of the four. Interpolating
+  the nearest point along the two adjoining segments would remove it, let `PlayerPhysics.TubeAxisUncertainty` go to
+  zero and tighten every tube ride; the camera's `PushOutOfTubes` reads the same query and would gain the same accuracy.
+  Outside T7's boundary (the packet allows `TryTubeFollow` and `TubeMesh` only).

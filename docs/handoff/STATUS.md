@@ -14,7 +14,8 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 
 ## Baseline at handoff
 
-- `develop` a793dbe (2026-09-07): Phase 3 complete (D-097..D-104), sample-stage selector merged. Full harness 303/303.
+- `develop` a793dbe (2026-09-07): Phase 3 complete (D-097..D-104), sample-stage selector merged. This branch is stacked on
+  `feature/branching-exits` (34db4be: D-105 plus the golden hashes); merge that first. Full harness there 309/309 plus the golden-hash check.
 - D-105 branching exits delivered on `feature/branching-exits` (e5ab011, 2026-09-07): `StageDefinition.Exits`, any pad ends
   the stage (`MovementToyWorld.StageExitIndex`). T1 reads the list, not a single exit.
 - Main-track reservations: Phase 4 impact model and Flow integration; Sky Terraces second cut; Dune Sea optional line;

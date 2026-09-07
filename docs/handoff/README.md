@@ -88,6 +88,11 @@ notification.
 Every new behaviour gets a harness check in `tests/MovementToySelfTest.cs` using `Check(name, ok, detail)`. Never loosen
 an existing tolerance; if one fails for a reason outside the packet, record it under "Needs main track" and stop the push.
 
+**Golden hashes.** `tests/GoldenHashes.cs` pins the hash of every sample stage. If the check "every sample stage generates
+its golden hash" fails on your branch, generation moved: never update the table, find the change you made to generation
+data, undo it, and record what happened under "Needs main track". Dressing, HUD, lifecycle and instruments never move a
+hash; the check runs in the 35 s data-only mode, so run it after every edit near `src/Generation` or `src/World`.
+
 ## 7. What each task must leave behind
 
 1. **The packet's Delivery record** filled in (branch, commits, harness count, files, what was built, what deviated from

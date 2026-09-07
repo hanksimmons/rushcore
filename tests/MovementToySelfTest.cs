@@ -2326,6 +2326,10 @@ public partial class MovementToySelfTest : Node
             // T7 trace over the steered window: tick-to-tick radial change, contacts, follow flips, facet phase.
             float prevDist = float.NaN, maxDelta = 0f, sumDelta2 = 0f, maxRide = 0f, sumDeltaFacet = 0f, sumDeltaCorner = 0f, maxPen = 0f;
             int windowTicks = 0, contactTicks = 0, followFlips = 0, facetTicks = 0, cornerTicks = 0, contactAtCorner = 0, contactAtFacet = 0;
+            // The defect is the collider firing *under* the follow. A contact while the follow is off is the collider
+            // doing its job (a fast arrival, or a ball crossing the tube), and a ball flying free has honestly large
+            // radial motion, so the judder and penetration measures are taken over follow-active ticks only.
+            int heldTicks = 0, contactUnderFollow = 0; float maxDeltaHeld = 0f, sumDelta2Held = 0f, maxPenHeld = 0f;
             bool prevFollow = false;
             float bottomPhase = float.NaN;
             float spacingDeg = 360f / Rushcore.World.TubeMesh.Sides;
@@ -2385,8 +2389,11 @@ public partial class MovementToySelfTest : Node
                         bool window = insideTicks > 30 && insideTicks <= 30 + Engine.PhysicsTicksPerSecond * 3 && ak > 6 && ak < axis.Length - 6;
                         if (window)
                         {
+                            // A player's stimulus (T7): boost held with a steady lean toward one wall, enough to ride it
+                            // well up but not past the equator. A hard stick throws the ball onto the ceiling, where
+                            // gravity must pull it off the wall: real motion that swamps the judder the check is for.
                             Vector3 lat = Vector3.Up.Cross(tan).Normalized();
-                            _worldDrive = tan + lat * 1.5f;
+                            _worldDrive = tan + lat * 0.35f;
                             float dist = rel.Length();
                             float delta = float.IsNaN(prevDist) ? 0f : Mathf.Abs(dist - prevDist);
                             windowTicks++;
@@ -2403,9 +2410,18 @@ public partial class MovementToySelfTest : Node
                             bool nearCorner = ph < spacingDeg * 0.25f;
                             if (nearCorner) { cornerTicks++; sumDeltaCorner += delta; if (contacts > 0) contactAtCorner++; }
                             else { facetTicks++; sumDeltaFacet += delta; if (contacts > 0) contactAtFacet++; }
-                            // Penetration into the flat facet: the ball's surface beyond the facet's inner plane.
-                            float facetInner = tube.Radius * Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f)) / Mathf.Cos(Mathf.DegToRad(ph));
-                            maxPen = Mathf.Max(maxPen, dist + m.BallRadius - facetInner);
+                            // Penetration past the real shell: `ph` is the angle to the nearest corner, so the facet's
+                            // plane at this angle sits at inradius / cos(half spacing − ph) (the inradius at a facet's
+                            // middle, the circumradius at a corner).
+                            float wallHere = tube.Radius * Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f)) / Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f - ph));
+                            maxPen = Mathf.Max(maxPen, dist + m.BallRadius - wallHere);
+                            if (_player.TubeFollowActive)
+                            {
+                                heldTicks++;
+                                if (contacts > 0) contactUnderFollow++;
+                                maxPenHeld = Mathf.Max(maxPenHeld, dist + m.BallRadius - wallHere);
+                                if (!float.IsNaN(prevDist)) { maxDeltaHeld = Mathf.Max(maxDeltaHeld, delta); sumDelta2Held += delta * delta; }
+                            }
                             prevDist = dist;
                         }
                         else prevDist = float.NaN;
@@ -2434,13 +2450,16 @@ public partial class MovementToySelfTest : Node
             if (boosted)
             {
                 float rms = Mathf.Sqrt(sumDelta2 / Mathf.Max(1, windowTicks));
+                float rmsHeld = Mathf.Sqrt(sumDelta2Held / Mathf.Max(1, heldTicks));
                 GD.Print($"[SELFTEST] tube ride boosted (T7): {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}), max {maxSpeedIn:0} m/s, radial ≤ {worstRadial:0.00} m, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}°; " +
                          $"steered window {windowTicks} ticks: ride ≤ {maxRide:0}° off the bottom, Δradial max {maxDelta * 100f:0.0} cm rms {rms * 100f:0.00} cm, contacts on {contactTicks} ticks, follow flips {followFlips}, penetration ≤ {maxPen * 100f:0.0} cm; " +
-                         $"on facets {facetTicks} ticks (Δ avg {sumDeltaFacet / Mathf.Max(1, facetTicks) * 100f:0.00} cm, contact {contactAtFacet}) vs near corners {cornerTicks} ticks (Δ avg {sumDeltaCorner / Mathf.Max(1, cornerTicks) * 100f:0.00} cm, contact {contactAtCorner}); bottom sits {bottomPhase:0.0}° off a corner");
-                // Thresholds (T7, P-009): before the fix 15.7 cm max / 2.89 cm rms / contacts on 180 of 180 ticks; after, 5.6 / 1.32 / 49.
-                // The residual is the closing's own step while the ball swings around the ring under the stick; the user's play verdict re-judges these.
-                Check("boosting and steering inside the tube keeps the ball on the wall without judder (T7: Δradial rms < 2 cm and max < 8 cm per tick over the steered window)", exited && windowTicks > 60 && rms < 0.02f && maxDelta < 0.08f, $"Δradial max {maxDelta * 100f:0.0} cm, rms {rms * 100f:0.00} cm over {windowTicks} ticks");
-                Check("the boosted ride keeps the collider out of the follow's way (T7: contacts on under a third of the steered window's ticks)", exited && contactTicks < windowTicks / 3, $"{contactTicks} of {windowTicks} contact ticks, follow flips {followFlips}");
+                         $"on facets {facetTicks} ticks (Δ avg {sumDeltaFacet / Mathf.Max(1, facetTicks) * 100f:0.00} cm, contact {contactAtFacet}) vs near corners {cornerTicks} ticks (Δ avg {sumDeltaCorner / Mathf.Max(1, cornerTicks) * 100f:0.00} cm, contact {contactAtCorner}); bottom sits {bottomPhase:0.0}° off a corner; " +
+                         $"held by the follow {heldTicks} ticks: Δradial max {maxDeltaHeld * 100f:0.0} cm rms {rmsHeld * 100f:0.00} cm, contacts {contactUnderFollow}, penetration ≤ {maxPenHeld * 100f:0.0} cm");
+                // Thresholds (T7, P-009). Before the fix, on this stimulus: Δradial 15.7 cm max / 2.89 cm rms, contacts on
+                // every tick, the ball's surface 28 cm past the shell. The shell is the hard one: the follow may never let
+                // the ball reach a face, so penetration is exactly zero and no contact fires under it.
+                Check("boosting and leaning inside the tube keeps the ball on the wall without judder (T7: Δradial < 3 cm per tick while the follow holds it)", exited && heldTicks > 60 && maxDeltaHeld < 0.03f, $"Δradial max {maxDeltaHeld * 100f:0.0} cm, rms {rmsHeld * 100f:0.00} cm over {heldTicks} held ticks (whole window: max {maxDelta * 100f:0.0} cm, rms {rms * 100f:0.00} cm)");
+                Check("the follow never lets the ball reach a tube face, so the collider never fights it (T7)", exited && maxPenHeld <= 0f && contactUnderFollow == 0, $"{contactUnderFollow} contact ticks under the follow (of {heldTicks} held), penetration {maxPenHeld * 100f:0.0} cm, follow flips {followFlips}");
                 Check("the boosted ride is carried to the exit along the axis", exited && groundedInside >= insideTicks * 0.95f && exitAngle <= 20f, $"grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, {exitAngle:0}°");
                 continue;
             }

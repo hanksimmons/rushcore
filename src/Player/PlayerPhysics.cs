@@ -602,6 +602,14 @@ public partial class PlayerPhysics : RigidBody3D
         float press = Mathf.Max(0f, -outward.Y * m.Gravity);
         Vector3 around = v - tangent * v.Dot(tangent) - outward * vOut;
         press += 0.5f * around.LengthSquared() / Mathf.Max(0.5f, dist);
+        // Never step outside the shell (T7): the collider is a ring of flat facets whose nearest point to the axis is the
+        // inscribed circle, so a ball kept inside that circle cannot reach a face while the follow holds it, whatever the
+        // drive, the boost or the ring motion does. The bound is applied to the velocity the step will actually carry, so
+        // it comes before the pre-compensation below, which stands for exactly what the step adds after this callback:
+        // the outward travel is then (min(vOut, room/dt) − press·dt + press·dt)·dt ≤ room. A bound, not a target: at the
+        // rest band's outer edge it still allows 2.4 m/s outward, so the wall is not sticky.
+        float room = Mathf.Max(0f, radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - m.BallRadius - dist);
+        vOut = Mathf.Min(vOut, room / dt);
         vOut -= press * dt;
         v = v - outward * v.Dot(outward) + outward * vOut;
         normal = -outward;

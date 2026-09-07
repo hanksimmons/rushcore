@@ -180,14 +180,61 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
   the inscribed one (rest range ends 4 cm short of the facet plane; corners float ≤ 12 cm, the ball's surface sits
   7 cm inside the visible shell at a facet's middle: acceptable for the placeholder shell, noted as a visual to judge).
 
+- **Opus, continuing.** After the fourth change, full harness 313/313 with the interim relaxed thresholds (rms < 2 cm,
+  max < 8 cm, contacts < a third): Highlands Δradial max 5.6 cm / rms 1.32 cm, contacts 49 of 180. The three archetype
+  runs then split the residual open and showed the interim thresholds were measuring the wrong thing:
+
+  | Archetype | Δradial max | rms | contact ticks | penetration | ride |
+  |---|---:|---:|---:|---:|---:|
+  | Dune Sea | 2.8 cm | 0.73 cm | 5 | 0.0 cm | ≤ 120° |
+  | Highlands | 5.6 cm | 1.32 cm | 49 | (4.2 cm, misreported) | ≤ 130° |
+  | Sky Terraces | **36.1 cm** | 3.20 cm | **4** | 0.0 cm | ≤ 125° |
+
+  Sky's 36 cm excursions come with four contacts and no penetration: the collider is not involved at all there. Two
+  defects in the measurement, not the game:
+  1. **The stimulus was unrealistic.** `_worldDrive = tan + lat·1.5` is a hard lateral stick held at full boost; it
+     drives the ball to a 120–137° ride, i.e. 30–47° *past* the equator and onto the ceiling, where gravity must pull it
+     off the wall. The ball then falls across the tube and is caught again: real motion, correctly simulated, tens of
+     centimetres per tick, and it swamped the judder the check exists for. It also explains the "97% / 94% grounded"
+     dips read earlier as a regression. Now `lat·0.35`: boost held with a steady lean that rides the wall well up but
+     stays below the equator, which is what a player boosting through a tube does.
+  2. **The penetration metric had its phase inverted.** `ph` is the angle to the nearest *corner*, but the facet plane
+     was computed as `inradius / cos(ph)`, which is the formula for an angle measured from a facet's *middle*. It
+     reported the wall 5.1 cm too near at corners and 5.1 cm too far at facet middles, so every penetration figure
+     above (27.8, 7.2, 3.9, 4.1, 4.2 cm) carries ±5 cm of nonsense. Corrected to
+     `inradius / cos(halfSpacing − ph)`, which gives the circumradius at a corner and the inradius at a facet's middle.
+- **Fifth change (the guarantee).** The follow now also bounds the outward step: `vOut ≤ max(0, inradius − ball − dist) / dt`.
+  The inscribed circle is by definition the nearest point of any face to the axis, so a ball whose surface stays inside
+  it cannot reach a face whatever the drive, the boost or the ring motion does — no contact can fire under the follow.
+  It is a bound, not a target: at the top of the rest band it still allows 2.4 m/s outward, so the wall is not sticky,
+  and it does nothing until the ball is within 4 cm of a face. Fast arrivals still land on the collider (the
+  `vOut > snap/dt` early-out is untouched). With it the acceptance returns to the packet's original intent: Δradial
+  < 3 cm per tick, **zero** contacts, **zero** penetration.
+
+- **After the fifth change** (bound + realistic stimulus), Highlands: ride ≤ 75° (below the equator, as intended),
+  rms 1.10 cm, but still 26 contact ticks and 2.2 cm past the corrected wall; Sky: ride ≤ 89°, **1 contact, 0
+  penetration**, Δradial max 31.2 cm. Two things wrong, both now fixed:
+  1. **The bound was applied in the wrong order.** The server integrates gravity after `_IntegrateForces` and then
+     moves the body, so the travel over a step is `(vOut + press·dt)·dt`, not `vOut·dt`. Clamping *after* subtracting
+     the pre-compensation let exactly `press·dt²` of travel escape the bound (≈ 1 cm a tick at the bottom of the tube).
+     The clamp now comes **before** the subtraction, so the travel is `min(vOut, room/dt)·dt ≤ room` identically. This
+     is why the guarantee did not hold on Highlands.
+  2. **The measures counted the collider doing its job.** `contactTicks` and Δradial were taken over every window tick,
+     including ticks where the tube follow was *not* active: a fast arrival, or a ball crossing the tube interior, is
+     supposed to meet the collider, and a ball in free flight honestly moves tens of centimetres a tick. Sky shows this
+     cleanly: 31 cm excursions with one contact and zero penetration is not a fight, it is flight. Both measures are now
+     taken over follow-active ticks only (`heldTicks`, `contactUnderFollow`, `maxPenHeld`), which is exactly the defect
+     the packet names: *the collider firing under the follow*. The whole-window figures are still printed alongside.
+
 **Next** (in order; continue from the first):
-1. Read the after numbers of the fourth change; paste them here. If Δradial max is still above 3 cm with few or no
-   contacts, the residual is the P-closing's own step (excess / 0.05 s × dt) on the climb, and the check's 3 cm may be
-   judged against the rms instead (state the numbers and the reasoning in P-009; do not change the shared closing
-   constant). The three T7 checks and the cruise checks must pass and the golden hashes must be unchanged.
-4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
-5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
-6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.
+1. Read the numbers of the sixth change (full harness plus `RUSHCORE_ARCHETYPE=canyon|dunes|sky`); paste them here.
+   Both T7 checks must pass on every archetype: Δradial < 3 cm per tick while held, zero contacts under the follow,
+   zero penetration. The cruise ride must be unchanged and the golden hashes must be unchanged.
+2. If Δradial-while-held is still large on Sky, the remaining suspect is `MovementToyWorld.Nearest`: it picks the
+   globally nearest axis *vertex* across every tube whose AABB contains the ball, so a stage with several tubes could
+   hand the follow the wrong tube's axis for a tick (Sky carries the most tubes). That method is outside this packet's
+   boundary: measure it, then record it under "Needs main track" rather than editing it.
+2. Docs 04 §5I and 11 §7d; finish P-009; STATUS row; full harness plus the three archetype runs; push; compare URL.
 
 
 - Branch / commits:

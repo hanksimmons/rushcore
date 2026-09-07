@@ -284,10 +284,12 @@ the line, and the builder rejects any tube whose floor would sink into the groun
 integrates the axis as carried (no corner limit, no launch); the controller adds the **tube follow**, the
 shell twin of the ground follow (03 §3): inside a tube any contact is ground, the ball is held to the shell
 within the snap distance, and the wall's normal is its ground normal, so drive and charge work on the
-wall. The circle the follow holds is the collider's inscribed one (a ring of 24 flat facets; T7, P-009): on the
-analytic circle the ball sat 29 cm inside every facet's middle at ten sides and the solver and the follow fought each
-tick whenever steering or boost held the ball off the bottom corner, a judder for as long as boost was held; on the
-inscribed circle the collider never fires while the follow is active. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
+wall. The shell is a ring of 24 flat facets and the follow holds the ball clear inside their inscribed circle
+(T7, P-009): on the analytic circle the ball sat 29 cm inside every facet's middle at ten sides, and the solver pushed
+it out while the follow pulled it in on every tick whenever steering or boost held the ball off the bottom corner, a
+judder for as long as boost was held. The follow also supplies the wall's normal force in advance and never lets a step
+cross the inscribed circle, and it aims a margin inside that circle because the structure query answers with the nearest
+axis *sample* rather than the nearest point on the axis, which on a 4 m-sampled curving tube is up to 3.5 cm out. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
 at the model's speed and 0° off the axis, the lens outside the shell on every frame with a clear line of sight
 to the ball against the terrain. Tubes appear on about 15% of Highlands, 7% of Canyon and 41% of Dune Sea
 seeds; edge and midair mouths, and exits onto other lines or floors, arrive with Sky Terraces.

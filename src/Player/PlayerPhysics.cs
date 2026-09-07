@@ -72,6 +72,10 @@ public partial class PlayerPhysics : RigidBody3D
     /// <summary>Ground follow (03 §3, D-092): gaps inside the deadband are left to the solver; larger
     /// gaps close over this horizon as a velocity, never as a transform write.</summary>
     private const float GroundFollowDeadband = 0.03f;
+    /// <summary>How far the nearest-vertex axis reference can be from the real tube axis (T7); the tube follow keeps this
+    /// much clear of the shell on top of its rest band. It shrinks to nothing once the structure query interpolates the
+    /// axis between its samples instead of answering with the nearest sample.</summary>
+    private const float TubeAxisUncertainty = 0.05f;
     private const float GroundFollowCloseSeconds = 0.05f;
     private const float JumpLockoutSeconds = 0.08f;
     private const float CheckpointIntervalSeconds = 0.75f;
@@ -583,9 +587,12 @@ public partial class PlayerPhysics : RigidBody3D
         // flat facets, so a ball held on the circle sits inside every facet's middle and the solver and the follow fight
         // each tick (a judder while steering or boosting up the wall). On the inscribed circle the ball touches the
         // collider only at a facet's middle and never fires it while the follow is active; fast arrivals still land.
-        // Held two deadbands plus a centimetre inside the inscribed circle: the ball may rest anywhere inside the deadband
-        // and the closing overshoots by about one more, and at a facet's middle the inscribed circle is the collider itself.
-        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - 0.01f;
+        // How far inside the inscribed circle the ball is held: the rest band, the axis reference's own uncertainty, and a
+        // centimetre. `Structure.Nearest` answers with the nearest axis *vertex* and its tangent, and the axis is sampled
+        // every few metres, so on a curving tube the perpendicular distance to that vertex's tangent line differs from the
+        // distance to the real axis by (Δs/2)²/2ρ: measured up to 2.9 cm on the first tube (T7). The follow therefore knows
+        // where the wall is only to about that, and must not aim closer than it knows.
+        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - TubeAxisUncertainty - 0.01f;
         float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vOut = v.Dot(outward);

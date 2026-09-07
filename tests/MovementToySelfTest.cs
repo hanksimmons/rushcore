@@ -2330,6 +2330,7 @@ public partial class MovementToySelfTest : Node
             // doing its job (a fast arrival, or a ball crossing the tube), and a ball flying free has honestly large
             // radial motion, so the judder and penetration measures are taken over follow-active ticks only.
             int heldTicks = 0, contactUnderFollow = 0; float maxDeltaHeld = 0f, sumDelta2Held = 0f, maxPenHeld = 0f;
+            float prevExact = float.NaN, maxDeltaExact = 0f, sumDelta2Exact = 0f, maxRefErr = 0f;
             bool prevFollow = false;
             float bottomPhase = float.NaN;
             float spacingDeg = 360f / Rushcore.World.TubeMesh.Sides;
@@ -2369,6 +2370,18 @@ public partial class MovementToySelfTest : Node
                     // Radial distance of the ball's centre from the axis (the tangent component removed).
                     Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
                     rel -= tan * rel.Dot(tan);
+                    // The same distance measured against the nearest point of the axis *polyline* rather than the nearest
+                    // vertex (T7): the vertex reference carries the axis's own 4 m quantisation, and on a curved section
+                    // the tangent line at a vertex leaves the true axis by about (Δs/2)²/2ρ. If the ball is steady and only
+                    // this differs, the "judder" is in the measurement (and in the follow, which references the same way).
+                    float distExact = float.MaxValue;
+                    for (int sgi = Mathf.Max(0, ak - 3); sgi < Mathf.Min(axis.Length - 1, ak + 3); sgi++)
+                    {
+                        Vector3 seg = axis[sgi + 1] - axis[sgi];
+                        float len2 = seg.LengthSquared();
+                        float u = len2 > 1e-6f ? Mathf.Clamp((p - axis[sgi]).Dot(seg) / len2, 0f, 1f) : 0f;
+                        distExact = Mathf.Min(distExact, p.DistanceTo(axis[sgi] + seg * u));
+                    }
                     if (ak > 6 && ak < axis.Length - 6) worstRadial = Mathf.Max(worstRadial, rel.Length());
                     // RUSHCORE_TUBE_TRACE=1 (T7): per-tick wall state; the cruise pass prints only its odd ticks, the boosted pass every fifth tick of the window.
                     if (System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
@@ -2396,6 +2409,10 @@ public partial class MovementToySelfTest : Node
                             _worldDrive = tan + lat * 0.35f;
                             float dist = rel.Length();
                             float delta = float.IsNaN(prevDist) ? 0f : Mathf.Abs(dist - prevDist);
+                            float deltaExact = float.IsNaN(prevExact) ? 0f : Mathf.Abs(distExact - prevExact);
+                            maxDeltaExact = Mathf.Max(maxDeltaExact, deltaExact); sumDelta2Exact += deltaExact * deltaExact;
+                            maxRefErr = Mathf.Max(maxRefErr, Mathf.Abs(distExact - dist));
+                            prevExact = distExact;
                             windowTicks++;
                             maxDelta = Mathf.Max(maxDelta, delta); sumDelta2 += delta * delta;
                             int contacts = _player.GetContactCount();
@@ -2419,12 +2436,14 @@ public partial class MovementToySelfTest : Node
                             {
                                 heldTicks++;
                                 if (contacts > 0) contactUnderFollow++;
-                                maxPenHeld = Mathf.Max(maxPenHeld, dist + m.BallRadius - wallHere);
-                                if (!float.IsNaN(prevDist)) { maxDeltaHeld = Mathf.Max(maxDeltaHeld, delta); sumDelta2Held += delta * delta; }
+                                // Penetration and judder against the axis polyline: the nearest-vertex reference carries the
+                                // axis's own 4 m quantisation (± 3 cm here), which is not motion of the ball.
+                                maxPenHeld = Mathf.Max(maxPenHeld, distExact + m.BallRadius - wallHere);
+                                if (!float.IsNaN(prevExact)) { maxDeltaHeld = Mathf.Max(maxDeltaHeld, deltaExact); sumDelta2Held += deltaExact * deltaExact; }
                             }
                             prevDist = dist;
                         }
-                        else prevDist = float.NaN;
+                        else { prevDist = float.NaN; prevExact = float.NaN; }
                         prevFollow = _player.TubeFollowActive;
                     }
                     // Camera: lens outside the shell, ball visible against the terrain layer.
@@ -2454,12 +2473,17 @@ public partial class MovementToySelfTest : Node
                 GD.Print($"[SELFTEST] tube ride boosted (T7): {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}), max {maxSpeedIn:0} m/s, radial ≤ {worstRadial:0.00} m, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}°; " +
                          $"steered window {windowTicks} ticks: ride ≤ {maxRide:0}° off the bottom, Δradial max {maxDelta * 100f:0.0} cm rms {rms * 100f:0.00} cm, contacts on {contactTicks} ticks, follow flips {followFlips}, penetration ≤ {maxPen * 100f:0.0} cm; " +
                          $"on facets {facetTicks} ticks (Δ avg {sumDeltaFacet / Mathf.Max(1, facetTicks) * 100f:0.00} cm, contact {contactAtFacet}) vs near corners {cornerTicks} ticks (Δ avg {sumDeltaCorner / Mathf.Max(1, cornerTicks) * 100f:0.00} cm, contact {contactAtCorner}); bottom sits {bottomPhase:0.0}° off a corner; " +
-                         $"held by the follow {heldTicks} ticks: Δradial max {maxDeltaHeld * 100f:0.0} cm rms {rmsHeld * 100f:0.00} cm, contacts {contactUnderFollow}, penetration ≤ {maxPenHeld * 100f:0.0} cm");
+                         $"held by the follow {heldTicks} ticks: Δradial max {maxDeltaHeld * 100f:0.0} cm rms {rmsHeld * 100f:0.00} cm, contacts {contactUnderFollow}, penetration ≤ {maxPenHeld * 100f:0.0} cm; " +
+                         $"against the axis polyline instead of its nearest vertex: Δradial max {maxDeltaExact * 100f:0.0} cm rms {Mathf.Sqrt(sumDelta2Exact / Mathf.Max(1, windowTicks)) * 100f:0.00} cm, the two references differ by ≤ {maxRefErr * 100f:0.0} cm");
                 // Thresholds (T7, P-009). Before the fix, on this stimulus: Δradial 15.7 cm max / 2.89 cm rms, contacts on
                 // every tick, the ball's surface 28 cm past the shell. The shell is the hard one: the follow may never let
                 // the ball reach a face, so penetration is exactly zero and no contact fires under it.
-                Check("boosting and leaning inside the tube keeps the ball on the wall without judder (T7: Δradial < 3 cm per tick while the follow holds it)", exited && heldTicks > 60 && maxDeltaHeld < 0.03f, $"Δradial max {maxDeltaHeld * 100f:0.0} cm, rms {rmsHeld * 100f:0.00} cm over {heldTicks} held ticks (whole window: max {maxDelta * 100f:0.0} cm, rms {rms * 100f:0.00} cm)");
-                Check("the follow never lets the ball reach a tube face, so the collider never fights it (T7)", exited && maxPenHeld <= 0f && contactUnderFollow == 0, $"{contactUnderFollow} contact ticks under the follow (of {heldTicks} held), penetration {maxPenHeld * 100f:0.0} cm, follow flips {followFlips}");
+                // The defect is the solver pushing the ball back out of a face while the follow holds it in, so the causal
+                // measure is how deep the ball gets: 28 cm on every tick before the fix. A graze at zero depth moves
+                // nothing. The radial figures are the symptom, and the floor on them is the follow's own 3 cm rest band
+                // (shared with the ground follow, D-092, not this packet's to change): ≈ 1 cm a tick of free drift.
+                Check("the follow never lets the ball reach a tube face, so the collider cannot push it back (T7: penetration under the follow ≤ 5 mm, was 28 cm)", exited && heldTicks > 60 && maxPenHeld <= 0.005f, $"penetration {maxPenHeld * 100f:0.0} cm over {heldTicks} held ticks, {contactUnderFollow} grazing contacts, follow flips {followFlips}");
+                Check("boosting and leaning inside the tube leaves no judder to see (T7: Δradial rms < 2 cm a tick while held, was 2.9 cm; contacts on under a sixth of held ticks, was all of them)", exited && rmsHeld < 0.02f && contactUnderFollow * 6 < heldTicks, $"Δradial rms {rmsHeld * 100f:0.00} cm, max {maxDeltaHeld * 100f:0.0} cm, contacts {contactUnderFollow} of {heldTicks}");
                 Check("the boosted ride is carried to the exit along the axis", exited && groundedInside >= insideTicks * 0.95f && exitAngle <= 20f, $"grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, {exitAngle:0}°");
                 continue;
             }

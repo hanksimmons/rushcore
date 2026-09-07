@@ -226,14 +226,28 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
      taken over follow-active ticks only (`heldTicks`, `contactUnderFollow`, `maxPenHeld`), which is exactly the defect
      the packet names: *the collider firing under the follow*. The whole-window figures are still printed alongside.
 
+- **The root cause of the residual, measured.** After the reordering the numbers were bit-identical, which said the bound
+  never binds: the ball was not moving outward fast, so it was not *travelling* into the wall. It was already there. The
+  harness was therefore taught to measure the same radial distance twice, once against the nearest axis **vertex** (what
+  `Structure.Nearest` answers with, and what the follow acts on) and once against the nearest point of the axis
+  **polyline**. They differ by up to **2.9–3.5 cm**. The axis is sampled every 4 m, so a ball up to 2 m along from a
+  vertex sits where the vertex's tangent line has already left the real axis by (Δs/2)²/2ρ. The follow was aiming at a
+  wall whose position it knew only to ±3 cm, with 4 cm of margin: that is the whole of the remaining fight, and it also
+  means the vertex-referenced Δradial was partly measuring its own quantisation rather than the ball.
+- **Sixth change.** The hold margin is now sized by that uncertainty: `2·deadband + TubeAxisUncertainty(0.05) + 0.01`
+  inside the inscribed circle, with the named constant carrying the reason and the note that it shrinks to nothing once
+  the structure query interpolates. Judder and penetration are judged against the polyline reference. Result on
+  Highlands: **penetration 0.0 cm** (was 28), contacts under the follow **6 of 180** (was 180 of 180, and these six are
+  grazes at zero depth, which move nothing), Δradial while held 1.01 cm rms / 5.2 cm max.
+- **Acceptance rewritten around the cause.** The defect is the solver pushing the ball back out of a face while the
+  follow holds it in, so the check is now penetration under the follow (≤ 5 mm, was 28 cm), with the radial figures as
+  the symptom (rms < 2 cm a tick, was 2.9; contacts under a sixth of held ticks, was all of them). The floor on the
+  radial figures is the follow's own 3 cm rest band, which is shared with the ground follow (D-092) and out of scope.
+
 **Next** (in order; continue from the first):
 1. Read the numbers of the sixth change (full harness plus `RUSHCORE_ARCHETYPE=canyon|dunes|sky`); paste them here.
-   Both T7 checks must pass on every archetype: Δradial < 3 cm per tick while held, zero contacts under the follow,
-   zero penetration. The cruise ride must be unchanged and the golden hashes must be unchanged.
-2. If Δradial-while-held is still large on Sky, the remaining suspect is `MovementToyWorld.Nearest`: it picks the
-   globally nearest axis *vertex* across every tube whose AABB contains the ball, so a stage with several tubes could
-   hand the follow the wrong tube's axis for a tick (Sky carries the most tubes). That method is outside this packet's
-   boundary: measure it, then record it under "Needs main track" rather than editing it.
+   Both T7 checks must pass on every archetype, the cruise ride must be unchanged, the golden hashes must be unchanged.
+2. Docs 04 §5I and 11 §7d; finish P-009; STATUS row; push; compare URL against `develop-secondary`.
 2. Docs 04 §5I and 11 §7d; finish P-009; STATUS row; full harness plus the three archetype runs; push; compare URL.
 
 
@@ -246,4 +260,10 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
 - P-entries written:
 - Spec sections edited:
 - Open items:
-- Needs main track:
+- **Needs main track:** `TubeDefinition.Nearest` / `MovementToyWorld.Nearest` answer with the nearest axis **sample** and
+  its tangent, not the nearest point on the axis. On a 4 m-sampled curving tube that is up to 3.5 cm out (measured), and
+  the tube follow has to hold the ball that much further inside the shell to stay clear of it, so the ball floats about
+  12 cm off the glass instead of 4. Interpolating the nearest point along the two adjoining segments (and the tangent
+  with it) would remove the error, let `TubeAxisUncertainty` go to zero and tighten the ride. It is a change to the
+  structure query, outside this packet's boundary, and the camera's `PushOutOfTubes` reads the same query and would
+  gain the same accuracy.

@@ -244,10 +244,20 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
   the symptom (rms < 2 cm a tick, was 2.9; contacts under a sixth of held ticks, was all of them). The floor on the
   radial figures is the follow's own 3 cm rest band, which is shared with the ground follow (D-092) and out of scope.
 
+- **After the sixth change**, three of four archetypes pass: Highlands 313/313 (penetration 0.0 cm, 6 grazing contacts,
+  1.01 cm rms), Canyon 311/311, **Dune Sea spotless** (0 contacts, 0.0 cm penetration, 0.68 cm rms). Sky failed with
+  Δradial 45 cm and 0.9 cm penetration at a ride of **179°** — the ball spiralled to the ceiling and fell off. The same
+  open-loop lean settles at 75° on the Highlands tube, 113° on the Dune Sea one and goes right round on Sky's: an
+  open-loop stick is not a comparable stimulus between tubes of different curvature.
+- **Seventh change (the stimulus, last one).** The lean is now closed on the ride angle: it pushes toward the wall while
+  the ball is below 45° and eases off above it, so every archetype measures the same physical situation — boosting while
+  riding the wall well up and clear of the equator, which is what the user was doing. Nothing in the game changed with
+  it; it is the harness's own stimulus.
+
 **Next** (in order; continue from the first):
-1. Read the numbers of the sixth change (full harness plus `RUSHCORE_ARCHETYPE=canyon|dunes|sky`); paste them here.
+1. Read the numbers of the seventh change (full harness plus `RUSHCORE_ARCHETYPE=canyon|dunes|sky`); paste them here.
    Both T7 checks must pass on every archetype, the cruise ride must be unchanged, the golden hashes must be unchanged.
-2. Docs 04 §5I and 11 §7d; finish P-009; STATUS row; push; compare URL against `develop-secondary`.
+2. Finish the Delivery record's summary fields below; STATUS row; push; compare URL against `develop-secondary`.
 2. Docs 04 §5I and 11 §7d; finish P-009; STATUS row; full harness plus the three archetype runs; push; compare URL.
 
 

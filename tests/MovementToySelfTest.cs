@@ -225,6 +225,10 @@ public partial class MovementToySelfTest : Node
         AddChild(ramp);
     }
 
+    /// <summary>The wall-ride angle the boosted tube ride holds (T7): well up the wall, clear of the equator, the same
+    /// physical situation on every archetype's tube whatever its curvature.</summary>
+    private const float TubeRideTargetDegrees = 45f;
+
     // ---------------- helpers ----------------
     private void Check(string name, bool ok, string detail = "")
     {
@@ -2398,15 +2402,20 @@ public partial class MovementToySelfTest : Node
                     if (boosted)
                     {
                         Input.ActionPress(InputBootstrap.Boost, 1f);
-                        // The steered window: from half a second inside, three seconds of stick toward one wall.
+                        // The steered window: from half a second inside, three seconds riding the wall.
                         bool window = insideTicks > 30 && insideTicks <= 30 + Engine.PhysicsTicksPerSecond * 3 && ak > 6 && ak < axis.Length - 6;
                         if (window)
                         {
-                            // A player's stimulus (T7): boost held with a steady lean toward one wall, enough to ride it
-                            // well up but not past the equator. A hard stick throws the ball onto the ceiling, where
-                            // gravity must pull it off the wall: real motion that swamps the judder the check is for.
-                            Vector3 lat = Vector3.Up.Cross(tan).Normalized();
-                            _worldDrive = tan + lat * 0.35f;
+                            // A player's stimulus (T7): boost held while riding the wall at a steady angle. An open-loop
+                            // stick is not comparable between tubes — the same lean settles at 75° on a Highlands tube and
+                            // spirals to the ceiling on a Sky one, where the ball simply falls off and its honest 45 cm of
+                            // flight per tick swamps the judder this measures. So the lean is closed on the ride angle:
+                            // lean toward the wall while below the target, ease off above it.
+                            Vector3 ringDown = (Vector3.Down - tan * Vector3.Down.Dot(tan)).Normalized();
+                            Vector3 ringSide = tan.Cross(ringDown).Normalized();
+                            float signedRide = Mathf.RadToDeg(Mathf.Atan2(rel.Dot(ringSide), rel.Dot(ringDown)));
+                            float lean = Mathf.Clamp((TubeRideTargetDegrees - signedRide) / TubeRideTargetDegrees, -1f, 1f) * 0.6f;
+                            _worldDrive = tan + ringSide * lean;
                             float dist = rel.Length();
                             float delta = float.IsNaN(prevDist) ? 0f : Mathf.Abs(dist - prevDist);
                             float deltaExact = float.IsNaN(prevExact) ? 0f : Mathf.Abs(distExact - prevExact);

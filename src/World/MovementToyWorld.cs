@@ -12,7 +12,7 @@ namespace Rushcore.World;
 /// active <see cref="IHeightSource"/> (<see cref="TerrainHeightField"/> lab, or the
 /// <see cref="ScaleStripHeightField"/> for Gate M1) and <see cref="WorldDressing"/>.
 /// </summary>
-public partial class MovementToyWorld : Node3D
+public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
 {
     /// <summary>Lab default: metres between height samples, also the size of one rendered facet.</summary>
     public const float DefaultCellSize = 4f;
@@ -244,6 +244,10 @@ public partial class MovementToyWorld : Node3D
     }
 
     public Vector3 SurfacePoint(float x, float z, float above = 0f) => new(x, SampleHeight(x, z) + above, z);
+
+    // IGroundSurface (D-092): the ground follow reads the grid the collider and mesh are built from.
+    float Rushcore.Player.IGroundSurface.Height(float x, float z) => SampleHeight(x, z);
+    bool Rushcore.Player.IGroundSurface.Contains(float x, float z) => Mathf.Abs(x) <= HalfX && Mathf.Abs(z) <= HalfZ;
 
     /// <summary>One ArrayMesh per tile: each allocation is bounded (~4 MB at 128 cells) and the
     /// renderer culls tiles the camera cannot see. Collision stays a single heightfield.</summary>

@@ -47,6 +47,13 @@ public sealed class MovementTuning
     public float LandingCapBleed = 39.95f;
     /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
     public float MinGroundNormalDot = 0.498000025749207f;
+    /// <summary>Analytic ground follow (03 §3, D-092): each tick the controller reads the terrain
+    /// grid under the ball; where the surface could physically carry it (v²κ below gravity) the
+    /// outward velocity is removed and the ball is treated as grounded, so the collider's flat
+    /// facets no longer hop it. Off reproduces the contact-only D-091 controller exactly.</summary>
+    public bool GroundFollow = true;
+    /// <summary>Metres above (or below) the surface within which the follow acts.</summary>
+    public float GroundFollowSnapDistance = 0.5f;
     /// <summary>Speed bands are readability/Flow hooks only (02 §5); no physics reads them.
     /// Ladder set against the accepted cap: Rush ~1/3, Crush ~2/3, Overdrive ~95% (V-004).</summary>
     public float RushThreshold = 50f;
@@ -220,7 +227,8 @@ public sealed class WorldTuning
     /// <summary>Phase 2 debug view (04 §16): draw the primary route, its bends and crests above the terrain.</summary>
     public bool RouteDebugLines = true;
     /// <summary>Metres between height samples (= facet size). Rebuilds the world when the slider settles.
-    /// The M1 budget choice: 4 m is the lab default; 8 m quarters the triangle count.</summary>
+    /// The M1 budget choice: 4 m is the lab default; 8 m quarters the triangle count; 16 m is the
+    /// coarse candidate the ground follow (D-092) makes drivable.</summary>
     public float CellSize = 4f;
     /// <summary>Depth-fog end in metres; begin is 16% of it. A sightline instrument for M1.</summary>
     public float FogEnd = 2400f;
@@ -279,6 +287,8 @@ public sealed class GameplayTuning
         F(CatMovement, "Hard Max Locomotion Speed", 5f, 250f, () => m.HardMaxLocomotionSpeed, v => m.HardMaxLocomotionSpeed = v);
         F(CatMovement, "Landing Cap Bleed", 2f, 400f, () => m.LandingCapBleed, v => m.LandingCapBleed = v);
         F(CatMovement, "Min Ground Normal Dot", 0.1f, 0.95f, () => m.MinGroundNormalDot, v => m.MinGroundNormalDot = v);
+        B(CatMovement, "Ground Follow", () => m.GroundFollow, v => m.GroundFollow = v);
+        F(CatMovement, "Ground Follow Snap (m)", 0f, 2f, () => m.GroundFollowSnapDistance, v => m.GroundFollowSnapDistance = v);
         F(CatMovement, "Rush Threshold", 1f, 250f, () => m.RushThreshold, v => m.RushThreshold = v);
         F(CatMovement, "Crush Threshold", 1f, 250f, () => m.CrushThreshold, v => m.CrushThreshold = v);
         F(CatMovement, "Overdrive Threshold", 1f, 250f, () => m.OverdriveThreshold, v => m.OverdriveThreshold = v);
@@ -370,7 +380,7 @@ public sealed class GameplayTuning
         B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
         B(CatWorld, "Generated Stage (Phase 2)", () => w.GeneratedStage, v => w.GeneratedStage = v);
         B(CatWorld, "Route Debug Lines", () => w.RouteDebugLines, v => w.RouteDebugLines = v);
-        F(CatWorld, "Cell Size (m)", 2f, 8f, () => w.CellSize, v => w.CellSize = v);
+        F(CatWorld, "Cell Size (m)", 2f, 16f, () => w.CellSize, v => w.CellSize = v);
         F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);
 
         foreach (var e in p) e.DefaultValue = e.Get();

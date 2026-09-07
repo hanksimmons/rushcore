@@ -34,6 +34,7 @@ public partial class PlayerPhysics : RigidBody3D
 
     // ---- movement state (03 §3: track only what behavior needs) ----
     private bool _rawGrounded;
+    private bool _followActive;
     private float _groundStick;
     private Vector3 _groundNormal = Vector3.Up;
     private float _jumpLockout;
@@ -68,6 +69,10 @@ public partial class PlayerPhysics : RigidBody3D
 
     /// <summary>Ground grace used for locomotion only. Charge start still requires a raw contact.</summary>
     private const float GroundStickSeconds = 0.05f;
+    /// <summary>Ground follow (03 §3, D-092): gaps inside the deadband are left to the solver; larger
+    /// gaps close over this horizon as a velocity, never as a transform write.</summary>
+    private const float GroundFollowDeadband = 0.03f;
+    private const float GroundFollowCloseSeconds = 0.05f;
     private const float JumpLockoutSeconds = 0.08f;
     private const float CheckpointIntervalSeconds = 0.75f;
 
@@ -81,6 +86,10 @@ public partial class PlayerPhysics : RigidBody3D
     public MovementState State { get; private set; } = MovementState.Airborne;
     public bool IsGrounded { get; private set; }
     public bool IsRawGrounded => _rawGrounded;
+    /// <summary>True while the analytic ground follow is carrying the ball this tick (03 §3, D-092).</summary>
+    public bool GroundFollowActive => _followActive;
+    /// <summary>The terrain grid the ground follow reads; null (the default) disables the follow.</summary>
+    public IGroundSurface? Ground { get; set; }
     public Vector3 GroundNormal => _groundNormal;
     public Vector3 Velocity { get; private set; }
     /// <summary>Grounded: ground-tangent speed. Airborne: world-XZ speed (03 §5).</summary>
@@ -247,7 +256,7 @@ public partial class PlayerPhysics : RigidBody3D
         _landedThisTick = false;
         _sinceSlamLanding += dt;
         _sinceSlamPress += dt;
-        UpdateGroundState(state, dt);
+        UpdateGroundState(state, dt, ref v);
         HandleLanding(wasGrounded, preVerticalSpeed);
         UpdateJumpInput(dt, ref v);
 
@@ -440,13 +449,14 @@ public partial class PlayerPhysics : RigidBody3D
         _sinceFlowGain = float.PositiveInfinity;
         _prevLocSpeed = 0f;
         _rawGrounded = false;
+        _followActive = false;
         IsGrounded = false;
         _groundNormal = Vector3.Up;
         State = MovementState.Airborne;
         _needsInterpolationReset = true;
     }
 
-    private void UpdateGroundState(PhysicsDirectBodyState3D state, float dt)
+    private void UpdateGroundState(PhysicsDirectBodyState3D state, float dt, ref Vector3 v)
     {
         if (_jumpLockout > 0f) _jumpLockout -= dt;
 
@@ -463,10 +473,13 @@ public partial class PlayerPhysics : RigidBody3D
             }
         }
 
-        _rawGrounded = hits > 0 && _jumpLockout <= 0f;
+        // The analytic follow reads the same terrain grid the collider is built from, so a facet
+        // edge that would hop the ball for a few ticks reads as continuous ground instead (D-092).
+        _followActive = TryGroundFollow(state, dt, ref v, out Vector3 followNormal);
+        _rawGrounded = (hits > 0 || _followActive) && _jumpLockout <= 0f;
         if (_rawGrounded)
         {
-            _groundNormal = sum.Normalized();     // stable representative normal (03 §3)
+            _groundNormal = _followActive ? followNormal : sum.Normalized();     // stable representative normal (03 §3)
             _groundStick = GroundStickSeconds;
         }
         else
@@ -477,6 +490,60 @@ public partial class PlayerPhysics : RigidBody3D
         }
 
         IsGrounded = _rawGrounded || _groundStick > 0f;
+    }
+
+    /// <summary>
+    /// Analytic ground follow (03 §3, D-092). The collider is flat facets; at speed every convex
+    /// facet edge launches a real sphere for a few ticks, so contact flickers and a held charge
+    /// cancels. The fix reads the terrain grid under the ball: where the surface could physically
+    /// carry the ball (its curvature demand v²κ along travel is below the gravity available) and
+    /// the ball is within the snap distance, the outward velocity component is removed, the gap is
+    /// closed as a bounded velocity, and the ball counts as grounded with the grid's smooth normal.
+    /// Where v²κ ≥ g nothing happens, so launches stay real. Never during jump lockout or a slam,
+    /// never on a slope steeper than the ground limit, never against a falling ball (the solver
+    /// lands that). A velocity rule only: no transform is written.
+    /// </summary>
+    private bool TryGroundFollow(PhysicsDirectBodyState3D state, float dt, ref Vector3 v, out Vector3 normal)
+    {
+        normal = Vector3.Up;
+        var m = _t.Movement;
+        if (Ground is not { } g || !m.GroundFollow || _jumpLockout > 0f || _slamActive) return false;
+        Vector3 c = state.Transform.Origin;
+        if (!g.Contains(c.X, c.Z)) return false;
+
+        // Sample along and across the travel direction. The normal spans one cell each side and the
+        // curvature three, so a single facet kink averages out while the underlying bend remains.
+        float cell = Mathf.Max(0.5f, g.CellSize);
+        Vector3 flat = new(v.X, 0f, v.Z);
+        Vector3 d = flat.LengthSquared() > 1e-4f ? flat.Normalized() : Vector3.Forward;
+        Vector3 q = new(-d.Z, 0f, d.X);
+        float h0 = g.Height(c.X, c.Z);
+        float hf = g.Height(c.X + d.X * cell, c.Z + d.Z * cell), hb = g.Height(c.X - d.X * cell, c.Z - d.Z * cell);
+        float hl = g.Height(c.X + q.X * cell, c.Z + q.Z * cell), hr = g.Height(c.X - q.X * cell, c.Z - q.Z * cell);
+        float sd = (hf - hb) / (2f * cell), sq = (hl - hr) / (2f * cell);
+        Vector3 n = new Vector3(-(sd * d.X + sq * q.X), 1f, -(sd * d.Z + sq * q.Z)).Normalized();
+        if (n.Y < m.MinGroundNormalDot) return false;
+
+        float gap = (c.Y - h0) * n.Y - m.BallRadius;              // perpendicular distance from the resting height
+        if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
+        float vN = v.Dot(n);
+        if (vN < -m.GroundFollowSnapDistance / dt) return false;   // arriving faster than one snap per tick: a landing
+
+        // Contact possibility: a surface curving away demands v²κ of centripetal acceleration; gravity supplies g·n.Y.
+        float span = 3f * cell;
+        float hF = g.Height(c.X + d.X * span, c.Z + d.Z * span), hB = g.Height(c.X - d.X * span, c.Z - d.Z * span);
+        float second = (hF - 2f * h0 + hB) / (span * span);
+        float slope2 = 1f + sd * sd;
+        float kappa = second / (slope2 * Mathf.Sqrt(slope2));       // signed curvature along travel; negative = convex
+        Vector3 vT = v - n * vN;
+        if (kappa < 0f && vT.LengthSquared() * -kappa >= m.Gravity * n.Y) return false;
+
+        float excess = Mathf.Max(0f, Mathf.Abs(gap) - GroundFollowDeadband) * Mathf.Sign(gap);
+        float target = -excess / GroundFollowCloseSeconds;         // toward the surface; zero inside the deadband
+        vN = gap >= 0f ? Mathf.Min(vN, target) : Mathf.Max(vN, target);
+        v = vT + n * vN;
+        normal = n;
+        return true;
     }
 
     private void HandleLanding(bool wasGrounded, float preVerticalSpeed)
@@ -755,4 +822,13 @@ public interface ICameraBasis
 {
     Vector3 FlatForward { get; }
     Vector3 FlatRight { get; }
+}
+
+/// <summary>The terrain grid the analytic ground follow reads (03 §3, D-092): the same samples the
+/// collider and the render mesh are built from, so the one height source stays one.</summary>
+public interface IGroundSurface
+{
+    float CellSize { get; }
+    bool Contains(float x, float z);
+    float Height(float x, float z);
 }

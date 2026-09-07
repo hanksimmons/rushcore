@@ -163,7 +163,7 @@ Toggles:
 - challenge zones,
 - spawn anchors,
 - invalid slopes/regions,
-- player ground normal/contact,
+- player ground normal/contact (contact, raw, ground follow),
 - impact vector.
 
 Disabled by default.

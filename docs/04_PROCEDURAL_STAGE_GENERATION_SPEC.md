@@ -125,6 +125,11 @@ Modify terrain around the primary route to enforce:
 
 The route is not required to be flat. It may descend, climb, bank, crest, and roll.
 
+The stamped profile is continuous along the route: the corridor height at any point interpolates
+the profile between the two route samples it lies between (D-093). A nearest-sample height is a
+staircase at the sample spacing, invisible to validators that read the samples but resolved by a
+heightfield grid of the same spacing into flat treads and double-grade risers.
+
 ### E — Challenge modules
 
 Small authored procedural grammar pieces with explicit preconditions.
@@ -250,10 +255,13 @@ any slam landing. The calibration environment must be large enough to measure th
 the Movement Toy lab (±512 m) is crossed in about seven seconds at that speed, so the 6.4 km scale strip (`World › Calibration Strip (M1)`, D-079, runbook) is the M1 instrument.
 
 Scale is decided on two sides at once (D-080): feel, and the **terrain budget** at that scale
-(samples, triangles, build time, memory, draw distance). Cell size is a measured choice: it is
-also a ground-contact-stability choice (measured: 4 m keeps 99% contact on the gentlest strip
-hills, 8 m only 86%). Render terrain is tiled from the start; the budget model and measurements
-live in the runbook.
+(samples, triangles, build time, memory, draw distance). Cell size is a measured choice: it was
+also a ground-contact-stability choice (measured 2026-09-05: 4 m kept 99% contact on the gentlest
+strip hills, 8 m only 86%). Since the analytic ground follow (03 §3, D-092) the controller reads the
+terrain grid and keeps contact wherever contact is physically possible, so contact no longer
+depends on the cell size (measured 2026-09-06: 100% raw contact on the same hill at 4, 8 and 16 m)
+and cell size is decided on draw cost, silhouette and validator resolution alone. Render terrain
+is tiled from the start; the budget model and measurements live in the runbook.
 
 Crest contact is a hard geometric input: a ball leaves the ground at any crest whose radius is
 below v²/g (91 m at 60 m/s, 358 m at the burst speed, 560 m at the cap). For a cosine hill the
@@ -365,11 +373,16 @@ curve on the scale-strip runway and the descent speeds on the lab grade fan and 
 model is within 5% of what the ball does (delivered 2026-09-05: runway within 0.8%; real 0→cap
 is 7.1 s / ≈ 580 m). It is pure data code with no scene dependency
 (`src/Generation/RouteSpeedModel.cs`). Its first whole-route reading (Gate G0, D-087): the harness follower
-drives a generated stage end to end within 4.3% of the model's time. The model runs slightly fast because
+drives a generated stage end to end within 4.3% of the model's time (8.5% at the D-091 baseline before
+D-093, 0.5% after it). The model ran slightly fast because
 it has no airborne phase: contact per kilometre was 90 / 94 / 58 / 87 / 76 / 22%, the low readings on the
 two launch-crest kilometres, and after the second crest (taken at the cap) the ball skipped for most of
-the remaining kilometre and arrived at 119 m/s against the model's 149. Landing-zone and expected-speed
-assumptions for the Phase 3 modules (§5E, §11) must read that, not the model's 193 m landing estimate.
+the remaining kilometre and arrived at 119 m/s against the model's 149. With the ground follow (D-092) and
+the interpolated corridor profile (D-093) the same drive reads 0.5% (47.2 s vs 47.4 s) with 100 / 100 / 67 /
+100 / 100 / 75% raw contact: every loss of contact is now a real launch (the harness confirms each crest is
+left exactly when v² > g·r) and the ball lands at the cap, so what remains of the model error is the
+airborne-and-landing phase at the crests. Landing-zone and expected-speed assumptions for the Phase 3
+modules (§5E, §11) must still read the measured landing, not the model's 193 m estimate.
 
 **Two speeds (D-088).** From the Flow headroom slice on, generation reads two speeds. The base-kit
 profile above (entry speed 0, base cap, no Flow) decides mandatory crossability and the base-kit

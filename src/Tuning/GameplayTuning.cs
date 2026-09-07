@@ -231,6 +231,8 @@ public sealed class WorldTuning
     public float Archetype = 0f;
     /// <summary>Phase 2 debug view (04 §16): draw the primary route, its bends and crests above the terrain.</summary>
     public bool RouteDebugLines = true;
+    /// <summary>A named sample stage (docs/10, `SampleStages`): setting it picks that archetype and seed and rebuilds; 0 = none.</summary>
+    public float SampleStage = 0f;
     /// <summary>Phase 3 debug views (04 §16, D-104): corridor bounds, challenge zones, structure bounds and floors; off by default (07 §11).</summary>
     public bool StageDebugViews = false;
     /// <summary>Metres between height samples (= facet size). Rebuilds the world when the slider settles.
@@ -390,6 +392,7 @@ public sealed class GameplayTuning
         F(CatWorld, "Archetype (0 highlands, 1 canyon, 2 dunes, 3 sky)", 0f, 3f, () => w.Archetype, v => w.Archetype = Mathf.Round(v));
         B(CatWorld, "Route Debug Lines", () => w.RouteDebugLines, v => w.RouteDebugLines = v);
         B(CatWorld, "Stage Debug Views (corridor, challenges, structures, floors)", () => w.StageDebugViews, v => w.StageDebugViews = v);
+        F(CatWorld, "Sample Stage (" + Rushcore.Generation.SampleStages.Label + ")", 0f, Rushcore.Generation.SampleStages.All.Length, () => w.SampleStage, v => w.SampleStage = Mathf.Round(v));
         F(CatWorld, "Cell Size (m)", 2f, 16f, () => w.CellSize, v => w.CellSize = v);
         F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);
 

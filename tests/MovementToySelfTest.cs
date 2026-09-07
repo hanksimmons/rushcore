@@ -1221,6 +1221,37 @@ public partial class MovementToySelfTest : Node
             foreach (var _ in Frames(2)) yield return null;
         }
 
+        // ---- Sample stages (docs/10): World › Sample Stage picks a named archetype and seed and rebuilds ----
+        // Last, because it moves the world seed; every entry must generate a valid stage with what it promises.
+        {
+            var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
+            bool allValid = true; string detail = "";
+            foreach (var e in SampleStages.All)
+            {
+                var d = gen.Generate(new StageGenerationRequest(e.Seed, 0, e.Archetype));
+                bool shows = e.Name switch
+                {
+                    "tube" => d.Tubes.Count > 0,
+                    "tunnels + pit" => d.Lids.Count > 0 && d.PrimaryRoute.Spiral is not null,
+                    "sky floor 3" => d.OptionalLines.Any(l => l.Floor == 3),
+                    "dune trains" => d.PrimaryRoute.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest) >= 3,
+                    _ => d.Modules.Any(x => x.Kind == ChallengeModuleKind.ModerateGap),
+                };
+                bool ok = d.Report.Passed && !d.Report.UsedFallback && shows;
+                allValid &= ok;
+                detail += $" [{e.Name}: seed {e.Seed} {(ok ? "ok" : "FAIL")}]";
+            }
+            Check("every sample stage generates valid and shows what it promises (docs/10)", allValid, detail);
+            _debug.Tuning.World.SampleStage = 2f;
+            foreach (var _ in Frames(4)) yield return null;
+            var w = _debug.World;
+            Check("World › Sample Stage rebuilds the named stage from the panel", w.IsStage && w.Seed == SampleStages.All[1].Seed && w.Archetype == TerrainArchetype.CanyonRun, $"stage={w.IsStage} seed={w.Seed} {w.Archetype}");
+            _debug.Tuning.World.SampleStage = 0f;
+            _debug.Tuning.World.GeneratedStage = false;
+            _debug.Tuning.World.Archetype = 0f;
+            foreach (var _ in Frames(3)) yield return null;
+        }
+
         // ---- fall recovery ----
         foreach (var _ in Seconds(0.5f)) yield return null;
         _player.SetCheckpoint(PlatformCenter + Vector3.Up * 3f);

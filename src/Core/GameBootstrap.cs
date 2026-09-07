@@ -23,6 +23,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private TuningPanel _tuningPanel = null!;
     private TelemetryOverlay _telemetry = null!;
     private int _seed = DefaultSeed;
+    private int _sampleSeen;
     private float _cellSizeSeen, _cellSizeDwell;
 
     public GameplayTuning Tuning => _tuning;
@@ -127,6 +128,21 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (!InputBootstrap.IsTextEntryFocused(GetViewport())) HandleDebugHotkeys();
 
         if (_screenshotFrame > 0) StepScreenshotCapture();
+
+        // World › Sample Stage picks a named archetype and seed (docs/10) and rebuilds; the seed row shows the seed.
+        int sample = Mathf.RoundToInt(_tuning.World.SampleStage);
+        if (sample != _sampleSeen)
+        {
+            _sampleSeen = sample;
+            if (Rushcore.Generation.SampleStages.At(sample) is { } e)
+            {
+                _seed = e.Seed;
+                _tuning.World.GeneratedStage = true;
+                _tuning.World.Archetype = (int)e.Archetype;
+                GD.Print($"[RUSHCORE] Sample stage {sample}: {e.Name} ({e.What}), seed {e.Seed}");
+                RestartSameSeed();
+            }
+        }
 
         // World › Calibration Strip and Cell Size rebuild the whole terrain (Gate M1). The
         // toggle applies at once; the slider waits until it has stopped moving.

@@ -699,6 +699,15 @@ Expose:
 - validation report,
 - generation phase timing.
 
+Delivered (D-104): `World › Route Debug Lines` draws the primary (cyan straights, orange bends, magenta feature
+zones), optional lines by floor (green ridges and floor 2, gold floor 3), checkpoint posts and tube axes;
+`World › Stage Debug Views` (off by default, 07 §11) adds corridor bounds on every line, challenge zones (a yellow
+line from a module's entrance to the end of its landing zone with posts at both ends, and over every committed
+bend), structure bounds (lid box outlines, tube mouth rings, the spiral pit's rim), floor bounds in the floor's
+colour and each terrace's drain (a red line along its cliff foot). The telemetry `seed` row carries the counts
+(lines, terraces, tubes, lids, the pit) and the validation status; the log prints every check and the phase
+timings; signs mark gaps, ramps, crests, tubes, tunnels, floors and the pit.
+
 ## Empirical validation items
 
 1. ball/world scale,

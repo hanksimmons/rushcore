@@ -1985,6 +1985,8 @@ public partial class MovementToySelfTest : Node
         // RUSHCORE_ARCHETYPE=canyon|dunes drives a Canyon Run or Dune Sea stage (G0 per archetype, 08 §5).
         string envArchetype = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") ?? "";
         t.World.Archetype = (int)(envArchetype == "canyon" ? TerrainArchetype.CanyonRun : envArchetype == "dunes" ? TerrainArchetype.DuneSea : envArchetype == "sky" ? TerrainArchetype.SkyTerraces : TerrainArchetype.RollingHighlands);
+        // The stage debug views (D-104) build with the stage: a smoke test that every view draws and the tree stays flat.
+        t.World.StageDebugViews = true;
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -2519,6 +2521,7 @@ public partial class MovementToySelfTest : Node
         }
 
         t.World.GeneratedStage = false;
+        t.World.StageDebugViews = false;
         t.World.Archetype = 0f;
         t.World.CellSize = MovementToyWorld.DefaultCellSize;
         _debug.RestartSameSeed();

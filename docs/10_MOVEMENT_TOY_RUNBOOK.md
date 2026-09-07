@@ -314,7 +314,9 @@ What you see: a 6.0 × 2.0 km footprint; a green **START** pad and blue **EXIT**
 +X; the stamped 150 m corridor (wider and banked on bends) as a lighter track; **CREST ▲** signs on
 launch-crest straights; boost rings on the line every 1.2 km; scatter kept out of the corridor.
 `World › Route Debug Lines` (04 §16) draws the primary route 3 m up: cyan straights, orange bends,
-magenta crest zones. The telemetry `seed` row shows the generation summary (valid / fallback,
+magenta feature zones, optional lines by floor, checkpoint posts and tube axes; `World › Stage Debug Views`
+(D-104, off by default, rebuilds the world) adds corridor bounds, challenge zones, lid and tube-mouth outlines,
+the pit rim, floor bounds and terrace drains. The telemetry `seed` row shows the generation summary (valid / fallback,
 length, base-kit time, bends, crests, generation ms) and the log prints every validation check.
 Build: ≈ 3.6 s headless for 752 k samples / 1.5 M triangles / 48 tiles (world sampling dominates;
 the definition itself is ≈ 25 ms). The harness builds one stage every run and drives its whole primary

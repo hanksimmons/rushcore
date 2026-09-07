@@ -262,6 +262,8 @@ Until the implementation plan advances:
 > D-100 gap closure (crest paid path, optional lines checked at both speeds, the ridge redesign, one archetype selector),
 > and see-through tubes (D-101: swept shell, carried segments, the tube follow, the camera push-out, the harness ride),
 > wall tunnels and the spiral pit (D-102: lids with the confined camera, the unbounded-heading finale, the headroom validator),
-> and the first cut of Sky Terraces (D-103: terrace floors with cliff edges onto the floor below, drains, the cloud band).
+> the first cut of Sky Terraces (D-103: terrace floors with cliff edges onto the floor below, drains, the cloud band),
+> and the stage debug views (D-104). Phase 3's listed slices are all delivered; Gate G0 per archetype holds in the
+> harness and the manual sample is the user's. Difficulty stays parked until after Phase 4.
 
 The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-095: the user's `manual-small-3` preset, D-091 plus the slam and VFX overrides, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

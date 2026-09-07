@@ -116,8 +116,10 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     {
         bool wantStage = _t.World.GeneratedStage;
         bool wantStrip = !wantStage && _t.World.CalibrationStrip;
-        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype);
+        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype) && _t.World.StageDebugViews == BuiltDebugViews;
     }
+    /// <summary>Whether the last dressing build drew the stage debug views (the toggle rebuilds the world).</summary>
+    public bool BuiltDebugViews { get; private set; }
     /// <summary>Half extents of the active terrain in metres.</summary>
     public float HalfX { get; private set; } = Extent * 0.5f;
     public float HalfZ { get; private set; } = Extent * 0.5f;
@@ -185,7 +187,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +
-                           $"{Stage.OptionalLines.Count} lines, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
+                           $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Tubes.Count} tubes, {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
             GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
             foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
         }
@@ -228,6 +230,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         SpawnPoint = _field.SpawnXZ with { Y = SampleHeight(_field.SpawnXZ.X, _field.SpawnXZ.Z) + 4f };
 
         _dressing.Rebuild();
+        BuiltDebugViews = _t.World.StageDebugViews;
         BuildMillis = Time.GetTicksMsec() - start;
         GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
                  $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +

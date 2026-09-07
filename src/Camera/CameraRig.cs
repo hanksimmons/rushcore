@@ -36,6 +36,11 @@ public partial class CameraRig : Node3D, ICameraBasis
     private readonly RandomNumberGenerator _rng = new();
 
     private const float MinCameraDistance = 1.5f;
+    /// <summary>The focus never leads by more than this fraction of the lens-to-focus horizontal
+    /// reach, so the ball always sits in front of the lens whatever the look-ahead tuning says.</summary>
+    private const float MaxLookAheadFraction = 0.7f;
+    private float _framePitch;             // degrees of extra lens pitch holding the ball inside the frame band
+    private float _frameYaw;               // degrees of extra lens yaw (+ = left) doing the same sideways
     /// <summary>cos(120°): a heading further than this from the view is a reversal, not a turn.</summary>
     private const float ReverseCone = -0.5f;
 
@@ -62,6 +67,40 @@ public partial class CameraRig : Node3D, ICameraBasis
     public bool FlooredThisFrame { get; private set; }
     /// <summary>True while the yaw is deliberately held against a reversed travel heading.</summary>
     public bool ReverseHoldActive { get; private set; }
+    /// <summary>Extra lens pitch (degrees, + = up) currently applied by the framing pivot.</summary>
+    public float FramePitchDegrees => _framePitch;
+    /// <summary>Extra lens yaw (degrees, + = left) currently applied by the framing pivot.</summary>
+    public float FrameYawDegrees => _frameYaw;
+    /// <summary>The framing bands in degrees at the current field of view (vertical, horizontal).</summary>
+    public float FrameBandDegreesVertical => Mathf.Clamp(_t.Camera.FrameBandFraction, 0.05f, 0.98f) * _camera.Fov * 0.5f;
+    public float FrameBandDegreesHorizontal
+    {
+        get
+        {
+            Vector2 vp = _camera.GetViewport().GetVisibleRect().Size;
+            float aspect = Mathf.Max(0.5f, vp.X / Mathf.Max(1f, vp.Y));
+            float halfH = Mathf.RadToDeg(Mathf.Atan(Mathf.Tan(Mathf.DegToRad(_camera.Fov * 0.5f)) * aspect));
+            return Mathf.Clamp(_t.Camera.FrameBandHorizontalFraction, 0.05f, 0.98f) * halfH;
+        }
+    }
+
+    /// <summary>Horizontal angle (degrees, + = left of centre) at which the lens currently sees a world point; NaN if behind the lens.</summary>
+    public float FrameSideAngleTo(Vector3 worldPoint)
+    {
+        Transform3D cam = _camera.GlobalTransform;
+        Vector3 to = worldPoint - cam.Origin;
+        float ahead = to.Dot(-cam.Basis.Z), left = -to.Dot(cam.Basis.X);
+        return ahead > 0.05f ? Mathf.RadToDeg(Mathf.Atan2(left, ahead)) : float.NaN;
+    }
+
+    /// <summary>Vertical angle (degrees, + = above centre) at which the lens currently sees a world point; NaN if behind the lens.</summary>
+    public float FrameAngleTo(Vector3 worldPoint)
+    {
+        Transform3D cam = _camera.GlobalTransform;
+        Vector3 to = worldPoint - cam.Origin;
+        float ahead = to.Dot(-cam.Basis.Z), up = to.Dot(cam.Basis.Y);
+        return ahead > 0.05f ? Mathf.RadToDeg(Mathf.Atan2(up, ahead)) : float.NaN;
+    }
 
     public override void _Ready()
     {
@@ -114,6 +153,8 @@ public partial class CameraRig : Node3D, ICameraBasis
         _shake = 0f;
         _occlusion = 1f;
         _reverseHold = 0f;
+        _framePitch = 0f;
+        _frameYaw = 0f;
         UpdateOrientation();
         ApplyTransform(FullDistance(0f), 0f);
         ResetPhysicsInterpolation();
@@ -140,11 +181,17 @@ public partial class CameraRig : Node3D, ICameraBasis
         float speed01 = Mathf.Clamp(speed / cap, 0f, 1f + Mathf.Max(0f, _t.Flow.Headroom));
         float look01 = Mathf.Min(speed01, 1f);
 
-        UpdateYaw(flatVel, speed, dt);
+        // While carving the view tracks the facing (03 §11): the player looks at the exit, so does the camera.
+        UpdateYaw(_player.IsCarving ? new Vector3(_player.Facing.X, 0f, _player.Facing.Z).Normalized() * Mathf.Max(speed, 1f) : flatVel, speed, dt);
         UpdateOrientation();
 
         Vector3 lookAhead = Vector3.Zero;
         if (speed > 1f) lookAhead = flatVel / speed * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, look01);
+        // Geometry bound (D-090): a lead longer than the lens's horizontal reach would put the
+        // camera ahead of the ball; the occluded distance counts, so a pulled-in lens leads less.
+        float reach = Mathf.Min(FullDistance(speed01), Mathf.Max(MinCameraDistance, CurrentDistance)) * Mathf.Cos(Mathf.DegToRad(c.PitchDegrees));
+        float lookLimit = Mathf.Max(0f, reach * MaxLookAheadFraction);
+        if (lookAhead.Length() > lookLimit) lookAhead = lookAhead.Normalized() * lookLimit;
         CurrentLookAhead = lookAhead.Length();
 
         // The look-ahead point may lie inside an upslope; floor it so the focus, and
@@ -167,6 +214,47 @@ public partial class CameraRig : Node3D, ICameraBasis
         UpdateOcclusion(playerPos, Basis.Z * fullDist, dt);
         ApplyTransform(fullDist, _shake);
         _camera.Fov = Mathf.Lerp(c.FovMin, c.FovMax, speed01);
+        UpdateFramePitch(playerPos, dt);
+    }
+
+    /// <summary>
+    /// Framing pivot (03 §14, D-090). The rig's base pitch frames the road; the lens itself pitches
+    /// up or down whenever the ball would leave a band of ±FrameBand degrees around the screen
+    /// centre (a jump to the top, a dive off the bottom), holding it on the band edge at once, and
+    /// eases back to the base pitch once the ball is inside again. The rig basis, and therefore
+    /// camera-relative steering, is untouched.
+    /// </summary>
+    private void UpdateFramePitch(Vector3 ballPos, float dt)
+    {
+        var c = _t.Camera;
+        if (FlooredThisFrame) { _framePitch = 0f; _frameYaw = 0f; return; }   // the floor already re-aimed the lens
+        // Measure the ball as azimuth about world up (relative to the rig's flat forward) and
+        // elevation above the horizontal. Both are exact at any angle: the earlier rig-axis
+        // projection read a ball far to the side as far below, and pitched the lens into the
+        // ground once a carve slide reached the corner. The lens is then rebuilt as world yaw
+        // then pitch, so a sideways hold never rolls the horizon.
+        Vector3 to = ballPos - _camera.GlobalPosition;
+        float ahead = to.Dot(FlatForward), left = -to.Dot(FlatRight);
+        float flat = Mathf.Sqrt(ahead * ahead + left * left);
+        if (flat < 0.05f) return;
+        float azimuth = Mathf.RadToDeg(Mathf.Atan2(left, ahead));          // + = left of the rig's forward
+        float elevation = Mathf.RadToDeg(Mathf.Atan2(to.Y, flat));         // + = above the horizontal
+        float release = 1f - Mathf.Exp(-Mathf.Max(0.01f, c.PitchReleaseDamping) * dt);
+        _framePitch = Mathf.Clamp(Hold(_framePitch, elevation - c.PitchDegrees, FrameBandDegreesVertical, release), -80f, 80f);
+        // Sideways twin: a carve slide (03 §11) carries the ball across the screen; it parks on this edge.
+        _frameYaw = Mathf.Clamp(Hold(_frameYaw, azimuth, FrameBandDegreesHorizontal, release), -150f, 150f);
+        float pitch = Mathf.Clamp(c.PitchDegrees + _framePitch, -89f, 89f);
+        _camera.GlobalBasis = Basis.FromEuler(new Vector3(Mathf.DegToRad(pitch), _yaw + Mathf.DegToRad(_frameYaw), 0f));
+    }
+
+    /// <summary>Extra lens angle that keeps a ball seen at <paramref name="angle"/> inside ±band:
+    /// the clamp is immediate (the ball never leaves), only the return to zero is damped.</summary>
+    private static float Hold(float current, float angle, float bandDegrees, float release)
+    {
+        float band = Mathf.Max(1f, bandDegrees);
+        float want = angle > band ? angle - band : angle < -band ? angle + band : 0f;
+        bool pushingOut = want != 0f && (Mathf.Sign(want) != Mathf.Sign(current) || Mathf.Abs(want) > Mathf.Abs(current));
+        return pushingOut ? want : Mathf.Lerp(current, want, release);
     }
 
     // ---------------- orientation ----------------

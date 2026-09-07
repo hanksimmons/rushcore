@@ -42,6 +42,9 @@ public partial class MovementToySelfTest : Node
     private bool _done;
 
     private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount, _landedCount, _burstCount;
+    private bool _frameCheck;
+    private int _frameSamples, _frameOut;
+    private float _frameWorst, _frameSideWorst;
     private bool _releaseJumpFromProcess;
     /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
     private Vector3? _worldDrive;
@@ -119,6 +122,22 @@ public partial class MovementToySelfTest : Node
         {
             if (cam.Y < world.SampleHeight(cam.X, cam.Z) + _debug.Tuning.Camera.GroundClearance - 0.15f)
                 _groundViolations++;
+        }
+
+        // Framing pivot (D-090): every tick the ball is inside the lens's vertical frustum and
+        // within the band (one render frame of slack, since the pivot runs per rendered frame).
+        if (!rig.FlooredThisFrame && _frameCheck)
+        {
+            float angle = rig.FrameAngleTo(_player.GlobalPosition);
+            float side = rig.FrameSideAngleTo(_player.GlobalPosition);
+            float ballAngle = Mathf.RadToDeg(Mathf.Atan(_debug.Tuning.Movement.BallRadius / Mathf.Max(0.5f, rig.Camera.GlobalPosition.DistanceTo(_player.GlobalPosition))));
+            float halfFov = rig.Camera.Fov * 0.5f;
+            var vp = rig.Camera.GetViewport().GetVisibleRect().Size;
+            float halfFovH = Mathf.RadToDeg(Mathf.Atan(Mathf.Tan(Mathf.DegToRad(halfFov)) * Mathf.Max(0.5f, vp.X / Mathf.Max(1f, vp.Y))));
+            _frameSamples++;
+            if (float.IsNaN(angle) || Mathf.Abs(angle) + ballAngle > halfFov || Mathf.Abs(side) + ballAngle > halfFovH) _frameOut++;
+            if (!float.IsNaN(angle)) _frameWorst = Mathf.Max(_frameWorst, Mathf.Abs(angle));
+            if (!float.IsNaN(side)) _frameSideWorst = Mathf.Max(_frameSideWorst, Mathf.Abs(side));
         }
 
         if (!_visCheck) return;
@@ -236,7 +255,7 @@ public partial class MovementToySelfTest : Node
     private static readonly string[] AllActions =
     {
         InputBootstrap.MoveForward, InputBootstrap.MoveBack, InputBootstrap.MoveLeft,
-        InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost
+        InputBootstrap.MoveRight, InputBootstrap.Jump, InputBootstrap.Boost, InputBootstrap.Carve
     };
 
     private void ReleaseAll()
@@ -285,6 +304,14 @@ public partial class MovementToySelfTest : Node
         var t = _debug.Tuning;
         var m = t.Movement;
         var js = t.JumpSlam;
+
+        // ---- the locked preset is the compiled baseline, verbatim (D-078 procedure, D-091) ----
+        {
+            int applied = t.LoadOverride("res://tuning/presets/manual-small-2.json");
+            Check("the locked preset manual-small-2 loads as compiled defaults (verbatim promotion)", applied > 0 && t.OverrideCount == 0,
+                $"applied={applied} overrides={t.OverrideCount}: " + string.Join(", ", t.Parameters.Where(GameplayTuning.IsModified).Select(x => $"{x.Key}={x.Get():R} vs {x.DefaultValue:R}")));
+            t.ResetAll();
+        }
 
         // ---- body configuration invariants ----
         Check("CCD enabled", _player.ContinuousCd);
@@ -568,6 +595,9 @@ public partial class MovementToySelfTest : Node
         // ---- Flow headroom (02 §8, 03 §5, D-088): earned speed above the base cap ----
         foreach (var e in RunFlowHeadroomCase()) yield return e;
 
+        // ---- carve (03 §11, D-089): a held drift that preserves speed ----
+        foreach (var e in RunCarveCase()) yield return e;
+
         // ---- slam preserves lateral momentum and commits downward ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
         Input.ActionPress(InputBootstrap.MoveForward, 1f);
@@ -780,6 +810,82 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Seconds(1.5f)) yield return null;
         Check("occlusion probe can be disabled", rig.OcclusionFraction > 0.95f, $"fraction={rig.OcclusionFraction:0.00}");
         t.Camera.OcclusionProbe = true;
+
+        // ---- framing pivot (03 §14, D-090): the ball never leaves the frame on a jump, a dive or at the cap ----
+        {
+            foreach (var _ in Settle(PlatformCenter - Forward * 600f + Vector3.Up * 3f)) yield return null;
+            _frameCheck = true; _frameSamples = 0; _frameOut = 0; _frameWorst = 0f; _frameSideWorst = 0f;
+            Input.ActionPress(InputBootstrap.Jump, 1f);                          // full charge, straight up
+            foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.05f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            foreach (var _ in Seconds(1.0f)) yield return null;
+            Input.ActionPress(InputBootstrap.Jump, 1f);                          // slam: the dive
+            foreach (var _ in Act()) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            int lb = _landedCount, g = 0;
+            while (_landedCount == lb && g++ < 300) yield return null;
+            foreach (var _ in Seconds(0.5f)) yield return null;
+            int jumpSamples = _frameSamples, jumpOut = _frameOut;
+            float jumpWorst = _frameWorst;
+            _player.RefillBoost(t.Boost.BoostCapacity);                          // then the cap on the runway
+            _worldDrive = Forward;
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            float lookWorst = 0f;
+            foreach (var _ in Seconds(5f))
+            {
+                float reach = rig.CurrentDistance * Mathf.Cos(Mathf.DegToRad(t.Camera.PitchDegrees));
+                lookWorst = Mathf.Max(lookWorst, rig.CurrentLookAhead - reach * 0.7f);
+                yield return null;
+            }
+            ReleaseAll();
+            // A held carve at the cap with a close lens (the user's 6 m preset): the ball slides across
+            // the screen, the sideways pivot must engage, and the ball must park inside the frame.
+            int runwayOut = _frameOut, runwaySamples = _frameSamples;
+            float runwayWorst = _frameWorst;                                    // the band-lag check below is for the 26 m lens; at 6 m one frame is ~10°
+            float savedDistance = t.Camera.Distance, savedLookMax = t.Camera.LookAheadMax;
+            t.Camera.Distance = 6f; t.Camera.LookAheadMax = 5.8f;
+            foreach (var _ in Settle(PlatformCenter - Forward * 600f + Vector3.Up * 3f)) yield return null;
+            _player.RefillBoost(t.Boost.BoostCapacity);
+            _worldDrive = Forward;
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            foreach (var _ in Seconds(2.0f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Boost);
+            Vector3 carveEntry = FlatVel.Normalized();
+            _worldDrive = carveEntry.Rotated(Vector3.Up, Mathf.Pi * 0.5f);     // aim a left turn and hold the carve
+            Input.ActionPress(InputBootstrap.Carve, 1f);
+            int carveStart = _frameSamples, carveOutStart = _frameOut;
+            float sideBefore = _frameSideWorst;
+            _frameSideWorst = 0f;
+            float lowestPitch = 0f, worstRoll = 0f;
+            foreach (var _ in Seconds(1.2f))
+            {
+                lowestPitch = Mathf.Min(lowestPitch, rig.FramePitchDegrees);
+                Vector3 camRight = rig.Camera.GlobalBasis.X;
+                worstRoll = Mathf.Max(worstRoll, Mathf.RadToDeg(Mathf.Asin(Mathf.Clamp(camRight.Y, -1f, 1f))));
+                yield return null;
+            }
+            bool carved = _player.IsCarving;
+            float carveAngle = _player.CarveAngleDegrees;
+            ReleaseAll();
+            foreach (var _ in Seconds(0.3f)) yield return null;
+            _frameCheck = false;
+            float sideWorstCarve = _frameSideWorst;
+            GD.Print($"[SELFTEST] framing carve: carving={carved} angle {carveAngle:0}°, {_frameOut - carveOutStart}/{_frameSamples - carveStart} ticks out, worst side {sideWorstCarve:0.0}° (band {rig.FrameBandDegreesHorizontal:0}°), frame yaw {rig.FrameYawDegrees:0.0}°");
+            Check("a held carve slides the ball sideways but never out of frame", carved && carveAngle > 10f && _frameOut - carveOutStart == 0,
+                $"carving={carved} angle {carveAngle:0}° out {_frameOut - carveOutStart}");
+            Check("the sideways pivot engages and parks the ball on the horizontal band", sideWorstCarve <= rig.FrameBandDegreesHorizontal + 6f && sideWorstCarve >= rig.FrameBandDegreesHorizontal - 3f,
+                $"worst side {sideWorstCarve:0.0}° vs band {rig.FrameBandDegreesHorizontal:0}°");
+            Check("a sideways hold never pitches the lens into the ground", lowestPitch > -12f, $"lowest frame pitch {lowestPitch:0.0}°");
+            Check("a sideways hold never rolls the horizon", worstRoll < 1.5f, $"worst roll {worstRoll:0.00}°");
+            t.Camera.Distance = savedDistance; t.Camera.LookAheadMax = savedLookMax;
+            _frameOut = runwayOut; _frameSamples = runwaySamples; _frameSideWorst = sideBefore; _frameWorst = runwayWorst;
+            GD.Print($"[SELFTEST] framing: jump+dive {jumpOut}/{jumpSamples} ticks out of frame (worst {jumpWorst:0.0}°), runway {_frameOut - jumpOut}/{_frameSamples - jumpSamples} out (worst {_frameWorst:0.0}°), band {rig.FrameBandDegreesVertical:0}°, look-ahead over reach {lookWorst:0.00} m, frame pitch {rig.FramePitchDegrees:0.0}°");
+            Check("the ball stays in frame through a full jump and a slam dive", jumpOut == 0, $"{jumpOut}/{jumpSamples} ticks out, worst {jumpWorst:0.0}°");
+            Check("the ball stays in frame at the cap on the runway", _frameOut - jumpOut == 0, $"{_frameOut - jumpOut} ticks out, worst {_frameWorst:0.0}°");
+            Check("the framing pivot holds the ball near the band", _frameWorst <= rig.FrameBandDegreesVertical + 6f, $"worst {_frameWorst:0.0}° vs band {rig.FrameBandDegreesVertical:0}°");
+            Check("the look-ahead never exceeds the lens's horizontal reach", lookWorst <= 0.05f, $"over by {lookWorst:0.00} m");
+            foreach (var _ in Seconds(0.5f)) yield return null;
+        }
 
         // ---- chase camera: yaw follows the trajectory, never flips on reverse ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
@@ -1376,6 +1482,65 @@ public partial class MovementToySelfTest : Node
             _debug.RestartSameSeed();
             foreach (var _ in Frames(3)) yield return null;
         }
+    }
+
+    // ---------------- carve (03 §11; 08 §3; D-089) ----------------
+
+    private IEnumerable RunCarveCase()
+    {
+        var t = _debug.Tuning;
+        var cv = t.Carve;
+
+        // (a) below the minimum speed the button does nothing
+        foreach (var _ in Settle(PlatformCenter - Forward * 400f + Vector3.Up * 3f)) yield return null;
+        Input.ActionPress(InputBootstrap.Carve, 1f);
+        foreach (var _ in Frames(5)) yield return null;
+        Check("carve does nothing below the minimum speed", !_player.IsCarving, $"speed={_player.LocomotionSpeed:0.0}");
+        Input.ActionRelease(InputBootstrap.Carve);
+
+        // (b) a hot entry: boosted run, then hold the carve and aim a quarter turn to the right
+        _player.RefillBoost(t.Boost.BoostCapacity);
+        _worldDrive = Forward;
+        Input.ActionPress(InputBootstrap.Boost, 1f);
+        foreach (var _ in Seconds(2.0f)) yield return null;
+        Input.ActionRelease(InputBootstrap.Boost);
+        Vector3 entryDir = FlatVel.Normalized();
+        float entrySpeed = _player.LocomotionSpeed;
+        Vector3 turnDir = entryDir.Rotated(Vector3.Up, -Mathf.Pi * 0.5f);     // world-fixed: right of the entry heading
+        _worldDrive = turnDir;
+        Input.ActionPress(InputBootstrap.Carve, 1f);
+        foreach (var _ in Frames(2)) yield return null;
+        Check("carve starts when held above the minimum speed while grounded", _player.IsCarving && entrySpeed > cv.MinSpeed,
+            $"carving={_player.IsCarving} speed={entrySpeed:0.0}");
+        int carvesBefore = _player.CarveCount;
+        float flowBefore = _player.Flow, minSpeedDuring = float.MaxValue, maxOff = 0f;
+        foreach (var _ in Seconds(90f / Mathf.Max(30f, cv.YawRateDegrees) + 0.05f))
+        {
+            minSpeedDuring = Mathf.Min(minSpeedDuring, _player.LocomotionSpeed);
+            maxOff = Mathf.Max(maxOff, _player.CarveAngleDegrees);
+            yield return null;
+        }
+        Vector3 facing = new Vector3(_player.Facing.X, 0f, _player.Facing.Z).Normalized();
+        float facingTurn = Mathf.RadToDeg(entryDir.AngleTo(facing));
+        float travelTurn = Mathf.RadToDeg(entryDir.AngleTo(FlatVel.Normalized()));
+        float camToFacing = Forward.Dot(facing);
+        GD.Print($"[SELFTEST] carve: entry {entrySpeed:0.0} m/s, facing swung {facingTurn:0}°, travel turned {travelTurn:0}° (max off {maxOff:0}°), camera·facing {camToFacing:0.00}, min speed during {minSpeedDuring:0.0}");
+        Check("the facing swings toward the input at the yaw rate", facingTurn > 60f, $"{facingTurn:0}°");
+        Check("the velocity understeers: it turns far less than the facing", travelTurn < facingTurn * 0.6f, $"travel {travelTurn:0}° vs facing {facingTurn:0}°");
+        Check("the camera tracks behind the facing during the carve", camToFacing > 0.6f, $"dot={camToFacing:0.00}");
+        Check("the ball stays grounded through the carve", _player.IsGrounded && _player.IsCarving);
+        var vfx = _player.GetNodeOrNull<PlayerVfx>("PlayerVfx");
+        Check("carve debris is thrown while carving", vfx is not null && vfx.CarveDebrisActive, $"vfx={(vfx is null ? "missing" : vfx.CarveDebrisActive.ToString())}");
+        Input.ActionRelease(InputBootstrap.Carve);
+        foreach (var _ in Frames(2)) yield return null;
+        float exitOff = Mathf.RadToDeg(FlatVel.Normalized().AngleTo(facing));
+        Check("release snaps the velocity onto the facing", !_player.IsCarving && exitOff < 8f, $"off={exitOff:0.0}°");
+        Check("no speed is lost through the carve", _player.LocomotionSpeed >= entrySpeed - 1f, $"entry {entrySpeed:0.0} -> exit {_player.LocomotionSpeed:0.0}");
+        Check("a real carve counts and grants Flow", _player.CarveCount == carvesBefore + 1 && _player.Flow >= flowBefore + cv.FlowGain - 0.01f,
+            $"count {carvesBefore} -> {_player.CarveCount}, flow {flowBefore:0.00} -> {_player.Flow:0.00}");
+        Check("velocity finite after the carve", _player.Velocity.IsFinite());
+        ReleaseAll();
+        foreach (var _ in Seconds(0.5f)) yield return null;
     }
 
     // ---------------- Flow headroom (02 §8, 03 §5; 08 §3; D-088) ----------------

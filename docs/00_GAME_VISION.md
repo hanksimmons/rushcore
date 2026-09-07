@@ -60,7 +60,7 @@ However, realism never outranks control quality. Steering assistance, charge-jum
 
 Jump, slam, boost, successful enemy impacts, and good landings preserve or add useful momentum unless an action's explicit purpose is to trade speed for control.
 
-A carve action was prototyped as the deliberate exception (control for speed) and removed after playtest.
+A carve action was prototyped as the deliberate exception (control for speed) and removed after playtest. It returned as a speed-preserving drift (D-089): the carve trades line for direction, never speed.
 
 ### P5 — Successful play preserves Flow
 

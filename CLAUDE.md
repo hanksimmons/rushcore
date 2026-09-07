@@ -79,7 +79,7 @@ The Movement Toy must implement these accepted behaviors:
 - boost works in air,
 - boost direction blends current travel and desired input,
 - slow emergency passive boost refill plus active refill hooks,
-- there is no carve verb: it was prototyped and removed at Movement Toy acceptance (D-007).
+- **carve** (D-089; the D-007 removal covered a different, speed-costing verb): hold Left Alt / LB while grounded above a minimum speed; the facing swings toward the stick at a tunable yaw rate while the velocity understeers wide; release (or ground loss) re-aims the velocity along the facing at no less than the entry speed; the camera tracks the facing; a real turn grants Flow.
 
 Do not reinterpret charge jump as “jump on press with variable gravity.” Jump occurs on **release**.
 
@@ -248,8 +248,9 @@ After coding:
 Until the implementation plan advances:
 
 > **Phase 2C — Flow headroom** (D-088), inserted after Gate G0's objective closure (D-087) and before
-> Phase 3. The mechanic is in the toy with the user's provisional values; the user tunes it and names
-> a preset final, then the ceiling addendum (08 §4) re-derives the safety side of the world scale.
-> Phase 3 (Terrain Variety) opens at Gate F0 with the G0 manual sample played with Flow on.
+> Phase 3. The preset is locked (D-091: headroom 0.715, ball 0.66 m, steering 222.66, jump 84.63,
+> carve, camera). Next: the analytic ground follow, then the ceiling addendum (08 §4) re-derives the
+> safety side of the world scale at these values. Phase 3 opens at Gate F0 with the G0 manual sample
+> played with Flow on.
 
-The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-078: the user's `boost-finetune-final` preset, promoted verbatim) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is a layer above that baseline with its own tuning values; with headroom 0 the controller is the baseline.
+The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-091: the user's `manual-small-2` preset, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

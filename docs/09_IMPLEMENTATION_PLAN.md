@@ -92,6 +92,7 @@ route, so the speed-regaining verbs had nothing to buy. Deliver, in this order:
 - design on paper: 02 §8, 03 §5/§9, 04 §12 two-speed rule, 06, 08 — delivered 2026-09-06,
 - the mechanic in the toy: Flow meter, gains/losses, effective cap, burst multiplier, telemetry,
   panel category, camera extrapolation; harness checks — delivered 2026-09-06,
+- the carve as a speed-preserving drift on Left Alt / LB (03 §11, D-089) — delivered 2026-09-06,
 - the user tunes headroom, burst multiplier and the Flow values on the lab and strip, names a preset
   final; promoted verbatim (D-078 procedure),
 - the ceiling addendum: strip measurements at the ceiling, route speed model airborne-and-landing

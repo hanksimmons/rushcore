@@ -23,6 +23,7 @@ calibration terrain and exits non-zero on any failure. It does not judge feel.
 | W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes** (never reverses, D-076). Spawn faces down the lane (−X). |
 | Space / A | press on ground = charge; release = jump; new press in air = slam; **press again at the slam touchdown = landing burst** (±0.10 s; a press during the slam is buffered; ×1.15 of your speed, D-088) |
 | Shift / X | boost (ground and air) |
+| Left Alt / LB | **carve** (hold): the ball drifts wide while its facing swings toward the stick; release to bite off along the facing at no less than your entry speed (D-089) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
 | F2 | telemetry overlay |
@@ -56,21 +57,23 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 
 | Preset | Concept |
 |---|---|
-| `baseline` | compiled defaults; the comparison point |
+| `baseline` | compiled defaults (empty file); the comparison point |
 | `heavy-marble` | weight and momentum: stronger gravity, softer drive, hard slams, camera back |
 | `arcade-snap` | tight and forgiving: strong steering everywhere, quick charge, wide burst window |
 | `glide-and-soar` | air game: low gravity, big jumps, real air control, generous boost |
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
 | `technical-lines` | line craft: cap 50, sharper steering, small tank |
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
+| `manual-small-2` | **the compiled baseline since 2026-09-06 (D-091)**: small ball, close camera, Flow headroom 0.715, carve, higher steering and jump; see below |
 
-Accepted baseline (playtest 2026-09-05, final preset `boost-finetune-final` promoted to compiled
-defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5 m/s, steering
-151.25 m/s² rising ×1.45 at the cap, gravity 39.38, air control 0.308, ball radius 2.125 m, jump
-2.03→58.21 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
+Accepted baseline (`manual-small-2` promoted verbatim 2026-09-06, D-091, on top of D-078): cap 148.5 m/s,
+steering 222.66 m/s² rising ×1.45 at the cap, gravity 39.39, drag 0.076, air control 0.308, ball radius
+0.66 m, jump 2.03→84.63 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
 landing burst ±0.10 s → ×1.15 of the current speed (D-088, was 80% of the cap), boost 88.64 m/s²,
-Overdrive at 141.06 m/s, chase camera (follow 4.99/s). Above the base cap sits Flow headroom (below).
-Carve was removed (D-007). `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
+Overdrive at 141.06 m/s, chase camera 18.8 m / −20.6° (follow 8/s, yaw 12.65/s, FOV 45.6→62.7), Flow
+headroom 0.715 (ceiling 254.7 m/s), carve 190°/s with 0.459 understeer.
+The first carve was removed (D-007); the drift carve of D-089 is a new verb on top of the baseline.
+`docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
 the old, slower baseline.
 
@@ -100,6 +103,12 @@ playtest:
   D-077/D-088): press Space again at the slam touchdown to multiply your speed along your heading,
   limited by the effective cap. Telemetry's `burst` row shows the window while it is open.
   `VFX › Burst Effect` scales the sparks and rings.
+- **Carve** (`Carve` panel category, D-089): hold Alt above 15 m/s and steer; the `carve` row shows
+  the facing's angle off travel and the entry speed. Facing swings at 220°/s, the velocity keeps
+  25% of its steering authority (`Understeer`), release re-aims at max(entry, current) speed. A
+  carve that turned ≥ 30° grants 0.10 Flow. Rocks and spray fly to the outside of the corner while you
+  slide (`VFX › Carve Effect` scales them). Try it on the turn pad rings of the strip: enter the
+  160 m ring at the cap, hold, release when the facing points down the exit.
 - **Flow headroom** (`Flow` panel category, D-088): the `flow` telemetry row shows Flow 0..1, the
   Flow cap (base 148.5 × (1 + Flow × `Headroom` 0.33) → 197.5 at full Flow), seconds since the last
   gain and the impact count; the `locomotion` row shows speed over the effective cap. Gains: burst
@@ -124,6 +133,42 @@ playtest:
 - Clipping defence: focus floored above ground; two same-frame sphere casts (focus→camera and
   ball→camera); shake bounded to the probe margin; lens floored above the heightfield
   (`Camera › Ground Clearance`).
+- **Framing pivot** (D-090): `Camera › Frame Band (frac)` (0.6 of the half field of view) is how far
+  above or below the screen centre the ball may go before the lens pitches to hold it there,
+  `Frame Band H (frac)` (0.6 of the half width) the same left and right, which is where a carve
+  slide parks the ball; `Pitch Release Damping` (6/s) is how fast both ease back. Fractions, so any
+  FOV keeps the band inside the frame (at FOV 45.6 the vertical band is 13.7°, at 62.7 it is 18.8°). The look-ahead is clamped to 70% of the lens's horizontal reach, so a large
+  `Look-Ahead Max` with a short `Distance` can no longer put the camera ahead of the ball. For a
+  small ball scale `Ground Clearance` and `Occlusion Margin` with the radius (0.66 m ball → 0.5 / 0.2)
+  or the focus floor overrides a negative `Height Offset` on flat ground.
+
+## Locked preset (2026-09-06): `manual-small-2` = compiled defaults
+
+The user's tuning after the Flow headroom, carve and framing slices, saved from the panel, checked in
+verbatim as `tuning/presets/manual-small-2.json` and **promoted to the compiled defaults on 2026-09-06
+(D-091)**: the toy launches on it, the panel reads "compiled defaults" with it loaded, and the harness
+asserts the file applies with zero overrides. What it changed against the previous baseline (D-078):
+
+| Value | D-078 | D-091 | Note |
+|---|---:|---:|---|
+| Movement › Ball Radius | 2.125 | 0.66 | the visual-scale dial (smaller ball, closer camera) in place of a bigger world; V-005 re-opened |
+| Movement › Steering Lateral Accel | 151.25 | 222.66 | D-078 value; changes the turn radius ladder every generation input was derived from |
+| Jump › Max Jump Takeoff | 58.21 | 84.63 | D-078 value; hang 4.3 s at 39.4 m/s² |
+| Flow › Headroom | 0.33 | 0.715 | ceiling 254.7 m/s at full Flow |
+| Carve › Yaw Rate / Understeer | 220 / 0.25 | 190.34 / 0.459 | |
+| Camera › Distance / Speed Distance Gain | 26 / 10 | 18.8 / 0 | |
+| Camera › Pitch / Height Offset | −34 / 3 | −20.62 / 0.08 | |
+| Camera › FOV Min / Max | 62 / 78 | 45.63 / 62.7 | widens with speed again (the earlier 97.5 / 78 narrowed) |
+| Camera › Follow / Vertical / Yaw Follow Damping | 4.99 / 4 / 3 | 8 / 8 / 12.65 | |
+| Camera › Look-Ahead Max | 22 | 15.47 | inside the 70% reach bound at 18.8 m |
+| Camera › Yaw Follow Min Speed | 2.035 | 0.545 | |
+| Camera › Ground Clearance | 1.5 | 1.505 | |
+| Movement › Drag / Gravity / Crush / Min Ground Normal Dot | 0.077 / 39.38 / 95 / 0.499 | 0.076 / 39.39 / 94.99 / 0.498 | slider noise, within 1% |
+| VFX › Charge Effect | 1 | 3 | |
+
+Frame Band 0.6 / Frame Band H 0.6 / Pitch Release 6 are the compiled defaults and are not in the file.
+The earlier `manual-finetune-small` / `manual-finetune-punchy` files (and a `.before-framing` backup
+that the framing slice made) remain in `user://tuning_presets/` as history; `manual-small-2` supersedes them.
 
 ## Calibration terrain (seed-invariant)
 

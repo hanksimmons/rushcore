@@ -36,6 +36,7 @@ Expose first:
 - SlamImpactMultiplier
 - LandingBurstWindowSeconds
 - LandingBurstMultiplier
+- Carve min speed, yaw rate, understeer, Flow gain and its minimum turn (D-089)
 - Flow headroom, gains (burst, slam landing, charged jump), losses (brake, impact, plain landing) with their thresholds, chain window, idle decay (D-088)
 - BoostAcceleration
 - BoostDirectionBlend
@@ -55,6 +56,7 @@ Expose:
 - look-ahead min/max,
 - follow damping,
 - vertical damping,
+- frame band and pitch release damping (the framing pivot, D-090),
 - FOV min/max,
 - speed-distance response,
 - shake strengths/decay.
@@ -83,6 +85,7 @@ Do not expose every internal constant.
 - dust,
 - slam effect,
 - landing-burst effect,
+- carve debris effect,
 - impact effect,
 - motion-effect intensity.
 

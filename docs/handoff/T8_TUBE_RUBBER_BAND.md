@@ -4,7 +4,10 @@
 **Phase:** 3 defect (D-101 see-through tubes), separate from T7
 **Owning specs:** 04 §5I, §9 (tube geometry); 03 §3, §12; 11 §7d; DECISIONS D-101
 **Reported:** 2026-09-07 by the user, boosting through a tube: "the player model teleports backwards a metre or two,
-ghosts forwards again, over and over", with the camera strobing along with it.
+ghosts forwards again, over and over", with the camera strobing along with it. **Resolved in play** on the combined
+build (`feature/tube-fixes`): the camera fix removed what the user was seeing, and T7 removed all but a trace of the
+arrest underneath it. A later report of the bottom of the tube still rubber-banding was on the T7 branch alone, which
+does not carry the camera fix.
 
 ## What was found, and what is already fixed
 
@@ -22,14 +25,17 @@ Two independent defects were behind that one symptom.
    every such tick. At the speed cap the ball should cover 2.48 m a tick; on the bad ones it covers 1.3–1.6 m and then
    resumes. That is the rubber-band the user sees, and the camera faithfully follows it. Across the archetypes:
 
-   | Archetype | Ticks more than 10% short | Worst |
+   | Archetype | Camera fix alone (10-sided shell) | Both fixes (T7's 24-sided shell) |
    |---|---:|---:|
-   | Rolling Highlands | 37 of 917 | 73% |
-   | Dune Sea | 32 of 854 | 79% |
-   | Sky Terraces | 43 of 911 | 95% |
+   | Rolling Highlands | 37 of 917, worst 73% | **1 of 915**, worst 94% |
+   | Dune Sea | 32 of 854, worst 79% | **0 of 842** |
+   | Sky Terraces | 43 of 911, worst 95% | **3 of 892**, worst 79% |
 
-   About one tick in twenty-five, on every archetype that carries a tube, and a 95% shortfall is very nearly a dead
-   stop for a frame.
+   **T7 all but removes it.** Measured again with T7 merged alongside the camera fix, the arrest falls from about one
+   tick in twenty-five to one in nine hundred, and Dune Sea has none at all. None of the survivors is near the bottom of
+   the tube: their mean ride is 99–171°, i.e. up the wall and onto the ceiling, where the ball is leaving the surface
+   anyway. So what is left of this defect is rare, confined to the ceiling, and no longer the thing a player feels.
+   The packet stays open because a 79–94% shortfall is still very nearly a dead stop for one frame when it does happen.
 
 ## Evidence that it is longitudinal, not radial
 

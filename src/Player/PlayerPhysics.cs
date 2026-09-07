@@ -590,8 +590,9 @@ public partial class PlayerPhysics : RigidBody3D
         // How far inside the inscribed circle the ball is held: the rest band, the axis reference's own uncertainty, and a
         // centimetre. `Structure.Nearest` answers with the nearest axis *vertex* and its tangent, and the axis is sampled
         // every few metres, so on a curving tube the perpendicular distance to that vertex's tangent line differs from the
-        // distance to the real axis by (Δs/2)²/2ρ: measured up to 2.9 cm on the first tube (T7). The follow therefore knows
-        // where the wall is only to about that, and must not aim closer than it knows.
+        // distance to the real axis by (Δs/2)²/2ρ: measured 1.4 cm on a Dune Sea tube, 3.5 cm on a Highlands one and 21 cm
+        // on a steeply climbing Sky one (T7). The follow therefore knows where the wall is only to about that, and must
+        // not aim closer than it knows; the margin comes off again once the query interpolates the axis.
         float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - TubeAxisUncertainty - 0.01f;
         float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;

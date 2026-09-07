@@ -323,12 +323,16 @@ public sealed class StageHeightField : IHeightSource
     public void AddLine(RouteSkeleton line)
     {
         var v = line.Vertices;
+        var pv = _primaryRoute.Vertices;
         var profile = new float[v.Count];
-        float span = Mathf.Max(1f, v[^1].Distance);
+        // The plateau envelope runs in the primary's distance, as the offset envelope does: the line's own distance
+        // is longer around the outside of the bend it shadows, and in it the descent slid into the return transition,
+        // where the primary's falloff blend squeezed it into a launch (D-100).
+        float span = Mathf.Max(1f, pv[line.JoinEnd].Distance - pv[line.JoinStart].Distance);
         for (int i = 0; i < v.Count; i++)
         {
             int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
-            profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(v[i].Distance, span);
+            profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(pv[pi].Distance - pv[line.JoinStart].Distance, span);
         }
         // Full strength from the first vertex: inside the S-transition the ridge's height is the primary's own
         // (the section avoids every feature and the plateau begins after the transition), so the overlap is

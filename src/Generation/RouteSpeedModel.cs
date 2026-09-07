@@ -379,18 +379,23 @@ public sealed class RouteSpeedModel
     /// </summary>
     /// <param name="descentAfter">Grade (tan) the ground falls away at past the crest: the swell under a
     /// crest can descend, and a flight over falling ground is far longer than over flat.</param>
-    public float CrestFlightLength(float wavelength, float height, float entrySpeed, float descentAfter = 0f)
+    /// <param name="crests">A dune train (D-099): this many crests a wavelength apart; the answer is the flight past
+    /// the last apex, with the landing from the previous crest moving its launch point as it does on the route.</param>
+    public float CrestFlightLength(float wavelength, float height, float entrySpeed, float descentAfter = 0f, int crests = 1)
     {
         const float lead = 200f, tail = 3000f;
+        crests = Mathf.Max(1, crests);
+        float body = wavelength * crests;
         var poly = new List<Vector3>();
-        for (float d = 0f; d <= lead + wavelength + tail; d += WorldScale.RouteSampleSpacing)
+        for (float d = 0f; d <= lead + body + tail; d += WorldScale.RouteSampleSpacing)
         {
-            float h = d >= lead && d <= lead + wavelength ? 0.5f * height * (1f - Mathf.Cos(Mathf.Tau * (d - lead) / wavelength)) : 0f;
-            if (d > lead + wavelength) h -= descentAfter * (d - lead - wavelength);
+            float h = d >= lead && d <= lead + body ? 0.5f * height * (1f - Mathf.Cos(Mathf.Tau * (d - lead) / wavelength)) : 0f;
+            if (d > lead + body) h -= descentAfter * (d - lead - body);
             poly.Add(new Vector3(d, h, 0f));
         }
-        var profile = Integrate(poly, entrySpeed);
-        float apex = lead + wavelength * 0.5f, best = 0f;
+        // The ceiling holds its chain across a train's landings (04 §12), the base kit re-accelerates.
+        var profile = Integrate(poly, entrySpeed, chainFromBaseCap: IsCeiling);
+        float apex = lead + body - wavelength * 0.5f, best = 0f;
         foreach (var f in profile.Flights)
             if (f.LaunchDistance <= apex + wavelength * 0.5f && f.LandingDistance > apex) best = Mathf.Max(best, f.LandingDistance - apex);
         return best;

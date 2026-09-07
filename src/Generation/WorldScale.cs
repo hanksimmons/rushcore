@@ -96,11 +96,18 @@ public static class WorldScale
     public const int OptionalLinesMax = 3;
     public const float OptionalLineSpacing = 700f;       // route distance between optional lines
     public const float RidgeOffset = 200f;               // lateral offset of a ridge line from the primary
-    public const float RidgeHeightMin = 25f, RidgeHeightMax = 40f;
-    /// <summary>Length of each lateral S-transition: 200 m over 360 m is a 108 m radius, a fast bend.</summary>
-    public const float RidgeTransition = 360f;
-    public const float RidgeLength = 1300f;              // shadowed section: 2 transitions + 2 ramps + plateau
-    public const float RidgeRampLength = 200f;           // climb onto / descent off the plateau (40 m → grade 0.20)
+    /// <summary>Ridge plateau height: with the cosine ramp below, the knee radius 2L² / (π² H) stays above the cap's
+    /// 560 m contact radius, so a ridge never launches the base kit into the bend it shadows (D-100; 25–40 m over
+    /// 200 m smoothstep ramps launched every ridge at the cap).</summary>
+    public const float RidgeHeightMin = 16f, RidgeHeightMax = 30f;
+    /// <summary>Length of each lateral S-transition: 200 m over 290 m is a 70 m radius, the tightest S that still holds
+    /// the base cap (68 m at D-091), so the base kit never brakes to leave or rejoin (D-100; was 360 m at r 108).</summary>
+    public const float RidgeTransition = 290f;
+    /// <summary>Shadowed section: 2 transitions + 2 ramps + a short plateau. The ramps lie wholly outside the transitions:
+    /// inside one the primary's falloff blend scales the ridge's height by a rising weight, and a ramp under that
+    /// weight becomes a convex knee at the cap's launch threshold (D-100, traced).</summary>
+    public const float RidgeLength = 1260f;
+    public const float RidgeRampLength = 300f;           // cosine climb onto / descent off the plateau (30 m → grade ≤ 0.16)
     /// <summary>An optional line stamps nothing while it is still inside the primary corridor and is fully its own beyond this offset.</summary>
     public const float OptionalStampFadeStart = 60f, OptionalStampFadeEnd = 160f;
     /// <summary>Inside a bend, an offset line needs this much radius left.</summary>

@@ -1827,7 +1827,7 @@ public partial class MovementToySelfTest : Node
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
         int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
-        int crests = 0, trains = 0, seedsWithTrain = 0;
+        int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0;
         string exampleGap = "", exampleRamp = "", exampleRegen = "", exampleTrain = "";
         double msSum = 0, msMax = 0;
         string firstFailure = "";
@@ -1849,6 +1849,7 @@ public partial class MovementToySelfTest : Node
                 }
             }
             if (i == 0) GD.Print($"[SELFTEST] generation timings: " + string.Join(", ", def.Report.Timings.Select(t => $"{t.phase} {t.ms:0.00} ms")));
+            if (def.DroppedLines > 0 && droppedShown++ < 2) GD.Print($"[SELFTEST] {A} seed {req.RunSeed}/{req.StageIndex} dropped optional lines: {def.DroppedDetail}");
             if (def.Hash() == again.Hash()) deterministic++;
             hashes.Add(def.Hash());
             bends += def.PrimaryRoute.Bends.Count;
@@ -1859,6 +1860,7 @@ public partial class MovementToySelfTest : Node
             msSum += def.Report.TotalMillis; msMax = Math.Max(msMax, def.Report.TotalMillis);
             if (def.OptionalLines.Count > 0) withLines++;
             linesTotal += def.OptionalLines.Count;
+            droppedLines += def.DroppedLines;
             minAnchors = Mathf.Min(minAnchors, def.Checkpoints.Count);
             belowSum += def.SpeedProfile.SecondsBelow(_debug.Tuning.Movement.HardMaxLocomotionSpeed * 0.98f);
             ceilFlights += def.CeilingProfile?.Flights.Count ?? 0;
@@ -1897,15 +1899,19 @@ public partial class MovementToySelfTest : Node
         if (fallbackReasons.Count > 0) GD.Print($"[SELFTEST] {A} attempt failures: " + string.Join(", ", fallbackReasons.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
         GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
-                 $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
+                 $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds, {droppedLines} dropped); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
         Check($"{A}: " + "every seed in the batch generates a valid primary route", passed == Count, $"{passed}/{Count}; first failure: {firstFailure}");
         Check($"{A}: " + "no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}: " + string.Join(", ", fallbackReasons.Select(kv => $"{kv.Key} ×{kv.Value}")));
         Check($"{A}: " + "same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
         Check($"{A}: " + "different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
         // D-086 measured 95% with ridge lines alone; module straights (≈ 1 km each, D-097) leave fewer 1.3 km sections.
-        // A dune sea is mostly train straights, which ridge lines avoid: 40% measured (D-099), a dune lane is the gap.
-        float linesFloor = archetype == TerrainArchetype.DuneSea ? 0.3f : 0.8f;
-        Check($"{A}: " + $"most seeds carry at least one optional line (≥ {linesFloor:P0})", withLines >= Count * linesFloor, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
+        // A dune sea is mostly train straights, which ridge lines avoid (D-099): its optional line is undesigned, so
+        // the figure is reported and not judged until a dune lane exists.
+        // A ridge needs a transition's worth of straight before and after the bend it shadows (D-100); the canyon's
+        // 200–450 m straights give one to about 70% of its seeds ("occasional upper ledge", 04 §6), the Highlands' to 90%.
+        float linesFloor = archetype == TerrainArchetype.CanyonRun ? 0.6f : 0.8f;
+        if (archetype == TerrainArchetype.DuneSea) GD.Print($"[SELFTEST] {A}: optional lines not judged: {withLines}/{Count} seeds carry a ridge line (a dune lane is the open design)");
+        else Check($"{A}: " + $"most seeds carry at least one optional line (≥ {linesFloor:P0})", withLines >= Count * linesFloor, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg, {droppedLines} dropped");
         Check($"{A}: " + "every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
         Check($"{A}: " + "every challenge module in the batch passes its validator (two prices, 04 §5E)", modulesPassed == modulesTotal, $"{modulesPassed}/{modulesTotal}");
         Check($"{A}: " + "the batch exercises gaps, ramps and banked turns", gaps > 0 && ramps > 0 && turns > 0, $"{gaps} gaps, {ramps} ramps, {turns} turns");
@@ -1963,8 +1969,7 @@ public partial class MovementToySelfTest : Node
         t.World.CellSize = stageCell;
         // RUSHCORE_ARCHETYPE=canyon|dunes drives a Canyon Run or Dune Sea stage (G0 per archetype, 08 §5).
         string envArchetype = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") ?? "";
-        t.World.CanyonRun = envArchetype == "canyon";
-        t.World.DuneSea = envArchetype == "dunes";
+        t.World.Archetype = (int)(envArchetype == "canyon" ? TerrainArchetype.CanyonRun : envArchetype == "dunes" ? TerrainArchetype.DuneSea : TerrainArchetype.RollingHighlands);
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -2095,8 +2100,9 @@ public partial class MovementToySelfTest : Node
         Check("the corridor keeps the ball grounded most of the way", groundedFrac > 0.6f, $"{groundedFrac:P0}");
         // Ground follow (D-092): away from the launch crests the ball never loses contact; at a crest it leaves
         // exactly when v² exceeds g·r (r = λ² / (2π²H)), so the follow never glues a launch and never fakes one.
+        // Vacuous on a seed whose every kilometre holds a launcher (a dune train does): the batch and the other seeds cover it.
         Check("the ground follow keeps raw contact on every km without a launch crest (≥ 97%)",
-            quietKm.Count > 0 && quietKm.All(q => q.raw >= 0.97f), string.Join(", ", quietKm.Select(q => $"km {q.km + 1}: {q.raw:P0}")));
+            quietKm.All(q => q.raw >= 0.97f), quietKm.Count == 0 ? "no kilometre without a launcher on this seed" : string.Join(", ", quietKm.Select(q => $"km {q.km + 1}: {q.raw:P0}")));
         {
             string crestDetail = ""; bool consistent = true; int decided = 0;
             for (int c = 0; c < crests.Count; c++)
@@ -2200,8 +2206,7 @@ public partial class MovementToySelfTest : Node
         }
 
         t.World.GeneratedStage = false;
-        t.World.CanyonRun = false;
-        t.World.DuneSea = false;
+        t.World.Archetype = 0f;
         t.World.CellSize = MovementToyWorld.DefaultCellSize;
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;

@@ -24,8 +24,6 @@ public sealed class RouteSkeletonBuilder
     // on a dune sea, a train of crests on the wave (approach, N crests, landing run). The feature spacing,
     // chance and mix are the archetype's (ArchetypeRules).
     private const float CrestApproach = 150f, CrestLanding = 300f;
-    /// <summary>Margin on the ceiling's estimated crest flight when the landing run is reserved.</summary>
-    private const float CrestFlightMargin = 1.15f;
     /// <summary>Chance a free bend keeps the previous turn sense: longer same-sense arcs give ridge lines room (04 §2).</summary>
     private const float TurnPersistence = 0.7f;
 
@@ -69,16 +67,21 @@ public sealed class RouteSkeletonBuilder
         return Mathf.Max(WorldScale.LandingZoneLength, Mathf.Max(flight - back + WorldScale.LandingRunAfterFlight, CeilingSlamRun(slope, lipHeight) - back));
     }
 
-    /// <summary>Landing run a crest needs: the accepted 300 m, or the ceiling flight plus its run when longer.</summary>
-    private float CrestLandingFor(float wavelength, float height, float descentAfter)
+    /// <summary>Landing run a crest (or the last crest of a train) needs past its span: the accepted 300 m, the
+    /// ceiling's roll-off flight, the base kit's full-charge jump from the apex at the cap (the crest's paid path,
+    /// D-100) or the ceiling's slam landing off that jump, whichever runs longest, plus the landing run.</summary>
+    private float CrestLandingFor(float wavelength, float height, float descentAfter, int crests = 1)
     {
-        if (_ceiling is null) return CrestLanding;
+        float half = wavelength * 0.5f;
         // The height field trims crests to the grade limit, so the requested height is the upper bound; the
         // swell under the crest may fall away at its steepest past the apex, so the flight is sized over that.
-        // The estimate is one crest on flat ground; on the route the swell under it and, in a dune train, the
-        // landing from the previous crest move the launch point, so the flight carries a margin.
-        float flight = _ceiling.CrestFlightLength(wavelength, height, _ceiling.Cap, descentAfter) * CrestFlightMargin;
-        return Mathf.Max(CrestLanding, flight - wavelength * 0.5f + WorldScale.LandingRunAfterFlight);
+        float paid = _speed.JumpRange(_speed.Cap, _fullTakeoff, height, 0f, descentAfter);
+        float landing = Mathf.Max(CrestLanding, paid - half + WorldScale.LandingRunAfterFlight);
+        if (_ceiling is null) return landing;
+        // The ceiling's roll-off is integrated over the train itself: the landing from the previous crest moves the launch point.
+        float rollOff = _ceiling.CrestFlightLength(wavelength, height, _ceiling.Cap, descentAfter, crests);
+        float slam = _ceiling.SlamRange(_ceiling.Cap, _fullTakeoff, WorldScale.SlamReactionSeconds, _slamInitial, _slamAccel, height);
+        return Mathf.Max(landing, Mathf.Max(rollOff, slam) - half + WorldScale.LandingRunAfterFlight);
     }
 
     public RouteSkeleton Build(ulong routeSeed, ArchetypeRules? rules = null)
@@ -143,7 +146,7 @@ public sealed class RouteSkeletonBuilder
                 else kind = rng.Chance(0.5f) ? RouteFeatureKind.Gap : RouteFeatureKind.LaunchRamp;
             }
             float featureLanding = !wantFeature ? CrestLanding
-                                 : kind == RouteFeatureKind.LaunchCrest ? CrestLandingFor(wavelength, crestHeight, rules.SwellMaxSlope)
+                                 : kind == RouteFeatureKind.LaunchCrest ? CrestLandingFor(wavelength, crestHeight, rules.SwellMaxSlope, Mathf.Max(1, trainCrests))
                                  : kind == RouteFeatureKind.Gap ? GapLandingFor(rules.SwellMaxSlope) : RampLandingFor(slope, lipHeight, rules.SwellMaxSlope);
             float featureBody = kind == RouteFeatureKind.LaunchCrest ? (trainCrests > 0 ? trainFirst + (trainCrests - 0.5f) * wavelength : CrestApproach + wavelength)
                               : kind == RouteFeatureKind.Gap ? WorldScale.TakeoffRunwayLength + opening
@@ -167,8 +170,10 @@ public sealed class RouteSkeletonBuilder
                 trainCrests = Mathf.Min(trainCrests, Mathf.FloorToInt((length - trainFirst - featureLanding) / wavelength + 0.5f));
                 if (trainCrests > 0)
                 {
+                    featureLanding = CrestLandingFor(wavelength, crestHeight, rules.SwellMaxSlope, trainCrests);
                     featureBody = trainFirst + (trainCrests - 0.5f) * wavelength;
                     length = featureBody + featureLanding;
+                    if (length > room) { trainCrests = 0; }   // the shorter train's own landing no longer fits either
                 }
             }
             bool feature = wantFeature && length >= featureBody + featureLanding - 1e-3f;

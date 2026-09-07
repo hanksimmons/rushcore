@@ -224,10 +224,8 @@ public sealed class WorldTuning
     public bool CalibrationStrip = false;
     /// <summary>Phase 2: replace the lab with a generated Rolling Highlands stage from the current seed (rebuilds the world).</summary>
     public bool GeneratedStage = false;
-    /// <summary>Generated stage archetype: Canyon Run instead of Rolling Highlands (04 §6, D-098).</summary>
-    public bool CanyonRun = false;
-    /// <summary>Generated stage archetype: Dune Sea (04 §6, D-099); wins over Canyon Run when both are on.</summary>
-    public bool DuneSea = false;
+    /// <summary>Generated stage archetype (04 §6) as the enum's index: 0 Rolling Highlands, 1 Canyon Run, 2 Dune Sea, 3 Sky Terraces.</summary>
+    public float Archetype = 0f;
     /// <summary>Phase 2 debug view (04 §16): draw the primary route, its bends and crests above the terrain.</summary>
     public bool RouteDebugLines = true;
     /// <summary>Metres between height samples (= facet size). Rebuilds the world when the slider settles.
@@ -383,8 +381,7 @@ public sealed class GameplayTuning
         F(CatWorld, "Prop Density", 0f, 3f, () => w.PropDensity, v => w.PropDensity = v);
         B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
         B(CatWorld, "Generated Stage (Phase 2)", () => w.GeneratedStage, v => w.GeneratedStage = v);
-        B(CatWorld, "Canyon Run (Phase 3)", () => w.CanyonRun, v => w.CanyonRun = v);
-        B(CatWorld, "Dune Sea (Phase 3)", () => w.DuneSea, v => w.DuneSea = v);
+        F(CatWorld, "Archetype (0 highlands, 1 canyon, 2 dunes)", 0f, 2f, () => w.Archetype, v => w.Archetype = Mathf.Round(v));
         B(CatWorld, "Route Debug Lines", () => w.RouteDebugLines, v => w.RouteDebugLines = v);
         F(CatWorld, "Cell Size (m)", 2f, 16f, () => w.CellSize, v => w.CellSize = v);
         F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);

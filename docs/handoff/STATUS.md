@@ -11,8 +11,8 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | not started | — | — | — | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
-| T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half fixed on `feature/camera-interpolation`; the ball arrest is open | — | — | — | — |
-| T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | pushed (awaiting the user's play verdict) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
+| T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |
+| T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | **merged** into `develop-secondary` (play verdict given: the rubber-banding is gone) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
 
 ## Baseline at handoff
 

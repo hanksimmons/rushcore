@@ -132,9 +132,20 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
   angle, facet phase (from `TubeMesh.Frames`, new public helper) and penetration into the facet plane. Three new checks
   (Δradial < 3 cm per tick, no contact ticks in the window, carried to the exit) are expected to FAIL before the fix.
 
+- Before numbers (full harness, Highlands 9/0, 311/313 with the two expected failures): cruise pass unchanged (100%
+  grounded, radial ≤ 5.33 m, exit 149 m/s at 0°, wall ride ≤ 78°). Boosted pass, steered window 180 ticks: ride ≤ 95° off
+  the bottom, **Δradial max 15.7 cm per tick, rms 2.89 cm, contacts on 180 of 180 ticks, penetration into the facet plane
+  ≤ 27.8 cm** (predicted 29.4), follow flips 0, bottom 0.0° off a corner. On facets 38 ticks (Δ avg 1.14 cm) vs near
+  corners 142 ticks (Δ avg 1.43 cm): the phase correlation predicted in the Analysis did NOT show, because the lateral
+  stick presses the ball into the wall everywhere, so the solver corrects at corners too; the depth of the fight (28 cm)
+  and its presence on every tick confirm the mechanism (collider against follow), not the corner-only refinement.
+  Frame twist is not a factor on this tube (bottom exactly on a corner).
+- Fix applied (commit with the after numbers): `TubeMesh.Sides` 24; `TryTubeFollow` holds `radius·cos(π/Sides) − ball`.
+  Docs 04 §5I, 11 §7d; P-009.
+
 **Next** (in order; continue from the first):
-1. Run the full harness; copy the "tube ride boosted (T7)" line here as the before numbers; confirm or refute the facet
-   hypothesis against the Analysis prediction (Δ on facets ≫ Δ near corners, contacts on facets); note the bottom phase.
+1. Read the after numbers from the full harness ("tube ride boosted (T7)" line); paste them here; the three T7 checks and
+   the cruise checks must pass and the golden hashes must be unchanged (the mesh is not in the hash).
 4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
 5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
 6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.

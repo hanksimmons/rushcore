@@ -346,6 +346,7 @@ minimum minus 120 m, so a fall is never a restore.
 | Tube radius | 4–8 m |
 | Mouth flare | ×2 over one tube diameter |
 | Rib spacing / thickness | 25 m / ≤ 0.5 m |
+| Shell facets per ring | 24 (even: the bottom is a corner; facet middles 5 cm inside the circle; the follow holds the inscribed circle, T7 / P-009) |
 | Path radius | ≥ 3 × tube radius (the sweep never self-intersects) |
 | Tube length | 150–800 m |
 | Axis clearance above ground and from walls | ≥ 30 m except at the mouths |

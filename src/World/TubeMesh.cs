@@ -11,7 +11,9 @@ namespace Rushcore.World;
 /// </summary>
 public static class TubeMesh
 {
-    public const int Sides = 10;
+    /// <summary>Ring vertices per axis sample. Even, so the bottom of the tube is a corner (the cruise rests exactly on
+    /// the analytic circle there); 24 puts every facet's middle 5 cm inside the circle (T7: it was 29 cm at 10).</summary>
+    public const int Sides = 24;
     private const float RibWidth = 0.6f, RibLift = 0.25f;
 
     public readonly record struct Built(ArrayMesh Shell, ArrayMesh Ribs, Vector3[] CollisionTriangles);

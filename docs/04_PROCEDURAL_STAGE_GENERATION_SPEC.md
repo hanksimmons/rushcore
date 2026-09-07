@@ -282,9 +282,12 @@ are primary straights clear of features, and the swing takes the outside of ever
 axis follows the primary's own geometry under a lateral and a height envelope, so both mouths land exactly on
 the line, and the builder rejects any tube whose floor would sink into the ground. The route speed model
 integrates the axis as carried (no corner limit, no launch); the controller adds the **tube follow**, the
-shell twin of the ground follow (03 §3): inside a tube any contact is ground, the ball is held to the analytic
-shell within the snap distance, and the wall's normal is its ground normal, so drive and charge work on the
-wall. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
+shell twin of the ground follow (03 §3): inside a tube any contact is ground, the ball is held to the shell
+within the snap distance, and the wall's normal is its ground normal, so drive and charge work on the
+wall. The circle the follow holds is the collider's inscribed one (a ring of 24 flat facets; T7, P-009): on the
+analytic circle the ball sat 29 cm inside every facet's middle at ten sides and the solver and the follow fought each
+tick whenever steering or boost held the ball off the bottom corner, a judder for as long as boost was held; on the
+inscribed circle the collider never fires while the follow is active. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
 at the model's speed and 0° off the axis, the lens outside the shell on every frame with a clear line of sight
 to the ball against the terrain. Tubes appear on about 15% of Highlands, 7% of Canyon and 41% of Dune Sea
 seeds; edge and midair mouths, and exits onto other lines or floors, arrive with Sky Terraces.

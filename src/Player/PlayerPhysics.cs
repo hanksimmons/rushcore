@@ -579,7 +579,12 @@ public partial class PlayerPhysics : RigidBody3D
         float dist = rel.Length();
         if (dist < 1e-3f) return false;
         Vector3 outward = rel / dist;
-        float gap = radius - m.BallRadius - dist;                   // > 0: inside, off the wall; < 0: pressed into it
+        // The wall the follow holds is the collider's inscribed circle, not the analytic one (T7): the shell is a ring of
+        // flat facets, so a ball held on the circle sits inside every facet's middle and the solver and the follow fight
+        // each tick (a judder while steering or boosting up the wall). On the inscribed circle the ball touches the
+        // collider only at a facet's middle and never fires it while the follow is active; fast arrivals still land.
+        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides);
+        float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vOut = v.Dot(outward);
         if (vOut > m.GroundFollowSnapDistance / dt) return false;   // flying into the wall: a landing

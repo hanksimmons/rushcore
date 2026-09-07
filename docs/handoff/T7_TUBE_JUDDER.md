@@ -154,12 +154,24 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
   (u²/dist), both × dt, after the clamp. Still a velocity rule scoped to tubes; the ground follow is untouched (its
   collider supplies the normal force and contacts are wanted there).
 
+- After the second fix (normal force), full harness 311/313: boosted window **penetration ≤ 3.9 cm, contacts on 129 of
+  180 ticks, Δradial max 8.8 cm (rms 1.73 cm)**, ride ≤ 134°; the cruise pass fell to **98% grounded** (was 100%), a
+  small regression to explain. Reading: the creep is gone (3.9 cm ≈ the 3 cm deadband plus the residual), but the
+  follow lets the ball rest anywhere inside the deadband, and at a facet's middle the inscribed circle *is* the collider,
+  so a ball resting 3 cm past the held circle touches it; the 8.8 cm jumps are the solver's corrections at those
+  contacts. The velocity path was checked: `v = vT + planeNormal·vN` keeps the follow's normal component, so nothing
+  downstream undoes the pre-compensation.
+- Third change (commit with its numbers): the held circle moves one deadband plus 1 cm inside the inscribed one
+  (`wall = R·cos(π/Sides) − 0.03 − 0.01`), so the ball's rest range ends at the facet plane; corners then float ≤ 9 cm,
+  invisible. Harness: `RUSHCORE_TUBE_TRACE=1` prints per-tick wall state (dist, vOut, contacts, follow, raw, grounded,
+  ground follow, height over terrain): the cruise pass prints its odd ticks (not raw-grounded, a contact, or the follow
+  off) to explain the 98%, the boosted pass every fifth window tick.
+
 **Next** (in order; continue from the first):
-1. Read the after numbers of the second fix from the full harness ("tube ride boosted (T7)" line); paste them here; the
-   three T7 checks and the cruise checks must pass and the golden hashes must be unchanged (the mesh is not in the hash).
-   If contacts remain on more than a few ticks, print per-tick `gap`, `vOut` before/after and the contact count for the
-   first 30 window ticks and look at whether the creep is gone (gap should sit inside the deadband) before changing
-   anything else.
+1. Read the after numbers of the third change ("tube ride boosted (T7)" line and the `[TUBE]` trace lines); paste them
+   here. Explain the cruise pass's odd ticks from the trace (expected: the mouths, where the ground follow holds the
+   ball and the tube follow yields; if they are mid-tube, the normal-force term is over-correcting there: check
+   `around` at the swing). The three T7 checks and the cruise checks must pass and the golden hashes must be unchanged.
 4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
 5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
 6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.

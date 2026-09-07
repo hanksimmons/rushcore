@@ -583,7 +583,9 @@ public partial class PlayerPhysics : RigidBody3D
         // flat facets, so a ball held on the circle sits inside every facet's middle and the solver and the follow fight
         // each tick (a judder while steering or boosting up the wall). On the inscribed circle the ball touches the
         // collider only at a facet's middle and never fires it while the follow is active; fast arrivals still land.
-        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides);
+        // Held one deadband plus a centimetre inside the inscribed circle: the ball may rest anywhere inside the deadband,
+        // and at a facet's middle the inscribed circle is the collider itself.
+        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - GroundFollowDeadband - 0.01f;
         float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vOut = v.Dot(outward);

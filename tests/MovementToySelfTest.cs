@@ -2366,6 +2366,18 @@ public partial class MovementToySelfTest : Node
                     Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
                     rel -= tan * rel.Dot(tan);
                     if (ak > 6 && ak < axis.Length - 6) worstRadial = Mathf.Max(worstRadial, rel.Length());
+                    // RUSHCORE_TUBE_TRACE=1 (T7): per-tick wall state; the cruise pass prints only its odd ticks, the boosted pass every fifth tick of the window.
+                    if (System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
+                    {
+                        int cc = _player.GetContactCount();
+                        bool odd = !_player.IsRawGrounded || cc > 0 || !_player.TubeFollowActive;
+                        bool inWin = boosted && insideTicks > 30 && insideTicks <= 30 + Engine.PhysicsTicksPerSecond * 3;
+                        if ((!boosted && odd) || (inWin && insideTicks % 5 == 0))
+                        {
+                            Vector3 outward = rel.Normalized();
+                            GD.Print($"[TUBE] {(boosted ? "boost" : "cruise")} tick {insideTicks} ak {ak}/{axis.Length} dist {rel.Length():0.000} vOut {_player.Velocity.Dot(outward):0.00} contacts {cc} follow {_player.TubeFollowActive} raw {_player.IsRawGrounded} grounded {_player.IsGrounded} gfollow {_player.GroundFollowActive} y {p.Y:0.0} ground {world.SampleHeight(p.X, p.Z):0.0}");
+                        }
+                    }
                     if (boosted)
                     {
                         Input.ActionPress(InputBootstrap.Boost, 1f);

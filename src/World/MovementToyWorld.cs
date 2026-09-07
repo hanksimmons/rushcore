@@ -52,6 +52,9 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public bool IsStage { get; private set; }
     /// <summary>The generated stage definition when <see cref="IsStage"/>; the debug views read it.</summary>
     public StageDefinition? Stage { get; private set; }
+    /// <summary>Archetype of the built stage, and the one the world tuning asks for.</summary>
+    public TerrainArchetype Archetype { get; private set; }
+    public TerrainArchetype WantedArchetype => _t.World.CanyonRun ? TerrainArchetype.CanyonRun : TerrainArchetype.RollingHighlands;
     /// <summary>One-line generation summary for the telemetry seed row.</summary>
     public string StageSummary { get; private set; } = "";
     /// <summary>Furthest primary-route vertex the player has reached on a generated stage.</summary>
@@ -86,7 +89,8 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         int hi = Mathf.Min(v.Count - 1, StageProgressIndex + 60);
         for (int i = Mathf.Max(0, StageProgressIndex - 5); i <= hi; i++)
         {
-            float d = new Vector2(v[i].Position.X - playerPos.X, v[i].Position.Z - playerPos.Z).LengthSquared();
+            // Height counts (D-096): a turn below or a floor above the ball never aliases as progress.
+            float d = v[i].Position.DistanceSquaredTo(playerPos);
             if (d < bestD) { bestD = d; best = i; }
         }
         // Only count it as progress while the ball is inside the corridor reach of that vertex.
@@ -111,7 +115,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     {
         bool wantStage = _t.World.GeneratedStage;
         bool wantStrip = !wantStage && _t.World.CalibrationStrip;
-        return wantStage == IsStage && wantStrip == IsStrip;
+        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype);
     }
     /// <summary>Half extents of the active terrain in metres.</summary>
     public float HalfX { get; private set; } = Extent * 0.5f;
@@ -170,10 +174,11 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         if (IsStage)
         {
             var generator = new StageGenerator(_t.Movement, _t.Flow, _t.JumpSlam);
-            Stage = generator.Generate(new StageGenerationRequest(Seed, 0));
+            Archetype = WantedArchetype;
+            Stage = generator.Generate(new StageGenerationRequest(Seed, 0, Archetype));
             _field = Stage.HeightField!;
             var r = Stage.Report;
-            StageSummary = $"stage {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
+            StageSummary = $"{(Archetype == TerrainArchetype.CanyonRun ? "canyon" : "highlands")} {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +

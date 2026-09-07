@@ -111,8 +111,8 @@ perfect chain feels faster and faster and a mistake never feels slow.
 Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 
 - challenge-module grammar (04 §5E) with the gap, launch ramp and banked bend as Flow opportunities under the two-price rule — delivered 2026-09-06 (D-097),
-- the route skeleton ordered by route distance (headings unbounded, cell buckets), wall and terrace stamps, and the headroom / wall-clearance / drain validators,
-- Canyon Run: slots, wall tunnels (lids with the confined camera), the spiral pit set-piece,
+- the route skeleton ordered by route distance (headings unbounded, cell buckets), wall and terrace stamps, and the headroom / wall-clearance / drain validators — the stamp map, the footprint validator, the height-aware progress tracker, the wall stamp and the wall-clearance validator delivered with Canyon Run 2026-09-07 (D-098); the unbounded-heading builder arrives with the spiral pit, terrace stamps with the drain validator arrive with Sky Terraces, headroom with the lids,
+- Canyon Run: slots and banked lines — delivered 2026-09-07 (D-098); wall tunnels (lids with the confined camera) and the spiral pit set-piece follow as their own slices,
 - Dune Sea,
 - tubes: the swept see-through shell and its collider, carried segments in the route speed model, mouths and branching exits, the tube camera rule, the harness ride check,
 - Sky Terraces: terrace steps, drains, the cloud band, tubes and bridges between floors,

@@ -2,8 +2,8 @@ using Godot;
 
 namespace Rushcore.Generation;
 
-/// <summary>Terrain archetypes (04 §6). Phase 2 delivers Rolling Highlands; the others arrive in Phase 3.</summary>
-public enum TerrainArchetype { RollingHighlands }
+/// <summary>Terrain archetypes (04 §6). Rolling Highlands (D-085) and Canyon Run (D-098); Dune Sea and Sky Terraces follow.</summary>
+public enum TerrainArchetype { RollingHighlands, CanyonRun }
 
 /// <summary>
 /// What a stage is generated from (04 §3). Danger tier, route modifiers and reward category

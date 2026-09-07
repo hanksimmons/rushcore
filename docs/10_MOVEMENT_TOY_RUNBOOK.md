@@ -14,6 +14,8 @@ RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>                    # pure-data case
 RUSHCORE_CELL_SIZE=8 <same command>                             # the stage case at another cell size (8 or 16)
 <same command> --seed 8                                         # the stage case drives stage 8/0 (pick a seed with a gap or a ramp)
 RUSHCORE_DRIVE_TRACE=3020 <same command> --seed 8               # per-tick ball trace ±120 m around that route metre
+RUSHCORE_ARCHETYPE=canyon <same command> --seed 3               # the stage case drives a Canyon Run stage (D-098)
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Canyon Run (Phase 3))
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
 

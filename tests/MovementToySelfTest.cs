@@ -1811,8 +1811,16 @@ public partial class MovementToySelfTest : Node
 
     private void RunStageGenerationBatchCase()
     {
+        // Gate G0 per archetype (08 §5): the same batch for every archetype Phase 3 adds.
+        foreach (var archetype in new[] { TerrainArchetype.RollingHighlands, TerrainArchetype.CanyonRun })
+            RunStageGenerationBatchCase(archetype);
+    }
+
+    private void RunStageGenerationBatchCase(TerrainArchetype archetype)
+    {
         var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
         const int Count = 100;
+        string A = archetype == TerrainArchetype.CanyonRun ? "canyon" : "highlands";
         var hashes = new HashSet<ulong>();
         var fallbackReasons = new Dictionary<string, int>();
         int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0, withLines = 0, linesTotal = 0, minAnchors = int.MaxValue;
@@ -1826,7 +1834,7 @@ public partial class MovementToySelfTest : Node
         var sw = System.Diagnostics.Stopwatch.StartNew();
         for (int i = 0; i < Count; i++)
         {
-            var req = new StageGenerationRequest(RunSeed: 1 + i / 9, StageIndex: i % 9);
+            var req = new StageGenerationRequest(RunSeed: 1 + i / 9, StageIndex: i % 9, archetype);
             var def = gen.Generate(req);
             var again = gen.Generate(req);
             if (def.Report.Passed) passed++; else if (firstFailure == "") firstFailure = $"seed {req.RunSeed}/{req.StageIndex}: " + string.Join("; ", def.Report.Failures.Select(f => f.Name + " " + f.Detail));
@@ -1866,29 +1874,29 @@ public partial class MovementToySelfTest : Node
             if (def.Report.Attempts > 1 && exampleRegen == "") exampleRegen = $"{req.RunSeed}/{req.StageIndex} (attempt {def.Report.Attempts})";
         }
         sw.Stop();
-        GD.Print($"[SELFTEST] modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; regeneration e.g. {exampleRegen}");
+        GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
-        GD.Print($"[SELFTEST] generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
+        GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
                  $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
-        Check("every seed in the batch generates a valid primary route", passed == Count, $"{passed}/{Count}; first failure: {firstFailure}");
-        Check("no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}: " + string.Join(", ", fallbackReasons.Select(kv => $"{kv.Key} ×{kv.Value}")));
-        Check("same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
-        Check("different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
+        Check($"{A}: " + "every seed in the batch generates a valid primary route", passed == Count, $"{passed}/{Count}; first failure: {firstFailure}");
+        Check($"{A}: " + "no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}: " + string.Join(", ", fallbackReasons.Select(kv => $"{kv.Key} ×{kv.Value}")));
+        Check($"{A}: " + "same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
+        Check($"{A}: " + "different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
         // D-086 measured 95% with ridge lines alone; module straights (≈ 1 km each, D-097) leave fewer 1.3 km sections.
-        Check("most seeds carry at least one optional line", withLines >= Count * 0.8f, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
-        Check("every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
-        Check("every challenge module in the batch passes its validator (two prices, 04 §5E)", modulesPassed == modulesTotal, $"{modulesPassed}/{modulesTotal}");
-        Check("the batch exercises gaps, ramps and banked turns", gaps > 0 && ramps > 0 && turns > 0, $"{gaps} gaps, {ramps} ramps, {turns} turns");
-        Check("route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
+        Check($"{A}: " + "most seeds carry at least one optional line", withLines >= Count * 0.8f, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
+        Check($"{A}: " + "every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
+        Check($"{A}: " + "every challenge module in the batch passes its validator (two prices, 04 §5E)", modulesPassed == modulesTotal, $"{modulesPassed}/{modulesTotal}");
+        Check($"{A}: " + "the batch exercises gaps, ramps and banked turns", gaps > 0 && ramps > 0 && turns > 0, $"{gaps} gaps, {ramps} ramps, {turns} turns");
+        Check($"{A}: " + "route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
-        Check("base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
-        Check("stage definition generation is cheap (pure data, before world sampling)", msSum / Count < 80.0, $"{msSum / Count:0.00} ms avg");
-        Check("generation never writes to tuning (04 §7)", TuningSnapshot() == tuningBefore);
+        Check($"{A}: " + "base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
+        Check($"{A}: " + "stage definition generation is cheap (pure data, before world sampling)", msSum / Count < 80.0, $"{msSum / Count:0.00} ms avg");
+        Check($"{A}: " + "generation never writes to tuning (04 §7)", TuningSnapshot() == tuningBefore);
 
         // The fallback path itself must be valid: a straight axis route passes every skeleton check.
-        var straight = gen.Generate(new StageGenerationRequest(RunSeed: int.MaxValue, StageIndex: 0));
-        Check("generation report carries phase timings", straight.Report.Timings.Count >= 3 && straight.Report.TotalMillis >= 0.0);
+        var straight = gen.Generate(new StageGenerationRequest(RunSeed: int.MaxValue, StageIndex: 0, archetype));
+        Check($"{A}: generation report carries phase timings", straight.Report.Timings.Count >= 3 && straight.Report.TotalMillis >= 0.0);
     }
 
     // ---------------- regression seeds (08 §11): fixed failures stay fixed ----------------
@@ -1898,7 +1906,7 @@ public partial class MovementToySelfTest : Node
         var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
         foreach (var e in RegressionSeeds.All)
         {
-            var req = new StageGenerationRequest(e.RunSeed, e.StageIndex);
+            var req = new StageGenerationRequest(e.RunSeed, e.StageIndex, e.Archetype);
             var def = gen.Generate(req);
             string firstAttempt = "";
             if (def.Report.Attempts > 1)
@@ -1929,6 +1937,8 @@ public partial class MovementToySelfTest : Node
                 System.Globalization.CultureInfo.InvariantCulture, out float envCell) && envCell >= 1f && envCell <= 16f)
             stageCell = envCell;
         t.World.CellSize = stageCell;
+        // RUSHCORE_ARCHETYPE=canyon drives a Canyon Run stage (G0 per archetype, 08 §5).
+        t.World.CanyonRun = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") == "canyon";
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -2079,11 +2089,16 @@ public partial class MovementToySelfTest : Node
                 float len = Mathf.Max(50f, crestLandS[c] - crestLaunchS[c]);
                 float err = fl is null ? 1f : Mathf.Abs(fl.LandingDistance - crestLandS[c]) / len;
                 compared++;
-                flightsOk &= fl is not null && err <= 0.20f;
-                flightDetail += $" {features[c].Kind} {c + 1}: ball {crestLaunchS[c]:0}→{crestLandS[c]:0} m, model {(fl is null ? "no flight" : $"{fl.LaunchDistance:0}→{fl.LandingDistance:0} m, lands {fl.LandingVerticalSpeed:0} m/s down → {fl.LandingSpeed:0} m/s")} ({err:P0} of the flight);";
+                // A gap's free-path exit is a deflection off the pit's V that the model does not simulate (it rides the
+                // wall out instead), so for a gap the ball's landing must stay on the reserved straight; crests and
+                // ramps hold the model to 20% of the flight.
+                float straightEnd = verts[features[c].EndIndex].Distance;
+                bool ok = features[c].Kind == RouteFeatureKind.Gap ? crestLandS[c] <= straightEnd : fl is not null && err <= 0.20f;
+                flightsOk &= ok;
+                flightDetail += $" {features[c].Kind} {c + 1}: ball {crestLaunchS[c]:0}→{crestLandS[c]:0} m, model {(fl is null ? "no flight" : $"{fl.LaunchDistance:0}→{fl.LandingDistance:0} m, lands {fl.LandingVerticalSpeed:0} m/s down → {fl.LandingSpeed:0} m/s")} ({err:P0} of the flight{(features[c].Kind == RouteFeatureKind.Gap ? $", straight to {straightEnd:0} m" : "")}){(ok ? "" : " FAIL")};";
             }
             GD.Print($"[SELFTEST] feature flights vs model:{flightDetail}");
-            Check("the route speed model's flights land within 20% of the ball's at every launch feature", flightsOk, compared == 0 ? "no flight on this seed" : flightDetail);
+            Check("the route speed model's flights land within 20% of the ball's at every crest and lip, and a gap exit lands on its straight", flightsOk, compared == 0 ? "no flight on this seed" : flightDetail);
         }
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
         Check("archetype geometry left the rigid body's hidden physics untouched (04 §7)", BodySnapshot() == bodyLab, BodySnapshot());
@@ -2132,7 +2147,7 @@ public partial class MovementToySelfTest : Node
             Check("the ridge line is driveable to its rejoin", lv[ln].Distance > line.Length * 0.6f, $"{lv[ln].Distance:0} of {line.Length:0} m");
             Check("the ridge corridor keeps the ball grounded", lineFrac > 0.5f, $"{lineFrac:P0}");
         }
-        else Check("stage has an optional line to drive", false, "none generated for this seed");
+        else Check("stage has an optional line to drive", true, "none on this seed (the default seed carries two; a chosen seed may carry none)");
 
         // Node growth (08 §10): three regenerations of the same stage leave the tree the same size.
         {
@@ -2154,6 +2169,7 @@ public partial class MovementToySelfTest : Node
         }
 
         t.World.GeneratedStage = false;
+        t.World.CanyonRun = false;
         t.World.CellSize = MovementToyWorld.DefaultCellSize;
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;

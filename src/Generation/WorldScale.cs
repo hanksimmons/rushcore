@@ -118,6 +118,16 @@ public static class WorldScale
     /// <summary>Metres a straight flight may drift off a bend's arc before it counts as flying the bend.</summary>
     public const float FlightDriftTolerance = 10f;
 
+    // ---- Canyon Run (04 §6, D-098; docs/11 §7c walls) ----
+    /// <summary>Side terrain above the channel floor.</summary>
+    public const float CanyonWallHeightMin = 60f, CanyonWallHeightMax = 120f;
+    /// <summary>Slot wall: the channel blends into the side terrain over three cells, an ~80° face at 100 m.</summary>
+    public const float CanyonWallFalloff = 12f;
+    /// <summary>Every wall stands this far outside the corridor's level width, so the ground follow's ±1 cell lateral samples never read it.</summary>
+    public const float WallSetback = 8f;
+    /// <summary>Canyon bends carry a taller berm: banked lines are the archetype's skill (04 §6).</summary>
+    public const float CanyonBankScale = 1.5f;
+
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;
     /// <summary>Route polyline vertex spacing; equal to the cell size so relief and stamping see every facet.</summary>

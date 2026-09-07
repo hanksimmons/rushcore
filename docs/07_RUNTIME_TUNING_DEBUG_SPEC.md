@@ -56,6 +56,7 @@ Expose:
 - look-ahead min/max,
 - follow damping,
 - vertical damping,
+- frame band and pitch release damping (the framing pivot, D-090),
 - FOV min/max,
 - speed-distance response,
 - shake strengths/decay.

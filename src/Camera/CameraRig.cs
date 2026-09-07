@@ -36,6 +36,10 @@ public partial class CameraRig : Node3D, ICameraBasis
     private readonly RandomNumberGenerator _rng = new();
 
     private const float MinCameraDistance = 1.5f;
+    /// <summary>The focus never leads by more than this fraction of the lens-to-focus horizontal
+    /// reach, so the ball always sits in front of the lens whatever the look-ahead tuning says.</summary>
+    private const float MaxLookAheadFraction = 0.7f;
+    private float _framePitch;             // degrees of extra lens pitch holding the ball inside the frame band
     /// <summary>cos(120°): a heading further than this from the view is a reversal, not a turn.</summary>
     private const float ReverseCone = -0.5f;
 
@@ -62,6 +66,17 @@ public partial class CameraRig : Node3D, ICameraBasis
     public bool FlooredThisFrame { get; private set; }
     /// <summary>True while the yaw is deliberately held against a reversed travel heading.</summary>
     public bool ReverseHoldActive { get; private set; }
+    /// <summary>Extra lens pitch (degrees, + = up) currently applied by the framing pivot.</summary>
+    public float FramePitchDegrees => _framePitch;
+
+    /// <summary>Vertical angle (degrees, + = above centre) at which the lens currently sees a world point; NaN if behind the lens.</summary>
+    public float FrameAngleTo(Vector3 worldPoint)
+    {
+        Transform3D cam = _camera.GlobalTransform;
+        Vector3 to = worldPoint - cam.Origin;
+        float ahead = to.Dot(-cam.Basis.Z), up = to.Dot(cam.Basis.Y);
+        return ahead > 0.05f ? Mathf.RadToDeg(Mathf.Atan2(up, ahead)) : float.NaN;
+    }
 
     public override void _Ready()
     {
@@ -114,6 +129,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         _shake = 0f;
         _occlusion = 1f;
         _reverseHold = 0f;
+        _framePitch = 0f;
         UpdateOrientation();
         ApplyTransform(FullDistance(0f), 0f);
         ResetPhysicsInterpolation();
@@ -146,6 +162,11 @@ public partial class CameraRig : Node3D, ICameraBasis
 
         Vector3 lookAhead = Vector3.Zero;
         if (speed > 1f) lookAhead = flatVel / speed * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, look01);
+        // Geometry bound (D-090): a lead longer than the lens's horizontal reach would put the
+        // camera ahead of the ball; the occluded distance counts, so a pulled-in lens leads less.
+        float reach = Mathf.Min(FullDistance(speed01), Mathf.Max(MinCameraDistance, CurrentDistance)) * Mathf.Cos(Mathf.DegToRad(c.PitchDegrees));
+        float lookLimit = Mathf.Max(0f, reach * MaxLookAheadFraction);
+        if (lookAhead.Length() > lookLimit) lookAhead = lookAhead.Normalized() * lookLimit;
         CurrentLookAhead = lookAhead.Length();
 
         // The look-ahead point may lie inside an upslope; floor it so the focus, and
@@ -168,6 +189,31 @@ public partial class CameraRig : Node3D, ICameraBasis
         UpdateOcclusion(playerPos, Basis.Z * fullDist, dt);
         ApplyTransform(fullDist, _shake);
         _camera.Fov = Mathf.Lerp(c.FovMin, c.FovMax, speed01);
+        UpdateFramePitch(playerPos, dt);
+    }
+
+    /// <summary>
+    /// Framing pivot (03 §14, D-090). The rig's base pitch frames the road; the lens itself pitches
+    /// up or down whenever the ball would leave a band of ±FrameBand degrees around the screen
+    /// centre (a jump to the top, a dive off the bottom), holding it on the band edge at once, and
+    /// eases back to the base pitch once the ball is inside again. The rig basis, and therefore
+    /// camera-relative steering, is untouched.
+    /// </summary>
+    private void UpdateFramePitch(Vector3 ballPos, float dt)
+    {
+        var c = _t.Camera;
+        if (FlooredThisFrame) { _framePitch = 0f; return; }        // the floor already re-aimed the lens
+        Vector3 to = ballPos - _camera.GlobalPosition;
+        float ahead = to.Dot(-Basis.Z), up = to.Dot(Basis.Y);     // against the untilted rig view
+        if (ahead <= 0.05f) return;
+        float angle = Mathf.RadToDeg(Mathf.Atan2(up, ahead));
+        float band = Mathf.Max(1f, c.FrameBandDegrees);
+        float want = angle > band ? angle - band : angle < -band ? angle + band : 0f;
+        // Never let the ball out: the clamp is immediate; only the return is damped.
+        bool pushingOut = want != 0f && (Mathf.Sign(want) != Mathf.Sign(_framePitch) || Mathf.Abs(want) > Mathf.Abs(_framePitch));
+        _framePitch = pushingOut ? want : Mathf.Lerp(_framePitch, want, 1f - Mathf.Exp(-Mathf.Max(0.01f, c.PitchReleaseDamping) * dt));
+        _framePitch = Mathf.Clamp(_framePitch, -80f, 80f);
+        _camera.Rotation = new Vector3(Mathf.DegToRad(_framePitch), 0f, 0f);
     }
 
     // ---------------- orientation ----------------

@@ -42,6 +42,9 @@ public partial class MovementToySelfTest : Node
     private bool _done;
 
     private int _jumpedCount, _chargeCanceledCount, _slammedCount, _recoveredCount, _pickupCount, _landedCount, _burstCount;
+    private bool _frameCheck;
+    private int _frameSamples, _frameOut;
+    private float _frameWorst;
     private bool _releaseJumpFromProcess;
     /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
     private Vector3? _worldDrive;
@@ -119,6 +122,18 @@ public partial class MovementToySelfTest : Node
         {
             if (cam.Y < world.SampleHeight(cam.X, cam.Z) + _debug.Tuning.Camera.GroundClearance - 0.15f)
                 _groundViolations++;
+        }
+
+        // Framing pivot (D-090): every tick the ball is inside the lens's vertical frustum and
+        // within the band (one render frame of slack, since the pivot runs per rendered frame).
+        if (!rig.FlooredThisFrame && _frameCheck)
+        {
+            float angle = rig.FrameAngleTo(_player.GlobalPosition);
+            float ballAngle = Mathf.RadToDeg(Mathf.Atan(_debug.Tuning.Movement.BallRadius / Mathf.Max(0.5f, rig.Camera.GlobalPosition.DistanceTo(_player.GlobalPosition))));
+            float halfFov = rig.Camera.Fov * 0.5f;
+            _frameSamples++;
+            if (float.IsNaN(angle) || Mathf.Abs(angle) + ballAngle > halfFov) _frameOut++;
+            if (!float.IsNaN(angle)) _frameWorst = Mathf.Max(_frameWorst, Mathf.Abs(angle));
         }
 
         if (!_visCheck) return;
@@ -783,6 +798,42 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Seconds(1.5f)) yield return null;
         Check("occlusion probe can be disabled", rig.OcclusionFraction > 0.95f, $"fraction={rig.OcclusionFraction:0.00}");
         t.Camera.OcclusionProbe = true;
+
+        // ---- framing pivot (03 §14, D-090): the ball never leaves the frame on a jump, a dive or at the cap ----
+        {
+            foreach (var _ in Settle(PlatformCenter - Forward * 600f + Vector3.Up * 3f)) yield return null;
+            _frameCheck = true; _frameSamples = 0; _frameOut = 0; _frameWorst = 0f;
+            Input.ActionPress(InputBootstrap.Jump, 1f);                          // full charge, straight up
+            foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.05f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            foreach (var _ in Seconds(1.0f)) yield return null;
+            Input.ActionPress(InputBootstrap.Jump, 1f);                          // slam: the dive
+            foreach (var _ in Act()) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            int lb = _landedCount, g = 0;
+            while (_landedCount == lb && g++ < 300) yield return null;
+            foreach (var _ in Seconds(0.5f)) yield return null;
+            int jumpSamples = _frameSamples, jumpOut = _frameOut;
+            float jumpWorst = _frameWorst;
+            _player.RefillBoost(t.Boost.BoostCapacity);                          // then the cap on the runway
+            _worldDrive = Forward;
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            float lookWorst = 0f;
+            foreach (var _ in Seconds(5f))
+            {
+                float reach = rig.CurrentDistance * Mathf.Cos(Mathf.DegToRad(t.Camera.PitchDegrees));
+                lookWorst = Mathf.Max(lookWorst, rig.CurrentLookAhead - reach * 0.7f);
+                yield return null;
+            }
+            ReleaseAll();
+            _frameCheck = false;
+            GD.Print($"[SELFTEST] framing: jump+dive {jumpOut}/{jumpSamples} ticks out of frame (worst {jumpWorst:0.0}°), runway {_frameOut - jumpOut}/{_frameSamples - jumpSamples} out (worst {_frameWorst:0.0}°), band {t.Camera.FrameBandDegrees:0}°, look-ahead over reach {lookWorst:0.00} m, frame pitch {rig.FramePitchDegrees:0.0}°");
+            Check("the ball stays in frame through a full jump and a slam dive", jumpOut == 0, $"{jumpOut}/{jumpSamples} ticks out, worst {jumpWorst:0.0}°");
+            Check("the ball stays in frame at the cap on the runway", _frameOut - jumpOut == 0, $"{_frameOut - jumpOut} ticks out, worst {_frameWorst:0.0}°");
+            Check("the framing pivot holds the ball near the band", _frameWorst <= t.Camera.FrameBandDegrees + 6f, $"worst {_frameWorst:0.0}° vs band {t.Camera.FrameBandDegrees:0}°");
+            Check("the look-ahead never exceeds the lens's horizontal reach", lookWorst <= 0.05f, $"over by {lookWorst:0.00} m");
+            foreach (var _ in Seconds(0.5f)) yield return null;
+        }
 
         // ---- chase camera: yaw follows the trajectory, never flips on reverse ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;

@@ -162,6 +162,12 @@ public sealed class CameraTuning
     public float LookAheadMax = 22f;
     public float FollowDamping = 4.99f;
     public float VerticalDamping = 4f;
+    /// <summary>Framing pivot (03 §14, D-090): the ball is never further than this many degrees
+    /// above or below the screen centre. Beyond it the lens pitches at once to hold the ball on
+    /// the band edge; inside it the pitch eases back to the base pitch.</summary>
+    public float FrameBandDegrees = 22f;
+    /// <summary>How fast the framing pitch eases back once the ball is inside the band (1/s).</summary>
+    public float PitchReleaseDamping = 6f;
     public float FovMin = 62f;
     public float FovMax = 78f;
     public float SpeedDistanceGain = 10f;
@@ -328,6 +334,8 @@ public sealed class GameplayTuning
         F(CatCamera, "Look-Ahead Max", 0f, 90f, () => k.LookAheadMax, v => k.LookAheadMax = v);
         F(CatCamera, "Follow Damping", 0.5f, 30f, () => k.FollowDamping, v => k.FollowDamping = v);
         F(CatCamera, "Vertical Damping", 0.2f, 30f, () => k.VerticalDamping, v => k.VerticalDamping = v);
+        F(CatCamera, "Frame Band (deg)", 2f, 60f, () => k.FrameBandDegrees, v => k.FrameBandDegrees = v);
+        F(CatCamera, "Pitch Release Damping", 0.5f, 40f, () => k.PitchReleaseDamping, v => k.PitchReleaseDamping = v);
         F(CatCamera, "FOV Min", 30f, 110f, () => k.FovMin, v => k.FovMin = v);
         F(CatCamera, "FOV Max", 30f, 120f, () => k.FovMax, v => k.FovMax = v);
         F(CatCamera, "Speed Distance Gain", 0f, 60f, () => k.SpeedDistanceGain, v => k.SpeedDistanceGain = v);

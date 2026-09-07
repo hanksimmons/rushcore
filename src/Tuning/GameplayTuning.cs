@@ -28,16 +28,16 @@ public sealed class TuningToggle
 
 public sealed class MovementTuning
 {
-    public float Gravity = 39.38f;
+    public float Gravity = 39.3899993896484f;
     public float GroundDriveAcceleration = 27.99f;
-    public float GroundSteeringLateralAccel = 151.25f;
+    public float GroundSteeringLateralAccel = 222.65998840332f;
     /// <summary>Steering-authority multiplier reached at the hard speed cap (lerped from 1.0
     /// at rest). Below 1 speed removes authority; above 1 speed adds it. Accepted at 1.45
     /// (V-001): turn radius still grows as v^2 / (lateralAccel * mult), which satisfies D-002.</summary>
     public float HighSpeedSteeringMultiplier = 1.45f;
     public float AirControlMultiplier = 0.308f;
     /// <summary>Linear drag coefficient: a = -k*v. Governs coasting decay, not top speed.</summary>
-    public float DragCoefficient = 0.077f;
+    public float DragCoefficient = 0.0760000050067902f;
     public float HardMaxLocomotionSpeed = 148.5f;
     /// <summary>
     /// Landing on a slope at the cap makes ground-tangent speed exceed the cap by
@@ -46,13 +46,13 @@ public sealed class MovementTuning
     /// </summary>
     public float LandingCapBleed = 39.95f;
     /// <summary>dot(contactNormal, Up) required for a contact to count as ground (03 §3).</summary>
-    public float MinGroundNormalDot = 0.499f;
+    public float MinGroundNormalDot = 0.498000025749207f;
     /// <summary>Speed bands are readability/Flow hooks only (02 §5); no physics reads them.
     /// Ladder set against the accepted cap: Rush ~1/3, Crush ~2/3, Overdrive ~95% (V-004).</summary>
     public float RushThreshold = 50f;
-    public float CrushThreshold = 95f;
+    public float CrushThreshold = 94.9899978637695f;
     public float OverdriveThreshold = 141.06f;
-    public float BallRadius = 2.125f;
+    public float BallRadius = 0.659999966621399f;
 
     /// <summary>
     /// Solver friction for the player/terrain pair (both materials). The arcade controller
@@ -67,7 +67,7 @@ public sealed class MovementTuning
 public sealed class JumpSlamTuning
 {
     public float MinJumpTakeoffVerticalSpeed = 2.03f;
-    public float MaxJumpTakeoffVerticalSpeed = 58.21f;
+    public float MaxJumpTakeoffVerticalSpeed = 84.629997253418f;
     public float MaxJumpChargeSeconds = 0.445f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
@@ -97,9 +97,9 @@ public sealed class CarveTuning
     /// <summary>Below this locomotion speed the carve button does nothing.</summary>
     public float MinSpeed = 15f;
     /// <summary>How fast the facing swings toward the input while carving, degrees per second.</summary>
-    public float YawRateDegrees = 220f;
+    public float YawRateDegrees = 190.339996337891f;
     /// <summary>Fraction of normal lateral authority the velocity keeps while carving (the understeer).</summary>
-    public float Understeer = 0.25f;
+    public float Understeer = 0.459000021219254f;
     /// <summary>Flow granted at exit when the carve turned the heading by at least <see cref="FlowGainMinDegrees"/>.</summary>
     public float FlowGain = 0.10f;
     public float FlowGainMinDegrees = 30f;
@@ -113,7 +113,7 @@ public sealed class CarveTuning
 /// </summary>
 public sealed class FlowTuning
 {
-    public float Headroom = 0.33f;
+    public float Headroom = 0.715000033378601f;
     public float GainBurst = 0.35f;
     public float GainSlamLanding = 0.15f;
     /// <summary>Granted at takeoff when the charge is at least half (a large, risky jump).</summary>
@@ -144,36 +144,37 @@ public sealed class BoostTuning
 
 public sealed class CameraTuning
 {
-    public float Distance = 26f;
-    public float PitchDegrees = -34f;
-    public float YawFollowDamping = 3f;
+    public float Distance = 18.7999992370605f;
+    public float PitchDegrees = -20.6200008392334f;
+    public float YawFollowDamping = 12.6549997329712f;
     /// <summary>Degrees per second; caps how fast the view can swing.</summary>
     public float YawMaxTurnRate = 140f;
     /// <summary>Below this flat speed the yaw holds so a resting ball never spins the view.</summary>
-    public float YawFollowMinSpeed = 2.035f;
+    public float YawFollowMinSpeed = 0.545000016689301f;
     /// <summary>After the travel heading reverses (wall bounce, backward slide) the yaw is held
     /// only while the player pushes forward against it, and never longer than this. The camera
     /// always ends up behind the direction of travel.</summary>
     public float YawReverseHoldSeconds = 1.0f;
     /// <summary>Minimum height of the lens (and, +0.5, of the focus) above the heightfield.</summary>
-    public float GroundClearance = 1.5f;
-    public float HeightOffset = 3.0f;
+    public float GroundClearance = 1.50499999523163f;
+    public float HeightOffset = 0.0799998864531517f;
     public float LookAheadMin = 2f;
-    public float LookAheadMax = 22f;
-    public float FollowDamping = 4.99f;
-    public float VerticalDamping = 4f;
-    /// <summary>Framing pivot (03 §14, D-090): the ball is never further than this many degrees
-    /// above or below the screen centre. Beyond it the lens pitches at once to hold the ball on
-    /// the band edge; inside it the pitch eases back to the base pitch.</summary>
-    public float FrameBandDegrees = 22f;
-    /// <summary>Horizontal twin (D-090): the ball is never further than this many degrees left or
-    /// right of the screen centre; a carve slide parks the ball on this edge instead of leaving.</summary>
-    public float FrameBandHorizontalDegrees = 30f;
+    public float LookAheadMax = 15.4699993133545f;
+    public float FollowDamping = 8.0f;
+    public float VerticalDamping = 8.0f;
+    /// <summary>Framing pivot (03 §14, D-090): the ball is never further from the screen centre
+    /// than this fraction of the current half field of view, vertically. Beyond it the lens
+    /// pitches at once to hold the ball on the band edge; inside it the pitch eases back.
+    /// A fraction, not degrees, so any FOV tuning keeps the band inside the frustum.</summary>
+    public float FrameBandFraction = 0.6f;
+    /// <summary>Horizontal twin (D-090), a fraction of the half field of view across; a carve
+    /// slide parks the ball on this edge instead of leaving the frame.</summary>
+    public float FrameBandHorizontalFraction = 0.6f;
     /// <summary>How fast the framing pitch eases back once the ball is inside the band (1/s).</summary>
     public float PitchReleaseDamping = 6f;
-    public float FovMin = 62f;
-    public float FovMax = 78f;
-    public float SpeedDistanceGain = 10f;
+    public float FovMin = 45.6300010681152f;
+    public float FovMax = 62.7000007629395f;
+    public float SpeedDistanceGain = 0.0f;
     public float ShakeStrength = 1.0f;
     public float ShakeDecay = 6f;
     public float ZoomMin = 0.55f;
@@ -190,7 +191,7 @@ public sealed class CameraTuning
 
 public sealed class VfxTuning
 {
-    public float ChargeEffectStrength = 1f;
+    public float ChargeEffectStrength = 3.0f;
     public float JumpReleaseStrength = 1f;
     public float TrailIntensity = 1f;
     public float DustIntensity = 1f;
@@ -337,8 +338,8 @@ public sealed class GameplayTuning
         F(CatCamera, "Look-Ahead Max", 0f, 90f, () => k.LookAheadMax, v => k.LookAheadMax = v);
         F(CatCamera, "Follow Damping", 0.5f, 30f, () => k.FollowDamping, v => k.FollowDamping = v);
         F(CatCamera, "Vertical Damping", 0.2f, 30f, () => k.VerticalDamping, v => k.VerticalDamping = v);
-        F(CatCamera, "Frame Band (deg)", 2f, 60f, () => k.FrameBandDegrees, v => k.FrameBandDegrees = v);
-        F(CatCamera, "Frame Band H (deg)", 2f, 70f, () => k.FrameBandHorizontalDegrees, v => k.FrameBandHorizontalDegrees = v);
+        F(CatCamera, "Frame Band (frac)", 0.1f, 0.95f, () => k.FrameBandFraction, v => k.FrameBandFraction = v);
+        F(CatCamera, "Frame Band H (frac)", 0.1f, 0.95f, () => k.FrameBandHorizontalFraction, v => k.FrameBandHorizontalFraction = v);
         F(CatCamera, "Pitch Release Damping", 0.5f, 40f, () => k.PitchReleaseDamping, v => k.PitchReleaseDamping = v);
         F(CatCamera, "FOV Min", 30f, 110f, () => k.FovMin, v => k.FovMin = v);
         F(CatCamera, "FOV Max", 30f, 120f, () => k.FovMax, v => k.FovMax = v);

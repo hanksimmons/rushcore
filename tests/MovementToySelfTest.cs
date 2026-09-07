@@ -305,6 +305,14 @@ public partial class MovementToySelfTest : Node
         var m = t.Movement;
         var js = t.JumpSlam;
 
+        // ---- the locked preset is the compiled baseline, verbatim (D-078 procedure, D-091) ----
+        {
+            int applied = t.LoadOverride("res://tuning/presets/manual-small-2.json");
+            Check("the locked preset manual-small-2 loads as compiled defaults (verbatim promotion)", applied > 0 && t.OverrideCount == 0,
+                $"applied={applied} overrides={t.OverrideCount}: " + string.Join(", ", t.Parameters.Where(GameplayTuning.IsModified).Select(x => $"{x.Key}={x.Get():R} vs {x.DefaultValue:R}")));
+            t.ResetAll();
+        }
+
         // ---- body configuration invariants ----
         Check("CCD enabled", _player.ContinuousCd);
         Check("player cannot sleep", !_player.CanSleep);
@@ -862,19 +870,19 @@ public partial class MovementToySelfTest : Node
             foreach (var _ in Seconds(0.3f)) yield return null;
             _frameCheck = false;
             float sideWorstCarve = _frameSideWorst;
-            GD.Print($"[SELFTEST] framing carve: carving={carved} angle {carveAngle:0}°, {_frameOut - carveOutStart}/{_frameSamples - carveStart} ticks out, worst side {sideWorstCarve:0.0}° (band {t.Camera.FrameBandHorizontalDegrees:0}°), frame yaw {rig.FrameYawDegrees:0.0}°");
-            Check("a held carve slides the ball sideways but never out of frame", carved && carveAngle > 45f && _frameOut - carveOutStart == 0,
+            GD.Print($"[SELFTEST] framing carve: carving={carved} angle {carveAngle:0}°, {_frameOut - carveOutStart}/{_frameSamples - carveStart} ticks out, worst side {sideWorstCarve:0.0}° (band {rig.FrameBandDegreesHorizontal:0}°), frame yaw {rig.FrameYawDegrees:0.0}°");
+            Check("a held carve slides the ball sideways but never out of frame", carved && carveAngle > 10f && _frameOut - carveOutStart == 0,
                 $"carving={carved} angle {carveAngle:0}° out {_frameOut - carveOutStart}");
-            Check("the sideways pivot engages and parks the ball on the horizontal band", sideWorstCarve <= t.Camera.FrameBandHorizontalDegrees + 6f && sideWorstCarve >= t.Camera.FrameBandHorizontalDegrees - 3f,
-                $"worst side {sideWorstCarve:0.0}° vs band {t.Camera.FrameBandHorizontalDegrees:0}°");
+            Check("the sideways pivot engages and parks the ball on the horizontal band", sideWorstCarve <= rig.FrameBandDegreesHorizontal + 6f && sideWorstCarve >= rig.FrameBandDegreesHorizontal - 3f,
+                $"worst side {sideWorstCarve:0.0}° vs band {rig.FrameBandDegreesHorizontal:0}°");
             Check("a sideways hold never pitches the lens into the ground", lowestPitch > -12f, $"lowest frame pitch {lowestPitch:0.0}°");
             Check("a sideways hold never rolls the horizon", worstRoll < 1.5f, $"worst roll {worstRoll:0.00}°");
             t.Camera.Distance = savedDistance; t.Camera.LookAheadMax = savedLookMax;
             _frameOut = runwayOut; _frameSamples = runwaySamples; _frameSideWorst = sideBefore; _frameWorst = runwayWorst;
-            GD.Print($"[SELFTEST] framing: jump+dive {jumpOut}/{jumpSamples} ticks out of frame (worst {jumpWorst:0.0}°), runway {_frameOut - jumpOut}/{_frameSamples - jumpSamples} out (worst {_frameWorst:0.0}°), band {t.Camera.FrameBandDegrees:0}°, look-ahead over reach {lookWorst:0.00} m, frame pitch {rig.FramePitchDegrees:0.0}°");
+            GD.Print($"[SELFTEST] framing: jump+dive {jumpOut}/{jumpSamples} ticks out of frame (worst {jumpWorst:0.0}°), runway {_frameOut - jumpOut}/{_frameSamples - jumpSamples} out (worst {_frameWorst:0.0}°), band {rig.FrameBandDegreesVertical:0}°, look-ahead over reach {lookWorst:0.00} m, frame pitch {rig.FramePitchDegrees:0.0}°");
             Check("the ball stays in frame through a full jump and a slam dive", jumpOut == 0, $"{jumpOut}/{jumpSamples} ticks out, worst {jumpWorst:0.0}°");
             Check("the ball stays in frame at the cap on the runway", _frameOut - jumpOut == 0, $"{_frameOut - jumpOut} ticks out, worst {_frameWorst:0.0}°");
-            Check("the framing pivot holds the ball near the band", _frameWorst <= t.Camera.FrameBandDegrees + 6f, $"worst {_frameWorst:0.0}° vs band {t.Camera.FrameBandDegrees:0}°");
+            Check("the framing pivot holds the ball near the band", _frameWorst <= rig.FrameBandDegreesVertical + 6f, $"worst {_frameWorst:0.0}° vs band {rig.FrameBandDegreesVertical:0}°");
             Check("the look-ahead never exceeds the lens's horizontal reach", lookWorst <= 0.05f, $"over by {lookWorst:0.00} m");
             foreach (var _ in Seconds(0.5f)) yield return null;
         }

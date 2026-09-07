@@ -422,7 +422,7 @@ Mechanically:
   of travel. There is no reverse-drive hold because `S` cannot reverse (D-076),
 - a fixed **base pitch** frames the road; no manual rotation; player may adjust baseline zoom within limits,
 - **framing pivot** (D-090): the lens itself pitches or yaws the instant the ball would leave a
-  band of ± a tunable angle around the screen centre, vertically (a jump to the top, a dive off the
+  band around the screen centre, a tunable fraction of the current half field of view each way, vertically (a jump to the top, a dive off the
   bottom) or sideways (a carve slide, §11), holding it on the band edge, and eases back once it is
   inside again; steering stays relative to the rig, not the turned lens,
 - focus/look target leads along useful velocity; look-ahead grows with speed and is bounded, and
@@ -440,31 +440,28 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 
 ## 15. Tuning schema
 
-**Accepted baseline** (Movement Toy playtest, 2026-09-05; the user's final preset
-`boost-finetune-final`, promoted verbatim on top of `manual-finetune-punchy`, sub-percent slider
-values included, so the preset reads as "compiled defaults"; D-078). **This table is the
-authoritative movement baseline.** A working preset that moves some of these
-values (`manual-small-2`, 2026-09-06: ball 0.66 m, steering 222.66, max jump 84.63, Flow headroom
-0.715, camera) is checked in and documented in the runbook; it is not promoted until the user names
-it final (V-014). These are the compiled defaults in `GameplayTuning`; the
-runtime panel edits the same values and persists overrides (D-075). Min ground-normal dot 0.499,
-camera yaw hold below 2.035 m/s, camera follow damping 4.99/s and terrain wavelength 1.005 are
-part of the same promotion.
+**Accepted baseline** (the user's `manual-small-2` preset, named final and promoted verbatim on
+2026-09-06, D-091, on top of `boost-finetune-final` of 2026-09-05, D-078; sub-percent slider values
+included, so the preset reads as "compiled defaults"). **This table is the authoritative movement
+baseline.** These are the compiled defaults in `GameplayTuning`; the runtime panel edits the same values
+and persists overrides (D-075). `tuning/presets/manual-small-2.json` is the promoted file; the harness
+asserts it loads with zero overrides. Min ground-normal dot 0.498, camera yaw hold below 0.545 m/s and
+terrain wavelength 1.005 are part of the same promotion.
 
 | Parameter | Accepted | Status |
 |---|---:|---|
 | Physics tick rate | 60 Hz | ACCEPTED (V-007) |
-| Gravity | 39.38 m/s² | ACCEPTED |
+| Gravity | 39.39 m/s² | ACCEPTED (D-091) |
 | Ground drive accel | 27.99 m/s² | ACCEPTED |
-| Ground steering lateral accel | 151.25 m/s² | ACCEPTED (V-001) |
+| Ground steering lateral accel | 222.66 m/s² | ACCEPTED (V-001, D-091; was 151.25) |
 | High-speed steering multiplier | 1.45 at the cap (authority rises with speed; radius = v²/(a·mult)) | ACCEPTED (V-001) |
 | Hard max locomotion speed | 148.5 m/s | ACCEPTED (V-004) |
 | Landing cap bleed | 39.95 m/s² | ACCEPTED (D-074) |
-| Drag coefficient | 0.077 | ACCEPTED |
+| Drag coefficient | 0.076 | ACCEPTED (D-091) |
 | Air control multiplier | 0.308 | ACCEPTED (D-078) |
-| Ball radius | 2.125 m | ACCEPTED (V-005) |
+| Ball radius | 0.66 m (1.32 m diameter) | ACCEPTED (V-005, D-091; was 2.125: the visual-scale dial, physics and generation stay in metres) |
 | Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
-| Max jump takeoff vertical speed | 58.21 m/s | ACCEPTED (V-010) |
+| Max jump takeoff vertical speed | 84.63 m/s | ACCEPTED (V-010, D-091; was 58.21) |
 | Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |
 | Charge release grace | 0.10 s | ACCEPTED |
 | Slam initial downward speed | 42.95 m/s | ACCEPTED |
@@ -473,18 +470,18 @@ part of the same promotion.
 | Slam lateral retention | 1.0 | ACCEPTED |
 | Slam impact multiplier | 1.35 on every slam landing | ACCEPTED (D-077) |
 | Landing-burst window | ±0.10 s around the slam touchdown | ACCEPTED (D-077) |
-| Landing-burst multiplier | ×1.15 of the current speed along the heading (slider 1.0–1.3), limited by the effective cap | PROVISIONAL (D-088; user's default, tuned by preset) |
-| Flow headroom | 0.33 → effective cap up to 197.5 m/s at full Flow (slider 0–1) | PROVISIONAL (D-088; user's default, V-013) |
-| Flow gains: burst / slam landing / charged jump | 0.35 / 0.15 / 0.10 | PROVISIONAL (D-088) |
-| Flow losses: brake per s / impact / plain landing | 1.0 / 0.5 (one-tick loss > 20 m/s) / 0.25 (vertical ≥ 30 m/s) | PROVISIONAL (D-088) |
-| Flow chain window / idle decay | 6 s / 0.05 per s after it | PROVISIONAL (D-088) |
-| Carve min speed / yaw rate / understeer | 15 m/s / 220°/s / 0.25 of steering authority | PROVISIONAL (D-089) |
-| Carve Flow gain / min turn | 0.10 / 30° | PROVISIONAL (D-089) |
+| Landing-burst multiplier | ×1.15 of the current speed along the heading (slider 1.0–1.3), limited by the effective cap | ACCEPTED (D-088, D-091) |
+| Flow headroom | 0.715 → effective cap up to 254.7 m/s at full Flow (slider 0–1) | ACCEPTED (D-088, D-091) |
+| Flow gains: burst / slam landing / charged jump | 0.35 / 0.15 / 0.10 | ACCEPTED (D-088, D-091) |
+| Flow losses: brake per s / impact / plain landing | 1.0 / 0.5 (one-tick loss > 20 m/s) / 0.25 (vertical ≥ 30 m/s) | ACCEPTED (D-088, D-091) |
+| Flow chain window / idle decay | 6 s / 0.05 per s after it | ACCEPTED (D-088, D-091) |
+| Carve min speed / yaw rate / understeer | 15 m/s / 190.34°/s / 0.459 of steering authority | ACCEPTED (D-089, D-091) |
+| Carve Flow gain / min turn | 0.10 / 30° | ACCEPTED (D-089, D-091) |
 | Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
 | Boost pickup refill | 35 | ACCEPTED (toy) |
-| Rush / Crush / Overdrive thresholds | 50 / 95 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush provisional ladder (V-004), readability/Flow hooks only |
+| Rush / Crush / Overdrive thresholds | 50 / 94.99 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush provisional ladder (V-004), readability/Flow hooks only |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 

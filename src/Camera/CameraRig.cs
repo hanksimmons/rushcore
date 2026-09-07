@@ -71,6 +71,18 @@ public partial class CameraRig : Node3D, ICameraBasis
     public float FramePitchDegrees => _framePitch;
     /// <summary>Extra lens yaw (degrees, + = left) currently applied by the framing pivot.</summary>
     public float FrameYawDegrees => _frameYaw;
+    /// <summary>The framing bands in degrees at the current field of view (vertical, horizontal).</summary>
+    public float FrameBandDegreesVertical => Mathf.Clamp(_t.Camera.FrameBandFraction, 0.05f, 0.98f) * _camera.Fov * 0.5f;
+    public float FrameBandDegreesHorizontal
+    {
+        get
+        {
+            Vector2 vp = _camera.GetViewport().GetVisibleRect().Size;
+            float aspect = Mathf.Max(0.5f, vp.X / Mathf.Max(1f, vp.Y));
+            float halfH = Mathf.RadToDeg(Mathf.Atan(Mathf.Tan(Mathf.DegToRad(_camera.Fov * 0.5f)) * aspect));
+            return Mathf.Clamp(_t.Camera.FrameBandHorizontalFraction, 0.05f, 0.98f) * halfH;
+        }
+    }
 
     /// <summary>Horizontal angle (degrees, + = left of centre) at which the lens currently sees a world point; NaN if behind the lens.</summary>
     public float FrameSideAngleTo(Vector3 worldPoint)
@@ -228,9 +240,9 @@ public partial class CameraRig : Node3D, ICameraBasis
         float azimuth = Mathf.RadToDeg(Mathf.Atan2(left, ahead));          // + = left of the rig's forward
         float elevation = Mathf.RadToDeg(Mathf.Atan2(to.Y, flat));         // + = above the horizontal
         float release = 1f - Mathf.Exp(-Mathf.Max(0.01f, c.PitchReleaseDamping) * dt);
-        _framePitch = Mathf.Clamp(Hold(_framePitch, elevation - c.PitchDegrees, c.FrameBandDegrees, release), -80f, 80f);
+        _framePitch = Mathf.Clamp(Hold(_framePitch, elevation - c.PitchDegrees, FrameBandDegreesVertical, release), -80f, 80f);
         // Sideways twin: a carve slide (03 §11) carries the ball across the screen; it parks on this edge.
-        _frameYaw = Mathf.Clamp(Hold(_frameYaw, azimuth, c.FrameBandHorizontalDegrees, release), -150f, 150f);
+        _frameYaw = Mathf.Clamp(Hold(_frameYaw, azimuth, FrameBandDegreesHorizontal, release), -150f, 150f);
         float pitch = Mathf.Clamp(c.PitchDegrees + _framePitch, -89f, 89f);
         _camera.GlobalBasis = Basis.FromEuler(new Vector3(Mathf.DegToRad(pitch), _yaw + Mathf.DegToRad(_frameYaw), 0f));
     }

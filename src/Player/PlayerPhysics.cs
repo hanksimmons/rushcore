@@ -591,6 +591,14 @@ public partial class PlayerPhysics : RigidBody3D
         float excess = Mathf.Max(0f, Mathf.Abs(gap) - GroundFollowDeadband) * Mathf.Sign(gap);
         float target = excess / GroundFollowCloseSeconds;           // toward the wall (outward) when off it
         vOut = gap >= 0f ? Mathf.Max(vOut, target) : Mathf.Min(vOut, target);
+        // The wall's normal force (T7): the server integrates gravity after this callback, so a ball held on the wall
+        // creeps into it by g·dt² a tick until the closing velocity balances it a few centimetres inside the collider,
+        // and the solver fights the follow there. Cancel in advance what the coming step pushes into the wall: gravity's
+        // outward component and the centripetal demand of the ball's motion around the ring.
+        float press = Mathf.Max(0f, -outward.Y * m.Gravity);
+        Vector3 around = v - tangent * v.Dot(tangent) - outward * vOut;
+        press += around.LengthSquared() / Mathf.Max(0.5f, dist);
+        vOut -= press * dt;
         v = v - outward * v.Dot(outward) + outward * vOut;
         normal = -outward;
         return true;

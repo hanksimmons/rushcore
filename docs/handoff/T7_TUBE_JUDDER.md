@@ -143,9 +143,23 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
 - Fix applied (commit with the after numbers): `TubeMesh.Sides` 24; `TryTubeFollow` holds `radius·cos(π/Sides) − ball`.
   Docs 04 §5I, 11 §7d; P-009.
 
+- After the first fix (24 sides + inscribed circle), full harness 311/313: cruise pass unchanged (100% grounded, radial
+  ≤ 5.35 m, exit 149 m/s at 1°); boosted window: **Δradial max 5.7 cm, rms 1.32 cm, penetration ≤ 7.2 cm, contacts on
+  175 of 180 ticks**, ride ≤ 116°. Better by 3×, not clean. Cause of the residual, from the code: the server integrates
+  gravity *after* `_IntegrateForces`, so a ball the follow holds on the wall creeps outward by g·dt² per tick (≈ 1.1 cm)
+  until the follow's closing velocity (excess / 0.05 s) balances it, at excess ≈ 1.1 cm × 0.05 / 0.0167 ≈ 3.3 cm past
+  the 3 cm deadband: ≈ 6 cm inside the held circle, which is past the facet plane (0–5 cm). Prediction matched 7.2 cm.
+- Second fix (same commit as the after numbers): the follow supplies the wall's **normal force** in advance, cancelling
+  gravity's outward component (max(0, −outward.Y·g)) and the centripetal demand of the motion around the ring
+  (u²/dist), both × dt, after the clamp. Still a velocity rule scoped to tubes; the ground follow is untouched (its
+  collider supplies the normal force and contacts are wanted there).
+
 **Next** (in order; continue from the first):
-1. Read the after numbers from the full harness ("tube ride boosted (T7)" line); paste them here; the three T7 checks and
-   the cruise checks must pass and the golden hashes must be unchanged (the mesh is not in the hash).
+1. Read the after numbers of the second fix from the full harness ("tube ride boosted (T7)" line); paste them here; the
+   three T7 checks and the cruise checks must pass and the golden hashes must be unchanged (the mesh is not in the hash).
+   If contacts remain on more than a few ticks, print per-tick `gap`, `vOut` before/after and the contact count for the
+   first 30 window ticks and look at whether the creep is gone (gap should sit inside the deadband) before changing
+   anything else.
 4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
 5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
 6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.

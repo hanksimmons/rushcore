@@ -2329,7 +2329,7 @@ public partial class MovementToySelfTest : Node
             for (int q = 1; q < axis.Length; q++) lensAlongBase[q] = lensAlongBase[q - 1] + axis[q].DistanceTo(axis[q - 1]);
             float prevLensAlong = float.NaN, prevLensStep = float.NaN, maxLensJump = 0f;
             Vector3 prevBallPos = new(float.NaN, float.NaN, float.NaN);
-            int arrestedTicks = 0, stalled = 0, stallShown = 0; float worstShortfall = 0f, prevBallSpeed = 0f;
+            int arrestedTicks = 0, stalled = 0, stallShown = 0, stalledLow = 0; float worstShortfall = 0f, prevBallSpeed = 0f, stallRideSum = 0f;
             float worstRadial = 0f, minLens = float.MaxValue, entrySpeed = 0f, exitSpeed = 0f, exitAngle = 0f, maxSpeedIn = 0f;
             bool entered = false, exited = false;
             int phase = 0;   // 0 approach on the primary, 1 aim at the mouth, 2 ride the axis
@@ -2389,7 +2389,18 @@ public partial class MovementToySelfTest : Node
                         {
                             float shortfall = (expected - travelled) / expected;
                             arrestedTicks++;
-                            if (shortfall > 0.10f) stalled++;
+                            if (shortfall > 0.10f)
+                            {
+                                stalled++;
+                                // Where on the ring the ball sits when it is arrested: 0° is the bottom of the tube.
+                                Vector3 ringT = tube.TangentAt(ak);
+                                Vector3 dn = (Vector3.Down - ringT * Vector3.Down.Dot(ringT)).Normalized();
+                                Vector3 sd = ringT.Cross(dn).Normalized();
+                                Vector3 rr = p - axis[ak]; rr -= ringT * rr.Dot(ringT);
+                                float rideDeg = Mathf.Abs(Mathf.RadToDeg(Mathf.Atan2(rr.Dot(sd), rr.Dot(dn))));
+                                if (rideDeg < 30f) stalledLow++;
+                                stallRideSum += rideDeg;
+                            }
                             worstShortfall = Mathf.Max(worstShortfall, shortfall);
                             if (shortfall > 0.25f && stallShown < 6 && System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
                             {
@@ -2590,7 +2601,7 @@ public partial class MovementToySelfTest : Node
             // The ball's step changes by at most acceleration × dt² (a few centimetres at the drive's ≈ 100 m/s²), and the
             // chase only smooths that further, so a quarter of a metre leaves ample headroom while a sample-grid snap
             // (± 2 m, on and off every frame) is caught outright.
-            GD.Print($"[SELFTEST] tube ride travel (T8): {stalled} of {arrestedTicks} ticks travelled more than 10% short of the ball's own velocity, worst {worstShortfall:P0}; worst change in the lens's step {maxLensJump:0.00} m");
+            GD.Print($"[SELFTEST] tube ride travel (T8): {stalled} of {arrestedTicks} ticks travelled more than 10% short of the ball's own velocity, worst {worstShortfall:P0}; {stalledLow} of them within 30° of the bottom, mean ride {stallRideSum / Mathf.Max(1, stalled):0}°; worst change in the lens's step {maxLensJump:0.00} m");
             // The travel figure is reported, not asserted: it measures a defect that is still open (T8), and asserting a
             // threshold above it would bless it. The camera figure is a regression guard: the tube push-out used to snap
             // the lens onto the axis sample grid, worth 4.94 m of abrupt step; it is 2.30 m now, and the rest is not yet

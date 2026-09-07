@@ -16,7 +16,9 @@ public static class TubeMesh
 
     public readonly record struct Built(ArrayMesh Shell, ArrayMesh Ribs, Vector3[] CollisionTriangles);
 
-    public static Built Build(TubeDefinition tube)
+    /// <summary>The ring frame at every axis sample: the parallel-transported "up" (ring vertex 0) and its binormal.
+    /// Public so the harness can read the facet phase of a ball inside the tube (T7).</summary>
+    public static (Vector3 n, Vector3 b)[] Frames(TubeDefinition tube)
     {
         var axis = tube.Axis;
         int n = axis.Length;
@@ -31,6 +33,14 @@ public static class TubeMesh
             frames[i] = (nn, t.Cross(nn).Normalized());
             prevN = nn;
         }
+        return frames;
+    }
+
+    public static Built Build(TubeDefinition tube)
+    {
+        var axis = tube.Axis;
+        int n = axis.Length;
+        var frames = Frames(tube);
         float flareLen = tube.Radius * 2f;
         float Radius(float along, float fromEnd)
         {

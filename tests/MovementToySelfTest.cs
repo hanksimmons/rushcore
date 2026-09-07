@@ -2304,10 +2304,15 @@ public partial class MovementToySelfTest : Node
                 GD.Print($"[SELFTEST] tube ride: drive seed has no tube; using seed {tubeSeed}/0 ({stage.Tubes.Count} tubes)");
             }
         }
-        if (stage.Tubes.Count > 0)
+        // Two passes (T7): the cruise ride, then the same ride boosting with the stick held toward one wall for three
+        // seconds of the cruise, tracing the radial distance, the facet phase and the contacts every tick: the judder
+        // reported while boosting is the follow holding the ball on the analytic circle inside a flat facet.
+        for (int pass = 0; pass < (stage.Tubes.Count > 0 ? 2 : 0); pass++)
         {
+            bool boosted = pass == 1;
             var tube = stage.Tubes[0];
             var axis = tube.Axis;
+            var frames = Rushcore.World.TubeMesh.Frames(tube);
             float entryD = verts[tube.JoinStart].Distance;
             int startIdx = stage.PrimaryRoute.IndexAtDistance(Mathf.Max(0f, entryD - 700f));
             foreach (var _ in Settle(verts[startIdx].Position + Vector3.Up * (m.BallRadius + 0.6f), 0.5f)) yield return null;
@@ -2318,6 +2323,12 @@ public partial class MovementToySelfTest : Node
             float worstRadial = 0f, minLens = float.MaxValue, entrySpeed = 0f, exitSpeed = 0f, exitAngle = 0f, maxSpeedIn = 0f;
             bool entered = false, exited = false;
             int phase = 0;   // 0 approach on the primary, 1 aim at the mouth, 2 ride the axis
+            // T7 trace over the steered window: tick-to-tick radial change, contacts, follow flips, facet phase.
+            float prevDist = float.NaN, maxDelta = 0f, sumDelta2 = 0f, maxRide = 0f, sumDeltaFacet = 0f, sumDeltaCorner = 0f, maxPen = 0f;
+            int windowTicks = 0, contactTicks = 0, followFlips = 0, facetTicks = 0, cornerTicks = 0, contactAtCorner = 0, contactAtFacet = 0;
+            bool prevFollow = false;
+            float bottomPhase = float.NaN;
+            float spacingDeg = 360f / Rushcore.World.TubeMesh.Sides;
             while (rt++ < Engine.PhysicsTicksPerSecond * 45 && !exited)
             {
                 Vector3 p = _player.GlobalPosition;
@@ -2355,6 +2366,39 @@ public partial class MovementToySelfTest : Node
                     Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
                     rel -= tan * rel.Dot(tan);
                     if (ak > 6 && ak < axis.Length - 6) worstRadial = Mathf.Max(worstRadial, rel.Length());
+                    if (boosted)
+                    {
+                        Input.ActionPress(InputBootstrap.Boost, 1f);
+                        // The steered window: from half a second inside, three seconds of stick toward one wall.
+                        bool window = insideTicks > 30 && insideTicks <= 30 + Engine.PhysicsTicksPerSecond * 3 && ak > 6 && ak < axis.Length - 6;
+                        if (window)
+                        {
+                            Vector3 lat = Vector3.Up.Cross(tan).Normalized();
+                            _worldDrive = tan + lat * 1.5f;
+                            float dist = rel.Length();
+                            float delta = float.IsNaN(prevDist) ? 0f : Mathf.Abs(dist - prevDist);
+                            windowTicks++;
+                            maxDelta = Mathf.Max(maxDelta, delta); sumDelta2 += delta * delta;
+                            int contacts = _player.GetContactCount();
+                            if (contacts > 0) contactTicks++;
+                            if (_player.TubeFollowActive != prevFollow) followFlips++;
+                            // Ring frame: angle from the ring's "up" (vertex 0); corners every 360/Sides degrees.
+                            float ang = Mathf.RadToDeg(Mathf.Atan2(rel.Dot(frames[ak].b), rel.Dot(frames[ak].n)));
+                            float ride = Mathf.Abs(Mathf.Wrap(ang - 180f, -180f, 180f));   // 0 = bottom
+                            maxRide = Mathf.Max(maxRide, ride);
+                            float ph = Mathf.Abs(Mathf.Wrap(ang, -spacingDeg * 0.5f, spacingDeg * 0.5f));   // 0 = on a corner
+                            if (float.IsNaN(bottomPhase)) bottomPhase = Mathf.Abs(Mathf.Wrap(180f, -spacingDeg * 0.5f, spacingDeg * 0.5f));
+                            bool nearCorner = ph < spacingDeg * 0.25f;
+                            if (nearCorner) { cornerTicks++; sumDeltaCorner += delta; if (contacts > 0) contactAtCorner++; }
+                            else { facetTicks++; sumDeltaFacet += delta; if (contacts > 0) contactAtFacet++; }
+                            // Penetration into the flat facet: the ball's surface beyond the facet's inner plane.
+                            float facetInner = tube.Radius * Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f)) / Mathf.Cos(Mathf.DegToRad(ph));
+                            maxPen = Mathf.Max(maxPen, dist + m.BallRadius - facetInner);
+                            prevDist = dist;
+                        }
+                        else prevDist = float.NaN;
+                        prevFollow = _player.TubeFollowActive;
+                    }
                     // Camera: lens outside the shell, ball visible against the terrain layer.
                     Vector3 lens = rig.Camera.GlobalPosition;
                     int li = tube.Nearest(lens, out float ld);
@@ -2375,6 +2419,17 @@ public partial class MovementToySelfTest : Node
             ReleaseAll();
             float modelExit = tube.Profile!.Speed[^1];
             if (!exited) exitSpeed = _player.LocomotionSpeed;
+            if (boosted)
+            {
+                float rms = Mathf.Sqrt(sumDelta2 / Mathf.Max(1, windowTicks));
+                GD.Print($"[SELFTEST] tube ride boosted (T7): {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}), max {maxSpeedIn:0} m/s, radial ≤ {worstRadial:0.00} m, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}°; " +
+                         $"steered window {windowTicks} ticks: ride ≤ {maxRide:0}° off the bottom, Δradial max {maxDelta * 100f:0.0} cm rms {rms * 100f:0.00} cm, contacts on {contactTicks} ticks, follow flips {followFlips}, penetration ≤ {maxPen * 100f:0.0} cm; " +
+                         $"on facets {facetTicks} ticks (Δ avg {sumDeltaFacet / Mathf.Max(1, facetTicks) * 100f:0.00} cm, contact {contactAtFacet}) vs near corners {cornerTicks} ticks (Δ avg {sumDeltaCorner / Mathf.Max(1, cornerTicks) * 100f:0.00} cm, contact {contactAtCorner}); bottom sits {bottomPhase:0.0}° off a corner");
+                Check("boosting and steering inside the tube keeps the ball on the wall without judder (T7: Δradial < 3 cm per tick over the steered window)", exited && windowTicks > 60 && maxDelta < 0.03f, $"Δradial max {maxDelta * 100f:0.0} cm over {windowTicks} ticks");
+                Check("the boosted ride never lets the collider fight the follow (T7: no contact ticks in the steered window)", exited && contactTicks == 0, $"{contactTicks} contact ticks, follow flips {followFlips}");
+                Check("the boosted ride is carried to the exit along the axis", exited && groundedInside >= insideTicks * 0.95f && exitAngle <= 20f, $"grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, {exitAngle:0}°");
+                continue;
+            }
             GD.Print($"[SELFTEST] tube ride: entered {entered} at {entrySpeed:0} m/s, {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, tube contact {(t.Movement.TubeContact ? "on" : "off")}), max {maxSpeedIn:0} m/s, " +
                      $"radial ≤ {worstRadial:0.00} m of R {tube.Radius:0}, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}° to the axis; lens ≥ {minLens:0.0} m from the axis, pushed {pushed} frames, sight blocked {sightBlocked} ticks; {tube.Detail}");
             Check("the ball enters the tube at the cap and is carried through to the exit", entered && exited && entrySpeed > m.HardMaxLocomotionSpeed * 0.9f, $"entered={entered} exited={exited} entry {entrySpeed:0} m/s");
@@ -2384,7 +2439,7 @@ public partial class MovementToySelfTest : Node
             Check("the camera stays outside the tube for the whole ride", exited && minLens >= tube.Radius + WorldScale.TubeCameraMargin - 0.2f, $"lens ≥ {minLens:0.0} m from the axis (R {tube.Radius:0} + margin {WorldScale.TubeCameraMargin:0.0})");
             Check("the camera keeps a clear line of sight to the ball against the terrain through the ride", exited && sightBlocked == 0, $"{sightBlocked} of {insideTicks} ticks blocked");
         }
-        else Check("stage has a tube to ride", true, "none on this seed nor on seeds 1–60 of this archetype");
+        if (stage.Tubes.Count == 0) Check("stage has a tube to ride", true, "none on this seed nor on seeds 1–60 of this archetype");
 
         // Wall tunnel and spiral pit (08 §5, D-102), on a Canyon Run stage: a lid holds the ball from above (a charged
         // jump under it is refused) and from below (it is a floor), the camera stays under the roof; the spiral drives

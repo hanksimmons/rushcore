@@ -126,12 +126,15 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
 ## Delivery record (running log; the main track started it, Opus continues it)
 
 **Done** (each with its commit; add the harness check if one is missing):
-- (nothing yet)
+- Branch `opus/t7-tube-judder` off `develop-secondary` (with the packet merged); builds.
+- Harness instrumentation (WIP commit): the tube ride runs twice; pass 2 holds boost and, for three seconds of the cruise,
+  the stick toward one wall, tracing per tick the radial distance, tick-to-tick change, contacts, follow flips, ride
+  angle, facet phase (from `TubeMesh.Frames`, new public helper) and penetration into the facet plane. Three new checks
+  (Δradial < 3 cm per tick, no contact ticks in the window, carried to the exit) are expected to FAIL before the fix.
 
 **Next** (in order; continue from the first):
-1. Branch `opus/t7-tube-judder` off `develop-secondary`; build; data-only harness green.
-2. Harness reproduction: the boosted-and-steered pass in the tube ride with the per-tick trace; record the before numbers here.
-3. Confirm or refute the facet hypothesis against the prediction in the Analysis; check the bottom corner's phase.
+1. Run the full harness; copy the "tube ride boosted (T7)" line here as the before numbers; confirm or refute the facet
+   hypothesis against the Analysis prediction (Δ on facets ≫ Δ near corners, contacts on facets); note the bottom phase.
 4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
 5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
 6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.

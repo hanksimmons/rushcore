@@ -59,6 +59,29 @@ dot(contactNormal, Vector3.Up) >= MinGroundNormalDot
 
 With multiple contacts, derive a stable representative normal rather than trusting one noisy point.
 
+### Analytic ground follow (D-092)
+
+The collider is flat facets sampled from the height source (04 §9). A real sphere at speed leaves
+every convex facet edge for a few ticks, so contact flickers along any convex stretch, a held charge
+cancels through its grace, and the ball reads as bouncing over ground that is smooth by design. The
+controller therefore reads the terrain grid under the ball every tick (the same samples the collider
+and mesh are built from: one height source) and asks whether the surface could physically carry it:
+
+```text
+n      = grid normal over ±1 cell along and across travel
+gap    = perpendicular distance from the ball's resting height (within GroundFollowSnapDistance)
+κ      = grid curvature along travel over ±3 cells (negative = convex)
+follow if  n·up ≥ MinGroundNormalDot  and  |gap| ≤ snap  and  (κ ≥ 0 or v²·(−κ) < g·n.y)
+```
+
+While following, the outward component of the velocity along `n` is removed, a gap beyond a small
+deadband closes as a bounded velocity toward the surface, and the ball counts as **raw grounded** with
+`n` as its ground normal. Where `v²κ ≥ g` nothing happens, so a launch crest, a ramp lip or a cliff is
+left to real physics. The follow never runs during jump lockout or a slam, never on a slope steeper
+than the ground-normal limit, never on a ball arriving faster than one snap distance per tick (that is
+a landing, resolved by the solver), and never writes a transform. `Ground Follow` off reproduces the
+contact-only controller exactly, so the frozen baseline is unchanged by it.
+
 Track only the state required for behavior:
 
 - grounded,
@@ -460,6 +483,7 @@ terrain wavelength 1.005 are part of the same promotion.
 | Drag coefficient | 0.076 | ACCEPTED (D-091) |
 | Air control multiplier | 0.308 | ACCEPTED (D-078) |
 | Ball radius | 0.66 m (1.32 m diameter) | ACCEPTED (V-005, D-091; was 2.125: the visual-scale dial, physics and generation stay in metres) |
+| Ground follow / snap distance | on / 0.5 m (off = the contact-only D-091 controller) | ACCEPTED (D-092) |
 | Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
 | Max jump takeoff vertical speed | 84.63 m/s | ACCEPTED (V-010, D-091; was 58.21) |
 | Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |
@@ -496,7 +520,7 @@ Expose:
 - Flow, seconds since the last gain, impact count,
 - carve state, facing angle off travel, entry speed, carve count,
 - speed band,
-- grounded state,
+- grounded state (contact, raw, ground follow),
 - ground normal,
 - jump charge seconds/normalized charge,
 - computed jump takeoff speed,

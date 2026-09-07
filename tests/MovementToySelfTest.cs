@@ -1085,15 +1085,23 @@ public partial class MovementToySelfTest : Node
             Check("player spawned on the strip, grounded, facing down it",
                 _player.IsGrounded && _player.GlobalPosition.X > 3000f && Forward.Dot(Vector3.Left) > 0.99f,
                 $"pos={_player.GlobalPosition} fwd={Forward}");
-            // ---- M1 budget: facet hops over the 800 m hill station, 4 m vs 8 m cells (W held from 60 m/s) ----
-            int[] hops = new int[2];
-            float[] groundedFrac = new float[2];
-            int[] tris = new int[2];
-            ulong[] buildMs = new ulong[2];
-            float[] cells = { 4f, 8f };
-            for (int k = 0; k < cells.Length; k++)
+            // ---- M1 budget (D-080) + ground follow (D-092): the 800 m / 80 m hill station at 4 / 8 / 16 m
+            // cells with the follow on, then 16 m with it off as the contrast. W held from 60 m/s; Space is
+            // held from 100 m before the apex and released at it, so a facet hop on the convex approach
+            // would cancel the charge (grace 0.10 s) and the release would not jump. ----
+            const int Runs = 4;
+            int[] hops = new int[Runs];
+            float[] groundedFrac = new float[Runs], rawFrac = new float[Runs], apexSpeed = new float[Runs];
+            bool[] chargedAtApex = new bool[Runs], jumpedAtApex = new bool[Runs];
+            int[] tris = new int[Runs];
+            ulong[] buildMs = new ulong[Runs];
+            float[] cells = { 4f, 8f, 16f, 16f };
+            bool[] follow = { true, true, true, false };
+            float apexX = ScaleStripHeightField.X(3800f), holdX = ScaleStripHeightField.X(3700f);
+            for (int k = 0; k < Runs; k++)
             {
                 t.World.CellSize = cells[k];
+                m.GroundFollow = follow[k];
                 _debug.RestartSameSeed();
                 foreach (var _ in Frames(3)) yield return null;
                 world = _debug.World;
@@ -1102,28 +1110,54 @@ public partial class MovementToySelfTest : Node
                 foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.X(3400f), 0f, m.BallRadius + 0.4f), 0.6f)) yield return null;
                 _player.LinearVelocity = Vector3.Left * 60f;
                 Input.ActionPress(InputBootstrap.MoveForward, 1f);
-                int ticks = 0, airborne = 0, blips = 0, airStart = 0;
-                bool wasGrounded = true;
-                while (_player.GlobalPosition.X > ScaleStripHeightField.X(4200f) && ticks < Engine.PhysicsTicksPerSecond * 25)
+                int ticks = 0, airborne = 0, raw = 0, blips = 0, airStart = 0, jumpsAtStart = _jumpedCount;
+                bool wasGrounded = true, holding = false, released = false;
+                int total = 0;
+                while (_player.GlobalPosition.X > ScaleStripHeightField.X(4200f) && total++ < Engine.PhysicsTicksPerSecond * 25)
                 {
-                    ticks++;
-                    bool g = _player.IsGrounded;
-                    if (!g) airborne++;
-                    if (wasGrounded && !g) airStart = ticks;
-                    if (!wasGrounded && g && ticks - airStart <= 9) blips++;   // <= 0.15 s: a facet hop, not a crest launch
-                    wasGrounded = g;
+                    float x = _player.GlobalPosition.X;
+                    if (!released)
+                    {
+                        // Contact statistics cover the approach only: the jump at the apex is the charge check's flight.
+                        ticks++;
+                        bool g = _player.IsGrounded;
+                        if (!g) airborne++;
+                        if (_player.IsRawGrounded) raw++;
+                        if (wasGrounded && !g) airStart = ticks;
+                        if (!wasGrounded && g && ticks - airStart <= 9) blips++;   // <= 0.15 s: a facet hop, not a crest launch
+                        wasGrounded = g;
+                    }
+                    if (!holding && x <= holdX) { holding = true; Input.ActionPress(InputBootstrap.Jump, 1f); }
+                    if (holding && !released && x <= apexX)
+                    {
+                        released = true;
+                        chargedAtApex[k] = _player.IsCharging;
+                        apexSpeed[k] = _player.LocomotionSpeed;
+                        Input.ActionRelease(InputBootstrap.Jump);
+                    }
                     yield return null;
                 }
                 ReleaseAll();
+                jumpedAtApex[k] = _jumpedCount > jumpsAtStart;
                 hops[k] = blips;
                 groundedFrac[k] = ticks > 0 ? 1f - airborne / (float)ticks : 0f;
+                rawFrac[k] = ticks > 0 ? raw / (float)ticks : 0f;
             }
-            GD.Print($"[SELFTEST] M1 budget  4 m: {tris[0] / 1000} k tris, build {buildMs[0]} ms, hops {hops[0]}, grounded {groundedFrac[0]:P0}   " +
-                     $"8 m: {tris[1] / 1000} k tris, build {buildMs[1]} ms, hops {hops[1]}, grounded {groundedFrac[1]:P0}");
-            Check("cell size is a live world parameter", Mathf.IsEqualApprox(_debug.World.CellSize, 8f), $"cell={_debug.World.CellSize}");
+            m.GroundFollow = true;
+            string Col(int k) => $"{cells[k]:0} m{(follow[k] ? "" : " (follow off)")}: {tris[k] / 1000} k tris, build {buildMs[k]} ms, hops {hops[k]}, grounded {groundedFrac[k]:P0}, raw contact {rawFrac[k]:P0}, apex {apexSpeed[k]:0} m/s charge {(chargedAtApex[k] ? "held" : "LOST")}";
+            GD.Print($"[SELFTEST] M1 budget  {Col(0)}   |   {Col(1)}   |   {Col(2)}   |   {Col(3)}");
+            Check("cell size is a live world parameter", Mathf.IsEqualApprox(_debug.World.CellSize, 16f), $"cell={_debug.World.CellSize}");
             Check("8 m cells cut the triangle count to about a quarter", tris[1] < tris[0] * 0.3f, $"{tris[0]} -> {tris[1]}");
-            Check("4 m facets cause few short hops over the hill station", hops[0] <= 6, $"hops={hops[0]} grounded={groundedFrac[0]:P0}");
-            Check("hill station run completed", groundedFrac[0] > 0.3f && groundedFrac[1] > 0.3f, $"grounded {groundedFrac[0]:P0} / {groundedFrac[1]:P0}");
+            Check("the ground follow removes facet hops over the hill station at 4 and 8 m cells", hops[0] == 0 && hops[1] == 0, $"hops {hops[0]} / {hops[1]}");
+            Check("the ground follow keeps raw contact on the hill station at 4 / 8 / 16 m cells", rawFrac[0] > 0.97f && rawFrac[1] > 0.97f && rawFrac[2] > 0.95f,
+                $"raw {rawFrac[0]:P0} / {rawFrac[1]:P0} / {rawFrac[2]:P0}");
+            Check("a charge held on the roll-crest approach survives to the apex and jumps there, at every cell size",
+                chargedAtApex[0] && jumpedAtApex[0] && chargedAtApex[1] && jumpedAtApex[1] && chargedAtApex[2] && jumpedAtApex[2],
+                $"4 m {chargedAtApex[0]}/{jumpedAtApex[0]}, 8 m {chargedAtApex[1]}/{jumpedAtApex[1]}, 16 m {chargedAtApex[2]}/{jumpedAtApex[2]}");
+            Check("with the follow off, 16 m facets hop the ball and break the charge (the toggle is the baseline)",
+                hops[3] > hops[2] && rawFrac[3] < rawFrac[2] - 0.1f && !chargedAtApex[3],
+                $"hops {hops[2]} -> {hops[3]}, raw {rawFrac[2]:P0} -> {rawFrac[3]:P0}, charge at apex {chargedAtApex[3]}");
+            Check("hill station approach completed at speed in every run", apexSpeed.All(v => v > 60f), string.Join(" / ", apexSpeed.Select(v => $"{v:0}")));
 
             t.World.CellSize = MovementToyWorld.DefaultCellSize;
             t.World.CalibrationStrip = false;
@@ -1719,6 +1753,13 @@ public partial class MovementToySelfTest : Node
         string bodyLab = BodySnapshot();
         int nodesLab = GetTree().GetNodeCount();
         t.World.GeneratedStage = true;
+        // RUSHCORE_CELL_SIZE=8 (or 16) builds and drives the stage at that cell size: the D-092 cell
+        // re-measurement knob. Everything else in the harness stays at the default 4 m.
+        float stageCell = MovementToyWorld.DefaultCellSize;
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("RUSHCORE_CELL_SIZE"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float envCell) && envCell >= 1f && envCell <= 16f)
+            stageCell = envCell;
+        t.World.CellSize = stageCell;
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -1726,7 +1767,7 @@ public partial class MovementToySelfTest : Node
         var stage = world.Stage;
         Check("generated stage is the active terrain", world.IsStage && stage is not null && world.HalfX > 2900f, $"halfX={world.HalfX}");
         if (stage is null) { t.World.GeneratedStage = false; _debug.RestartSameSeed(); yield break; }
-        GD.Print($"[SELFTEST] generated stage: build {world.BuildMillis} ms, {world.SampleCount / 1000} k samples, {world.Triangles / 1000} k tris, {world.Tiles} tiles; {world.StageSummary}");
+        GD.Print($"[SELFTEST] generated stage: cells {world.CellSize:0} m, build {world.BuildMillis} ms, {world.SampleCount / 1000} k samples ({world.SampleCount * 4 / 1e6f:0.0} MB heights), {world.Triangles / 1000} k tris, {world.Tiles} tiles; {world.StageSummary}");
         Check("generated stage passed its own validation", stage.Report.Passed && !stage.Report.UsedFallback,
             string.Join("; ", stage.Report.Failures.Select(f => f.Name + " " + f.Detail)));
         Check("generated stage builds within the budget", world.BuildMillis < 8000, $"{world.BuildMillis} ms");
@@ -1761,8 +1802,15 @@ public partial class MovementToySelfTest : Node
         int ticks = 0, grounded = 0, nearest = 0, exitTick = -1, impactsBefore = _player.ImpactCount;
         int maxTicks = Engine.PhysicsTicksPerSecond * 100;
         float maxSpeed = 0f, maxOffLine = 0f, nextMark = 1000f, worstMark = 0f;
-        int markTicks = 0, markGrounded = 0;
+        int markTicks = 0, markGrounded = 0, markRaw = 0;
         string marks = "";
+        // Ground follow (D-092): raw contact per km, and whether each launch crest was taken as physics says.
+        var crests = stage.PrimaryRoute.Features.Where(f => f.Kind == RouteFeatureKind.LaunchCrest).ToList();
+        var crestKm = new HashSet<int>();
+        foreach (var f in crests) { int km = (int)(f.CentreDistance / 1000f); crestKm.Add(km); crestKm.Add(km + 1); }
+        var crestApexSpeed = new float[crests.Count];
+        var crestLeft = new bool[crests.Count];
+        var quietKm = new List<(int km, float raw)>();
         while (ticks < maxTicks)
         {
             ticks++;
@@ -1774,17 +1822,28 @@ public partial class MovementToySelfTest : Node
                 if (d < best) { best = d; nearest = i; }
             }
             maxOffLine = Mathf.Max(maxOffLine, Mathf.Sqrt(best));
-            if (verts[nearest].Distance >= nextMark)
+            float along = verts[nearest].Distance;
+            for (int c = 0; c < crests.Count; c++)
             {
-                float ballT = ticks / (float)Engine.PhysicsTicksPerSecond, modelT = profile.TimeAt(verts[nearest].Distance);
+                float rel = along - crests[c].CentreDistance;
+                if (crestApexSpeed[c] == 0f && rel >= 0f) crestApexSpeed[c] = _player.LocomotionSpeed;
+                if (rel >= 0f && rel <= crests[c].Wavelength * 0.5f + 60f && !_player.IsGrounded) crestLeft[c] = true;
+            }
+            if (along >= nextMark)
+            {
+                float ballT = ticks / (float)Engine.PhysicsTicksPerSecond, modelT = profile.TimeAt(along);
                 float err = Mathf.Abs(ballT - modelT) / Mathf.Max(1f, modelT);
                 worstMark = Mathf.Max(worstMark, err);
-                marks += $" {nextMark:0} m: ball {ballT:0.0} s model {modelT:0.0} s ({_player.LocomotionSpeed:0} vs {profile.SpeedAt(verts[nearest].Distance):0} m/s, grounded {markGrounded / (float)Mathf.Max(1, markTicks):P0});";
+                float rawFrac = markRaw / (float)Mathf.Max(1, markTicks);
+                int km = (int)(nextMark / 1000f) - 1;
+                if (!crestKm.Contains(km)) quietKm.Add((km, rawFrac));
+                marks += $" {nextMark:0} m: ball {ballT:0.0} s model {modelT:0.0} s ({_player.LocomotionSpeed:0} vs {profile.SpeedAt(along):0} m/s, grounded {markGrounded / (float)Mathf.Max(1, markTicks):P0}, raw {rawFrac:P0}{(crestKm.Contains(km) ? ", crest" : "")});";
                 nextMark += 1000f;
-                markTicks = 0; markGrounded = 0;
+                markTicks = 0; markGrounded = 0; markRaw = 0;
             }
             markTicks++;
             if (_player.IsGrounded) markGrounded++;
+            if (_player.IsRawGrounded) markRaw++;
             if (nearest >= verts.Count - 2) { exitTick = ticks; break; }
             var target = verts[Mathf.Min(verts.Count - 1, nearest + 15)].Position;
             _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
@@ -1805,6 +1864,23 @@ public partial class MovementToySelfTest : Node
             $"ball {ballTime:0.0} s, model {profile.TotalTime:0.0} s ({timeErr:P1}); marks:{marks}");
         Check("the follower stays inside the corridor for the whole route", maxOffLine < StageHeightField.CorridorHalfWidth, $"off-line ≤ {maxOffLine:0} m");
         Check("the corridor keeps the ball grounded most of the way", groundedFrac > 0.6f, $"{groundedFrac:P0}");
+        // Ground follow (D-092): away from the launch crests the ball never loses contact; at a crest it leaves
+        // exactly when v² exceeds g·r (r = λ² / (2π²H)), so the follow never glues a launch and never fakes one.
+        Check("the ground follow keeps raw contact on every km without a launch crest (≥ 97%)",
+            quietKm.Count > 0 && quietKm.All(q => q.raw >= 0.97f), string.Join(", ", quietKm.Select(q => $"km {q.km + 1}: {q.raw:P0}")));
+        {
+            string crestDetail = ""; bool consistent = true; int decided = 0;
+            for (int c = 0; c < crests.Count; c++)
+            {
+                float r = crests[c].Wavelength * crests[c].Wavelength / (2f * Mathf.Pi * Mathf.Pi * Mathf.Max(0.1f, crests[c].Height));
+                float ratio = crestApexSpeed[c] * crestApexSpeed[c] / (m.Gravity * r);
+                string verdict = ratio > 1.25f ? (crestLeft[c] ? "launched" : "GLUED") : ratio < 0.8f ? (crestLeft[c] ? "FAKE LAUNCH" : "rolled") : "marginal";
+                if (ratio > 1.25f || ratio < 0.8f) { decided++; consistent &= verdict == "launched" || verdict == "rolled"; }
+                crestDetail += $" crest {c + 1} at {crests[c].CentreDistance:0} m: r {r:0} m, apex {crestApexSpeed[c]:0} m/s, v²/gr {ratio:0.00}, {verdict};";
+            }
+            GD.Print($"[SELFTEST] launch crests:{crestDetail}");
+            Check("launch crests stay real: the ball leaves when v² > g·r and rolls when it does not", decided > 0 && consistent, crestDetail);
+        }
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
         Check("archetype geometry left the rigid body's hidden physics untouched (04 §7)", BodySnapshot() == bodyLab, BodySnapshot());
         Check("the corridor drive registers no Flow impact (no false mistakes on clean terrain)", _player.ImpactCount == impactsBefore, $"impacts {impactsBefore} -> {_player.ImpactCount}");
@@ -1874,6 +1950,7 @@ public partial class MovementToySelfTest : Node
         }
 
         t.World.GeneratedStage = false;
+        t.World.CellSize = MovementToyWorld.DefaultCellSize;
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
         Check("lab restored after the generated stage", !_debug.World.IsStage && !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f));

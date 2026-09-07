@@ -148,6 +148,9 @@ this target (08 §7); the footprint is not resized before then.
 on the gentlest strip hills; the facet kink at 4 m is 0.4° on the smallest cruise crest (r 560) and
 2.3° on a 100 m launch crest, both below the ball's contact tolerance in the measurement. 8 m is
 rejected on contact, not on triangles. 6 m was not measured; it is the fallback if memory (3h) forces it.
+*Amended 2026-09-06 (D-092): the analytic ground follow removed contact from this decision (100% raw contact
+at 4, 8 and 16 m on the same hill); 4 m stands on silhouette and validator resolution, to be re-decided on
+draw cost with the ceiling addendum and the LOD work.*
 
 ### 3h. Terrain budget at the proposed scale
 

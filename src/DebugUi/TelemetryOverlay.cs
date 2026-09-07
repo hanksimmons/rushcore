@@ -143,7 +143,7 @@ public partial class TelemetryOverlay : Control
         Set(Row.Physics, $"{Engine.PhysicsTicksPerSecond} Hz");
         Set(Row.State, p.State.ToString());
         Set(Row.Band, p.Band.ToString());
-        Set(Row.Ground, $"{OnOff(p.IsGrounded)}   raw {OnOff(p.IsRawGrounded)}");
+        Set(Row.Ground, $"{OnOff(p.IsGrounded)}   raw {OnOff(p.IsRawGrounded)}   follow {OnOff(p.GroundFollowActive)}");
         Set(Row.Normal, $"{n.X,6:0.00} {n.Y,6:0.00} {n.Z,6:0.00}");
         Set(Row.Velocity, $"{v.X,7:0.0} {v.Y,7:0.0} {v.Z,7:0.0}   |v| {v.Length():0.0}");
         Set(Row.Locomotion, $"{p.LocomotionSpeed,6:0.0} / {p.EffectiveLocomotionCap:0.0} m/s   (base {p.LocomotionCap:0.0})");

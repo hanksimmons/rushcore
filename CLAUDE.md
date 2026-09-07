@@ -168,6 +168,7 @@ Current accepted direction:
 - continuous collision detection enabled on the high-speed player,
 - `CustomIntegrator` left disabled initially so standard Jolt gravity/damping remain active,
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
+- the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
 - `HeightMapShape3D` main terrain.
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
@@ -249,8 +250,8 @@ Until the implementation plan advances:
 
 > **Phase 2C — Flow headroom** (D-088), inserted after Gate G0's objective closure (D-087) and before
 > Phase 3. The preset is locked (D-091: headroom 0.715, ball 0.66 m, steering 222.66, jump 84.63,
-> carve, camera). Next: the analytic ground follow, then the ceiling addendum (08 §4) re-derives the
-> safety side of the world scale at these values. Phase 3 opens at Gate F0 with the G0 manual sample
-> played with Flow on.
+> carve, camera) and the analytic ground follow is in (D-092). Next: the ceiling addendum (08 §4)
+> re-derives the safety side of the world scale at these values. Phase 3 opens at Gate F0 with the G0
+> manual sample played with Flow on.
 
 The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-091: the user's `manual-small-2` preset, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

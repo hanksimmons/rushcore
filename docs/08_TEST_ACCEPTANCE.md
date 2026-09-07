@@ -45,6 +45,7 @@ Toy contains only:
 - Player cannot sleep during normal player control.
 - Standard gravity remains active without requiring a custom-force-integrator reimplementation.
 - Ground/contact reporting is configured and produces usable contact data during normal terrain contact.
+- Analytic ground follow (D-092): over the strip's 800 m / 80 m hill station the ball keeps raw contact on the whole approach at 4, 8 and 16 m cells with no facet hop; a charge held from 100 m before the apex survives to it and the release jumps there at every cell size; with the follow off, 16 m facets hop the ball and cancel the charge (the toggle is the baseline); on the generated stage every kilometre without a launch crest keeps ≥ 97% raw contact and every launch crest is left exactly when v² > g·r (never glued, never faked).
 - Player accelerates from rest.
 - Hard locomotion speed cap is consistently enforced using the grounded-tangent / airborne-horizontal definition without clipping vertical jump/slam behavior or rotating velocity at state transitions.
 - Downhill terrain materially accelerates player until cap.
@@ -162,7 +163,10 @@ time within 10% (measured 4.3%: ball 49.9 s, model 47.8 s), verifies no solid pr
 corridor, every anchor arms and restores, the SceneTree node count is flat across three regenerations,
 and neither generation nor a stage build writes to tuning or the rigid body. Mandatory jumps do not
 exist yet (the Phase 3 gap modules bring them and their envelope check). The gate is re-run per
-archetype as Phase 3 adds Canyon Run and Dune Sea; the manual sample is the user's.
+archetype as Phase 3 adds Canyon Run and Dune Sea; the manual sample is the user's. At the D-091
+baseline with the ground follow (D-092) and the interpolated corridor profile (D-093) the same drive
+reads 0.5% (ball 47.2 s, model 47.4 s) with raw contact 100 / 100 / 67 / 100 / 100 / 75% per kilometre;
+the two low readings are the launch crests, each left exactly when v² > g·r.
 
 ## 6. Combat — Gate C0
 

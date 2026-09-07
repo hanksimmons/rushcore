@@ -18,10 +18,18 @@ Two independent defects were behind that one symptom.
    abrupt change in the lens's step: **4.94 m → 2.30 m**.
 
 2. **The shell arrests the ball (open, this packet).** Independently of the camera, the ball's travel over a physics
-   tick falls short of what its own velocity says, on **37 of 917 ticks inside the tube (4%)**, by up to **73%**, with
-   the tube follow active and one or two contacts reported on every such tick. At the speed cap the ball should cover
-   2.48 m a tick; it covers 1.26–1.60 m on the bad ones and then resumes. That is the rubber-band the user sees, and the
-   camera faithfully follows it.
+   tick falls short of what its own velocity says, with the tube follow active and one or two contacts reported on
+   every such tick. At the speed cap the ball should cover 2.48 m a tick; on the bad ones it covers 1.3–1.6 m and then
+   resumes. That is the rubber-band the user sees, and the camera faithfully follows it. Across the archetypes:
+
+   | Archetype | Ticks more than 10% short | Worst |
+   |---|---:|---:|
+   | Rolling Highlands | 37 of 917 | 73% |
+   | Dune Sea | 32 of 854 | 79% |
+   | Sky Terraces | 43 of 911 | 95% |
+
+   About one tick in twenty-five, on every archetype that carries a tube, and a 95% shortfall is very nearly a dead
+   stop for a frame.
 
 ## Evidence that it is longitudinal, not radial
 

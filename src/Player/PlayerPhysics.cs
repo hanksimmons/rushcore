@@ -72,6 +72,10 @@ public partial class PlayerPhysics : RigidBody3D
     /// <summary>Ground follow (03 §3, D-092): gaps inside the deadband are left to the solver; larger
     /// gaps close over this horizon as a velocity, never as a transform write.</summary>
     private const float GroundFollowDeadband = 0.03f;
+    /// <summary>How far the nearest-vertex axis reference can be from the real tube axis (T7); the tube follow keeps this
+    /// much clear of the shell on top of its rest band. It shrinks to nothing once the structure query interpolates the
+    /// axis between its samples instead of answering with the nearest sample.</summary>
+    private const float TubeAxisUncertainty = 0.05f;
     private const float GroundFollowCloseSeconds = 0.05f;
     private const float JumpLockoutSeconds = 0.08f;
     private const float CheckpointIntervalSeconds = 0.75f;
@@ -579,13 +583,42 @@ public partial class PlayerPhysics : RigidBody3D
         float dist = rel.Length();
         if (dist < 1e-3f) return false;
         Vector3 outward = rel / dist;
-        float gap = radius - m.BallRadius - dist;                   // > 0: inside, off the wall; < 0: pressed into it
+        // The wall the follow holds is the collider's inscribed circle, not the analytic one (T7): the shell is a ring of
+        // flat facets, so a ball held on the circle sits inside every facet's middle and the solver and the follow fight
+        // each tick (a judder while steering or boosting up the wall). On the inscribed circle the ball touches the
+        // collider only at a facet's middle and never fires it while the follow is active; fast arrivals still land.
+        // How far inside the inscribed circle the ball is held: the rest band, the axis reference's own uncertainty, and a
+        // centimetre. `Structure.Nearest` answers with the nearest axis *vertex* and its tangent, and the axis is sampled
+        // every few metres, so on a curving tube the perpendicular distance to that vertex's tangent line differs from the
+        // distance to the real axis by (Δs/2)²/2ρ: measured 1.4 cm on a Dune Sea tube, 3.5 cm on a Highlands one and 21 cm
+        // on a steeply climbing Sky one (T7). The follow therefore knows where the wall is only to about that, and must
+        // not aim closer than it knows; the margin comes off again once the query interpolates the axis.
+        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - TubeAxisUncertainty - 0.01f;
+        float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vOut = v.Dot(outward);
         if (vOut > m.GroundFollowSnapDistance / dt) return false;   // flying into the wall: a landing
         float excess = Mathf.Max(0f, Mathf.Abs(gap) - GroundFollowDeadband) * Mathf.Sign(gap);
         float target = excess / GroundFollowCloseSeconds;           // toward the wall (outward) when off it
         vOut = gap >= 0f ? Mathf.Max(vOut, target) : Mathf.Min(vOut, target);
+        // The wall's normal force (T7): the server integrates gravity after this callback, so a ball held on the wall
+        // creeps into it by g·dt² a tick until the closing velocity balances it a few centimetres inside the collider,
+        // and the solver fights the follow there. Cancel in advance what the coming step pushes into the wall: gravity's
+        // outward component and the centripetal demand of the ball's motion around the ring.
+        // Gravity is exact (the server adds g·dt at the same instant); the ring's centripetal term is half, because a
+        // straight step of the motion around the ring leaves the circle by u²dt²/2r, not u²dt²/r.
+        float press = Mathf.Max(0f, -outward.Y * m.Gravity);
+        Vector3 around = v - tangent * v.Dot(tangent) - outward * vOut;
+        press += 0.5f * around.LengthSquared() / Mathf.Max(0.5f, dist);
+        // Never step outside the shell (T7): the collider is a ring of flat facets whose nearest point to the axis is the
+        // inscribed circle, so a ball kept inside that circle cannot reach a face while the follow holds it, whatever the
+        // drive, the boost or the ring motion does. The bound is applied to the velocity the step will actually carry, so
+        // it comes before the pre-compensation below, which stands for exactly what the step adds after this callback:
+        // the outward travel is then (min(vOut, room/dt) − press·dt + press·dt)·dt ≤ room. A bound, not a target: at the
+        // rest band's outer edge it still allows 2.4 m/s outward, so the wall is not sticky.
+        float room = Mathf.Max(0f, radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - m.BallRadius - dist);
+        vOut = Mathf.Min(vOut, room / dt);
+        vOut -= press * dt;
         v = v - outward * v.Dot(outward) + outward * vOut;
         normal = -outward;
         return true;

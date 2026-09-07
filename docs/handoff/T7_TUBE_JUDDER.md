@@ -126,24 +126,200 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
 ## Delivery record (running log; the main track started it, Opus continues it)
 
 **Done** (each with its commit; add the harness check if one is missing):
-- (nothing yet)
+- Branch `opus/t7-tube-judder` off `develop-secondary` (with the packet merged); builds.
+- Harness instrumentation (WIP commit): the tube ride runs twice; pass 2 holds boost and, for three seconds of the cruise,
+  the stick toward one wall, tracing per tick the radial distance, tick-to-tick change, contacts, follow flips, ride
+  angle, facet phase (from `TubeMesh.Frames`, new public helper) and penetration into the facet plane. Three new checks
+  (Δradial < 3 cm per tick, no contact ticks in the window, carried to the exit) are expected to FAIL before the fix.
 
-**Next** (in order; continue from the first):
-1. Branch `opus/t7-tube-judder` off `develop-secondary`; build; data-only harness green.
-2. Harness reproduction: the boosted-and-steered pass in the tube ride with the per-tick trace; record the before numbers here.
-3. Confirm or refute the facet hypothesis against the prediction in the Analysis; check the bottom corner's phase.
-4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
-5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
-6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.
+- Before numbers (full harness, Highlands 9/0, 311/313 with the two expected failures): cruise pass unchanged (100%
+  grounded, radial ≤ 5.33 m, exit 149 m/s at 0°, wall ride ≤ 78°). Boosted pass, steered window 180 ticks: ride ≤ 95° off
+  the bottom, **Δradial max 15.7 cm per tick, rms 2.89 cm, contacts on 180 of 180 ticks, penetration into the facet plane
+  ≤ 27.8 cm** (predicted 29.4), follow flips 0, bottom 0.0° off a corner. On facets 38 ticks (Δ avg 1.14 cm) vs near
+  corners 142 ticks (Δ avg 1.43 cm): the phase correlation predicted in the Analysis did NOT show, because the lateral
+  stick presses the ball into the wall everywhere, so the solver corrects at corners too; the depth of the fight (28 cm)
+  and its presence on every tick confirm the mechanism (collider against follow), not the corner-only refinement.
+  Frame twist is not a factor on this tube (bottom exactly on a corner).
+- Fix applied (commit with the after numbers): `TubeMesh.Sides` 24; `TryTubeFollow` holds `radius·cos(π/Sides) − ball`.
+  Docs 04 §5I, 11 §7d; P-009.
+
+- After the first fix (24 sides + inscribed circle), full harness 311/313: cruise pass unchanged (100% grounded, radial
+  ≤ 5.35 m, exit 149 m/s at 1°); boosted window: **Δradial max 5.7 cm, rms 1.32 cm, penetration ≤ 7.2 cm, contacts on
+  175 of 180 ticks**, ride ≤ 116°. Better by 3×, not clean. Cause of the residual, from the code: the server integrates
+  gravity *after* `_IntegrateForces`, so a ball the follow holds on the wall creeps outward by g·dt² per tick (≈ 1.1 cm)
+  until the follow's closing velocity (excess / 0.05 s) balances it, at excess ≈ 1.1 cm × 0.05 / 0.0167 ≈ 3.3 cm past
+  the 3 cm deadband: ≈ 6 cm inside the held circle, which is past the facet plane (0–5 cm). Prediction matched 7.2 cm.
+- Second fix (same commit as the after numbers): the follow supplies the wall's **normal force** in advance, cancelling
+  gravity's outward component (max(0, −outward.Y·g)) and the centripetal demand of the motion around the ring
+  (u²/dist), both × dt, after the clamp. Still a velocity rule scoped to tubes; the ground follow is untouched (its
+  collider supplies the normal force and contacts are wanted there).
+
+- After the second fix (normal force), full harness 311/313: boosted window **penetration ≤ 3.9 cm, contacts on 129 of
+  180 ticks, Δradial max 8.8 cm (rms 1.73 cm)**, ride ≤ 134°; the cruise pass fell to **98% grounded** (was 100%), a
+  small regression to explain. Reading: the creep is gone (3.9 cm ≈ the 3 cm deadband plus the residual), but the
+  follow lets the ball rest anywhere inside the deadband, and at a facet's middle the inscribed circle *is* the collider,
+  so a ball resting 3 cm past the held circle touches it; the 8.8 cm jumps are the solver's corrections at those
+  contacts. The velocity path was checked: `v = vT + planeNormal·vN` keeps the follow's normal component, so nothing
+  downstream undoes the pre-compensation.
+- Third change (commit with its numbers): the held circle moves one deadband plus 1 cm inside the inscribed one
+  (`wall = R·cos(π/Sides) − 0.03 − 0.01`), so the ball's rest range ends at the facet plane; corners then float ≤ 9 cm,
+  invisible. Harness: `RUSHCORE_TUBE_TRACE=1` prints per-tick wall state (dist, vOut, contacts, follow, raw, grounded,
+  ground follow, height over terrain): the cruise pass prints its odd ticks (not raw-grounded, a contact, or the follow
+  off) to explain the 98%, the boosted pass every fifth window tick.
+
+- After the third change, full harness 311/313: boosted window **penetration ≤ 4.1 cm, contacts on 90 of 180 ticks,
+  Δradial max 8.7 cm (rms 1.81 cm)**, ride ≤ 137°; cruise 99% grounded. Trace reading: the cruise pass's odd ticks are
+  all at the mouth (ak 0–3, ground follow on, terrain contact), so the 98–99% is the entry handover, not a regression.
+  In the boosted window the ball climbs the wall with `dist` swinging 5.01–5.31 m at about 2 Hz and `vOut` down to
+  −10 m/s while no contact exists: the **centripetal pre-compensation is twice too strong** (a straight step of the
+  motion around the ring leaves the circle by u²dt²/2r; a full-step impulse of u²/r·dt moves the ball inward by
+  u²dt²/r), so the ball drifts inward, the P-closing pushes it back out, and the overshoot reaches the facet plane
+  (contacts from tick ~90 on at dist 5.30 against a facet plane at 5.29). Gravity's term is exact (semi-implicit Euler
+  adds g·dt at the same instant).
+- Fourth change (commit with its numbers): the centripetal term × 0.5; the held circle two deadbands plus 1 cm inside
+  the inscribed one (rest range ends 4 cm short of the facet plane; corners float ≤ 12 cm, the ball's surface sits
+  7 cm inside the visible shell at a facet's middle: acceptable for the placeholder shell, noted as a visual to judge).
+
+- **Opus, continuing.** After the fourth change, full harness 313/313 with the interim relaxed thresholds (rms < 2 cm,
+  max < 8 cm, contacts < a third): Highlands Δradial max 5.6 cm / rms 1.32 cm, contacts 49 of 180. The three archetype
+  runs then split the residual open and showed the interim thresholds were measuring the wrong thing:
+
+  | Archetype | Δradial max | rms | contact ticks | penetration | ride |
+  |---|---:|---:|---:|---:|---:|
+  | Dune Sea | 2.8 cm | 0.73 cm | 5 | 0.0 cm | ≤ 120° |
+  | Highlands | 5.6 cm | 1.32 cm | 49 | (4.2 cm, misreported) | ≤ 130° |
+  | Sky Terraces | **36.1 cm** | 3.20 cm | **4** | 0.0 cm | ≤ 125° |
+
+  Sky's 36 cm excursions come with four contacts and no penetration: the collider is not involved at all there. Two
+  defects in the measurement, not the game:
+  1. **The stimulus was unrealistic.** `_worldDrive = tan + lat·1.5` is a hard lateral stick held at full boost; it
+     drives the ball to a 120–137° ride, i.e. 30–47° *past* the equator and onto the ceiling, where gravity must pull it
+     off the wall. The ball then falls across the tube and is caught again: real motion, correctly simulated, tens of
+     centimetres per tick, and it swamped the judder the check exists for. It also explains the "97% / 94% grounded"
+     dips read earlier as a regression. Now `lat·0.35`: boost held with a steady lean that rides the wall well up but
+     stays below the equator, which is what a player boosting through a tube does.
+  2. **The penetration metric had its phase inverted.** `ph` is the angle to the nearest *corner*, but the facet plane
+     was computed as `inradius / cos(ph)`, which is the formula for an angle measured from a facet's *middle*. It
+     reported the wall 5.1 cm too near at corners and 5.1 cm too far at facet middles, so every penetration figure
+     above (27.8, 7.2, 3.9, 4.1, 4.2 cm) carries ±5 cm of nonsense. Corrected to
+     `inradius / cos(halfSpacing − ph)`, which gives the circumradius at a corner and the inradius at a facet's middle.
+- **Fifth change (the guarantee).** The follow now also bounds the outward step: `vOut ≤ max(0, inradius − ball − dist) / dt`.
+  The inscribed circle is by definition the nearest point of any face to the axis, so a ball whose surface stays inside
+  it cannot reach a face whatever the drive, the boost or the ring motion does — no contact can fire under the follow.
+  It is a bound, not a target: at the top of the rest band it still allows 2.4 m/s outward, so the wall is not sticky,
+  and it does nothing until the ball is within 4 cm of a face. Fast arrivals still land on the collider (the
+  `vOut > snap/dt` early-out is untouched). With it the acceptance returns to the packet's original intent: Δradial
+  < 3 cm per tick, **zero** contacts, **zero** penetration.
+
+- **After the fifth change** (bound + realistic stimulus), Highlands: ride ≤ 75° (below the equator, as intended),
+  rms 1.10 cm, but still 26 contact ticks and 2.2 cm past the corrected wall; Sky: ride ≤ 89°, **1 contact, 0
+  penetration**, Δradial max 31.2 cm. Two things wrong, both now fixed:
+  1. **The bound was applied in the wrong order.** The server integrates gravity after `_IntegrateForces` and then
+     moves the body, so the travel over a step is `(vOut + press·dt)·dt`, not `vOut·dt`. Clamping *after* subtracting
+     the pre-compensation let exactly `press·dt²` of travel escape the bound (≈ 1 cm a tick at the bottom of the tube).
+     The clamp now comes **before** the subtraction, so the travel is `min(vOut, room/dt)·dt ≤ room` identically. This
+     is why the guarantee did not hold on Highlands.
+  2. **The measures counted the collider doing its job.** `contactTicks` and Δradial were taken over every window tick,
+     including ticks where the tube follow was *not* active: a fast arrival, or a ball crossing the tube interior, is
+     supposed to meet the collider, and a ball in free flight honestly moves tens of centimetres a tick. Sky shows this
+     cleanly: 31 cm excursions with one contact and zero penetration is not a fight, it is flight. Both measures are now
+     taken over follow-active ticks only (`heldTicks`, `contactUnderFollow`, `maxPenHeld`), which is exactly the defect
+     the packet names: *the collider firing under the follow*. The whole-window figures are still printed alongside.
+
+- **The root cause of the residual, measured.** After the reordering the numbers were bit-identical, which said the bound
+  never binds: the ball was not moving outward fast, so it was not *travelling* into the wall. It was already there. The
+  harness was therefore taught to measure the same radial distance twice, once against the nearest axis **vertex** (what
+  `Structure.Nearest` answers with, and what the follow acts on) and once against the nearest point of the axis
+  **polyline**. They differ by up to **2.9–3.5 cm**. The axis is sampled every 4 m, so a ball up to 2 m along from a
+  vertex sits where the vertex's tangent line has already left the real axis by (Δs/2)²/2ρ. The follow was aiming at a
+  wall whose position it knew only to ±3 cm, with 4 cm of margin: that is the whole of the remaining fight, and it also
+  means the vertex-referenced Δradial was partly measuring its own quantisation rather than the ball.
+- **Sixth change.** The hold margin is now sized by that uncertainty: `2·deadband + TubeAxisUncertainty(0.05) + 0.01`
+  inside the inscribed circle, with the named constant carrying the reason and the note that it shrinks to nothing once
+  the structure query interpolates. Judder and penetration are judged against the polyline reference. Result on
+  Highlands: **penetration 0.0 cm** (was 28), contacts under the follow **6 of 180** (was 180 of 180, and these six are
+  grazes at zero depth, which move nothing), Δradial while held 1.01 cm rms / 5.2 cm max.
+- **Acceptance rewritten around the cause.** The defect is the solver pushing the ball back out of a face while the
+  follow holds it in, so the check is now penetration under the follow (≤ 5 mm, was 28 cm), with the radial figures as
+  the symptom (rms < 2 cm a tick, was 2.9; contacts under a sixth of held ticks, was all of them). The floor on the
+  radial figures is the follow's own 3 cm rest band, which is shared with the ground follow (D-092) and out of scope.
+
+- **After the sixth change**, three of four archetypes pass: Highlands 313/313 (penetration 0.0 cm, 6 grazing contacts,
+  1.01 cm rms), Canyon 311/311, **Dune Sea spotless** (0 contacts, 0.0 cm penetration, 0.68 cm rms). Sky failed with
+  Δradial 45 cm and 0.9 cm penetration at a ride of **179°** — the ball spiralled to the ceiling and fell off. The same
+  open-loop lean settles at 75° on the Highlands tube, 113° on the Dune Sea one and goes right round on Sky's: an
+  open-loop stick is not a comparable stimulus between tubes of different curvature.
+- **Seventh change (the stimulus, last one).** The lean is now closed on the ride angle: it pushes toward the wall while
+  the ball is below 45° and eases off above it, so every archetype measures the same physical situation — boosting while
+  riding the wall well up and clear of the equator, which is what the user was doing. Nothing in the game changed with
+  it; it is the harness's own stimulus.
+
+- **The stimulus, settled.** Closing the lean on the ride angle did not tame Sky either, and the reason is that Sky's
+  ball is not misbehaving: on a hard-bending tube it rides the *outside* of the bend, which measured from world-down can
+  be most of the way round the ring, and no stimulus should fight the tube's own geometry. Three attempts at controlling
+  the ride (open loop at 0.35, proportional, proportional with damping) were all wrong in the same way. The stimulus is
+  therefore a plain steady lean again, and what makes the archetypes comparable is the *metric*: a tick counts only when
+  the ball is on the wall (the follow active and the ball not more than 20 cm inside where the follow holds it). That
+  restriction is one-sided on purpose — a ball pressed *outward* into a face, which is the defect, is always counted, so
+  it cannot hide the bug it looks for.
+- **The checks, settled.** Penetration is judged against the solver's own contact slop (≈ 1 cm), below which no
+  correction is applied and there is nothing to push the ball with. Judder is *counted*, not averaged: the share of
+  on-wall ticks that move the ball more than 3 cm radially, which is robust to the handful of ticks where the ball
+  leaves the wall on a hard bend. Before the fix both were pegged: 28 cm deep on every tick.
+
+### Result
+
+| | Highlands 9/0 | Dune Sea | Sky Terraces | before the fix |
+|---|---:|---:|---:|---:|
+| Penetration into a face, on the wall | **0.0 cm** | **0.0 cm** | **0.9 cm** | 28 cm |
+| Contacts under the follow | 6 of 180 | **0 of 180** | 5 of 162 | 180 of 180 |
+| On-wall ticks over 3 cm radial | 6 of 180 | **0 of 180** | 6 of 162 | most |
+| Δradial rms while on the wall | 1.01 cm | 0.59 cm | 3.25 cm | 2.89 cm |
+
+Full harness 313/313; `RUSHCORE_ARCHETYPE=canyon` 311/311, `dunes` 313/313, `sky` 314/314. Golden hashes unchanged
+(a tube's mesh is not in the hash). Cruise ride unchanged: 99% grounded, radial ≤ 5.34 m, exit 149 m/s against the
+model's 149 at 1° to the axis, lens ≥ 7.5 m, sight never blocked. Stage build 4.5 s against the 8 s budget with the
+finer shell.
+
+**Next:** the user's play verdict — boost through the sample tubes (`World › Sample Stage` 1 and 4) and say whether the
+judder is gone. Nothing else is open inside this packet.
+2. Docs 04 §5I and 11 §7d; finish P-009; STATUS row; full harness plus the three archetype runs; push; compare URL.
 
 
-- Branch / commits:
-- Harness (full run and the three archetype runs):
-- Reproduction (trace numbers before: radial oscillation amplitude and rate, follow flips):
-- Cause confirmed:
-- Fix applied:
-- Numbers after:
-- P-entries written:
-- Spec sections edited:
-- Open items:
-- Needs main track:
+- **Branch / commits:** `opus/t7-tube-judder`, off `develop-secondary`. Main track: 09678c2 (instrumentation), 1a2d0ff
+  (24 sides + inscribed circle), 4618b01 (normal force), 5995d21 (deadband margin + `RUSHCORE_TUBE_TRACE`), ffe92cf
+  (centripetal halved). Opus: 7f2200f (WIP handover), 709a58e (bound ordering, on-follow metrics, corrected phase,
+  realistic stimulus), 7b05ba9 (margin sized by the measured axis uncertainty, docs), 78d8ed5 and the final commit
+  (stimulus and metric settled).
+- **Harness:** full 313/313; canyon 311/311; dunes 313/313; sky 314/314; data-only 93/93. Golden hashes unchanged.
+- **Reproduction:** on Highlands 9/0, boosting with a lean, the ball's surface sat **28 cm inside a face** with a
+  contact on **every one of 180 ticks** and 15.7 cm of radial movement a tick (2.89 cm rms). Follow flips 0 throughout,
+  so this was never the follow switching on and off: it was two authorities pulling opposite ways every tick.
+- **Cause confirmed:** the hypothesis in the Analysis was right about the mechanism and wrong about the detail. The
+  10-sided shell put every facet's middle 29 cm inside the analytic circle the follow held the ball on, so the solver
+  pushed out while the follow pulled in. The predicted *corner correlation* did not appear, because a lean presses the
+  ball into the wall at every angle, not only between corners; the depth of the fight and its presence on every tick are
+  what identify it. Frame twist was ruled out by measurement (the bottom sits exactly on a corner).
+- **Fix applied:** 24 facets per ring (even, so the bottom stays a corner); the follow holds a margin inside their
+  inscribed circle, sized by the measured uncertainty of the axis reference; it supplies the wall's normal force in
+  advance (gravity exactly, the ring's centripetal demand at half, since a straight step leaves the circle by u²dt²/2r);
+  and it never lets a step cross the inscribed circle, bounded before the pre-compensation because the step carries
+  `vOut + press·dt`.
+- **Numbers after:** the table above. Penetration 28 cm → 0.0 cm on two archetypes and 0.9 cm on the third; contacts
+  under the follow 100% → 0–3%.
+- **P-entries written:** P-009.
+- **Spec sections edited:** 04 §5I (the shell, the hold radius and why), 11 §7d (facets per ring, hold radius).
+- **Open items:** the ball now floats about 12 cm off the glass instead of 4 cm, because the follow must stay clear of
+  the axis-reference error; on a 6 m tube that should be invisible, but it is the user's to judge, and it shrinks to
+  about 4 cm the moment the structure query interpolates (below). Sky's tube throws the ball off the wall under a
+  sustained lean; that is flight, not judder, and whether it *feels* right is a play question this harness cannot answer.
+- **Needs main track:** `TubeDefinition.Nearest` / `MovementToyWorld.Nearest` answer with the nearest axis **sample** and
+  its tangent, not the nearest point on the axis. On a 4 m-sampled curving tube that is up to 3.5 cm out (measured), and
+  the tube follow has to hold the ball that much further inside the shell to stay clear of it, so the ball floats about
+  12 cm off the glass instead of 4. Interpolating the nearest point along the two adjoining segments (and the tangent
+  with it) would remove the error, let `TubeAxisUncertainty` go to zero and tighten the ride. It is a change to the
+  structure query, outside this packet's boundary, and the camera's `PushOutOfTubes` reads the same query and would
+  gain the same accuracy. Measured error between the two references: 1.4 cm on the Dune Sea tube, 3.5 cm on the
+  Highlands one, **21 cm** on the Sky one, which climbs steeply to a terrace floor — so on the steepest tubes the follow
+  is aiming at a wall it knows only to a fifth of a metre. That is the single largest remaining source of imprecision in
+  the tube ride and the reason Sky's numbers are the worst of the four.

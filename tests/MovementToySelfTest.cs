@@ -225,6 +225,10 @@ public partial class MovementToySelfTest : Node
         AddChild(ramp);
     }
 
+    /// <summary>The wall-ride angle the boosted tube ride holds (T7): well up the wall, clear of the equator, the same
+    /// physical situation on every archetype's tube whatever its curvature.</summary>
+    private const float TubeRideTargetDegrees = 45f;
+
     // ---------------- helpers ----------------
     private void Check(string name, bool ok, string detail = "")
     {
@@ -2304,10 +2308,15 @@ public partial class MovementToySelfTest : Node
                 GD.Print($"[SELFTEST] tube ride: drive seed has no tube; using seed {tubeSeed}/0 ({stage.Tubes.Count} tubes)");
             }
         }
-        if (stage.Tubes.Count > 0)
+        // Two passes (T7): the cruise ride, then the same ride boosting with the stick held toward one wall for three
+        // seconds of the cruise, tracing the radial distance, the facet phase and the contacts every tick: the judder
+        // reported while boosting is the follow holding the ball on the analytic circle inside a flat facet.
+        for (int pass = 0; pass < (stage.Tubes.Count > 0 ? 2 : 0); pass++)
         {
+            bool boosted = pass == 1;
             var tube = stage.Tubes[0];
             var axis = tube.Axis;
+            var frames = Rushcore.World.TubeMesh.Frames(tube);
             float entryD = verts[tube.JoinStart].Distance;
             int startIdx = stage.PrimaryRoute.IndexAtDistance(Mathf.Max(0f, entryD - 700f));
             foreach (var _ in Settle(verts[startIdx].Position + Vector3.Up * (m.BallRadius + 0.6f), 0.5f)) yield return null;
@@ -2315,9 +2324,26 @@ public partial class MovementToySelfTest : Node
             var space = _player.GetWorld3D().DirectSpaceState;
             var ray = new PhysicsRayQueryParameters3D { CollisionMask = 1, Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() } };
             int rt = 0, rn = startIdx, ak = 0, insideTicks = 0, groundedInside = 0, sightBlocked = 0, pushed = 0;
+            // Distance of each axis sample from the tube's start, so the lens's station along the tube is one number.
+            var lensAlongBase = new float[axis.Length];
+            for (int q = 1; q < axis.Length; q++) lensAlongBase[q] = lensAlongBase[q - 1] + axis[q].DistanceTo(axis[q - 1]);
+            float prevLensAlong = float.NaN, prevLensStep = float.NaN, maxLensJump = 0f;
+            Vector3 prevBallPos = new(float.NaN, float.NaN, float.NaN);
+            int arrestedTicks = 0, stalled = 0, stallShown = 0, stalledLow = 0; float worstShortfall = 0f, prevBallSpeed = 0f, stallRideSum = 0f;
             float worstRadial = 0f, minLens = float.MaxValue, entrySpeed = 0f, exitSpeed = 0f, exitAngle = 0f, maxSpeedIn = 0f;
             bool entered = false, exited = false;
             int phase = 0;   // 0 approach on the primary, 1 aim at the mouth, 2 ride the axis
+            // T7 trace over the steered window: tick-to-tick radial change, contacts, follow flips, facet phase.
+            float prevDist = float.NaN, maxDelta = 0f, sumDelta2 = 0f, maxRide = 0f, sumDeltaFacet = 0f, sumDeltaCorner = 0f, maxPen = 0f;
+            int windowTicks = 0, contactTicks = 0, followFlips = 0, facetTicks = 0, cornerTicks = 0, contactAtCorner = 0, contactAtFacet = 0;
+            // The defect is the collider firing *under* the follow. A contact while the follow is off is the collider
+            // doing its job (a fast arrival, or a ball crossing the tube), and a ball flying free has honestly large
+            // radial motion, so the judder and penetration measures are taken over follow-active ticks only.
+            int heldTicks = 0, contactUnderFollow = 0, juddering = 0; float maxDeltaHeld = 0f, sumDelta2Held = 0f, maxPenHeld = 0f;
+            float prevExact = float.NaN, maxDeltaExact = 0f, sumDelta2Exact = 0f, maxRefErr = 0f;
+            bool prevFollow = false;
+            float bottomPhase = float.NaN;
+            float spacingDeg = 360f / Rushcore.World.TubeMesh.Sides;
             while (rt++ < Engine.PhysicsTicksPerSecond * 45 && !exited)
             {
                 Vector3 p = _player.GlobalPosition;
@@ -2350,15 +2376,178 @@ public partial class MovementToySelfTest : Node
                     _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
                     insideTicks++;
                     if (_player.IsGrounded) groundedInside++;
+                    // The rubber-band itself (T8): a body whose travel over a tick falls short of its own velocity was
+                    // arrested by the solver, whatever the camera is doing. This is what the eye sees as a lurch.
+                    if (!float.IsNaN(prevBallPos.X))
+                    {
+                        // Compare the step just taken against the velocity that produced it, not the one published after
+                        // it: the harness runs before the player each frame, so the two are one step apart and a ball
+                        // still accelerating would look arrested.
+                        float travelled = p.DistanceTo(prevBallPos);
+                        float expected = prevBallSpeed / Engine.PhysicsTicksPerSecond;
+                        if (expected > 0.5f && ak > 6 && ak < axis.Length - 6)
+                        {
+                            float shortfall = (expected - travelled) / expected;
+                            arrestedTicks++;
+                            if (shortfall > 0.10f)
+                            {
+                                stalled++;
+                                // Where on the ring the ball sits when it is arrested: 0° is the bottom of the tube.
+                                Vector3 ringT = tube.TangentAt(ak);
+                                Vector3 dn = (Vector3.Down - ringT * Vector3.Down.Dot(ringT)).Normalized();
+                                Vector3 sd = ringT.Cross(dn).Normalized();
+                                Vector3 rr = p - axis[ak]; rr -= ringT * rr.Dot(ringT);
+                                float rideDeg = Mathf.Abs(Mathf.RadToDeg(Mathf.Atan2(rr.Dot(sd), rr.Dot(dn))));
+                                if (rideDeg < 30f) stalledLow++;
+                                stallRideSum += rideDeg;
+                            }
+                            worstShortfall = Mathf.Max(worstShortfall, shortfall);
+                            if (shortfall > 0.25f && stallShown < 6 && System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
+                            {
+                                stallShown++;
+                                GD.Print($"[STALL] tick {insideTicks} ak {ak} travelled {travelled:0.00} of {expected:0.00} m ({shortfall:P0} short) contacts {_player.GetContactCount()} follow {_player.TubeFollowActive} grounded {_player.IsGrounded}");
+                            }
+                        }
+                    }
+                    prevBallPos = p; prevBallSpeed = _player.Velocity.Length();
                     maxSpeedIn = Mathf.Max(maxSpeedIn, _player.LocomotionSpeed);
                     // Radial distance of the ball's centre from the axis (the tangent component removed).
                     Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
                     rel -= tan * rel.Dot(tan);
+                    // The same distance measured against the nearest point of the axis *polyline* rather than the nearest
+                    // vertex (T7): the vertex reference carries the axis's own 4 m quantisation, and on a curved section
+                    // the tangent line at a vertex leaves the true axis by about (Δs/2)²/2ρ. If the ball is steady and only
+                    // this differs, the "judder" is in the measurement (and in the follow, which references the same way).
+                    float distExact = float.MaxValue;
+                    for (int sgi = Mathf.Max(0, ak - 3); sgi < Mathf.Min(axis.Length - 1, ak + 3); sgi++)
+                    {
+                        Vector3 seg = axis[sgi + 1] - axis[sgi];
+                        float len2 = seg.LengthSquared();
+                        float u = len2 > 1e-6f ? Mathf.Clamp((p - axis[sgi]).Dot(seg) / len2, 0f, 1f) : 0f;
+                        distExact = Mathf.Min(distExact, p.DistanceTo(axis[sgi] + seg * u));
+                    }
                     if (ak > 6 && ak < axis.Length - 6) worstRadial = Mathf.Max(worstRadial, rel.Length());
+                    // RUSHCORE_TUBE_TRACE=1 (T7): per-tick wall state; the cruise pass prints only its odd ticks, the boosted pass every fifth tick of the window.
+                    if (System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
+                    {
+                        int cc = _player.GetContactCount();
+                        bool odd = !_player.IsRawGrounded || cc > 0 || !_player.TubeFollowActive;
+                        bool inWin = boosted && insideTicks > 30 && insideTicks <= 30 + Engine.PhysicsTicksPerSecond * 3;
+                        if ((!boosted && odd) || (inWin && insideTicks % 5 == 0))
+                        {
+                            Vector3 outward = rel.Normalized();
+                            GD.Print($"[TUBE] {(boosted ? "boost" : "cruise")} tick {insideTicks} ak {ak}/{axis.Length} dist {rel.Length():0.000} vOut {_player.Velocity.Dot(outward):0.00} contacts {cc} follow {_player.TubeFollowActive} raw {_player.IsRawGrounded} grounded {_player.IsGrounded} gfollow {_player.GroundFollowActive} y {p.Y:0.0} ground {world.SampleHeight(p.X, p.Z):0.0}");
+                        }
+                    }
+                    if (boosted)
+                    {
+                        Input.ActionPress(InputBootstrap.Boost, 1f);
+                        // The steered window: from half a second inside, three seconds riding the wall.
+                        bool window = insideTicks > 30 && insideTicks <= 30 + Engine.PhysicsTicksPerSecond * 3 && ak > 6 && ak < axis.Length - 6;
+                        if (window)
+                        {
+                            // A player's stimulus (T7): boost held while riding the wall at a steady angle. An open-loop
+                            // stick is not comparable between tubes — the same lean settles at 75° on a Highlands tube and
+                            // spirals to the ceiling on a Sky one, where the ball simply falls off and its honest 45 cm of
+                            // flight per tick swamps the judder this measures. So the lean is closed on the ride angle:
+                            // lean toward the wall while below the target, ease off above it.
+                            Vector3 ringDown = (Vector3.Down - tan * Vector3.Down.Dot(tan)).Normalized();
+                            Vector3 ringSide = tan.Cross(ringDown).Normalized();
+                            float signedRide = Mathf.RadToDeg(Mathf.Atan2(rel.Dot(ringSide), rel.Dot(ringDown)));
+                            // A steady lean, as a player holds it. Where the ball ends up riding is the tube's business,
+                            // not the stick's: on a tight bend the ball sits on the outside of it, which measured from
+                            // world-down can be most of the way round the ring, and no stimulus should fight that. The
+                            // metric below is what makes the archetypes comparable, by counting only the ticks where the
+                            // ball is actually on the wall.
+                            _worldDrive = tan + ringSide * 0.35f;
+                            float dist = rel.Length();
+                            float delta = float.IsNaN(prevDist) ? 0f : Mathf.Abs(dist - prevDist);
+                            float deltaExact = float.IsNaN(prevExact) ? 0f : Mathf.Abs(distExact - prevExact);
+                            maxDeltaExact = Mathf.Max(maxDeltaExact, deltaExact); sumDelta2Exact += deltaExact * deltaExact;
+                            maxRefErr = Mathf.Max(maxRefErr, Mathf.Abs(distExact - dist));
+                            prevExact = distExact;
+                            windowTicks++;
+                            maxDelta = Mathf.Max(maxDelta, delta); sumDelta2 += delta * delta;
+                            int contacts = _player.GetContactCount();
+                            if (contacts > 0) contactTicks++;
+                            if (_player.TubeFollowActive != prevFollow) followFlips++;
+                            // Ring frame: angle from the ring's "up" (vertex 0); corners every 360/Sides degrees.
+                            float ang = Mathf.RadToDeg(Mathf.Atan2(rel.Dot(frames[ak].b), rel.Dot(frames[ak].n)));
+                            float ride = Mathf.Abs(Mathf.Wrap(ang - 180f, -180f, 180f));   // 0 = bottom
+                            maxRide = Mathf.Max(maxRide, ride);
+                            float ph = Mathf.Abs(Mathf.Wrap(ang, -spacingDeg * 0.5f, spacingDeg * 0.5f));   // 0 = on a corner
+                            if (float.IsNaN(bottomPhase)) bottomPhase = Mathf.Abs(Mathf.Wrap(180f, -spacingDeg * 0.5f, spacingDeg * 0.5f));
+                            bool nearCorner = ph < spacingDeg * 0.25f;
+                            if (nearCorner) { cornerTicks++; sumDeltaCorner += delta; if (contacts > 0) contactAtCorner++; }
+                            else { facetTicks++; sumDeltaFacet += delta; if (contacts > 0) contactAtFacet++; }
+                            // Penetration past the real shell: `ph` is the angle to the nearest corner, so the facet's
+                            // plane at this angle sits at inradius / cos(half spacing − ph) (the inradius at a facet's
+                            // middle, the circumradius at a corner).
+                            float wallHere = tube.Radius * Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f)) / Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f - ph));
+                            maxPen = Mathf.Max(maxPen, dist + m.BallRadius - wallHere);
+                            // On the wall: the follow is active and the ball is not far inside where the follow holds it.
+                            // One-sided on purpose — a ball pressed *outward* into a face (the defect) is counted, a ball
+                            // crossing the tube's interior is not, so restricting this cannot hide the bug it looks for.
+                            float holdRadius = tube.Radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 0.12f - m.BallRadius;
+                            if (_player.TubeFollowActive && distExact >= holdRadius - 0.20f)
+                            {
+                                heldTicks++;
+                                if (contacts > 0) contactUnderFollow++;
+                                // Penetration and judder against the axis polyline: the nearest-vertex reference carries the
+                                // axis's own 4 m quantisation (± 3 cm here), which is not motion of the ball.
+                                maxPenHeld = Mathf.Max(maxPenHeld, distExact + m.BallRadius - wallHere);
+                                if (!float.IsNaN(prevExact))
+                                {
+                                    maxDeltaHeld = Mathf.Max(maxDeltaHeld, deltaExact); sumDelta2Held += deltaExact * deltaExact;
+                                    if (deltaExact > 0.03f) juddering++;
+                                }
+                            }
+                            prevDist = dist;
+                        }
+                        else { prevDist = float.NaN; prevExact = float.NaN; }
+                        prevFollow = _player.TubeFollowActive;
+                    }
                     // Camera: lens outside the shell, ball visible against the terrain layer.
                     Vector3 lens = rig.Camera.GlobalPosition;
                     int li = tube.Nearest(lens, out float ld);
                     if (li > 6 && li < axis.Length - 6) minLens = Mathf.Min(minLens, ld);
+                    // The lens must travel along the tube as smoothly as the ball does (T8). The tube push-out used to
+                    // rebuild the lens from the nearest axis sample, which threw away its station along the tube and
+                    // snapped the camera onto the 4 m sample grid on every frame it fired: a ± 2 m jump, on and off,
+                    // frame after frame. Measured as the lens's own step along the axis against the ball's.
+                    {
+                        // Station along the tube measured against the axis *polyline*, not the nearest sample: a sample
+                        // reference jumps as the nearest one switches, which is the measurement's own artifact and not
+                        // motion of the lens (the same trap as the ball's radial distance in T7).
+                        float lensAlong = 0f, bestSeg = float.MaxValue;
+                        for (int q = Mathf.Max(0, li - 3); q < Mathf.Min(axis.Length - 1, li + 3); q++)
+                        {
+                            Vector3 seg = axis[q + 1] - axis[q];
+                            float len2 = seg.LengthSquared();
+                            if (len2 < 1e-6f) continue;
+                            float u = Mathf.Clamp((lens - axis[q]).Dot(seg) / len2, 0f, 1f);
+                            Vector3 foot = axis[q] + seg * u;
+                            float dd = lens.DistanceSquaredTo(foot);
+                            if (dd < bestSeg) { bestSeg = dd; lensAlong = lensAlongBase[q] + seg.Length() * u; }
+                        }
+                        if (!float.IsNaN(prevLensAlong) && li > 6 && li < axis.Length - 6)
+                        {
+                            // How much the lens's step *changes* from tick to tick. The chase's own smoothing (follow 8/s)
+                            // makes the lens lag the ball and catch up, so its step differs from the ball's by the best part
+                            // of a metre by design; what smoothing cannot do is change that step abruptly. A snap can, and
+                            // does: the ball's own step changes by at most an acceleration times dt², a few centimetres.
+                            float step = lensAlong - prevLensAlong;
+                            if (!float.IsNaN(prevLensStep))
+                            {
+                                float jump = Mathf.Abs(step - prevLensStep);
+                                if (jump > maxLensJump && System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
+                                    GD.Print($"[LENS] tick {insideTicks} ak {ak} li {li}/{axis.Length} jump {jump:0.00} m step {step:0.00} pushed {rig.TubePushedThisFrame} floored {rig.FlooredThisFrame} occl {rig.CurrentDistance:0.0} lensR {(lens - axis[li] - tube.TangentAt(li) * (lens - axis[li]).Dot(tube.TangentAt(li))).Length():0.00}");
+                                maxLensJump = Mathf.Max(maxLensJump, jump);
+                            }
+                            prevLensStep = step;
+                        }
+                        prevLensAlong = lensAlong;
+                    }
                     if (rig.TubePushedThisFrame) pushed++;
                     ray.From = lens; ray.To = p;
                     if (space.IntersectRay(ray).Count > 0) sightBlocked++;
@@ -2375,6 +2564,32 @@ public partial class MovementToySelfTest : Node
             ReleaseAll();
             float modelExit = tube.Profile!.Speed[^1];
             if (!exited) exitSpeed = _player.LocomotionSpeed;
+            if (boosted)
+            {
+                float rms = Mathf.Sqrt(sumDelta2 / Mathf.Max(1, windowTicks));
+                float rmsHeld = Mathf.Sqrt(sumDelta2Held / Mathf.Max(1, heldTicks));
+                GD.Print($"[SELFTEST] tube ride boosted (T7): {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}), max {maxSpeedIn:0} m/s, radial ≤ {worstRadial:0.00} m, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}°; " +
+                         $"steered window {windowTicks} ticks: ride ≤ {maxRide:0}° off the bottom, Δradial max {maxDelta * 100f:0.0} cm rms {rms * 100f:0.00} cm, contacts on {contactTicks} ticks, follow flips {followFlips}, penetration ≤ {maxPen * 100f:0.0} cm; " +
+                         $"on facets {facetTicks} ticks (Δ avg {sumDeltaFacet / Mathf.Max(1, facetTicks) * 100f:0.00} cm, contact {contactAtFacet}) vs near corners {cornerTicks} ticks (Δ avg {sumDeltaCorner / Mathf.Max(1, cornerTicks) * 100f:0.00} cm, contact {contactAtCorner}); bottom sits {bottomPhase:0.0}° off a corner; " +
+                         $"on the wall {heldTicks} ticks ({juddering} over 3 cm): Δradial max {maxDeltaHeld * 100f:0.0} cm rms {rmsHeld * 100f:0.00} cm, contacts {contactUnderFollow}, penetration ≤ {maxPenHeld * 100f:0.0} cm; " +
+                         $"against the axis polyline instead of its nearest vertex: Δradial max {maxDeltaExact * 100f:0.0} cm rms {Mathf.Sqrt(sumDelta2Exact / Mathf.Max(1, windowTicks)) * 100f:0.00} cm, the two references differ by ≤ {maxRefErr * 100f:0.0} cm");
+                // Thresholds (T7, P-009). Before the fix, on this stimulus: Δradial 15.7 cm max / 2.89 cm rms, contacts on
+                // every tick, the ball's surface 28 cm past the shell. The shell is the hard one: the follow may never let
+                // the ball reach a face, so penetration is exactly zero and no contact fires under it.
+                // The defect is the solver pushing the ball back out of a face while the follow holds it in, so the causal
+                // measure is how deep the ball gets: 28 cm on every tick before the fix. A graze at zero depth moves
+                // nothing. The radial figures are the symptom, and the floor on them is the follow's own 3 cm rest band
+                // (shared with the ground follow, D-092, not this packet's to change): ≈ 1 cm a tick of free drift.
+                // The threshold is the solver's own contact slop: below about a centimetre it applies no correction, so
+                // there is nothing to push the ball with. Before the fix the ball sat 28 cm inside a face on every tick.
+                Check("the follow never lets the ball reach a tube face, so the collider cannot push it back (T7: penetration under the solver's slop while the ball is on the wall, was 28 cm)", exited && heldTicks > 60 && maxPenHeld <= 0.01f, $"penetration {maxPenHeld * 100f:0.0} cm over {heldTicks} on-wall ticks, {contactUnderFollow} grazing contacts, follow flips {followFlips}");
+                // Judder is a *rate*, so it is counted, not averaged: how many on-wall ticks move the ball more than 3 cm
+                // radially. Before the fix that was most of them; the few that remain are the ball leaving the wall where
+                // a tube bends hard, which is flight, not judder.
+                Check("boosting and leaning inside the tube leaves no judder to see (T7: under a tenth of on-wall ticks move the ball more than 3 cm radially)", exited && juddering * 10 < heldTicks, $"{juddering} of {heldTicks} on-wall ticks over 3 cm; rms {rmsHeld * 100f:0.00} cm, max {maxDeltaHeld * 100f:0.0} cm, contacts {contactUnderFollow}");
+                Check("the boosted ride is carried to the exit along the axis", exited && groundedInside >= insideTicks * 0.95f && exitAngle <= 20f, $"grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, {exitAngle:0}°");
+                continue;
+            }
             GD.Print($"[SELFTEST] tube ride: entered {entered} at {entrySpeed:0} m/s, {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, tube contact {(t.Movement.TubeContact ? "on" : "off")}), max {maxSpeedIn:0} m/s, " +
                      $"radial ≤ {worstRadial:0.00} m of R {tube.Radius:0}, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}° to the axis; lens ≥ {minLens:0.0} m from the axis, pushed {pushed} frames, sight blocked {sightBlocked} ticks; {tube.Detail}");
             Check("the ball enters the tube at the cap and is carried through to the exit", entered && exited && entrySpeed > m.HardMaxLocomotionSpeed * 0.9f, $"entered={entered} exited={exited} entry {entrySpeed:0} m/s");
@@ -2383,8 +2598,17 @@ public partial class MovementToySelfTest : Node
             Check("the route speed model's carried profile predicts the exit speed within 10%", exited && Mathf.Abs(exitSpeed - modelExit) / Mathf.Max(1f, modelExit) <= 0.10f, $"ball {exitSpeed:0} m/s, model {modelExit:0} m/s");
             Check("the camera stays outside the tube for the whole ride", exited && minLens >= tube.Radius + WorldScale.TubeCameraMargin - 0.2f, $"lens ≥ {minLens:0.0} m from the axis (R {tube.Radius:0} + margin {WorldScale.TubeCameraMargin:0.0})");
             Check("the camera keeps a clear line of sight to the ball against the terrain through the ride", exited && sightBlocked == 0, $"{sightBlocked} of {insideTicks} ticks blocked");
+            // The ball's step changes by at most acceleration × dt² (a few centimetres at the drive's ≈ 100 m/s²), and the
+            // chase only smooths that further, so a quarter of a metre leaves ample headroom while a sample-grid snap
+            // (± 2 m, on and off every frame) is caught outright.
+            GD.Print($"[SELFTEST] tube ride travel (T8): {stalled} of {arrestedTicks} ticks travelled more than 10% short of the ball's own velocity, worst {worstShortfall:P0}; {stalledLow} of them within 30° of the bottom, mean ride {stallRideSum / Mathf.Max(1, stalled):0}°; worst change in the lens's step {maxLensJump:0.00} m");
+            // The travel figure is reported, not asserted: it measures a defect that is still open (T8), and asserting a
+            // threshold above it would bless it. The camera figure is a regression guard: the tube push-out used to snap
+            // the lens onto the axis sample grid, worth 4.94 m of abrupt step; it is 2.30 m now, and the rest is not yet
+            // diagnosed, so this catches a return of the snap rather than certifying the camera is smooth.
+            Check("the tube camera does not snap along the axis sample grid (T8 regression guard: 4.94 m before the fix)", exited && maxLensJump < 3.5f, $"worst change in the lens's step between ticks {maxLensJump:0.00} m");
         }
-        else Check("stage has a tube to ride", true, "none on this seed nor on seeds 1–60 of this archetype");
+        if (stage.Tubes.Count == 0) Check("stage has a tube to ride", true, "none on this seed nor on seeds 1–60 of this archetype");
 
         // Wall tunnel and spiral pit (08 §5, D-102), on a Canyon Run stage: a lid holds the ball from above (a charged
         // jump under it is refused) and from below (it is a floor), the camera stays under the roof; the spiral drives

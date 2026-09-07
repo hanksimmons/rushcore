@@ -11,12 +11,16 @@ namespace Rushcore.World;
 /// </summary>
 public static class TubeMesh
 {
-    public const int Sides = 10;
+    /// <summary>Ring vertices per axis sample. Even, so the bottom of the tube is a corner (the cruise rests exactly on
+    /// the analytic circle there); 24 puts every facet's middle 5 cm inside the circle (T7: it was 29 cm at 10).</summary>
+    public const int Sides = 24;
     private const float RibWidth = 0.6f, RibLift = 0.25f;
 
     public readonly record struct Built(ArrayMesh Shell, ArrayMesh Ribs, Vector3[] CollisionTriangles);
 
-    public static Built Build(TubeDefinition tube)
+    /// <summary>The ring frame at every axis sample: the parallel-transported "up" (ring vertex 0) and its binormal.
+    /// Public so the harness can read the facet phase of a ball inside the tube (T7).</summary>
+    public static (Vector3 n, Vector3 b)[] Frames(TubeDefinition tube)
     {
         var axis = tube.Axis;
         int n = axis.Length;
@@ -31,6 +35,14 @@ public static class TubeMesh
             frames[i] = (nn, t.Cross(nn).Normalized());
             prevN = nn;
         }
+        return frames;
+    }
+
+    public static Built Build(TubeDefinition tube)
+    {
+        var axis = tube.Axis;
+        int n = axis.Length;
+        var frames = Frames(tube);
         float flareLen = tube.Radius * 2f;
         float Radius(float along, float fromEnd)
         {

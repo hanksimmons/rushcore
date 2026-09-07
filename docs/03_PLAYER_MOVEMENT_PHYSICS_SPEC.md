@@ -455,7 +455,8 @@ Mechanically:
 - **framing pivot** (D-090): the lens itself pitches or yaws the instant the ball would leave a
   band around the screen centre, a tunable fraction of the current half field of view each way, vertically (a jump to the top, a dive off the
   bottom) or sideways (a carve slide, §11), holding it on the band edge, and eases back once it is
-  inside again; steering stays relative to the rig, not the turned lens,
+  inside again; it aims at where the next physics tick puts the ball (position + velocity × frame
+  dt), since the lens set in a frame is shown after that tick; steering stays relative to the rig, not the turned lens,
 - focus/look target leads along useful velocity; look-ahead grows with speed and is bounded, and
   is never more than 70% of the lens's horizontal reach (occluded distance included), so the
   camera can never be ahead of the ball whatever the tuning says,

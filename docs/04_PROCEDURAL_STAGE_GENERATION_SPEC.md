@@ -163,7 +163,7 @@ Vertical grammar modules (D-096, §5I), each with the same seven fields:
 7. WallTunnel — a slot through a wall closed by a lid; the camera confines (06 §11); the roof refuses a charged jump, so the module declares its ceiling (§10 headroom).
 8. Tube — a see-through swept cylinder with flared mouths; entry from a ramp lip, an edge or midair, exit onto a landing zone of any line or floor; a branch point of the line graph.
 9. SpiralPit / SpiralRamp — a conical helix of banked bends, each turn at a different radius, descending into a pit or climbing a mesa; falling off the inner edge lands on the turn below.
-10. TerraceStep — a floor step of 100–200 m reached by a ramp and a charge, with a landing zone on the upper floor and a drain below its edge.
+10. TerraceStep — a floor step of 60–90 m reached by a ramp lip and a full charge (at most 20 m when mandatory), with a landing zone on the upper floor and a drain below its edge; larger lifts are spiral ramps and tubes.
 11. Bridge — a lid used as a floor across a valley or a gap; falling off it lands on the drain.
 
 ### F — Gameplay object placement
@@ -209,8 +209,10 @@ Three kinds of thing, and the ball drives on all of them:
   see-through shell with opaque ribs, inward-facing triangles for the collider). Structures are never a
   second height layer: the ground follow, the route speed model's touchdown and the validators keep reading
   the one heightfield, and the contact baseline carries the ball on a structure (03 §3).
-- **Floors**: terraces, not stacked layers. Floors reached by a ramp and a charge are 100–200 m apart
-  (`docs/11 §7`); the guaranteed primary route stays on the lowest floor (the free path of the two-price
+- **Floors**: terraces, not stacked layers. A jump step is 60–90 m (the full-charge apex is 91 m above
+  the lip at any speed, because the takeoff sets the vertical and a ramp does not add to it, `docs/11
+  §7`); larger lifts are spiral ramps and tubes, which a driven ball climbs at up to 35° without losing
+  speed; three floors put the top 120–270 m up. The guaranteed primary route stays on the lowest floor (the free path of the two-price
   rule), upper floors are paid lines, and under every edge of an upper floor the ground **drains**: every
   cell below the edge has a descending drivable path back to the primary. The top floor may sit in the cloud
   band (06 §3). Floors that share an XZ (a true helix inside a tower, a room under a room) are not built; if
@@ -276,8 +278,8 @@ Geometry:
 
 Geometry:
 
-- three floors of terraces 100–200 m apart, the primary on the lowest,
-- ramp-and-charge steps and midair tube mouths up; cliff edges and drains down,
+- three floors of terraces, the primary on the lowest, the top 120–270 m up,
+- 60–90 m jump steps, spiral ramps and tube lifts and midair tube mouths up; cliff edges and drains down,
 - the top floor in the cloud band,
 - tubes and bridges linking floors and branching lines,
 - every fall lands on ground that drains back to the primary.

@@ -214,7 +214,10 @@ public partial class CameraRig : Node3D, ICameraBasis
         UpdateOcclusion(playerPos, Basis.Z * fullDist, dt);
         ApplyTransform(fullDist, _shake);
         _camera.Fov = Mathf.Lerp(c.FovMin, c.FovMax, speed01);
-        UpdateFramePitch(playerPos, dt);
+        // The lens set now is shown after the next physics tick moves the ball, so the pivot frames
+        // where the ball will be then: a slam dive drops 2.5 m per tick, 7.6° at this distance, more
+        // than the slack between the band and the frustum edge at 60 Hz.
+        UpdateFramePitch(playerPos + _player.Velocity * dt, dt);
     }
 
     /// <summary>

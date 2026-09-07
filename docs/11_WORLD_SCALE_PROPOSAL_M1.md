@@ -274,25 +274,28 @@ the 100-seed batch the two-speed figures (100 seeds: 100 valid, 0 fallbacks; sec
 Written 2026-09-06 for the vertical grammar (04 §5I). The family above is unchanged; this section adds
 the sizes that walls, floors, tubes and lids need, derived from the same frozen inputs (g 39.39, full
 charge 84.63 m/s, half charge 43.3 m/s, base cap 148.5, ceiling 254.7, ball 0.66 m, rig 18.8 m at
-−20.6°). Every size is provisional until measured (V-016); the reach rows assume the charge adds along
-the ramp normal and are measured on the strip ramps before any floor is placed.
+−20.6°). Every size is provisional until measured (V-016). The reach rows follow the controller's
+takeoff rule (03 §6, D-012): the release sets the vertical speed to max(current vertical, charge
+takeoff), so a ramp adds nothing to a charged jump until its own vertical exceeds the charge; the
+lip's rise (20 m) does add. Measured on the strip ramps before any floor is placed.
 
 ### 7a. Reach: how far up one move goes
 
-| Move | Vertical takeoff | Apex above the launch |
+| Move | Vertical takeoff | Apex above the lip |
 |---|---:|---:|
-| Full charge from flat | 84.6 m/s | 91 m |
-| Half charge from flat | 43.3 m/s | 24 m |
-| 11° ramp at the base cap + full charge | 112 m/s | 159 m |
-| 19° ramp at the base cap + half charge | 90 m/s | 103 m |
-| 19° ramp at the base cap + full charge | 129 m/s | 211 m |
-| 19° ramp at the ceiling + full charge | 164 m/s | 342 m |
+| Full charge, flat or any ramp ≤ 27° at the base cap | 84.6 m/s | 91 m |
+| Half charge, same | 43.3 m/s | 24 m |
+| 19° ramp at the ceiling, charged or not | 84.2 m/s | 90 m |
+| 27° ramp at the ceiling, charged or not | 114 m/s | 165 m |
 
-**Floor step band 100–200 m.** One 19° ramp and a full charge at the base cap reaches a 200 m step; a
-half charge reaches 100 m. A mandatory terrace step therefore stays at 100 m (half charge, 04 §11) and
-paid floors use the full band. A midair tube mouth is placed inside the reachable set from its runway
-at the arrival speed, with the mouth radius as the aim tolerance; the hang time at 129 m/s of vertical
-is 6.5 s, so the horizontal reach at the same height is about 900 m and never binds.
+**Jump step band 60–90 m.** A full charge lifts the ball 91 m above the lip at any speed, so a floor
+step taken by a jump is 60–90 m (plus the lip); a mandatory step is at most 20 m (half charge, 04
+§11), which is a lip rather than a floor. Larger lifts are not jumps: a driven ball climbs any grade up
+to 0.71 (35°, §2) without losing speed, so spiral ramps and tubes (whose walls carry the ball at any
+pitch) link floors of any spacing, and three floors put the top 120–270 m up. A midair tube mouth is
+placed inside the reachable set from its runway at the arrival speed, with the mouth radius as the aim
+tolerance; the hang time at 84.6 m/s of vertical is 4.3 s, so the horizontal reach at the lip's height
+is 640 m at the base cap and never binds.
 
 ### 7b. Falls
 

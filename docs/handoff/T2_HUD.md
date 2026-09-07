@@ -1,6 +1,6 @@
 # T2 — Player HUD and the health value
 
-**Branch:** `opus/t2-hud` off `develop` after T1 merges (or stacked on `opus/t1-stage-lifecycle` if T1 is still open; say which)  
+**Branch:** `opus/t2-hud` off `develop-secondary` after T1 merges (or stacked on `opus/t1-stage-lifecycle` if T1 is still open; say which)  
 **Phase:** 5 "HUD"; Phase 4 "health" (value only)  
 **Gate lines served:** 08 §9 "Flow/boost state is readable", "game remains playable with camera shake reduced/disabled" (unaffected); 08 §7 (HUD is part of "a complete stage")  
 **Owning specs:** 06 §12, §17, §18; 07 §7, §10 (what stays in telemetry), §12 (kill/heal); 02 §8 (Flow rewards presentation), §14; 03 §5 (bands); 05 §5 (communication), §13

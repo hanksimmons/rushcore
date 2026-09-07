@@ -1,6 +1,6 @@
 # T6 — Presentation fixes from the user's sample-stage playtest
 
-**Branch:** `opus/t6-sample-fixes` off `develop`  
+**Branch:** `opus/t6-sample-fixes` off `develop-secondary`  
 **Phase:** 3 close-out (visuals of the vertical grammar were unverified in the toy until the user's sample)  
 **Gate lines served:** 08 §5 G0 manual sample per archetype; 08 §9 V0 lines on readability  
 **Owning specs:** 06 §2, §3, §4, §11 (Structures, D-096), §16, §17; 04 §16; 07 §11; 10 (sample table)

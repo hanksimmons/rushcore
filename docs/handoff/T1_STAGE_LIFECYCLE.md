@@ -1,6 +1,6 @@
 # T1 — Stage completion, transition, run seed and stage index
 
-**Branch:** `opus/t1-stage-lifecycle` off `develop`  
+**Branch:** `opus/t1-stage-lifecycle` off `develop-secondary`  
 **Phase:** 5 (partial): "start/exit", "completion transition", "clean stage lifecycle" (also Phase 6's "clean stage lifecycle")  
 **Gate lines served:** 08 §7 "starts deterministically", "supports fall recovery", "exits cleanly without previous-stage leakage"; 08 §10 "no unbounded node growth across stages", "stage generation transition instrumented in milliseconds"  
 **Owning specs:** 02 §1, §2, §14; 05 §7, §9, §10 (teleport/interpolation rule); 06 §13; 07 §12; 08 §7, §10

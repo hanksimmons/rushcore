@@ -1,6 +1,6 @@
 # T3 — Enemy silhouettes, pickup shapes, reward burst, combat VFX one-shots
 
-**Branch:** `opus/t3-visuals` off `develop`  
+**Branch:** `opus/t3-visuals` off `develop-secondary`  
 **Phase:** 4 "basic reward drops with auto-collect", "enemy/pickup VFX" (presentation only); Phase 4's enemies as visuals only  
 **Gate lines served:** 08 §9 "enemy archetypes are distinguishable", "reward lines do not read as hazards", "particles do not obscure landing surfaces"  
 **Owning specs:** 06 §2, §3, §8, §9, §10, §17; 02 §7 (what each enemy must communicate), §12; 05 §13, §14, §15 (pooling: no); 04 §5F (placement is later)

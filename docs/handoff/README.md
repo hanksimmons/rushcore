@@ -22,7 +22,7 @@ Resume RUSHCORE (Godot .NET 4.7.2, C#, macOS arm64, repo ~/rushcore). You are th
 docs/handoff/README.md. Read, in order: CLAUDE.md, README.md, docs/00, docs/01, docs/handoff/README.md,
 docs/handoff/STATUS.md, then the packet you are assigned (docs/handoff/T<n>_*.md) and every spec section it names.
 
-Rules: feature branch off develop named opus/t<n>-<slug> -> full harness green -> push -> give the compare URL
+Rules: feature branch off develop-secondary named opus/t<n>-<slug> -> full harness green -> push -> give the compare URL
 (no gh CLI) -> the user merges or instructs. No attribution lines in commits or PR text. Docs with code, same commit.
 The movement baseline (D-095) is frozen: never change a compiled default in Movement, Boost, Camera, Flow, Carve or VFX.
 Never change a generator rule, validator tolerance, WorldScale number or route topology: if a task seems to need one,
@@ -45,7 +45,7 @@ every push. Tell me in one line what you are about to do, then go.
 
 ## 4. Standing rules (the user's, verbatim in intent)
 
-- Workflow: feature branch off `develop` → push → compare URL → the user merges or instructs. No `gh` CLI.
+- Workflow: feature branch off `develop-secondary` → push → compare URL → the user merges or instructs. No `gh` CLI.
 - **No attribution lines** in commit messages or PR descriptions.
 - Commit docs with code. Update an owning spec only when accepted behaviour changed, and only the sections the packet names.
 - The D-095 baseline is frozen input. Only a preset the user names final changes it, promoted verbatim by the main track.
@@ -106,8 +106,8 @@ hash; the check runs in the 35 s data-only mode, so run it after every edit near
 
 ## 8. Reconciliation protocol (main track, on return)
 
-1. `git log --first-parent develop` for `opus/` merges; read `STATUS.md`, every Delivery record, `PROVISIONAL_DECISIONS.md`.
-2. Run the full harness on `develop`; record the count in `STATUS.md`.
+1. `git log --first-parent develop-secondary` for `opus/` merges; read `STATUS.md`, every Delivery record, `PROVISIONAL_DECISIONS.md`.
+2. Run the full harness on `develop-secondary`; record the count in `STATUS.md`.
 3. For each P-entry: the user's verdict. Accepted → promote verbatim to `docs/DECISIONS.md` as the next free D-number
    (D-106 onward; D-105 is branching exits), mark the P-entry `PROMOTED D-nnn`. Rejected → mark `REJECTED`, open a fix
    task. Search the docs for the `(P-nnn)` tags and replace them with the D-number.

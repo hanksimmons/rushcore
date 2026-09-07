@@ -1,6 +1,6 @@
 # T5 — Generation instruments: wall probe, tube ride, floor-3 room, landing run
 
-**Branch:** `opus/t5-measurements` off `develop`  
+**Branch:** `opus/t5-measurements` off `develop-secondary`  
 **Phase:** 3 follow-up (the open gaps recorded in D-100..D-103); data only  
 **Gate lines served:** 08 §5 (G0 measurements), 04 "Empirical validation items"  
 **Owning specs:** 04 §5A, §5E, §5I, §6, §12 (Secondary, Route speed model), the "Empirical validation items" list; 08 §5, §11; 11 §7; DECISIONS D-100, D-101, D-103, V-015, V-016

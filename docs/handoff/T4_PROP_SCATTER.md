@@ -1,6 +1,6 @@
 # T4 — Archetype-aware prop scatter on generated stages
 
-**Branch:** `opus/t4-prop-scatter` off `develop`  
+**Branch:** `opus/t4-prop-scatter` off `develop-secondary`  
 **Phase:** 3 "prop scatter/MultiMesh only where useful" (the last open Phase 3 bullet)  
 **Gate lines served:** 08 §9 "gaps/ramps/banks are readable early enough" (scale cues), 08 §10 "stable 60 FPS", "no obvious managed-allocation hot-loop spikes"; 04 §5G  
 **Owning specs:** 04 §5G, §16; 05 §9 (cosmetic stream), §13, §21; 06 §3, §16, §17; 07 §5 (Prop Density)

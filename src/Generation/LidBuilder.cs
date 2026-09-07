@@ -9,7 +9,7 @@ namespace Rushcore.Generation;
 /// </summary>
 public static class LidBuilder
 {
-    public static List<LidDefinition> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules rules, IReadOnlyList<TubeDefinition> tubes)
+    public static List<LidDefinition> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules rules, IReadOnlyList<TubeDefinition> tubes, IReadOnlyList<RouteSkeleton>? lines = null)
     {
         var lids = new List<LidDefinition>();
         if (rules.LidChance <= 0f) return lids;
@@ -32,7 +32,7 @@ public static class LidBuilder
             if (from < lastEnd + WorldScale.OptionalLineSpacing * 0.5f) continue;
             if (to > primary.Length - 400f) break;
             if (primary.Spiral is { } pit && to > pit.ApproachDistance - 100f) break;
-            if (FeatureBetween(primary, from - 50f, to + 50f) || TubeMouthBetween(primary, tubes, from - 50f, to + 50f)) continue;
+            if (FeatureBetween(primary, from - 50f, to + 50f) || TubeMouthBetween(primary, tubes, from - 50f, to + 50f) || LineJoinBetween(primary, lines, from - 50f, to + 50f)) continue;
             if (!rng.Chance(rules.LidChance)) continue;
             int a = primary.IndexAtDistance(from), b = primary.IndexAtDistance(to);
             float top = float.MinValue;
@@ -60,6 +60,20 @@ public static class LidBuilder
         {
             float fs = f.Kind == RouteFeatureKind.LaunchCrest ? f.CentreDistance - f.Wavelength * 0.5f - 50f : v[f.StartIndex].Distance;
             if (from < f.ReservedEnd && to > fs) return true;
+        }
+        return false;
+    }
+
+    /// <summary>A line's leaving or rejoining transition (D-100) is a fork the player must see; no roof over it (D-105).</summary>
+    private static bool LineJoinBetween(RouteSkeleton primary, IReadOnlyList<RouteSkeleton>? lines, float from, float to)
+    {
+        if (lines is null) return false;
+        var v = primary.Vertices;
+        foreach (var l in lines)
+        {
+            float ds = v[l.JoinStart].Distance, de = v[l.JoinEnd].Distance;
+            if (from < ds + l.Transition && to > ds) return true;
+            if (!l.Terminal && from < de && to > de - l.Transition) return true;
         }
         return false;
     }

@@ -155,7 +155,8 @@ Required:
 - primary corridor is not blocked,
 - archetype rules do not modify hidden player physics,
 - two speeds (04 §12, D-094): the ceiling profile is computed for every stage; no bend sits inside a flight or its landing run at the base cap or at the ceiling; a chainable line exists on the primary; every report carries seconds below the base cap,
-- vertical grammar (D-096), for each archetype that uses it: the headroom, wall-clearance, drain and tube-clearance validators hold across the batch; the harness drives the ball into a tube at the cap and asserts it is carried through and exits along the axis with no face crossed; a lid holds the ball from above and from below; from the top floor of a Sky Terraces stage a dropped ball lands and the follower drives from the landing back onto the primary; the camera stays outside a tube for a whole ride with a clear line of sight to the ball against the terrain layer on every tick, and stays inside the declared clearance through a wall tunnel.
+- vertical grammar (D-096), for each archetype that uses it: the headroom, wall-clearance, drain and tube-clearance validators hold across the batch; the harness drives the ball into a tube at the cap and asserts it is carried through and exits along the axis with no face crossed; a lid holds the ball from above and from below; from the top floor of a Sky Terraces stage a dropped ball lands and the follower drives from the landing back onto the primary; the camera stays outside a tube for a whole ride with a clear line of sight to the ball against the terrain layer on every tick, and stays inside the declared clearance through a wall tunnel,
+- exits (02 §4, D-105): every stage's exits are distinct, inside the footprint and on level pads; most seeds of each archetype offer a second exit (floors: Highlands 75%, Canyon Run 85%, Sky Terraces 65%, Dune Sea 40%); the harness drives the ball from the primary up a terminal line's ramp to its pad and asserts the stage ends by that exit with the plateau holding the ball grounded.
 
 Manual sample:
 
@@ -165,7 +166,8 @@ Manual sample:
 - optional lines are meaningful,
 - terrain is not noise soup,
 - high-speed lines exist,
-- a vertical stage reads top to bottom from the cloud band, the camera sees the ball through every tube, and a fall reads as a setback, not a death.
+- a vertical stage reads top to bottom from the cloud band, the camera sees the ball through every tube, and a fall reads as a setback, not a death,
+- a fork reads as a choice from the primary at speed, and each exit pad reads as an ending (D-105).
 
 **Result (Rolling Highlands):** objective checks passed 2026-09-06 (D-087). The harness generates 100
 requests plus the regression list every run (all valid, deterministic hashes, no fallback), drives the
@@ -329,6 +331,11 @@ The list is `tests/RegressionSeeds.cs`: one entry per stage request (run seed / 
 telemetry seed row shows them) with the reason it is there. The harness generates every entry on every
 run and asserts it is valid without the known-safe fallback, so a fixed failure stays fixed. Add the
 seed when the bug is reproduced, before the fix; never remove one.
+
+`tests/GoldenHashes.cs` pins the hash of every sample stage (docs/10): the harness regenerates each sample data-only
+and asserts the hash is unchanged, so any change to generation fails the run at once. An intended generator change
+updates the table in the same commit and names it in its decision; a branch that must not touch generation
+(`docs/handoff`) never edits it.
 
 ## 12. Definition of Done per task
 

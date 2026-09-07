@@ -195,6 +195,8 @@ public sealed class StageHeightField : IHeightSource
 
     private readonly StampedLine _primary;
     private readonly List<StampedLine> _lines = new();
+    /// <summary>Plan positions of every exit pad (D-105): the primary's and each terminal line's; coloured like the primary's.</summary>
+    private readonly List<Vector2> _exitPads = new();
     private readonly float[] _primaryProfile;
     /// <summary>The primary's smoothed profile before any feature or module stamp: optional lines ride this,
     /// so a ridge beside a gap or a ramp does not carry a copy of it (D-097).</summary>
@@ -337,6 +339,7 @@ public sealed class StageHeightField : IHeightSource
         route.Side = 0f;   // the primary has no "toward the primary" side
         _primary = new StampedLine(route, rh, SizeX, SizeZ, _rules);
         _lines.Add(_primary);
+        _exitPads.Add(new Vector2(v[n - 1].Position.X, v[n - 1].Position.Z));
 
         SpawnXZ = new Vector3(v[0].Position.X, 0f, v[0].Position.Z);
         SpawnFacing = new Vector3(Mathf.Cos(v[0].Heading), 0f, Mathf.Sin(v[0].Heading));
@@ -362,7 +365,17 @@ public sealed class StageHeightField : IHeightSource
         for (int i = 0; i < v.Count; i++)
         {
             int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
-            profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(pv[pi].Distance - pv[line.JoinStart].Distance, span, line.Transition, line.RampLength);
+            float pd = pv[pi].Distance - pv[line.JoinStart].Distance;
+            profile[i] = _primaryBase[pi] + line.RidgeHeight * (line.Terminal ? OptionalLineBuilder.TerminalPlateau(pd, line.Transition, line.RampLength)
+                                                                                : OptionalLineBuilder.Plateau(pd, span, line.Transition, line.RampLength));
+        }
+        if (line.Terminal)
+        {
+            // A terminal line (D-105) ends on its own exit pad: level over the pad's reach, as the primary's is.
+            float end = v[^1].Distance, padH = profile[^1];
+            for (int i = 0; i < v.Count; i++)
+                profile[i] = Mathf.Lerp(padH, profile[i], Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, end - v[i].Distance));
+            _exitPads.Add(new Vector2(v[^1].Position.X, v[^1].Position.Z));
         }
         // Full strength from the first vertex: inside the S-transition the ridge's height is the primary's own
         // (the section avoids every feature and the plateau begins after the transition), so the overlap is
@@ -502,9 +515,12 @@ public sealed class StageHeightField : IHeightSource
         }
         c = c.Lerp(Track, track * 0.45f);
         float dStart = point.DistanceTo(new Vector3(_primary.X[0], point.Y, _primary.Z[0]));
-        float dExit = point.DistanceTo(new Vector3(_primary.X[_primary.N - 1], point.Y, _primary.Z[_primary.N - 1]));
         c = c.Lerp(StartPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dStart)));
-        c = c.Lerp(ExitPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dExit)));
+        foreach (var pad in _exitPads)
+        {
+            float dExit = new Vector2(point.X - pad.X, point.Z - pad.Y).Length();
+            c = c.Lerp(ExitPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dExit)));
+        }
         return TerrainHeightField.FacetJitter(c, point);
     }
 

@@ -27,9 +27,12 @@ Special route modifiers may add/replace an objective only when communicated befo
 
 ## 3. Route choice
 
-After normal stage completion, present **two** route choices unless a special transition intentionally replaces the route screen.
+Route choice is made **in the world** (D-105): a stage has one to three exits, and the exit the player reaches
+decides the next stage. The primary route ends at exit A; each further exit is a terminal line that forks off the
+primary in the last third of the stage, climbs onto its own plateau (or terrace) and ends on its own pad. Choosing an
+exit is steering: every fork is a drive-in ramp, never a paid move. The post-stage screen is a summary, not a menu.
 
-Each route communicates at minimum:
+Each exit's route card (the sign at its fork, and the HUD when it exists) communicates at minimum:
 
 - terrain archetype,
 - primary reward category,
@@ -45,7 +48,8 @@ Danger: ★★★
 Modifier: Crossfire
 ```
 
-Route choice is informed strategy, not blind randomness.
+Route choice is informed strategy, not blind randomness. Until Phase 6 supplies the cards, the signs read
+`EXIT A`, `EXIT B`, `EXIT C`.
 
 Normal reward categories:
 
@@ -67,7 +71,7 @@ A stage is a **broad directional traversal landscape**:
 - primary traversable region,
 - approximately 1–3 meaningful optional lines/shortcuts,
 - local tactical line choices,
-- exit.
+- one to three exits (D-105): the primary's, and the pads of its terminal lines.
 
 It is neither a narrow race corridor nor an unstructured open sandbox.
 

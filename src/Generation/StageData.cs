@@ -220,8 +220,12 @@ public sealed class TubeDefinition
 public sealed class RouteSkeleton
 {
     public RouteLineKind Kind = RouteLineKind.Primary;
-    /// <summary>Primary-route vertex indices where an optional line leaves and rejoins.</summary>
+    /// <summary>Primary-route vertex indices where an optional line leaves and rejoins (a terminal line: leaves, and the
+    /// primary vertex its exit pad lies beside).</summary>
     public int JoinStart = -1, JoinEnd = -1;
+    /// <summary>Branching exits (D-105): a terminal line never rejoins; it widens away from the primary and ends on its own
+    /// exit pad, so reaching that pad ends the stage by another exit.</summary>
+    public bool Terminal;
     /// <summary>Stamped corridor half-width for this line.</summary>
     public float CorridorHalfWidth = WorldScale.TypicalCorridorWidth * 0.5f;
     /// <summary>Ridge and terrace lines: extra height above the primary profile at the plateau.</summary>
@@ -288,6 +292,13 @@ public sealed class ValidationReport
     public IEnumerable<ValidationCheck> Failures => Checks.Where(c => !c.Passed);
 }
 
+/// <summary>One way out of a stage (02 §4, D-105): the primary's exit pad (index 0, label A) or a terminal line's pad
+/// (B, C). Which exit the ball reaches decides the next stage (Phase 6).</summary>
+public readonly record struct StageExit(int Index, string Label, Vector3 Position, float Heading, int LineIndex)
+{
+    public bool IsPrimary => LineIndex < 0;
+}
+
 /// <summary>Invisible recovery anchor on the primary progression (04 §13).</summary>
 public struct Checkpoint
 {
@@ -325,11 +336,14 @@ public sealed class StageDefinition
     /// <summary>Lids (04 §5I, D-102): wall tunnels over slot sections.</summary>
     public List<LidDefinition> Lids { get; } = new();
     public List<Checkpoint> Checkpoints { get; } = new();
+    /// <summary>Every exit pad (D-105): index 0 is the primary's; the rest are terminal lines' pads in route order.</summary>
+    public List<StageExit> Exits { get; } = new();
     public ValidationReport Report { get; }
     /// <summary>The one logical height source for render and collision (04 §9); null only for skeleton-only builds.</summary>
     public StageHeightField? HeightField { get; internal set; }
     public Vector3 StartPosition => PrimaryRoute.Start;
     public Vector3 StartFacing => new(Mathf.Cos(PrimaryRoute.Vertices[0].Heading), 0f, Mathf.Sin(PrimaryRoute.Vertices[0].Heading));
+    /// <summary>The primary's exit pad (exit A); the others are in <see cref="Exits"/>.</summary>
     public Vector3 ExitPosition => PrimaryRoute.Exit;
 
     public StageDefinition(StageGenerationRequest request, RouteSkeleton route, RouteSpeedProfile profile, ValidationReport report)

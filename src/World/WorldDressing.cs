@@ -270,7 +270,15 @@ public partial class WorldDressing : Node3D
         var field = stage.HeightField;
 
         AddSign(_world.SurfacePoint(route.Start.X, route.Start.Z, 26f), "START", 10f);
-        AddSign(_world.SurfacePoint(route.Exit.X, route.Exit.Z, 26f), "EXIT", 10f);
+        // Exits (02 §4, D-105): every pad is named, and a terminal line's fork carries the name at the top of its S.
+        foreach (var e in stage.Exits) AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, 26f), $"EXIT {e.Label}", 10f);
+        foreach (var e in stage.Exits)
+        {
+            if (e.IsPrimary) continue;
+            var line = stage.OptionalLines[e.LineIndex];
+            var fork = line.Vertices[Mathf.Min(line.Vertices.Count - 1, line.IndexAtDistance(line.Transition))];
+            AddSign(fork.Position + Vector3.Up * 30f, $"EXIT {e.Label} ↑", 8f);
+        }
         foreach (var f in route.Features)
         {
             var c = route.Vertices[route.IndexAtDistance(f.CentreDistance)];
@@ -324,7 +332,7 @@ public partial class WorldDressing : Node3D
         if (_t.World.RouteDebugLines)
         {
             BuildRouteLines(route);
-            foreach (var line in stage.OptionalLines) BuildRouteLines(line, line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : RouteOptionalColor);
+            foreach (var line in stage.OptionalLines) BuildRouteLines(line, line.Terminal ? ExitLineColor : line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : RouteOptionalColor);
             foreach (var cp in stage.Checkpoints) AddCheckpointPost(cp.Position);
             foreach (var tube in stage.Tubes) BuildPolyline(tube.Axis, RouteTubeColor, 0f);
         }
@@ -356,6 +364,7 @@ public partial class WorldDressing : Node3D
     private static readonly Color ChallengeColor = new(1.0f, 0.95f, 0.25f);
     private static readonly Color StructureColor = new(1.0f, 0.55f, 0.85f);
     private static readonly Color DrainColor = new(0.95f, 0.45f, 0.35f);
+    private static readonly Color ExitLineColor = new(1.0f, 0.75f, 0.55f);
 
     /// <summary>A collider-free post: debug markers may stand inside a corridor.</summary>
     private void AddMarker(Vector3 at, float height, Material material)
@@ -413,6 +422,17 @@ public partial class WorldDressing : Node3D
                 }
                 if (pts.Count > 1) BuildPolyline(pts.ToArray(), DrainColor, 0f);
             }
+        }
+        // Exit pads (D-105): a ring at the pad radius around every exit.
+        foreach (var e in stage.Exits)
+        {
+            var ring = new Vector3[49];
+            for (int i = 0; i < ring.Length; i++)
+            {
+                float ang = Mathf.Tau * i / (ring.Length - 1);
+                ring[i] = _world.SurfacePoint(e.Position.X + Mathf.Cos(ang) * WorldScale.PadRadius, e.Position.Z + Mathf.Sin(ang) * WorldScale.PadRadius, 1.5f);
+            }
+            BuildPolyline(ring, ExitLineColor, 0f);
         }
         // Challenge zones.
         foreach (var f in route.Features)

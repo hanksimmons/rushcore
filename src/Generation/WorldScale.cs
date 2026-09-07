@@ -113,6 +113,18 @@ public static class WorldScale
     /// <summary>Inside a bend, an offset line needs this much radius left.</summary>
     public const float InsideOffsetMargin = 30f;         // leaves a technical-radius bend on the line (D-082: optional only)
     public const float OptionalBandHalfWidth = 800f;     // optional lines may use the scenery margin
+    /// <summary>Branching exits (D-105): a terminal line leaves like a ridge (its offset and S), then widens to
+    /// <c>ExitLineOffset</c> over <c>ExitLineSpread</c> (a lateral S of 150 m over 300 m: r ≈ 100, the base kit's, on the
+    /// plateau where the S-transition already asked r 70), runs level for <c>ExitLineRun</c> and ends on a pad. Up to
+    /// <c>ExitLinesMax</c> per stage, on opposite sides, their forks at least <c>ExitForkSpacing</c> apart, all inside the
+    /// last <c>ExitZoneLength</c> of the primary, which rejoining lines leave alone.</summary>
+    public const float ExitLineOffset = 350f;
+    public const float ExitLineSpread = 300f;
+    public const float ExitLineRun = 200f;
+    public const int ExitLinesMax = 2;
+    public const float ExitForkSpacing = 300f;
+    public const float ExitZoneLength = 3000f;
+    public const float ExitSeparationMin = 250f;        // any two exit pads, plan distance
     public const float CheckpointSpacing = 400f;
 
     // ---- Flow ceiling (04 §12, D-094; derived at D-091: 148.5 × 1.715 = 254.7 m/s, steering saturated at 322.9 m/s²) ----

@@ -117,6 +117,7 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 - tubes: the swept see-through shell and its collider, carried segments in the route speed model, mouths and branching exits, the tube camera rule, the harness ride check — delivered 2026-09-07 (D-101) as ground-mouth optional lines with the tube follow; edge and midair mouths and exits onto floors arrive with Sky Terraces,
 - Sky Terraces: terrace steps, drains, the cloud band, tubes and bridges between floors — first cut delivered 2026-09-07 (D-103: ramp-climbed terrace floors with cliff edges onto the floor below, the drain validator, the cloud band; jump steps, edge and midair tube mouths, bridges and floor-3 branching remain open),
 - route/challenge/structure debug views — delivered 2026-09-07 (D-104: `World › Stage Debug Views`),
+- branching exits (02 §3, §4; 04 §5J) — delivered 2026-09-07 (D-105: terminal lines ending on their own pads, one to three exits per stage; the route cards on the fork signs and the next-stage seed from the exit taken arrive with Phase 6),
 - prop scatter/MultiMesh only where useful.
 
 Gate: **G0** per archetype, plus the vertical-grammar checks in 08 §5.

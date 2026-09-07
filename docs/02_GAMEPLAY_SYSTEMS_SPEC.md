@@ -82,7 +82,8 @@ Velocity remains continuous. Four qualitative bands provide gameplay/readability
 3. **Crush** — strong offensive state.
 4. **Overdrive** — exceptional high-speed/score state.
 
-Exact thresholds are tuning values owned by `03`.
+Exact thresholds are tuning values owned by `03`. Speed above the base cap exists only through Flow
+headroom (§8, D-088), so Overdrive is where a chain is being held.
 
 Normal player HUD does not need to display exact m/s.
 
@@ -166,7 +167,10 @@ A normal archetype with one constrained modifier, stronger resistance/behavior w
 
 ## 8. Flow
 
-Flow measures **quality and continuity of execution**, not velocity itself.
+Flow measures **quality and continuity of execution**, not velocity itself. Its first reward is
+velocity headroom (D-088): the effective locomotion cap is the frozen base cap × (1 + Flow × headroom),
+so speed above the base cap is earned by chaining perfect actions and lost by mistakes. A player at
+zero Flow still has the whole base kit at the base cap; nobody is ever slow.
 
 ### Increase through
 
@@ -182,15 +186,15 @@ Flow measures **quality and continuity of execution**, not velocity itself.
 
 ### Decrease through
 
-- prolonged low-energy play,
-- failed hostile impacts,
-- severe environmental crashes,
-- damage,
-- falling/recovery,
-- inactivity.
+- mistakes, immediately: braking, a hard impact, a hard landing without a slam, failed hostile
+  impacts, damage,
+- falling/recovery (Flow ends),
+- prolonged low-energy play: a slow decay that starts only after a chain window with no gain;
+  there is no decay while a chain is alive (D-088).
 
 ### Rewards
 
+- velocity headroom above the base cap (D-088; the base cap and the D-078 kit never change),
 - score multiplier,
 - modest XP bonus,
 - modest currency bonus,

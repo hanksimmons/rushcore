@@ -371,6 +371,15 @@ two launch-crest kilometres, and after the second crest (taken at the cap) the b
 the remaining kilometre and arrived at 119 m/s against the model's 149. Landing-zone and expected-speed
 assumptions for the Phase 3 modules (§5E, §11) must read that, not the model's 193 m landing estimate.
 
+**Two speeds (D-088).** From the Flow headroom slice on, generation reads two speeds. The base-kit
+profile above (entry speed 0, base cap, no Flow) decides mandatory crossability and the base-kit
+time. The **ceiling**, base cap × (1 + headroom), decides safety: crest contact radii, corridor width
+and bank on bends, sightline and fog, landing runs. A stage must be safe for a player holding a full
+chain and completable by one who never gains Flow. Two secondary checks follow: a **chainable line
+exists** (consecutive Flow opportunities on some line are never further apart than the chain window
+at the ceiling speed), and every report carries **seconds below the base cap** on the primary, the
+one figure the Phase 4 difficulty reassessment reads.
+
 Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove the numeric checks plus the route speed model insufficient.
 
 ## 13. Recovery checkpoints

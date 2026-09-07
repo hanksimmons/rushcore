@@ -135,13 +135,16 @@ public partial class CameraRig : Node3D, ICameraBasis
         Vector3 flatVel = new(_player.Velocity.X, 0f, _player.Velocity.Z);
         float speed = flatVel.Length();
         float cap = Mathf.Max(0.001f, _t.Movement.HardMaxLocomotionSpeed);
-        float speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
+        // Above the base cap (Flow headroom, D-088) distance and FOV keep extrapolating so speed
+        // earned on the edge reads as more speed; the look-ahead saturates at the base cap.
+        float speed01 = Mathf.Clamp(speed / cap, 0f, 1f + Mathf.Max(0f, _t.Flow.Headroom));
+        float look01 = Mathf.Min(speed01, 1f);
 
         UpdateYaw(flatVel, speed, dt);
         UpdateOrientation();
 
         Vector3 lookAhead = Vector3.Zero;
-        if (speed > 1f) lookAhead = flatVel / speed * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, speed01);
+        if (speed > 1f) lookAhead = flatVel / speed * Mathf.Lerp(c.LookAheadMin, c.LookAheadMax, look01);
         CurrentLookAhead = lookAhead.Length();
 
         // The look-ahead point may lie inside an upslope; floor it so the focus, and

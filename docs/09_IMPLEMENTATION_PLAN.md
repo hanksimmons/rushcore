@@ -84,6 +84,24 @@ Deliver, in this order:
 Gate: **G0 (Rolling Highlands)** — objective checks passed 2026-09-06; the manual sample (08 §5) is the
 user's. G0 is re-run for each archetype Phase 3 adds.
 
+## Phase 2C — Flow headroom
+
+Inserted 2026-09-06 (D-088) after the G0 finding that the ball sits at the base cap for ~95% of a
+route, so the speed-regaining verbs had nothing to buy. Deliver, in this order:
+
+- design on paper: 02 §8, 03 §5/§9, 04 §12 two-speed rule, 06, 08 — delivered 2026-09-06,
+- the mechanic in the toy: Flow meter, gains/losses, effective cap, burst multiplier, telemetry,
+  panel category, camera extrapolation; harness checks — delivered 2026-09-06,
+- the user tunes headroom, burst multiplier and the Flow values on the lab and strip, names a preset
+  final; promoted verbatim (D-078 procedure),
+- the ceiling addendum: strip measurements at the ceiling, route speed model airborne-and-landing
+  phase, `WorldScale` ceiling constants, two-speed validators, chainable-line check, seconds below
+  the base cap in every report (08 §4 addendum),
+- the G0 manual sample is played with Flow on.
+
+Gate: **F0** — Flow preset named final; ceiling measured; harness green; the user's verdict that a
+perfect chain feels faster and faster and a mistake never feels slow.
+
 ## Phase 3 — Terrain Variety
 
 Add:

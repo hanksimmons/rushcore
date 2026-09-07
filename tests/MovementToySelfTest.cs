@@ -463,10 +463,13 @@ public partial class MovementToySelfTest : Node
         Check("Space inside the window fires the landing burst", _burstCount == burstsBefore + 1,
             $"bursts={_burstCount - burstsBefore}");
         Check("the burst press never starts a charge or a jump", !_player.IsCharging && _jumpedCount == jumpsBefore);
-        CheckNear("burst sets the tuned fraction of the cap", _player.LocomotionSpeed,
-            js.LandingBurstSpeedFraction * m.HardMaxLocomotionSpeed, 2.5f);
-        Check("burst raised the speed", _player.LocomotionSpeed > speedAtLanding + 20f,
+        CheckNear("burst multiplies the landing speed by the tuned factor (D-088)", _player.LocomotionSpeed,
+            Mathf.Min(speedAtLanding * js.LandingBurstMultiplier, _player.FlowCap), 4f);
+        Check("burst raised the speed", _player.LocomotionSpeed > speedAtLanding + 2f,
             $"{speedAtLanding:0.0} -> {_player.LocomotionSpeed:0.0}");
+        Check("slam landing and burst granted Flow", _player.Flow >= t.Flow.GainSlamLanding + t.Flow.GainBurst - 0.01f, $"flow={_player.Flow:0.00}");
+        Check("Flow raised the effective cap above the base cap", _player.FlowCap > m.HardMaxLocomotionSpeed + 5f,
+            $"cap {_player.FlowCap:0.0} vs base {m.HardMaxLocomotionSpeed:0.0}");
         float burstDrift = Mathf.RadToDeg(headingAtLanding.AngleTo(FlatVel.Normalized()));
         Check("burst keeps the heading (seamless)", burstDrift < 3f, $"drift={burstDrift:0.00} deg");
         Check("burst keeps the ball on the ground", _player.IsGrounded);
@@ -500,6 +503,8 @@ public partial class MovementToySelfTest : Node
 
         // (c) press just before touchdown, during the slam, is buffered and counts
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 8f, 0.05f)) yield return null;
+        _player.LinearVelocity = Vector3.Right * 40f;
+        foreach (var _ in Frames(1)) yield return null;
         guard = 0;
         while (_player.IsGrounded && guard++ < 60) yield return null;
         Input.ActionPress(InputBootstrap.Jump, 1f);                  // slam from 8 m
@@ -511,12 +516,13 @@ public partial class MovementToySelfTest : Node
         Input.ActionRelease(InputBootstrap.Jump);
         landingsBefore = _landedCount; burstsBefore = _burstCount;
         guard = 0;
-        while (_landedCount == landingsBefore && guard++ < 120) yield return null;
+        float speedBeforeLanding = _player.LocomotionSpeed;
+        while (_landedCount == landingsBefore && guard++ < 120) { speedBeforeLanding = _player.LocomotionSpeed; yield return null; }
         foreach (var _ in Act()) yield return null;
         Check("a press just before touchdown fires the burst on landing", _burstCount == burstsBefore + 1,
             $"bursts={_burstCount - burstsBefore} landed={_landedCount - landingsBefore}");
-        CheckNear("buffered burst also reaches the tuned speed", _player.LocomotionSpeed,
-            js.LandingBurstSpeedFraction * m.HardMaxLocomotionSpeed, 2.5f);
+        CheckNear("buffered burst also multiplies the landing speed", _player.LocomotionSpeed,
+            Mathf.Min(speedBeforeLanding * js.LandingBurstMultiplier, _player.FlowCap), 4f);
         ReleaseAll();
         foreach (var _ in Seconds(1.0f)) yield return null;
 
@@ -534,10 +540,10 @@ public partial class MovementToySelfTest : Node
         ReleaseAll();
         foreach (var _ in Seconds(2.5f)) yield return null;
 
-        // (e) the burst is a floor: a faster ball is never slowed and never turned
+        // (e) the burst never slows or turns the ball: multiplier 1.0 leaves the speed alone
         {
-            float savedFraction = js.LandingBurstSpeedFraction;
-            js.LandingBurstSpeedFraction = 0.05f;
+            float savedFraction = js.LandingBurstMultiplier;
+            js.LandingBurstMultiplier = 1.0f;
             foreach (var _ in Settle(PlatformCenter + Vector3.Up * 8f, 0.05f)) yield return null;
             _player.LinearVelocity = Vector3.Right * 40f;
             foreach (var _ in Frames(1)) yield return null;
@@ -551,13 +557,16 @@ public partial class MovementToySelfTest : Node
             guard = 0;
             while (_landedCount == landingsBefore && guard++ < 120) yield return null;
             foreach (var _ in Act()) yield return null;
-            Check("burst fired for the floor case", _burstCount == burstsBefore + 1);
-            Check("burst never slows a faster ball", _player.Velocity.Dot(Vector3.Right) > 36f,
+            Check("burst fired for the multiplier-1 case", _burstCount == burstsBefore + 1);
+            Check("burst never slows the ball", _player.Velocity.Dot(Vector3.Right) > 36f,
                 $"vel.x={_player.Velocity.X:0.0}");
-            js.LandingBurstSpeedFraction = savedFraction;
+            js.LandingBurstMultiplier = savedFraction;
             ReleaseAll();
             foreach (var _ in Seconds(1.0f)) yield return null;
         }
+
+        // ---- Flow headroom (02 §8, 03 §5, D-088): earned speed above the base cap ----
+        foreach (var e in RunFlowHeadroomCase()) yield return e;
 
         // ---- slam preserves lateral momentum and commits downward ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
@@ -690,6 +699,34 @@ public partial class MovementToySelfTest : Node
         Check("velocity finite after the high-speed impact", _player.Velocity.IsFinite());
         ReleaseAll();
         foreach (var _ in Seconds(0.5f)) yield return null;
+
+        // ---- CCD at the Flow ceiling (D-088): the same plate at base cap × (1 + headroom) ----
+        {
+            float savedCap = m.HardMaxLocomotionSpeed;
+            float ceiling = savedCap * (1f + t.Flow.Headroom);
+            m.HardMaxLocomotionSpeed = ceiling;        // the harness stands in for full Flow; restored exactly below
+            foreach (var _ in Settle(_wallLaneStart)) yield return null;
+            _player.LinearVelocity = _laneFwd * 140f;
+            _player.RefillBoost(t.Boost.BoostCapacity);
+            _worldDrive = _laneFwd;
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            maxProgress = float.MinValue; maxSpeedSeen = 0f;
+            foreach (var _ in Seconds(3f))
+            {
+                maxProgress = Mathf.Max(maxProgress, (_player.GlobalPosition - _wallCentre).Dot(_laneFwd));
+                maxSpeedSeen = Mathf.Max(maxSpeedSeen, _player.LocomotionSpeed);
+                yield return null;
+            }
+            finalProgress = (_player.GlobalPosition - _wallCentre).Dot(_laneFwd);
+            Check("reached the thin wall at the Flow ceiling", maxSpeedSeen > ceiling - 5f && maxProgress > -3f,
+                $"maxSpeed={maxSpeedSeen:0.0} ceiling={ceiling:0.0} closest={maxProgress:0.00} m");
+            Check("did not tunnel through a 0.3 m plate at the Flow ceiling (CCD)", finalProgress < 0f && maxProgress < 1.5f,
+                $"final={finalProgress:0.00} m maxPast={maxProgress:0.00} m");
+            Check("velocity finite after the ceiling impact", _player.Velocity.IsFinite());
+            m.HardMaxLocomotionSpeed = savedCap;
+            ReleaseAll();
+            foreach (var _ in Seconds(0.5f)) yield return null;
+        }
 
         // ---- landing at the cap on a slope bleeds the tangent excess instead of clipping it ----
         foreach (var _ in Settle(_landingStart)) yield return null;
@@ -1341,6 +1378,88 @@ public partial class MovementToySelfTest : Node
         }
     }
 
+    // ---------------- Flow headroom (02 §8, 03 §5; 08 §3; D-088) ----------------
+
+    private IEnumerable RunFlowHeadroomCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        var js = t.JumpSlam;
+        var fl = t.Flow;
+        float baseCap = m.HardMaxLocomotionSpeed;
+
+        foreach (var _ in Settle(PlatformCenter - Forward * 700f + Vector3.Up * 3f)) yield return null;
+        Check("Flow is zero after a recovery and the cap is the base cap", _player.Flow == 0f && Mathf.IsEqualApprox(_player.FlowCap, baseCap),
+            $"flow={_player.Flow:0.00} cap={_player.FlowCap:0.0}");
+
+        // A chain: boosted run, charged jump, slam, burst at touchdown.
+        _player.RefillBoost(t.Boost.BoostCapacity);
+        _worldDrive = Forward;
+        Input.ActionPress(InputBootstrap.Boost, 1f);
+        foreach (var _ in Seconds(1.2f)) yield return null;
+        Input.ActionRelease(InputBootstrap.Boost);
+        Input.ActionPress(InputBootstrap.Jump, 1f);
+        foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.05f)) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        foreach (var _ in Frames(12)) yield return null;
+        float flowAfterJump = _player.Flow;
+        Check("a charged jump grants Flow at takeoff", flowAfterJump >= fl.GainChargedJump - 0.01f, $"flow={flowAfterJump:0.00}");
+        Input.ActionPress(InputBootstrap.Jump, 1f);                  // slam
+        foreach (var _ in Act()) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        int landingsBefore = _landedCount, burstsBefore = _burstCount, guard = 0;
+        while (_landedCount == landingsBefore && guard++ < 300) yield return null;
+        foreach (var _ in Frames(1)) yield return null;
+        Input.ActionPress(InputBootstrap.Jump, 1f);                  // burst at touchdown
+        foreach (var _ in Act()) yield return null;
+        Input.ActionRelease(InputBootstrap.Jump);
+        foreach (var _ in Act()) yield return null;
+        float flowChain = _player.Flow;
+        Check("the chain jump → slam → burst stacks its Flow gains", _burstCount == burstsBefore + 1
+            && flowChain >= fl.GainChargedJump + fl.GainSlamLanding + fl.GainBurst - 0.01f, $"bursts={_burstCount - burstsBefore} flow={flowChain:0.00}");
+        float flowCap = _player.FlowCap;
+        Check("Flow headroom raises the effective cap", flowCap > baseCap + 5f, $"cap {flowCap:0.0} base {baseCap:0.0} headroom {fl.Headroom:0.00}");
+
+        // Drive and boost on: the ball rises above the base cap and never above the effective cap.
+        Input.ActionPress(InputBootstrap.Boost, 1f);
+        float maxSpeed = 0f, capViolations = 0f;
+        foreach (var _ in Seconds(3.0f))
+        {
+            maxSpeed = Mathf.Max(maxSpeed, _player.LocomotionSpeed);
+            if (_player.LocomotionSpeed > _player.EffectiveLocomotionCap + 0.5f) capViolations++;
+            yield return null;
+        }
+        Input.ActionRelease(InputBootstrap.Boost);
+        GD.Print($"[SELFTEST] flow headroom: flow {_player.Flow:0.00}, cap {_player.FlowCap:0.0} (base {baseCap:0.0}), max speed {maxSpeed:0.0} m/s, chain {_player.SinceFlowGain:0.0} s, impacts {_player.ImpactCount}");
+        Check("with Flow the ball travels above the base cap", maxSpeed > baseCap + 10f, $"max {maxSpeed:0.0} vs base {baseCap:0.0}");
+        Check("the effective cap is never exceeded", capViolations == 0f, $"{capViolations} ticks over");
+        Check("no time decay while the chain is alive", _player.Flow >= flowChain - 0.001f && _player.SinceFlowGain < fl.ChainWindowSeconds,
+            $"flow {flowChain:0.00} -> {_player.Flow:0.00} after {_player.SinceFlowGain:0.0} s");
+        Check("a clean drive registers no impact", _player.ImpactCount == 0, $"impacts={_player.ImpactCount}");
+
+        // Brake is the voluntary mistake: it drains Flow and the cap falls with it.
+        ReleaseAll();                                   // drop the held forward key so S is a pure brake
+        Input.ActionPress(InputBootstrap.MoveBack, 1f);
+        foreach (var _ in Seconds(0.6f)) yield return null;
+        Input.ActionRelease(InputBootstrap.MoveBack);
+        Check("braking drains Flow", _player.Flow <= flowChain - fl.LossBrakePerSecond * 0.5f + 0.01f, $"{flowChain:0.00} -> {_player.Flow:0.00}");
+        Check("the effective cap falls with Flow", _player.FlowCap < flowCap - 1f, $"{flowCap:0.0} -> {_player.FlowCap:0.0}");
+
+        // Headroom 0 is the frozen baseline: the cap is the base cap whatever Flow says.
+        float savedHeadroom = fl.Headroom;
+        fl.Headroom = 0f;
+        foreach (var _ in Frames(2)) yield return null;
+        Check("with zero headroom the cap is the frozen base cap", Mathf.IsEqualApprox(_player.FlowCap, baseCap) && _player.LocomotionSpeed <= baseCap + 0.5f,
+            $"cap {_player.FlowCap:0.0} speed {_player.LocomotionSpeed:0.0}");
+        fl.Headroom = savedHeadroom;
+
+        _player.RequestRecovery();
+        foreach (var _ in Frames(30)) yield return null;
+        Check("fall recovery ends the chain: Flow is zero", _player.Flow == 0f, $"flow={_player.Flow:0.00}");
+        ReleaseAll();
+        foreach (var _ in Seconds(0.5f)) yield return null;
+    }
+
     // ---------------- Phase 2: stage generation batch (04 §4, §5A, §12; 08 §5) ----------------
 
     private void RunStageGenerationBatchCase()
@@ -1474,7 +1593,7 @@ public partial class MovementToySelfTest : Node
         // test of one seed against the route speed model, not an agent that plays stages (04 §12).
         var verts = stage.PrimaryRoute.Vertices;
         var profile = stage.SpeedProfile;
-        int ticks = 0, grounded = 0, nearest = 0, exitTick = -1;
+        int ticks = 0, grounded = 0, nearest = 0, exitTick = -1, impactsBefore = _player.ImpactCount;
         int maxTicks = Engine.PhysicsTicksPerSecond * 100;
         float maxSpeed = 0f, maxOffLine = 0f, nextMark = 1000f, worstMark = 0f;
         int markTicks = 0, markGrounded = 0;
@@ -1523,6 +1642,7 @@ public partial class MovementToySelfTest : Node
         Check("the corridor keeps the ball grounded most of the way", groundedFrac > 0.6f, $"{groundedFrac:P0}");
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
         Check("archetype geometry left the rigid body's hidden physics untouched (04 §7)", BodySnapshot() == bodyLab, BodySnapshot());
+        Check("the corridor drive registers no Flow impact (no false mistakes on clean terrain)", _player.ImpactCount == impactsBefore, $"impacts {impactsBefore} -> {_player.ImpactCount}");
         Check("building and driving a stage never writes to tuning (04 §7)", TuningSnapshot() == tuningStage);
 
         // Progression anchors (04 §13): the drive armed checkpoints; a fall restores to the last one, not to the ball.

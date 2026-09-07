@@ -296,6 +296,10 @@ lip's rise (20 m) does add. Measured on the strip ramps before any floor is plac
 | 19° ramp at the ceiling, charged or not | 84.2 m/s | 90 m |
 | 27° ramp at the ceiling, charged or not | 114 m/s | 165 m |
 
+*Delivered (D-103):* the floor step is 60 m, taken by a ramp a driven ball climbs (420 m for 60 m, 600 m for
+120 m, knees above the cap's contact radius) and given back by a cliff onto the floor below (a 60 m fall lands
+at 69 m/s: a slam keeps Flow); the jump step onto a terrace is not yet built.
+
 **Jump step band 60–90 m.** A full charge lifts the ball 91 m above the lip at any speed, so a floor
 step taken by a jump is 60–90 m (plus the lip); a mandatory step is at most 20 m (half charge, 04
 §11), which is a lip rather than a floor. Larger lifts are not jumps: a driven ball climbs any grade up

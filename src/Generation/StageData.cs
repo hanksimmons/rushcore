@@ -231,6 +231,10 @@ public sealed class RouteSkeleton
     public float Offset = WorldScale.RidgeOffset, Transition = WorldScale.RidgeTransition, RampLength = WorldScale.RidgeRampLength;
     /// <summary>Sky Terraces (D-103): the floor this line is (1 = the primary's floor, 2 and 3 the terraces above it).</summary>
     public int Floor = 1;
+    /// <summary>Which side of the primary the line lies on (+1 its left, −1 its right); the primary is toward −Side.</summary>
+    public float Side = 1f;
+    /// <summary>Offset lines: the stamp's falloff toward the primary (−Side) and away from it; 0 = the archetype's (D-103).</summary>
+    public float InnerFalloff, OuterFalloff;
     /// <summary>Primary route of a Dune Sea stage: the wave its dune trains ride (D-099).</summary>
     public DuneWave Dunes;
     /// <summary>Canyon Run's set-piece (04 §6, D-102): the spiral pit the route descends into at its end; null when the stage has none.</summary>

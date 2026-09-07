@@ -401,6 +401,26 @@ Geometry:
 - tubes and bridges linking floors and branching lines,
 - every fall lands on ground that drains back to the primary.
 
+**Delivered 2026-09-07 (D-103), the first cut:** the Highlands family with 500–900 m straights and its
+optional lines as **terrace floors**: floor 2 is a corridor 60 m above the primary and 200 m to its side,
+floor 3 a corridor 120 m up and 300 m out, stacked beyond floor 2 on the same section. A terrace leaves the
+primary through an S-transition on a straight (290 m for floor 2, 360 m for floor 3), climbs a cosine ramp a
+driven ball takes without losing speed and whose knee never launches at the cap (420 m for 60 m, 600 m for
+120 m), runs its plateau past the bend it shadows, and returns the same way; every terrace therefore rejoins
+the primary and the graph stays acyclic. Its inner edge is a **cliff** (a 12 m face) whose foot lands on the
+floor below: the primary's flank for floor 2, floor 2's plateau for floor 3, so a fall from any floor is a
+setback of one step (60 m, a slam landing) onto drivable ground that leads back to the primary; its outer
+edge, where no floor stands beyond it, descends into the relief at the route grade (a smoothstep of the
+height plus half a swell over the grade limit, times the smoothstep's 1.5). The drain validator reads lateral
+cuts every 100 m of plateau: the cliff foot within 15 m of the floor below, no step up over relief noise on
+the way down, the outer slope inside the grade; a terrace that fails is dropped with its section (like a line
+whose flight cannot hold a corner). Tubes appear as on the other archetypes, cruising above the terraces.
+The cloud band is two translucent sheets 130 and 160 m above the primary's mean height, so floor 3 sits in
+it. Measured: 100 seeds valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped.
+Floor 3 is rare because its section needs about 2 km bounded by straights; branching floor 3 from floor 2,
+the jump step (a lip and a full charge onto a landing zone rather than a ramp), edge and midair tube mouths,
+bridges between floors and a second primary floor are the open work of this archetype.
+
 Archetype rules (D-098, extended D-099): an `ArchetypeRules` record per archetype carries the wall height,
 the wall and inside falloffs, the bend mix, the straight lengths, the bank scale, the swell slope budget,
 the feature spacing / chance / mix, the dune-train crest count and the heading limit; the skeleton builder,

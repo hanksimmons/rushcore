@@ -154,13 +154,27 @@ public static class WorldScale
     public const float DuneSwellMaxSlope = 0.08f;
 
     // ---- Sky Terraces (04 §6, §5I; docs/11 §7a–b; D-103) ----
-    /// <summary>Floor 2: a terrace 60–90 m above the primary (the jump-step band), 200 m to the side, climbed over 500 m
-    /// (cosine ramp: the knee radius 2L²/π²H stays above the cap's contact radius at 90 m).</summary>
-    public const float Floor2HeightMin = 60f, Floor2HeightMax = 90f, Floor2Offset = 200f, Floor2Ramp = 500f, Floor2Transition = 290f;
-    /// <summary>Floor 3: 150–200 m up, 550 m to the side (its drain to floor 2 then stays inside the route grade), climbed over 850 m.</summary>
-    public const float Floor3HeightMin = 150f, Floor3HeightMax = 200f, Floor3Offset = 550f, Floor3Ramp = 850f, Floor3Transition = 480f;
-    /// <summary>Every terrace edge drains at or under the route grade limit: the corridor falloff on this archetype is the tallest step over that grade.</summary>
-    public const float TerraceFalloff = 190f;
+    /// <summary>A floor step: each terrace stands this much above the floor below, so every drain (a step over its
+    /// falloff, <see cref="TerraceFalloff"/>) stays at the route grade limit. The bottom of the jump-step band (docs/11 §7a).</summary>
+    public const float FloorStep = 60f;
+    /// <summary>Route length a floor step drains over: a smoothstep's steepest grade is 1.5× its mean, so the step over
+    /// the route grade times 1.5 keeps every drain (and every terrace's outer falloff, scaled by its height) at the limit.</summary>
+    public const float TerraceFalloff = 1.5f * FloorStep / MaxRouteGrade;      // 225 m per 60 m step
+    /// <summary>The primary's own falloff on a terraced stage: short enough that floor 2's cliff foot lies beyond it on the flat flank.</summary>
+    public const float SkyPrimaryFalloff = 60f;
+    /// <summary>A terrace's inner edge, toward the floor below, is a cliff (a wall of the family kind, docs/11 §7c): the ball falls
+    /// onto that floor, which is the drain.</summary>
+    public const float TerraceCliffFalloff = 12f;
+    /// <summary>A terrace's outer falloff allows for the relief under it sitting a half swell below the primary's base.</summary>
+    public const float TerraceOuterMargin = LongSwellHeightMax * 0.5f;
+    /// <summary>Floor 2: 60 m up, 200 m to the side (the ridge offset: its cliff foot lies just beyond the primary's falloff), an
+    /// S of 290 m at r 70, a 420 m cosine climb (knee radius 2L²/π²H above the cap's contact radius).</summary>
+    public const float Floor2Offset = 200f, Floor2Ramp = 420f, Floor2Transition = 290f;
+    /// <summary>Floor 3: 120 m up, 300 m to the side (floor 2's outer edge plus a cliff and a half width), an S of 360 m, a 600 m
+    /// climb; it shares its section with a floor 2, whose outer edge is then the cliff up to it.</summary>
+    public const float Floor3Offset = 300f, Floor3Ramp = 600f, Floor3Transition = 360f;
+    /// <summary>Outer falloff of a terrace of the given height: the height plus the relief margin, over the grade limit, times the smoothstep's 1.5.</summary>
+    public static float TerraceOuterFalloff(float height) => 1.5f * (height + TerraceOuterMargin) / MaxRouteGrade;
     /// <summary>The cloud band begins this far above the primary's mean height: the top floor sits in it (06 §3).</summary>
     public const float CloudBandHeight = 130f;
 

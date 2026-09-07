@@ -229,6 +229,14 @@ floor at 134–149 m/s fully grounded, and a ball dropped off a turn's inner edg
 on to the exit; a canyon tube (seed 31/0, 2 594 m with a 141 m cruise over the walls) rides 99% grounded to the
 model's exit speed.
 
+**Result (Sky Terraces, first cut, D-103, 2026-09-07):** the sky batch places terraces on floor 2 and floor 3
+(100 seeds: 100 valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped by the drain or
+corner checks) with the drain validator holding on every kept terrace; the sky drive (`RUSHCORE_ARCHETYPE=sky`)
+follows the primary within 0.4% of the model, drives a floor-2 terrace 1.3 km grounded 88%, rides a tube, and,
+borrowing seed 30/0 for a floor 3, drops the ball off the top floor's inner edge (123 m) onto floor 2 (64 m) and
+drives it back to within 30 m of the primary in 4.3 s; 302/302. The cloud band and the manual read of the stage
+from top to bottom are the user's.
+
 ## 6. Combat — Gate C0
 
 Objective:

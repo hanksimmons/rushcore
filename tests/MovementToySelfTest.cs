@@ -1812,7 +1812,7 @@ public partial class MovementToySelfTest : Node
     private void RunStageGenerationBatchCase()
     {
         // Gate G0 per archetype (08 §5): the same batch for every archetype Phase 3 adds.
-        foreach (var archetype in new[] { TerrainArchetype.RollingHighlands, TerrainArchetype.CanyonRun, TerrainArchetype.DuneSea })
+        foreach (var archetype in new[] { TerrainArchetype.RollingHighlands, TerrainArchetype.CanyonRun, TerrainArchetype.DuneSea, TerrainArchetype.SkyTerraces })
             RunStageGenerationBatchCase(archetype);
     }
 
@@ -1827,7 +1827,7 @@ public partial class MovementToySelfTest : Node
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
         int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
-        int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0, tubes = 0, seedsWithTube = 0, tubesPassed = 0, lids = 0, lidsPassed = 0, spirals = 0;
+        int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0, tubes = 0, seedsWithTube = 0, tubesPassed = 0, lids = 0, lidsPassed = 0, spirals = 0, floor2 = 0, floor3 = 0, seedsWithFloor3 = 0;
         float rideMax = 0f; string exampleTube = "";
         string exampleGap = "", exampleRamp = "", exampleRegen = "", exampleTrain = "";
         double msSum = 0, msMax = 0;
@@ -1866,6 +1866,8 @@ public partial class MovementToySelfTest : Node
             tubesPassed += def.Tubes.Count(x => x.Passed);
             foreach (var x in def.Tubes) rideMax = Mathf.Max(rideMax, x.MaxRideDegrees);
             lids += def.Lids.Count; lidsPassed += def.Lids.Count(x => x.Passed);
+            floor2 += def.OptionalLines.Count(l => l.Floor == 2); floor3 += def.OptionalLines.Count(l => l.Floor == 3);
+            if (def.OptionalLines.Any(l => l.Floor == 3)) seedsWithFloor3++;
             if (def.PrimaryRoute.Spiral is not null) spirals++;
             if (def.Tubes.Count > 0) { seedsWithTube++; if (exampleTube == "" || (req.StageIndex == 0 && !exampleTube.EndsWith("/0"))) exampleTube = $"{req.RunSeed}/{req.StageIndex}"; }
             minAnchors = Mathf.Min(minAnchors, def.Checkpoints.Count);
@@ -1903,7 +1905,7 @@ public partial class MovementToySelfTest : Node
         sw.Stop();
         GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; {crests} crests, {trains} trains of ≥ 2 ({seedsWithTrain} seeds, e.g. {exampleTrain}); regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
-        GD.Print($"[SELFTEST] {A} structures over the batch: {tubes} tubes on {seedsWithTube} seeds (e.g. {exampleTube}), {tubesPassed} pass, wall ride ≤ {rideMax:0}°; {lids} lids ({lidsPassed} pass); {spirals} spiral pits");
+        GD.Print($"[SELFTEST] {A} structures over the batch: {tubes} tubes on {seedsWithTube} seeds (e.g. {exampleTube}), {tubesPassed} pass, wall ride ≤ {rideMax:0}°; {lids} lids ({lidsPassed} pass); {spirals} spiral pits; terraces: {floor2} on floor 2, {floor3} on floor 3 ({seedsWithFloor3} seeds)");
         if (fallbackReasons.Count > 0) GD.Print($"[SELFTEST] {A} attempt failures: " + string.Join(", ", fallbackReasons.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
         GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
@@ -1929,6 +1931,8 @@ public partial class MovementToySelfTest : Node
         Check($"{A}: " + "the batch places see-through tubes and every tube passes its validators (clearance, mouths, carried profile)", tubes > 0 && tubesPassed == tubes, $"{tubes} tubes, {tubesPassed} pass, {seedsWithTube} seeds");
         if (archetype == TerrainArchetype.CanyonRun)
             Check($"{A}: " + "the batch places wall tunnels and spiral pits and every lid keeps its clearance (D-102)", lids > 0 && lidsPassed == lids && spirals > 0, $"{lids} lids ({lidsPassed} pass), {spirals} spiral pits");
+        if (archetype == TerrainArchetype.SkyTerraces)
+            Check($"{A}: " + "the batch places terraces on floor 2 and floor 3 (D-103)", floor2 > 0 && floor3 > 0, $"{floor2} floor-2 and {floor3} floor-3 terraces ({seedsWithFloor3} seeds with a floor 3)");
         Check($"{A}: " + "route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
         Check($"{A}: " + "base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
@@ -1980,7 +1984,7 @@ public partial class MovementToySelfTest : Node
         t.World.CellSize = stageCell;
         // RUSHCORE_ARCHETYPE=canyon|dunes drives a Canyon Run or Dune Sea stage (G0 per archetype, 08 §5).
         string envArchetype = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") ?? "";
-        t.World.Archetype = (int)(envArchetype == "canyon" ? TerrainArchetype.CanyonRun : envArchetype == "dunes" ? TerrainArchetype.DuneSea : TerrainArchetype.RollingHighlands);
+        t.World.Archetype = (int)(envArchetype == "canyon" ? TerrainArchetype.CanyonRun : envArchetype == "dunes" ? TerrainArchetype.DuneSea : envArchetype == "sky" ? TerrainArchetype.SkyTerraces : TerrainArchetype.RollingHighlands);
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -2435,9 +2439,68 @@ public partial class MovementToySelfTest : Node
             else Check("stage has a spiral pit to test", true, "none on this seed nor on seeds 1–80");
         }
 
+        // Sky Terraces (08 §5, D-103): from the top floor a dropped ball lands on the drain and the follower drives it back onto the primary.
+        int skySeed = 0;
+        if (world.Archetype == TerrainArchetype.SkyTerraces)
+        {
+            if (!stage.OptionalLines.Any(l => l.Floor == 3))
+            {
+                var gen = new StageGenerator(t.Movement, t.Flow, t.JumpSlam);
+                for (int s = 1; s <= 80 && skySeed == 0; s++)
+                    if (gen.Generate(new StageGenerationRequest(s, 0, TerrainArchetype.SkyTerraces)).OptionalLines.Any(l => l.Floor == 3)) skySeed = s;
+                if (skySeed > 0)
+                {
+                    world.Regenerate(skySeed);
+                    foreach (var _ in Frames(3)) yield return null;
+                    stage = world.Stage!;
+                    verts = stage.PrimaryRoute.Vertices;
+                    GD.Print($"[SELFTEST] sky terraces: drive seed has no floor 3; using seed {skySeed}/0");
+                }
+            }
+            var top = stage.OptionalLines.FirstOrDefault(l => l.Floor == 3) ?? stage.OptionalLines.FirstOrDefault(l => l.Floor == 2);
+            if (top is not null)
+            {
+                var lv = top.Vertices;
+                int mid = lv.Count / 2;
+                var pv = verts[top.JoinStart + mid];
+                Vector3 toPrimary = new Vector3(pv.Position.X - lv[mid].Position.X, 0f, pv.Position.Z - lv[mid].Position.Z).Normalized();
+                float edge = top.CorridorHalfWidth + WorldScale.WallSetback + 12f;
+                Vector3 drop = lv[mid].Position + toPrimary * edge + Vector3.Up * 3f;
+                float topY = lv[mid].Position.Y;
+                foreach (var _ in Settle(drop, 0.2f)) yield return null;
+                int ft = 0; float landedY = float.NaN;
+                while (ft++ < Engine.PhysicsTicksPerSecond * 8)
+                {
+                    _worldDrive = toPrimary;
+                    if (ft > 30 && _player.IsRawGrounded && _player.GlobalPosition.Y < topY - 20f) { landedY = _player.GlobalPosition.Y; break; }
+                    yield return null;
+                }
+                int dn = top.JoinStart, dt2 = 0; float offLine = float.MaxValue;
+                while (dt2++ < Engine.PhysicsTicksPerSecond * 25)
+                {
+                    Vector3 p = _player.GlobalPosition;
+                    float best = float.MaxValue;
+                    for (int i = Mathf.Max(0, top.JoinStart - 20); i < Mathf.Min(verts.Count, top.JoinEnd + 200); i++)
+                    {
+                        float d = new Vector2(verts[i].Position.X - p.X, verts[i].Position.Z - p.Z).LengthSquared();
+                        if (d < best) { best = d; dn = i; }
+                    }
+                    offLine = Mathf.Sqrt(best);
+                    if (offLine < 30f && _player.IsGrounded && Mathf.Abs(p.Y - verts[dn].Position.Y) < 6f) break;
+                    var tg = verts[Mathf.Min(verts.Count - 1, dn + 10)].Position;
+                    _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
+                    yield return null;
+                }
+                ReleaseAll();
+                GD.Print($"[SELFTEST] sky terraces: dropped from floor {top.Floor} ({topY:0} m) off its inner edge, landed grounded {!float.IsNaN(landedY)} at {landedY:0} m, drove back to {offLine:0} m off the primary in {dt2 / (float)Engine.PhysicsTicksPerSecond:0.0} s");
+                Check("a ball dropped from the top floor lands on the drain and the follower drives it back onto the primary (08 §5)", !float.IsNaN(landedY) && offLine < 30f, $"landed {landedY:0} m, {offLine:0} m off the primary");
+            }
+            else Check("stage has a terrace to drop from", true, "none on this seed nor on seeds 1–80");
+        }
+
         // Node growth (08 §10): three regenerations of the same stage leave the tree the same size.
         {
-            if (tubeSeed > 0 || canyonSeed > 0) { _debug.RestartSameSeed(); }   // back to the drive seed the regenerations rebuild
+            if (tubeSeed > 0 || canyonSeed > 0 || skySeed > 0) { _debug.RestartSameSeed(); }   // back to the drive seed the regenerations rebuild
             foreach (var _ in Frames(3)) yield return null;
             int nodesStage = GetTree().GetNodeCount();
             double orphansStage = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);

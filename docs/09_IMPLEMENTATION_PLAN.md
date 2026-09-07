@@ -115,7 +115,7 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 - Canyon Run: slots and banked lines — delivered 2026-09-07 (D-098); wall tunnels (lids with the confined camera) and the spiral pit set-piece — delivered 2026-09-07 (D-102, with the unbounded-heading finale and the headroom validator),
 - Dune Sea — delivered 2026-09-07 (D-099: the seeded dune wave, dune trains riding it, the swale between; the set-piece dune and a dune-specific optional line remain open),
 - tubes: the swept see-through shell and its collider, carried segments in the route speed model, mouths and branching exits, the tube camera rule, the harness ride check — delivered 2026-09-07 (D-101) as ground-mouth optional lines with the tube follow; edge and midair mouths and exits onto floors arrive with Sky Terraces,
-- Sky Terraces: terrace steps, drains, the cloud band, tubes and bridges between floors,
+- Sky Terraces: terrace steps, drains, the cloud band, tubes and bridges between floors — first cut delivered 2026-09-07 (D-103: ramp-climbed terrace floors with cliff edges onto the floor below, the drain validator, the cloud band; jump steps, edge and midair tube mouths, bridges and floor-3 branching remain open),
 - route/challenge/structure debug views,
 - prop scatter/MultiMesh only where useful.
 

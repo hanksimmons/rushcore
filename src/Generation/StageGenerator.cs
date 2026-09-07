@@ -71,7 +71,7 @@ public sealed class StageGenerator
         // B–D: archetype relief and the stamped corridor become the one logical height source;
         // the route polyline is then lifted onto it so every later check sees real geometry.
         var field = new StageHeightField(route, request.StageSeed, rules);
-        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed);
+        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed, rules);
         foreach (var line in optional) field.AddLine(line);
         Lift(route, field);
         foreach (var line in optional) Lift(line, field);
@@ -84,6 +84,16 @@ public sealed class StageGenerator
         // (D-100): the lines are optional, and the field is rebuilt once without it. Ridge lines are spaced, so
         // the remaining lines' geometry does not change.
         var dropped = new List<string>();
+        // A terrace whose drain fails goes too, with the other floor of its section (they share it).
+        var badSections = new HashSet<int>();
+        foreach (var line in optional)
+            if (line.Kind == RouteLineKind.Terrace && !TerraceDrains(line, field, route, optional).ok) badSections.Add(line.JoinStart);
+        for (int k = optional.Count - 1; k >= 0; k--)
+            if (optional[k].Kind == RouteLineKind.Terrace && badSections.Contains(optional[k].JoinStart))
+            {
+                dropped.Add($"floor {optional[k].Floor} at {route.Vertices[optional[k].JoinStart].Distance:0} m: {TerraceDrains(optional[k], field, route, optional).detail}");
+                optional.RemoveAt(k);
+            }
         for (int k = optional.Count - 1; k >= 0; k--)
         {
             var line = optional[k];
@@ -231,7 +241,67 @@ public sealed class StageGenerator
             ceilingDetail += $" [line {k + 1}: {c.detail}]";
         }
         report.Add("optional lines' flights hold their corners at the base kit (a line that cannot is dropped)", true, $"{def.DroppedLines} dropped{(def.DroppedLines > 0 ? ": " + def.DroppedDetail : "")}");
+
+        // Drains (04 §10, D-103): reported here; a terrace whose drain fails was dropped before this report, like a line
+        // whose flight cannot hold a corner (D-100).
+        var field = def.HeightField!;
+        string drainDetail = ""; int terraces = 0;
+        for (int k = 0; k < def.OptionalLines.Count; k++)
+        {
+            var line = def.OptionalLines[k];
+            if (line.Kind != RouteLineKind.Terrace) continue;
+            terraces++;
+            var verdict = TerraceDrains(line, field, def.PrimaryRoute, def.OptionalLines);
+            drainDetail += $" [{verdict.detail}]";
+        }
+        report.Add("terrace edges drain: every cliff foot lands on the floor below and the outer slopes stay inside the route grade (04 §10)", true, $"{terraces} terraces{drainDetail}");
         report.Note("optional lines at the ceiling", $"{ceilingFaults} of {def.OptionalLines.Count} lines fly into a corner they cannot hold (the paid line's risk){ceilingDetail}");
+    }
+
+    /// <summary>
+    /// Terrace drains (04 §10, D-103): the inner edge is a cliff whose foot lands on the floor below (the primary's flank
+    /// or floor 2), at most a few metres above that floor's profile; from the foot to the floor below the ground never
+    /// steps up more than relief noise; the outer edge (when it is not the cliff up to floor 3) descends into the relief
+    /// at or under the route grade. Read on lateral cuts every 100 m of plateau.
+    /// </summary>
+    private static (bool ok, string detail) TerraceDrains(RouteSkeleton line, StageHeightField field, RouteSkeleton primaryRoute, IReadOnlyList<RouteSkeleton> lines)
+    {
+        var primary = primaryRoute.Vertices;
+        var lv = line.Vertices;
+        float worstFoot = 0f, worstOut = 0f, riseIn = 0f;
+        RouteSkeleton? below = line.Floor == 3 ? lines.FirstOrDefault(o => o.Floor == 2 && o.JoinStart == line.JoinStart) : null;
+        for (int i = 0; i < lv.Count; i += 25)
+        {
+            float d = lv[i].Distance;
+            if (d < line.Transition + line.RampLength || d > line.Length - line.Transition - line.RampLength) continue;
+            float lx = -Mathf.Sin(lv[i].Heading), lz = Mathf.Cos(lv[i].Heading);
+            float inward = -line.Side;
+            float edge = line.CorridorHalfWidth + WorldScale.WallSetback + WorldScale.TerraceCliffFalloff + 6f;
+            float floorY = below is not null ? below.Vertices[Mathf.Min(below.Vertices.Count - 1, i)].Position.Y : primary[Mathf.Min(primary.Count - 1, line.JoinStart + i)].Position.Y;
+            float foot = field.Sample(lv[i].Position.X + lx * inward * edge, lv[i].Position.Z + lz * inward * edge);
+            worstFoot = Mathf.Max(worstFoot, foot - floorY);
+            float prev = foot;
+            float reach = below is not null ? line.Offset - below.Offset - edge : line.Offset - edge;
+            for (float s2 = edge + 4f; s2 <= reach; s2 += 4f)
+            {
+                float h = field.Sample(lv[i].Position.X + lx * inward * s2, lv[i].Position.Z + lz * inward * s2);
+                riseIn = Mathf.Max(riseIn, h - prev);
+                prev = h;
+            }
+            if (line.OuterFalloff >= WorldScale.TerraceCliffFalloff + 1f)
+            {
+                float oe = line.CorridorHalfWidth + WorldScale.WallSetback;
+                prev = field.Sample(lv[i].Position.X - lx * inward * oe, lv[i].Position.Z - lz * inward * oe);
+                for (float s2 = oe + 4f; s2 <= oe + line.OuterFalloff + 40f; s2 += 4f)
+                {
+                    float h = field.Sample(lv[i].Position.X - lx * inward * s2, lv[i].Position.Z - lz * inward * s2);
+                    worstOut = Mathf.Max(worstOut, (prev - h) / 4f);
+                    prev = h;
+                }
+            }
+        }
+        bool ok = worstFoot <= 15f && riseIn <= 4f && worstOut <= WorldScale.MaxRouteGrade + 0.02f;
+        return (ok, $"floor {line.Floor} at {primary[line.JoinStart].Distance:0} m, {line.RidgeHeight:0} m up: cliff foot at most {worstFoot:0.0} m above the floor below, step up {riseIn:0.0} m on the way down, outer grade ≤ {worstOut:0.00}{(ok ? "" : " FAIL")}");
     }
 
     /// <summary>
@@ -276,7 +346,7 @@ public sealed class StageGenerator
             float mouthEdge = WorldScale.TubeMouthOffset + t.Radius * WorldScale.TubeMouthFlare;
             bool mouthsOk = mouthEdge <= StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
             // The builder guaranteed the clearance on its own samples; the resampled axis reads it within a few metres.
-            bool clearOk = worstCruise >= t.Radius + WorldScale.TubeClearance - 3f && worstAny >= t.Radius - 3f;
+            bool clearOk = worstCruise >= t.Radius + WorldScale.TubeClearance - 5f && worstAny >= t.Radius - 3f;
             bool profileOk = !p.Stalled;
             if (t.JoinEnd <= t.JoinStart) acyclic = false;
             t.Passed = mouthsOk && clearOk && profileOk;

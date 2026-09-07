@@ -64,8 +64,8 @@ public sealed record ArchetypeRules(
     /// <summary>Sky Terraces (04 §6, D-103): the Highlands family with terrace lines on two floors above the primary and a
     /// corridor falloff long enough that every terrace edge drains inside the route grade.</summary>
     public static readonly ArchetypeRules SkyTerraces = new(
-        TerrainArchetype.SkyTerraces, 0f, 0f, WorldScale.TerraceFalloff, WorldScale.TerraceFalloff,
-        0.50f, 0.35f, 250f, 600f, 1f,
+        TerrainArchetype.SkyTerraces, 0f, 0f, WorldScale.SkyPrimaryFalloff, WorldScale.SkyPrimaryFalloff,
+        0.50f, 0.35f, 500f, 900f, 1f,
         WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0.6f, 0f, 0f, 3);
 
     public static ArchetypeRules For(TerrainArchetype archetype) => archetype switch

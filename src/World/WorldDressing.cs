@@ -292,6 +292,32 @@ public partial class WorldDressing : Node3D
             var e = route.Vertices[lid.StartIndex];
             AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, lid.RoofBottom - e.Position.Y - 4f), "TUNNEL", 6f);
         }
+        foreach (var line in stage.OptionalLines)
+        {
+            if (line.Kind != RouteLineKind.Terrace) continue;
+            var c = line.Vertices[Mathf.Min(line.Vertices.Count - 1, line.Vertices.Count / 6)];
+            AddSign(c.Position + Vector3.Up * 30f, $"FLOOR {line.Floor} ↑", 8f);
+        }
+        if (stage.HeightField is { } hf && hf.Rules.Floors >= 2)
+        {
+            // The cloud band (06 §3, D-103): two translucent sheets above the primary's mean height; the top floor sits in it.
+            float mean = route.Vertices.Average(x => x.Position.Y);
+            for (int i = 0; i < 2; i++)
+                _content.AddChild(new MeshInstance3D
+                {
+                    Name = $"CloudBand{i}",
+                    Mesh = new PlaneMesh { Size = new Vector2(_world.HalfX * 2.2f, _world.HalfZ * 2.2f) },
+                    Position = new Vector3(0f, mean + WorldScale.CloudBandHeight + i * 30f, 0f),
+                    MaterialOverride = new StandardMaterial3D
+                    {
+                        AlbedoColor = new Color(0.95f, 0.96f, 0.98f, i == 0 ? 0.55f : 0.35f),
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+                    },
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                });
+        }
         if (stage.PrimaryRoute.Spiral is { } pit)
             AddSign(_world.SurfacePoint(route.Vertices[pit.StartIndex].Position.X, route.Vertices[pit.StartIndex].Position.Z, 30f), "PIT ↓", 8f);
 

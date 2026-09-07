@@ -55,7 +55,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     public StageDefinition? Stage { get; private set; }
     /// <summary>Archetype of the built stage, and the one the world tuning asks for.</summary>
     public TerrainArchetype Archetype { get; private set; }
-    public TerrainArchetype WantedArchetype => (TerrainArchetype)Mathf.Clamp(Mathf.RoundToInt(_t.World.Archetype), 0, (int)TerrainArchetype.DuneSea);
+    public TerrainArchetype WantedArchetype => (TerrainArchetype)Mathf.Clamp(Mathf.RoundToInt(_t.World.Archetype), 0, (int)TerrainArchetype.SkyTerraces);
     /// <summary>One-line generation summary for the telemetry seed row.</summary>
     public string StageSummary { get; private set; } = "";
     /// <summary>Furthest primary-route vertex the player has reached on a generated stage.</summary>

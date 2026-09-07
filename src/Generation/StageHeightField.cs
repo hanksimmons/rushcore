@@ -51,6 +51,8 @@ public sealed class StageHeightField : IHeightSource
         public readonly float[] Extra;
         public readonly bool[] Bend;
         public readonly float HalfWidth;
+        /// <summary>Offset lines (D-103): the side the primary lies toward (−Side) and the falloffs toward and away from it.</summary>
+        private readonly float _side, _innerFalloff2, _outerFalloff2;
         public readonly int Cx, Cz;
         public readonly int[] Coarse;
         /// <summary>Vertex indices sorted by X: the coarse map scans an X window whatever order the route visits it in (D-096: no monotonic-X assumption).</summary>
@@ -66,6 +68,9 @@ public sealed class StageHeightField : IHeightSource
             X = new float[N]; Z = new float[N]; H = profile; Heading = new float[N];
             BankHeight = new float[N]; BankSide = new float[N]; Bend = new bool[N]; Extra = new float[N];
             HalfWidth = route.CorridorHalfWidth;
+            _side = route.Side;
+            _innerFalloff2 = route.InnerFalloff > 0f ? route.InnerFalloff : rules.WallFalloff;
+            _outerFalloff2 = route.OuterFalloff > 0f ? route.OuterFalloff : rules.WallFalloff;
             for (int i = 0; i < N; i++)
             {
                 X[i] = v[i].Position.X; Z[i] = v[i].Position.Z; Heading[i] = v[i].Heading;
@@ -94,7 +99,7 @@ public sealed class StageHeightField : IHeightSource
             Cx = Mathf.CeilToInt(sizeX / CoarseCell) + 1;
             Cz = Mathf.CeilToInt(sizeZ / CoarseCell) + 1;
             Coarse = new int[Cx * Cz];
-            float reach = HalfWidth + BendExtraHalfWidth + WorldScale.WallSetback + Mathf.Max(_wallFalloff, _insideFalloff) + CoarseCell * 2f;
+            float reach = HalfWidth + BendExtraHalfWidth + WorldScale.WallSetback + Mathf.Max(Mathf.Max(_wallFalloff, _insideFalloff), Mathf.Max(_innerFalloff2, _outerFalloff2)) + CoarseCell * 2f;
             for (int cz = 0; cz < Cz; cz++)
             {
                 float z = cz * CoarseCell - sizeZ * 0.5f;
@@ -153,7 +158,10 @@ public sealed class StageHeightField : IHeightSource
         public float Weight(int i, float x, float z, float d)
         {
             float edge = Width(i) + WorldScale.WallSetback;
-            float falloff = BankSide[i] != 0f && Lateral(i, x, z) < 0f ? _insideFalloff : _wallFalloff;
+            float lateral = Lateral(i, x, z);
+            // An offset line's falloffs are per side (toward the primary or away, D-103); the primary's follow the bend.
+            float falloff = _side != 0f && !Bend[i] ? (lateral * _side < 0f ? _innerFalloff2 : _outerFalloff2)
+                          : BankSide[i] != 0f && lateral < 0f ? _insideFalloff : _wallFalloff;
             return 1f - Mathf.SmoothStep(edge, edge + falloff, d);
         }
 
@@ -326,6 +334,7 @@ public sealed class StageHeightField : IHeightSource
             rh[i] = Mathf.Lerp(exitH, rh[i], wExit);
         }
         _primaryProfile = rh;
+        route.Side = 0f;   // the primary has no "toward the primary" side
         _primary = new StampedLine(route, rh, SizeX, SizeZ, _rules);
         _lines.Add(_primary);
 
@@ -353,11 +362,12 @@ public sealed class StageHeightField : IHeightSource
         for (int i = 0; i < v.Count; i++)
         {
             int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
-            profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(pv[pi].Distance - pv[line.JoinStart].Distance, span);
+            profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(pv[pi].Distance - pv[line.JoinStart].Distance, span, line.Transition, line.RampLength);
         }
         // Full strength from the first vertex: inside the S-transition the ridge's height is the primary's own
         // (the section avoids every feature and the plateau begins after the transition), so the overlap is
         // seamless, and a fade would instead blend the ridge toward the side terrain a canyon raises.
+        // A terrace's falloffs are its own (D-103): a cliff toward the floor below, a drain-grade slope outward.
         var stamped = new StampedLine(line, profile, SizeX, SizeZ, _rules);
         _lines.Add(stamped);
     }

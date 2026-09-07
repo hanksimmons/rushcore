@@ -385,7 +385,7 @@ public sealed class GameplayTuning
         F(CatWorld, "Prop Density", 0f, 3f, () => w.PropDensity, v => w.PropDensity = v);
         B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
         B(CatWorld, "Generated Stage (Phase 2)", () => w.GeneratedStage, v => w.GeneratedStage = v);
-        F(CatWorld, "Archetype (0 highlands, 1 canyon, 2 dunes)", 0f, 2f, () => w.Archetype, v => w.Archetype = Mathf.Round(v));
+        F(CatWorld, "Archetype (0 highlands, 1 canyon, 2 dunes, 3 sky)", 0f, 3f, () => w.Archetype, v => w.Archetype = Mathf.Round(v));
         B(CatWorld, "Route Debug Lines", () => w.RouteDebugLines, v => w.RouteDebugLines = v);
         F(CatWorld, "Cell Size (m)", 2f, 16f, () => w.CellSize, v => w.CellSize = v);
         F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);

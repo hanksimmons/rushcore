@@ -48,7 +48,8 @@ Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud
 above which the fog thickens into a layer the top floor sits in and a fall drops through; a see-through
 tube is a translucent shell with opaque ribs every 25 m, the ribs being the motion cue (§2) at speed. Delivered
 (D-101): a pale blue skin at 22% alpha with a faint emission, back faces culled (the camera is always outside),
-ribs as glowing bands 0.6 m wide standing 0.25 m off the shell.
+ribs as glowing bands 0.6 m wide standing 0.25 m off the shell. The cloud band (D-103) is two unshaded
+translucent sheets at 55% and 35% alpha, 130 and 160 m above the primary's mean height, on Sky Terraces only.
 
 ## 4. Terrain shading
 

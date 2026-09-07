@@ -226,6 +226,8 @@ public sealed class WorldTuning
     public bool GeneratedStage = false;
     /// <summary>Generated stage archetype: Canyon Run instead of Rolling Highlands (04 §6, D-098).</summary>
     public bool CanyonRun = false;
+    /// <summary>Generated stage archetype: Dune Sea (04 §6, D-099); wins over Canyon Run when both are on.</summary>
+    public bool DuneSea = false;
     /// <summary>Phase 2 debug view (04 §16): draw the primary route, its bends and crests above the terrain.</summary>
     public bool RouteDebugLines = true;
     /// <summary>Metres between height samples (= facet size). Rebuilds the world when the slider settles.
@@ -382,6 +384,7 @@ public sealed class GameplayTuning
         B(CatWorld, "Calibration Strip (M1)", () => w.CalibrationStrip, v => w.CalibrationStrip = v);
         B(CatWorld, "Generated Stage (Phase 2)", () => w.GeneratedStage, v => w.GeneratedStage = v);
         B(CatWorld, "Canyon Run (Phase 3)", () => w.CanyonRun, v => w.CanyonRun = v);
+        B(CatWorld, "Dune Sea (Phase 3)", () => w.DuneSea, v => w.DuneSea = v);
         B(CatWorld, "Route Debug Lines", () => w.RouteDebugLines, v => w.RouteDebugLines = v);
         F(CatWorld, "Cell Size (m)", 2f, 16f, () => w.CellSize, v => w.CellSize = v);
         F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);

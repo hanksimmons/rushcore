@@ -9,20 +9,23 @@
 dotnet build                                                    # offline: Godot nupkgs from the app bundle
 /Applications/Godot_mono.app/Contents/MacOS/godot --path .      # play (or open in the Godot editor and press Play)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 34     # play a named world seed (stage 34/0)
-/Applications/Godot_mono.app/Contents/MacOS/godot --headless --fixed-fps 60 --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0; ~30 s
+/Applications/Godot_mono.app/Contents/MacOS/godot --headless --fixed-fps 60 --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0 per archetype; ~50 s
 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>                    # pure-data cases only (generation batch, regression seeds, model closed forms)
 RUSHCORE_CELL_SIZE=8 <same command>                             # the stage case at another cell size (8 or 16)
 <same command> --seed 8                                         # the stage case drives stage 8/0 (pick a seed with a gap or a ramp)
 RUSHCORE_DRIVE_TRACE=3020 <same command> --seed 8               # per-tick ball trace ±120 m around that route metre
 RUSHCORE_ARCHETYPE=canyon <same command> --seed 3               # the stage case drives a Canyon Run stage (D-098)
+RUSHCORE_ARCHETYPE=dunes <same command>                         # the stage case drives a Dune Sea stage (D-099)
+RUSHCORE_BATCH_FAILS=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>   # tally what attempt 1 failed on across each batch, with the first seed's features and bends
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Canyon Run (Phase 3))
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --dunes --seed 1    # play a Dune Sea stage (also World › Dune Sea (Phase 3))
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
 
 The self-test drives the real controller with synthetic input on an isolated rig plus the
 calibration terrain and exits non-zero on any failure. It does not judge feel. `--fixed-fps 60`
 advances exactly one 1/60 s physics tick per frame with no real-time sync, so the headless run goes as
-fast as the CPU allows (about 30 s for the full list against six minutes in real time) with byte-identical
+fast as the CPU allows (about 50 s for the full list with three archetype batches, against six minutes in real time) with byte-identical
 physics; every PASS line carries its wall-clock stamp. Do not use `Engine.TimeScale` for this: it scales
 the step size, not the tick count. Fixed fps also runs the camera once per tick, as a 60 Hz display does,
 which is how the slam-dive framing lag was found (D-090 amendment).

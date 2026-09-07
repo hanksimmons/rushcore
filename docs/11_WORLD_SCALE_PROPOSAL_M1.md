@@ -80,6 +80,7 @@ the accepted reference; scale linearly with radius (≈ 6 m at 50 m, 12 m at 100
 | Roller | 800 / 80 | 405 m | contact up to 126 m/s, launches at the cap (strip station verified) | 17° |
 | Launch crest | 300–500 / 30–60 | 76–210 m | launches above 55–90 m/s; ≈ 200 m of flight from a 400/40 crest at the cap, landing near the trough | 17–20° |
 | Micro relief (noise) | < 100 / **≤ 1** | ≥ 560 m | must never launch or hop a cruising ball | — |
+| Dune wave (Dune Sea, D-099) | 350–500 / 21–43 (0.06–0.085 λ) | 220–300 m | launches above 93–108 m/s; at the cap the flight lands on the same dune's downslope near the trough, 55–60 m/s down; the corridor rides it only on train straights | 11–15° |
 
 The micro-relief bound is the concrete form of 04 §5C ("noise cannot erase readability"): to keep crest
 radius ≥ 560 m, H ≤ λ² / 11 054, i.e. 0.9 m at λ 100, 3.6 m at λ 200, 0.23 m at λ 50. Below 100 m

@@ -1,10 +1,14 @@
+using Godot;
+
 namespace Rushcore.Generation;
 
 /// <summary>
 /// What an archetype changes (04 §6, §7): geometry only, never the player's physics. One record per
-/// archetype, read by the skeleton builder (bend mix, straight lengths), the height field (walls,
-/// falloffs, bank) and the validators. Rolling Highlands is the D-085 family; Canyon Run (D-098) is
-/// the same corridor cut as a channel through raised side terrain with slot walls.
+/// archetype, read by the skeleton builder (feature mix, bend mix, straight lengths, the dune train),
+/// the height field (walls, falloffs, bank, the swell budget, the dune wave) and the validators.
+/// Rolling Highlands is the D-085 family; Canyon Run (D-098) is the same corridor cut as a channel
+/// through raised side terrain with slot walls; Dune Sea (D-099) rides a seeded dune wave as trains of
+/// launch crests.
 /// </summary>
 public sealed record ArchetypeRules(
     TerrainArchetype Archetype,
@@ -18,16 +22,49 @@ public sealed record ArchetypeRules(
     float CruiseWeight, float FastWeight,
     float StraightMin, float StraightMax,
     /// <summary>Multiplier on the family bank (18/145 · r) on every bend.</summary>
-    float BankScale)
+    float BankScale,
+    /// <summary>Summed slope (tan) the long swells may reach: the corridor grade left over for a crest on top.</summary>
+    float SwellMaxSlope,
+    /// <summary>Route between feature straights, the chance a straight at that spacing hosts one, and the
+    /// feature mix (crest or dune train, then gap; the rest are ramps).</summary>
+    float FeatureSpacing, float FeatureChance, float CrestWeight, float GapWeight,
+    /// <summary>Crests per dune train (04 §6 Dune Sea); 0 on archetypes without the dune wave.</summary>
+    int TrainCrestsMin, int TrainCrestsMax,
+    /// <summary>Largest heading off the stage axis: 45° is the family's wander; a dune sea keeps to 12° so its
+    /// 2 km train straights fit the route band.</summary>
+    float MaxHeading)
 {
+    public bool HasDunes => TrainCrestsMax > 0;
+
     public static readonly ArchetypeRules RollingHighlands = new(
         TerrainArchetype.RollingHighlands, 0f, 0f, StageHeightField.FalloffWidth, StageHeightField.FalloffWidth,
-        0.50f, 0.35f, 250f, 600f, 1f);
+        0.50f, 0.35f, 250f, 600f, 1f,
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f);
 
     /// <summary>Canyon Run (04 §6): a winding low channel between walls, broad banked bends, the inside wall set back.</summary>
     public static readonly ArchetypeRules CanyonRun = new(
         TerrainArchetype.CanyonRun, WorldScale.CanyonWallHeightMin, WorldScale.CanyonWallHeightMax, WorldScale.CanyonWallFalloff, StageHeightField.FalloffWidth,
-        0.45f, 0.45f, 200f, 450f, WorldScale.CanyonBankScale);
+        0.45f, 0.45f, 200f, 450f, WorldScale.CanyonBankScale,
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f);
 
-    public static ArchetypeRules For(TerrainArchetype archetype) => archetype == TerrainArchetype.CanyonRun ? CanyonRun : RollingHighlands;
+    /// <summary>Dune Sea (04 §6): broad repeating waves, most straights a train of launch crests, cruise-heavy bends.</summary>
+    public static readonly ArchetypeRules DuneSea = new(
+        TerrainArchetype.DuneSea, 0f, 0f, StageHeightField.FalloffWidth, StageHeightField.FalloffWidth,
+        0.60f, 0.30f, 250f, 600f, 1f,
+        WorldScale.DuneSwellMaxSlope, 300f, 0.85f, 0.7f, 0.15f, WorldScale.DuneTrainCrestsMin, WorldScale.DuneTrainCrestsMax, Mathf.Pi / 15f);
+
+    public static ArchetypeRules For(TerrainArchetype archetype) => archetype switch
+    {
+        TerrainArchetype.CanyonRun => CanyonRun,
+        TerrainArchetype.DuneSea => DuneSea,
+        _ => RollingHighlands,
+    };
+
+    /// <summary>Short label for summaries and check names.</summary>
+    public static string Label(TerrainArchetype archetype) => archetype switch
+    {
+        TerrainArchetype.CanyonRun => "canyon",
+        TerrainArchetype.DuneSea => "dunes",
+        _ => "highlands",
+    };
 }

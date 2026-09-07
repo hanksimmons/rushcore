@@ -1,3 +1,5 @@
+using Godot;
+
 namespace Rushcore.Generation;
 
 /// <summary>
@@ -127,6 +129,22 @@ public static class WorldScale
     public const float WallSetback = 8f;
     /// <summary>Canyon bends carry a taller berm: banked lines are the archetype's skill (04 §6).</summary>
     public const float CanyonBankScale = 1.5f;
+
+    // ---- Dune Sea (04 §6, D-099; docs/11 §3b dune row) ----
+    /// <summary>The dune wave: one seeded directional cosine train across the stage, crests 0..H above the swells.</summary>
+    public const float DuneWavelengthMin = 350f, DuneWavelengthMax = 500f;
+    /// <summary>Dune height as a fraction of its wavelength: π × ratio is the face slope (11–15°), inside the
+    /// route grade limit with the archetype's swell slope on top, so the corridor rides the wave untrimmed.</summary>
+    public const float DuneHeightRatioMin = 0.06f, DuneHeightRatioMax = 0.085f;
+    /// <summary>The wave's crest lines run within this angle of across the stage axis.</summary>
+    public const float DuneWaveAngleMax = Mathf.Pi / 18f;                 // 10°
+    /// <summary>A straight hosts a dune train only within this angle of the wave's travel direction: the corridor is
+    /// level across, and a crest line crossing it more obliquely would leave a seam at the corridor's edges.</summary>
+    public const float DuneTrainAlignment = Mathf.Pi * 35f / 180f;
+    /// <summary>Crests in a dune train: the rhythm is crest to crest, so one crest is never a train.</summary>
+    public const int DuneTrainCrestsMin = 2, DuneTrainCrestsMax = 4;
+    /// <summary>Swell slope budget on a dune sea: the dunes are the relief, the swells only tilt the field.</summary>
+    public const float DuneSwellMaxSlope = 0.08f;
 
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;

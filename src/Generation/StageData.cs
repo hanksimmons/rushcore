@@ -2,8 +2,22 @@ using Godot;
 
 namespace Rushcore.Generation;
 
-/// <summary>Terrain archetypes (04 §6). Rolling Highlands (D-085) and Canyon Run (D-098); Dune Sea and Sky Terraces follow.</summary>
-public enum TerrainArchetype { RollingHighlands, CanyonRun }
+/// <summary>Terrain archetypes (04 §6). Rolling Highlands (D-085), Canyon Run (D-098) and Dune Sea (D-099); Sky Terraces follows.</summary>
+public enum TerrainArchetype { RollingHighlands, CanyonRun, DuneSea }
+
+/// <summary>
+/// The dune wave of a Dune Sea stage (04 §6, D-099): one directional cosine train across the whole stage,
+/// crests 0..<see cref="Height"/> above the swells, chosen by the skeleton builder so its dune trains sit on the
+/// wave's own crests and the height field raises the same wave in the relief. Zero height = no dunes.
+/// </summary>
+public readonly record struct DuneWave(float Wavelength, float Height, float Angle, float Phase)
+{
+    public bool Exists => Height > 0f;
+    /// <summary>Distance along the wave's travel direction.</summary>
+    public float Along(float x, float z) => x * Mathf.Cos(Angle) + z * Mathf.Sin(Angle);
+    /// <summary>Wave height at a point: 0 in the troughs, <see cref="Height"/> on the crests.</summary>
+    public float At(float x, float z) => Exists ? 0.5f * Height * (1f + Mathf.Cos(Mathf.Tau * Along(x, z) / Wavelength + Phase)) : 0f;
+}
 
 /// <summary>
 /// What a stage is generated from (04 §3). Danger tier, route modifiers and reward category
@@ -117,6 +131,8 @@ public sealed class RouteSkeleton
     public float CorridorHalfWidth = WorldScale.TypicalCorridorWidth * 0.5f;
     /// <summary>Ridge lines: extra height above the primary profile at the plateau.</summary>
     public float RidgeHeight;
+    /// <summary>Primary route of a Dune Sea stage: the wave its dune trains ride (D-099).</summary>
+    public DuneWave Dunes;
     public List<RouteVertex> Vertices { get; } = new();
     public List<RouteBend> Bends { get; } = new();
     public List<RouteFeature> Features { get; } = new();

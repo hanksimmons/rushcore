@@ -1812,7 +1812,7 @@ public partial class MovementToySelfTest : Node
     private void RunStageGenerationBatchCase()
     {
         // Gate G0 per archetype (08 §5): the same batch for every archetype Phase 3 adds.
-        foreach (var archetype in new[] { TerrainArchetype.RollingHighlands, TerrainArchetype.CanyonRun })
+        foreach (var archetype in new[] { TerrainArchetype.RollingHighlands, TerrainArchetype.CanyonRun, TerrainArchetype.DuneSea })
             RunStageGenerationBatchCase(archetype);
     }
 
@@ -1820,14 +1820,15 @@ public partial class MovementToySelfTest : Node
     {
         var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
         const int Count = 100;
-        string A = archetype == TerrainArchetype.CanyonRun ? "canyon" : "highlands";
+        string A = ArchetypeRules.Label(archetype);
         var hashes = new HashSet<ulong>();
         var fallbackReasons = new Dictionary<string, int>();
         int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0, withLines = 0, linesTotal = 0, minAnchors = int.MaxValue;
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
         int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
-        string exampleGap = "", exampleRamp = "", exampleRegen = "";
+        int crests = 0, trains = 0, seedsWithTrain = 0;
+        string exampleGap = "", exampleRamp = "", exampleRegen = "", exampleTrain = "";
         double msSum = 0, msMax = 0;
         string firstFailure = "";
         string tuningBefore = TuningSnapshot();
@@ -1871,11 +1872,29 @@ public partial class MovementToySelfTest : Node
             }
             if (def.Modules.Any(x => x.Kind == ChallengeModuleKind.ModerateGap)) { seedsWithGap++; if (exampleGap == "") exampleGap = $"{req.RunSeed}/{req.StageIndex}"; }
             if (def.Modules.Any(x => x.Kind == ChallengeModuleKind.LaunchRamp)) { seedsWithRamp++; if (exampleRamp == "") exampleRamp = $"{req.RunSeed}/{req.StageIndex}"; }
+            var crestStraights = def.PrimaryRoute.Features.Where(f => f.Kind == RouteFeatureKind.LaunchCrest).GroupBy(f => f.StartIndex).Select(g => g.Count()).ToList();
+            crests += crestStraights.Sum();
+            trains += crestStraights.Count(n => n >= 2);
+            if (crestStraights.Any(n => n >= 2)) { seedsWithTrain++; if (exampleTrain == "") exampleTrain = $"{req.RunSeed}/{req.StageIndex}"; }
             if (def.Report.Attempts > 1 && exampleRegen == "") exampleRegen = $"{req.RunSeed}/{req.StageIndex} (attempt {def.Report.Attempts})";
+            // RUSHCORE_BATCH_FAILS=1: tally what the first attempt failed on across the batch (a generation-tuning instrument).
+            if (def.Report.Attempts > 1 && System.Environment.GetEnvironmentVariable("RUSHCORE_BATCH_FAILS") == "1")
+            {
+                var first = gen.BuildAttempt(req, 0);
+                foreach (var f in first.Report.Failures)
+                {
+                    if (!fallbackReasons.ContainsKey("attempt 1: " + f.Name))
+                        GD.Print($"[SELFTEST] {A} seed {req.RunSeed}/{req.StageIndex} attempt 1: {f.Name} {f.Detail}; features: " +
+                                 string.Join(", ", first.PrimaryRoute.Features.Select(x => $"{x.Kind} {x.CentreDistance:0}→{x.FeatureEnd:0} m on {first.PrimaryRoute.Vertices[x.StartIndex].Distance:0}–{first.PrimaryRoute.Vertices[x.EndIndex].Distance:0}")) +
+                                 "; bends: " + string.Join(", ", first.PrimaryRoute.Bends.Select(b => $"r{b.Radius:0} at {first.PrimaryRoute.Vertices[b.StartIndex].Distance:0}")));
+                    fallbackReasons["attempt 1: " + f.Name] = fallbackReasons.GetValueOrDefault("attempt 1: " + f.Name) + 1;
+                }
+            }
         }
         sw.Stop();
-        GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; regeneration e.g. {exampleRegen}");
+        GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; {crests} crests, {trains} trains of ≥ 2 ({seedsWithTrain} seeds, e.g. {exampleTrain}); regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
+        if (fallbackReasons.Count > 0) GD.Print($"[SELFTEST] {A} attempt failures: " + string.Join(", ", fallbackReasons.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
         GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
                  $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
@@ -1884,10 +1903,15 @@ public partial class MovementToySelfTest : Node
         Check($"{A}: " + "same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
         Check($"{A}: " + "different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
         // D-086 measured 95% with ridge lines alone; module straights (≈ 1 km each, D-097) leave fewer 1.3 km sections.
-        Check($"{A}: " + "most seeds carry at least one optional line", withLines >= Count * 0.8f, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
+        // A dune sea is mostly train straights, which ridge lines avoid: 40% measured (D-099), a dune lane is the gap.
+        float linesFloor = archetype == TerrainArchetype.DuneSea ? 0.3f : 0.8f;
+        Check($"{A}: " + $"most seeds carry at least one optional line (≥ {linesFloor:P0})", withLines >= Count * linesFloor, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
         Check($"{A}: " + "every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
         Check($"{A}: " + "every challenge module in the batch passes its validator (two prices, 04 §5E)", modulesPassed == modulesTotal, $"{modulesPassed}/{modulesTotal}");
         Check($"{A}: " + "the batch exercises gaps, ramps and banked turns", gaps > 0 && ramps > 0 && turns > 0, $"{gaps} gaps, {ramps} ramps, {turns} turns");
+        // Dune Sea (D-099): the archetype's identity is the crest-to-crest rhythm, so most seeds carry a train.
+        if (archetype == TerrainArchetype.DuneSea)
+            Check($"{A}: " + "most seeds carry a dune train of at least two crests", seedsWithTrain >= Count * 0.6f, $"{seedsWithTrain}/{Count} seeds, {trains} trains, {crests} crests");
         Check($"{A}: " + "route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
         Check($"{A}: " + "base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
@@ -1937,8 +1961,10 @@ public partial class MovementToySelfTest : Node
                 System.Globalization.CultureInfo.InvariantCulture, out float envCell) && envCell >= 1f && envCell <= 16f)
             stageCell = envCell;
         t.World.CellSize = stageCell;
-        // RUSHCORE_ARCHETYPE=canyon drives a Canyon Run stage (G0 per archetype, 08 §5).
-        t.World.CanyonRun = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") == "canyon";
+        // RUSHCORE_ARCHETYPE=canyon|dunes drives a Canyon Run or Dune Sea stage (G0 per archetype, 08 §5).
+        string envArchetype = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") ?? "";
+        t.World.CanyonRun = envArchetype == "canyon";
+        t.World.DuneSea = envArchetype == "dunes";
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -1988,11 +2014,16 @@ public partial class MovementToySelfTest : Node
         var features = stage.PrimaryRoute.Features;
         var crests = features.Where(f => f.Kind == RouteFeatureKind.LaunchCrest).ToList();
         var crestKm = new HashSet<int>();
-        foreach (var f in features) { int km = (int)(f.CentreDistance / 1000f); crestKm.Add(km); crestKm.Add(km + 1); }
+        // A launcher's kilometre is not quiet, nor the next; nor the one before when the launch (up to half a wavelength
+        // before a crest's apex) begins there.
+        foreach (var f in features) { int km = (int)(f.CentreDistance / 1000f); crestKm.Add((int)((f.CentreDistance - launchBeforeOf(f)) / 1000f)); crestKm.Add(km); crestKm.Add(km + 1); }
+        static float launchBeforeOf(RouteFeature f) => f.Kind == RouteFeatureKind.LaunchCrest ? f.Wavelength * 0.5f : 20f;
         var crestApexSpeed = new float[crests.Count];
         var crestLeft = new bool[crests.Count];
         var launchPoint = features.Select(f => f.Kind == RouteFeatureKind.Gap ? f.FeatureEnd : f.CentreDistance).ToArray();
         var launchBefore = features.Select(f => f.Kind == RouteFeatureKind.LaunchCrest ? f.Wavelength * 0.5f : 20f).ToArray();
+        // A launcher's window closes where the next one's opens (a dune train's crests are a wavelength apart), else at 900 m.
+        var launchAfter = features.Select((f, c) => c + 1 < features.Count ? Mathf.Min(900f, launchPoint[c + 1] - launchBefore[c + 1] - launchPoint[c]) : 900f).ToArray();
         var crestLaunchS = new float[features.Count];
         var crestLandS = new float[features.Count];
         var launchArmed = new bool[features.Count];   // the ball must be grounded inside the window first: a gap's dive is still airborne when the far-rim window opens
@@ -2018,7 +2049,7 @@ public partial class MovementToySelfTest : Node
             for (int c = 0; c < features.Count; c++)
             {
                 float rel = along - launchPoint[c];
-                if (rel >= -launchBefore[c] && rel <= 900f)
+                if (rel >= -launchBefore[c] && rel <= launchAfter[c])
                 {
                     if (_player.IsGrounded && crestLaunchS[c] == 0f) launchArmed[c] = true;
                     if (!_player.IsGrounded) { if (launchArmed[c] && crestLaunchS[c] == 0f) crestLaunchS[c] = along; if (crestLaunchS[c] > 0f) crestLandS[c] = 0f; }
@@ -2085,7 +2116,7 @@ public partial class MovementToySelfTest : Node
             {
                 if (crestLaunchS[c] <= 0f || crestLandS[c] <= 0f) continue;
                 float window = Mathf.Max(30f, launchBefore[c] * 2f);
-                var fl = profile.Flights.FirstOrDefault(f => Mathf.Abs(f.LaunchDistance - crestLaunchS[c]) < window);
+                var fl = profile.Flights.Where(f => Mathf.Abs(f.LaunchDistance - crestLaunchS[c]) < window).OrderBy(f => Mathf.Abs(f.LaunchDistance - crestLaunchS[c])).FirstOrDefault();
                 float len = Mathf.Max(50f, crestLandS[c] - crestLaunchS[c]);
                 float err = fl is null ? 1f : Mathf.Abs(fl.LandingDistance - crestLandS[c]) / len;
                 compared++;
@@ -2170,6 +2201,7 @@ public partial class MovementToySelfTest : Node
 
         t.World.GeneratedStage = false;
         t.World.CanyonRun = false;
+        t.World.DuneSea = false;
         t.World.CellSize = MovementToyWorld.DefaultCellSize;
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;

@@ -137,7 +137,14 @@ public sealed class StageGenerator
                 tube.CeilingProfile = _ceiling.Integrate(tube.Axis, ceiling.Speed[tube.JoinStart], chainFromBaseCap: true, carried: true);
                 def.Tubes.Add(tube);
             }
-        if (!straight) def.Lids.AddRange(LidBuilder.Build(route, request.StageSeed, rules, def.Tubes));
+        if (!straight) def.Lids.AddRange(LidBuilder.Build(route, request.StageSeed, rules, def.Tubes, optional));
+        // Exits (02 §4, D-105): the primary's pad is A; each terminal line's pad follows in route order of its fork.
+        def.Exits.Add(new StageExit(0, "A", route.Exit, route.Vertices[^1].Heading, -1));
+        foreach (int k in Enumerable.Range(0, optional.Count).Where(k => optional[k].Terminal).OrderBy(k => optional[k].JoinStart))
+        {
+            var e = optional[k].Vertices[^1];
+            def.Exits.Add(new StageExit(def.Exits.Count, ((char)('A' + def.Exits.Count)).ToString(), e.Position, e.Heading, k));
+        }
         report.Timings.Add(("speed profiles", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         PlaceCheckpoints(def);
@@ -150,6 +157,7 @@ public sealed class StageGenerator
         ValidateTubes(def, report);
         ValidateStructuresAndHeadroom(def, report);
         ValidateCheckpoints(def, report);
+        ValidateExits(def, report);
         report.Timings.Add(("validation", sw.Elapsed.TotalMilliseconds));
         return def;
     }
@@ -225,9 +233,15 @@ public sealed class StageGenerator
             }
             float joinStart = Mathf.Abs(v[0].Position.Y - primary[line.JoinStart].Position.Y);
             float joinEnd = Mathf.Abs(v[^1].Position.Y - primary[line.JoinEnd].Position.Y);
-            bool ok = !prof.Stalled && maxGrade <= WorldScale.MaxRouteGrade && rise >= 15f && joinStart < 2f && joinEnd < 2f;
+            // A terminal line (D-105) ends on its own pad: level over the pad's reach instead of meeting the primary.
+            float padGrade = 0f;
+            if (line.Terminal)
+                for (int i = v.Count - 1; i > 0 && v[^1].Distance - v[i - 1].Distance <= WorldScale.PadRadius; i--)
+                    padGrade = Mathf.Max(padGrade, Mathf.Abs(v[i].Position.Y - v[i - 1].Position.Y) / Mathf.Max(1e-3f, v[i].Distance - v[i - 1].Distance));
+            bool ends = line.Terminal ? padGrade <= 0.03f : joinEnd < 2f;
+            bool ok = !prof.Stalled && maxGrade <= WorldScale.MaxRouteGrade && rise >= 15f && joinStart < 2f && ends;
             allOk &= ok;
-            detail += $" [{line.Kind} {v[0].Distance:0}→{v[^1].Distance:0} m of {line.Length:0}, rise {rise:0} m, grade {maxGrade:0.00}, exit {prof.Speed[^1]:0} m/s{(ok ? "" : " FAIL")}]";
+            detail += $" [{line.Kind}{(line.Terminal ? " → exit" : "")} {v[0].Distance:0}→{v[^1].Distance:0} m of {line.Length:0}, rise {rise:0} m, grade {maxGrade:0.00}, exit {prof.Speed[^1]:0} m/s{(ok ? "" : " FAIL")}]";
         }
         report.Add("optional lines are traversable, joined and distinct", allOk, $"{def.OptionalLines.Count} lines{detail}");
         // Flights on an optional line are judged on its own geometry (it has no bend list): no flight drifts through a
@@ -273,7 +287,7 @@ public sealed class StageGenerator
         for (int i = 0; i < lv.Count; i += 25)
         {
             float d = lv[i].Distance;
-            if (d < line.Transition + line.RampLength || d > line.Length - line.Transition - line.RampLength) continue;
+            if (d < line.Transition + line.RampLength || d > line.Length - (line.Terminal ? WorldScale.PadRadius * 2.5f : line.Transition + line.RampLength)) continue;
             float lx = -Mathf.Sin(lv[i].Heading), lz = Mathf.Cos(lv[i].Heading);
             float inward = -line.Side;
             float edge = line.CorridorHalfWidth + WorldScale.WallSetback + WorldScale.TerraceCliffFalloff + 6f;
@@ -437,6 +451,32 @@ public sealed class StageGenerator
     {
         int i = Array.BinarySearch(p.Distance, distance);
         return Mathf.Clamp(i >= 0 ? i : ~i, 0, p.Count - 1);
+    }
+
+    /// <summary>Exits (02 §4, 04 §12, D-105): at least the primary's; every pad inside the footprint with its radius to spare,
+    /// level across and along, and any two pads apart by <see cref="WorldScale.ExitSeparationMin"/>.</summary>
+    private static void ValidateExits(StageDefinition def, ValidationReport report)
+    {
+        var field = def.HeightField!;
+        bool ok = def.Exits.Count >= 1 && def.Exits[0].IsPrimary;
+        float worstSpread = 0f, minApart = float.MaxValue;
+        string detail = "";
+        foreach (var e in def.Exits)
+        {
+            bool inside = Mathf.Abs(e.Position.X) <= WorldScale.FootprintLength * 0.5f - WorldScale.PadRadius + 1f && Mathf.Abs(e.Position.Z) <= WorldScale.FootprintWidth * 0.5f - WorldScale.PadRadius;
+            float lx = -Mathf.Sin(e.Heading), lz = Mathf.Cos(e.Heading), fx = Mathf.Cos(e.Heading), fz = Mathf.Sin(e.Heading);
+            float h0 = field.Sample(e.Position.X, e.Position.Z), spread = 0f;
+            foreach (var (dx, dz) in new[] { (lx * 30f, lz * 30f), (-lx * 30f, -lz * 30f), (fx * 40f, fz * 40f), (-fx * 40f, -fz * 40f) })
+                spread = Mathf.Max(spread, Mathf.Abs(field.Sample(e.Position.X + dx, e.Position.Z + dz) - h0));
+            worstSpread = Mathf.Max(worstSpread, spread);
+            foreach (var o in def.Exits)
+                if (o.Index < e.Index) minApart = Mathf.Min(minApart, new Vector2(o.Position.X - e.Position.X, o.Position.Z - e.Position.Z).Length());
+            bool thisOk = inside && spread <= 3f;
+            ok &= thisOk;
+            detail += $" [{e.Label}{(e.IsPrimary ? " primary" : $" line {e.LineIndex + 1}")} at ({e.Position.X:0}, {e.Position.Z:0}) y {e.Position.Y:0}, spread {spread:0.0} m{(thisOk ? "" : " FAIL")}]";
+        }
+        if (def.Exits.Count > 1 && minApart < WorldScale.ExitSeparationMin) ok = false;
+        report.Add("exits are distinct, inside the footprint and on level pads (D-105)", ok, $"{def.Exits.Count} exits{detail}{(def.Exits.Count > 1 ? $", nearest pair {minApart:0} m apart" : "")}");
     }
 
     private static void ValidateCheckpoints(StageDefinition def, ValidationReport report)

@@ -170,8 +170,9 @@ Toggles:
 
 Disabled by default. `World › Sample Stage` picks a named archetype and seed from the runbook's sample list (the G0
 manual sample from the panel). Delivered (D-104): `World › Route Debug Lines` (route, optional lines by floor, checkpoints,
-tube axes; on by default in the toy) and `World › Stage Debug Views` (corridor bounds, challenge zones, structure
-bounds, floors and drains; off by default). Player contact and impact vectors remain in the telemetry rows.
+tube axes, terminal lines in their own colour; on by default in the toy) and `World › Stage Debug Views` (corridor
+bounds, challenge zones, structure bounds, floors and drains, exit pad rings (D-105); off by default). Player contact
+and impact vectors remain in the telemetry rows; the `stage` row names the exit reached.
 
 ## 12. Debug actions
 

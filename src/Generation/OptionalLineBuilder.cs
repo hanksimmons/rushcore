@@ -16,6 +16,8 @@ public static class OptionalLineBuilder
     private readonly record struct LineShape(RouteLineKind Kind, int Floor, float Offset, float Transition, float Ramp, float HeightMin, float HeightMax)
     {
         public float Length => 2f * Transition + 2f * Ramp + 80f;
+        /// <summary>A terminal line (D-105): the leaving S, the climb, the widening, a level run and the pad's flat.</summary>
+        public float TerminalLength(float spread) => Transition + Ramp + spread + WorldScale.ExitLineRun + WorldScale.PadRadius * 2.5f;
     }
 
     private static readonly LineShape Ridge = new(RouteLineKind.Ridge, 1, WorldScale.RidgeOffset, WorldScale.RidgeTransition, WorldScale.RidgeRampLength, WorldScale.RidgeHeightMin, WorldScale.RidgeHeightMax);
@@ -40,6 +42,14 @@ public static class OptionalLineBuilder
         float lastEnd = 500f - WorldScale.OptionalLineSpacing;   // leave the start alone
         var bends = primary.Bends;
         float stop = primary.Spiral is { } pit ? pit.ApproachDistance - 100f : primary.Length - 400f;
+        // Terminal lines (D-105) claim their spans first, from their own stream; rejoining lines fill around them on the
+        // same side (the other side is free: the stamps never meet, and a bend keeps a line on its outside anyway).
+        // On Sky Terraces the floors come first (a floor-3 stack needs the sections terminals would take): its terminal
+        // terraces fill around them instead.
+        var exitRng = new SeededRandom(SeedChain.Derive(stageSeed, "exits"));
+        float terminalStop = primary.Spiral is not null ? stop : primary.Length - 200f;
+        var terminals = rules.Floors >= 2 ? new List<RouteSkeleton>() : PlaceTerminals(primary, rules, exitRng, turnSign, terminalStop, lines);
+        bool Occupied(float from, float to, float side) => terminals.Any(t => t.Side == side && from < v[t.JoinEnd].Distance + 100f && to > v[t.JoinStart].Distance - 100f);
         for (int k = 0; k < bends.Count && lines.Count < WorldScale.OptionalLinesMax; k++)
         {
             float bs = v[bends[k].StartIndex].Distance;
@@ -63,7 +73,7 @@ public static class OptionalLineBuilder
                 float first = shape.Kind == RouteLineKind.Terrace ? -Mathf.Sign(v[a].Position.Z + v[b].Position.Z + 1e-3f) : rng.Sign();
                 float Offset(int i) => shape.Offset * Bump(v[i].Distance - v[a].Distance, v[b].Distance - v[a].Distance, shape.Transition);
                 float side = SideValid(primary, turnSign, a, b, first, Offset) ? first : SideValid(primary, turnSign, a, b, -first, Offset) ? -first : 0f;
-                if (side == 0f || OverlapsFeature(primary, d, dEnd) || !JoinsOnStraights(primary, a, b, T)) continue;
+                if (side == 0f || OverlapsFeature(primary, d, dEnd) || !JoinsOnStraights(primary, a, b, T) || Occupied(d, dEnd, side)) continue;
                 var line = BuildLine(primary, a, b, side, shape, rng.Range(shape.HeightMin, shape.HeightMax));
                 if (line is null) continue;
                 if (tier == 3)
@@ -79,13 +89,100 @@ public static class OptionalLineBuilder
                 placed = true;
             }
         }
+        if (rules.Floors >= 2) terminals = PlaceTerminals(primary, rules, exitRng, turnSign, terminalStop, lines);
+        lines.AddRange(terminals);
         return lines;
     }
 
+    /// <summary>
+    /// Branching exits (D-105): up to <see cref="WorldScale.ExitLinesMax"/> terminal lines in the last
+    /// <see cref="WorldScale.ExitZoneLength"/> of the primary. Each leaves like a ridge (its S on a straight, its climb clear
+    /// of every feature), widens to <see cref="WorldScale.ExitLineOffset"/> once on the plateau, runs level and ends on its
+    /// own exit pad. The two lie on opposite sides, so their forks may overlap in route distance (the stamps never meet);
+    /// their forks stay <see cref="WorldScale.ExitForkSpacing"/> apart so each reads as its own choice. The pad must sit inside
+    /// the footprint and, on a pit stage, clear of the disc. Entry is the drive-in ramp: choosing an exit is steering.
+    /// </summary>
+    private static List<RouteSkeleton> PlaceTerminals(RouteSkeleton primary, ArchetypeRules rules, SeededRandom rng, float[] turnSign, float stop, IReadOnlyList<RouteSkeleton> existing)
+    {
+        var lines = new List<RouteSkeleton>();
+        var v = primary.Vertices;
+        bool Taken(float from, float to, float side) => existing.Any(o => o.Side == side && from < v[o.JoinEnd].Distance + 100f && to > v[o.JoinStart].Distance - 100f);
+        // A sky exit is a floor-2 terrace ending on a pad (its cliff drains onto the primary); elsewhere a ridge.
+        var shape = rules.Floors >= 2 ? Floor2 : Ridge;
+        float spread = rules.ExitSpread;
+        float T = shape.Transition, L = shape.TerminalLength(spread);
+        // Only the fork must be clear of features: past the S the line's path is outside the primary's stamp, so no
+        // feature can leak into it (the D-100 rule for a whole rejoining section guards its return S as well).
+        float clear = T + 50f;
+        // The zone ends where the terminals must (before a pit's approach on a pit stage), so a pit stage's exits fork
+        // before the set-piece: taking one skips the finale.
+        float zoneStart = Mathf.Max(500f, stop - WorldScale.ExitZoneLength);
+        float side = rng.Sign();
+        var forks = new List<float>();
+        for (int n = 0; n < WorldScale.ExitLinesMax; n++, side = -side)
+        {
+            RouteSkeleton? best = null;
+            int tried = 0;
+            for (float d = zoneStart; d + L <= stop && best is null; d += 50f)
+            {
+                tried++;
+                if (forks.Any(f => Mathf.Abs(f - d) < WorldScale.ExitForkSpacing)) { Tally("fork spacing"); continue; }
+                int a = primary.IndexAtDistance(d), b = primary.IndexAtDistance(d + L);
+                if (b >= v.Count - 1) { Tally("end"); continue; }
+                if (OverlapsFeature(primary, d, d + clear)) { Tally("feature"); continue; }
+                if (Taken(d, d + L, side)) { Tally("line on that side"); continue; }
+                if (!LeavesOnStraight(primary, a, T)) { Tally("bend at fork"); continue; }
+                float Offset(int i) => TerminalOffset(v[i].Distance - v[a].Distance, shape, spread);
+                if (!SideValid(primary, turnSign, a, b, side, Offset)) { Tally("inside of a bend"); continue; }
+                var line = BuildLine(primary, a, b, side, shape, rng.Range(shape.HeightMin, shape.HeightMax), spread);
+                if (line is null) { Tally("band"); continue; }
+                if (!PadClear(primary, line)) { Tally("pad"); continue; }
+                best = line;
+                forks.Add(d);
+            }
+            if (tried == 0) Tally("no window");
+            if (best is null) continue;
+            lines.Add(best);
+        }
+        return lines;
+    }
+
+    public static readonly Dictionary<string, int> TerminalTally = new();
+    private static void Tally(string reason) { if (System.Environment.GetEnvironmentVariable("RUSHCORE_EXIT_TRACE") == "1") TerminalTally[reason] = TerminalTally.GetValueOrDefault(reason) + 1; }
+
+    /// <summary>The exit pad lies inside the footprint with its radius to spare and, on a pit stage, outside the disc.</summary>
+    private static bool PadClear(RouteSkeleton primary, RouteSkeleton line)
+    {
+        var e = line.Vertices[^1].Position;
+        if (Mathf.Abs(e.X) > WorldScale.FootprintLength * 0.5f - WorldScale.PadRadius || Mathf.Abs(e.Z) > WorldScale.FootprintWidth * 0.5f - WorldScale.PadRadius) return false;
+        if (primary.Spiral is { } pit)
+            foreach (var lv in line.Vertices)
+                if (new Vector2(lv.Position.X - pit.Centre.X, lv.Position.Z - pit.Centre.Z).Length() < pit.OuterRadius + WorldScale.PadRadius) return false;
+        return true;
+    }
+
+    /// <summary>The leaving transition lies on a primary straight (the first half of <see cref="JoinsOnStraights"/>).</summary>
+    private static bool LeavesOnStraight(RouteSkeleton primary, int a, float transition)
+    {
+        var v = primary.Vertices;
+        for (int i = a; i < v.Count && v[i].Distance <= v[a].Distance + transition; i++) if (v[i].Kind == RouteSegmentKind.Bend) return false;
+        return true;
+    }
+
+    /// <summary>Terminal offset envelope: the ridge's S out to its offset, then the widening S to the exit offset after the climb.</summary>
+    private static float TerminalOffset(float d, LineShape shape, float spread) =>
+        shape.Offset * Mathf.SmoothStep(0f, shape.Transition, d)
+        + (spread > 0f ? (WorldScale.ExitLineOffset - shape.Offset) * Mathf.SmoothStep(shape.Transition + shape.Ramp, shape.Transition + shape.Ramp + spread, d) : 0f);
+
+    /// <summary>Terminal plateau envelope: the climb once the line has left the primary, then level to the pad.</summary>
+    public static float TerminalPlateau(float d, float transition, float ramp) => CosineStep(transition, transition + ramp, d);
+
     /// <summary>The offset line between two primary vertices, or null if it leaves the optional band (a terrace's long
     /// falloff counts toward the band).</summary>
-    private static RouteSkeleton? BuildLine(RouteSkeleton primary, int a, int b, float side, LineShape shape, float height)
+    /// <param name="terminalSpread">Non-negative for a terminal line (D-105): its widening beyond the shape's offset; negative for a rejoining line.</param>
+    private static RouteSkeleton? BuildLine(RouteSkeleton primary, int a, int b, float side, LineShape shape, float height, float terminalSpread = -1f)
     {
+        bool terminal = terminalSpread >= 0f;
         var v = primary.Vertices;
         {
             var line = new RouteSkeleton
@@ -94,6 +191,7 @@ public static class OptionalLineBuilder
                 Floor = shape.Floor,
                 JoinStart = a,
                 JoinEnd = b,
+                Terminal = terminal,
                 CorridorHalfWidth = WorldScale.MinCorridorWidth * 0.5f,
                 RidgeHeight = height,
                 Offset = shape.Offset, Transition = shape.Transition, RampLength = shape.Ramp,
@@ -106,7 +204,8 @@ public static class OptionalLineBuilder
             float bandRoom = shape.Kind == RouteLineKind.Terrace ? WorldScale.MinCorridorWidth * 0.5f + WorldScale.WallSetback + 100f : 0f;
             for (int i = a; i <= b; i++)
             {
-                float offset = shape.Offset * Bump(v[i].Distance - v[a].Distance, sectionLength, shape.Transition);
+                float offset = terminal ? TerminalOffset(v[i].Distance - v[a].Distance, shape, terminalSpread)
+                                        : shape.Offset * Bump(v[i].Distance - v[a].Distance, sectionLength, shape.Transition);
                 float h = v[i].Heading;
                 var p = v[i].Position + new Vector3(-Mathf.Sin(h), 0f, Mathf.Cos(h)) * (offset * side);
                 if (Mathf.Abs(p.Z) + bandRoom > WorldScale.OptionalBandHalfWidth) return null;

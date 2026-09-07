@@ -66,6 +66,9 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     public float StageClock { get; private set; }
     /// <summary>Clock reading when the player first reached the exit pad this attempt; 0 = not yet.</summary>
     public float StageExitTime { get; private set; }
+    /// <summary>Which exit the ball reached (D-105): index into <c>Stage.Exits</c>; −1 until one is reached.</summary>
+    public int StageExitIndex { get; private set; } = -1;
+    public string StageExitLabel => Stage is { } st && StageExitIndex >= 0 && StageExitIndex < st.Exits.Count ? st.Exits[StageExitIndex].Label : "";
 
     public void ResetStageProgress()
     {
@@ -73,6 +76,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         StageCheckpointIndex = -1;
         StageClock = 0f;
         StageExitTime = 0f;
+        StageExitIndex = -1;
     }
 
     /// <summary>
@@ -97,11 +101,16 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         // Only count it as progress while the ball is inside the corridor reach of that vertex.
         if (best > StageProgressIndex && bestD < 150f * 150f) StageProgressIndex = best;
 
-        if (StageExitTime <= 0f && new Vector2(Stage.ExitPosition.X - playerPos.X, Stage.ExitPosition.Z - playerPos.Z).Length() < WorldScale.PadRadius)
-        {
-            StageExitTime = StageClock;
-            GD.Print($"[RUSHCORE] Stage exit reached in {StageExitTime:0.0} s (route speed model: {Stage.SpeedProfile.TotalTime:0.0} s base kit)");
-        }
+        // Any exit pad ends the stage (02 §4, D-105): the primary's or a terminal line's; the first one reached counts.
+        if (StageExitTime <= 0f)
+            foreach (var e in Stage.Exits)
+                if (new Vector2(e.Position.X - playerPos.X, e.Position.Z - playerPos.Z).Length() < WorldScale.PadRadius && Mathf.Abs(e.Position.Y - playerPos.Y) < 40f)
+                {
+                    StageExitTime = StageClock;
+                    StageExitIndex = e.Index;
+                    GD.Print($"[RUSHCORE] Stage exit {e.Label} reached in {StageExitTime:0.0} s (route speed model: {Stage.SpeedProfile.TotalTime:0.0} s base kit to exit A)");
+                    break;
+                }
 
         var cps = Stage.Checkpoints;
         int next = StageCheckpointIndex;
@@ -187,7 +196,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +
-                           $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Tubes.Count} tubes, {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
+                           $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Tubes.Count} tubes, {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Exits.Count} exits, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
             GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
             foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
         }

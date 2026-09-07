@@ -1235,11 +1235,32 @@ public partial class MovementToySelfTest : Node
                     "tunnels + pit" => d.Lids.Count > 0 && d.PrimaryRoute.Spiral is not null,
                     "sky floor 3" => d.OptionalLines.Any(l => l.Floor == 3),
                     "dune trains" => d.PrimaryRoute.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest) >= 3,
+                    "three exits" => d.Exits.Count >= 3,
                     _ => d.Modules.Any(x => x.Kind == ChallengeModuleKind.ModerateGap),
                 };
                 bool ok = d.Report.Passed && !d.Report.UsedFallback && shows;
                 allValid &= ok;
                 detail += $" [{e.Name}: seed {e.Seed} {(ok ? "ok" : "FAIL")}]";
+                if (!ok)
+                {
+                    // Replacement candidates: the first seeds of the archetype that show what the sample promises.
+                    var found = new List<int>();
+                    for (int s2 = 1; s2 <= 200 && found.Count < 5; s2++)
+                    {
+                        var d2 = gen.Generate(new StageGenerationRequest(s2, 0, e.Archetype));
+                        bool shows2 = e.Name switch
+                        {
+                            "tube" => d2.Tubes.Count > 0,
+                            "tunnels + pit" => d2.Lids.Count > 0 && d2.PrimaryRoute.Spiral is not null,
+                            "sky floor 3" => d2.OptionalLines.Any(l => l.Floor == 3),
+                            "dune trains" => d2.PrimaryRoute.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest) >= 3,
+                            "three exits" => d2.Exits.Count >= 3,
+                            _ => d2.Modules.Any(x => x.Kind == ChallengeModuleKind.ModerateGap),
+                        };
+                        if (d2.Report.Passed && !d2.Report.UsedFallback && shows2) found.Add(s2);
+                    }
+                    GD.Print($"[SELFTEST] sample '{e.Name}' no longer shows on seed {e.Seed}; candidates: {string.Join(" ", found)}");
+                }
             }
             Check("every sample stage generates valid and shows what it promises (docs/10)", allValid, detail);
             _debug.Tuning.World.SampleStage = 2f;
@@ -1860,6 +1881,7 @@ public partial class MovementToySelfTest : Node
         int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
         int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0, tubes = 0, seedsWithTube = 0, tubesPassed = 0, lids = 0, lidsPassed = 0, spirals = 0, floor2 = 0, floor3 = 0, seedsWithFloor3 = 0;
         float rideMax = 0f; string exampleTube = "";
+        int exitLines = 0, seedsWithBranch = 0, seedsWithThree = 0; string exampleBranch = "", exampleThree = ""; List<int> threeAtZero = new(), floor3AtZero = new();
         string exampleGap = "", exampleRamp = "", exampleRegen = "", exampleTrain = "";
         double msSum = 0, msMax = 0;
         string firstFailure = "";
@@ -1898,8 +1920,11 @@ public partial class MovementToySelfTest : Node
             foreach (var x in def.Tubes) rideMax = Mathf.Max(rideMax, x.MaxRideDegrees);
             lids += def.Lids.Count; lidsPassed += def.Lids.Count(x => x.Passed);
             floor2 += def.OptionalLines.Count(l => l.Floor == 2); floor3 += def.OptionalLines.Count(l => l.Floor == 3);
-            if (def.OptionalLines.Any(l => l.Floor == 3)) seedsWithFloor3++;
+            if (def.OptionalLines.Any(l => l.Floor == 3)) { seedsWithFloor3++; if (req.StageIndex == 0) floor3AtZero.Add(req.RunSeed); }
             if (def.PrimaryRoute.Spiral is not null) spirals++;
+            exitLines += def.OptionalLines.Count(l => l.Terminal);
+            if (def.Exits.Count >= 2) { seedsWithBranch++; if (exampleBranch == "") exampleBranch = $"{req.RunSeed}/{req.StageIndex}"; }
+            if (def.Exits.Count >= 3) { seedsWithThree++; if (exampleThree == "") exampleThree = $"{req.RunSeed}/{req.StageIndex}"; if (req.StageIndex == 0) threeAtZero.Add(req.RunSeed); }
             if (def.Tubes.Count > 0) { seedsWithTube++; if (exampleTube == "" || (req.StageIndex == 0 && !exampleTube.EndsWith("/0"))) exampleTube = $"{req.RunSeed}/{req.StageIndex}"; }
             minAnchors = Mathf.Min(minAnchors, def.Checkpoints.Count);
             belowSum += def.SpeedProfile.SecondsBelow(_debug.Tuning.Movement.HardMaxLocomotionSpeed * 0.98f);
@@ -1936,7 +1961,9 @@ public partial class MovementToySelfTest : Node
         sw.Stop();
         GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; {crests} crests, {trains} trains of ≥ 2 ({seedsWithTrain} seeds, e.g. {exampleTrain}); regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
-        GD.Print($"[SELFTEST] {A} structures over the batch: {tubes} tubes on {seedsWithTube} seeds (e.g. {exampleTube}), {tubesPassed} pass, wall ride ≤ {rideMax:0}°; {lids} lids ({lidsPassed} pass); {spirals} spiral pits; terraces: {floor2} on floor 2, {floor3} on floor 3 ({seedsWithFloor3} seeds)");
+        GD.Print($"[SELFTEST] {A} structures over the batch: {tubes} tubes on {seedsWithTube} seeds (e.g. {exampleTube}), {tubesPassed} pass, wall ride ≤ {rideMax:0}°; {lids} lids ({lidsPassed} pass); {spirals} spiral pits; terraces: {floor2} on floor 2, {floor3} on floor 3 ({seedsWithFloor3} seeds; at stage 0: {string.Join(" ", floor3AtZero)})");
+        GD.Print($"[SELFTEST] {A} exits over the batch: {exitLines} terminal lines; {seedsWithBranch} seeds with a second exit (e.g. {exampleBranch}), {seedsWithThree} with three (e.g. {exampleThree}; at stage 0: {string.Join(" ", threeAtZero)})");
+        if (OptionalLineBuilder.TerminalTally.Count > 0) { GD.Print($"[SELFTEST] {A} terminal candidates rejected: " + string.Join(", ", OptionalLineBuilder.TerminalTally.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}"))); OptionalLineBuilder.TerminalTally.Clear(); }
         if (fallbackReasons.Count > 0) GD.Print($"[SELFTEST] {A} attempt failures: " + string.Join(", ", fallbackReasons.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
         GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
@@ -1954,6 +1981,11 @@ public partial class MovementToySelfTest : Node
         if (archetype == TerrainArchetype.DuneSea) GD.Print($"[SELFTEST] {A}: optional lines not judged: {withLines}/{Count} seeds carry a ridge line (a dune lane is the open design)");
         else Check($"{A}: " + $"most seeds carry at least one optional line (≥ {linesFloor:P0})", withLines >= Count * linesFloor, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg, {droppedLines} dropped");
         Check($"{A}: " + "every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
+        // Branching exits (02 §4, D-105): measured 86 / 97 / 61 / 73 % of Highlands / Canyon / Dune Sea / Sky seeds with a
+        // second exit; a dune sea is mostly train straights, which the fork must avoid, and a sky stage places its
+        // terraces first, so those floors are lower.
+        float exitFloor = archetype == TerrainArchetype.DuneSea ? 0.4f : archetype == TerrainArchetype.RollingHighlands ? 0.75f : archetype == TerrainArchetype.SkyTerraces ? 0.65f : 0.85f;
+        Check($"{A}: " + $"most seeds offer a second exit (≥ {exitFloor:P0}, D-105)", seedsWithBranch >= Count * exitFloor, $"{seedsWithBranch}/{Count} seeds, {seedsWithThree} with three, {exitLines} terminal lines");
         Check($"{A}: " + "every challenge module in the batch passes its validator (two prices, 04 §5E)", modulesPassed == modulesTotal, $"{modulesPassed}/{modulesTotal}");
         Check($"{A}: " + "the batch exercises gaps, ramps and banked turns", gaps > 0 && ramps > 0 && turns > 0, $"{gaps} gaps, {ramps} ramps, {turns} turns");
         // Dune Sea (D-099): the archetype's identity is the crest-to-crest rhythm, so most seeds carry a train.
@@ -2531,9 +2563,62 @@ public partial class MovementToySelfTest : Node
             else Check("stage has a terrace to drop from", true, "none on this seed nor on seeds 1–80");
         }
 
+        // Branch exit ride (02 §4, 08 §5, D-105): from the primary before a terminal line's fork the follower takes the
+        // ramp, rides the line to its pad, and the stage ends by that exit. A drive seed without one borrows the first
+        // seed of its archetype that has one (the node-growth block restores).
+        int exitSeed = 0;
+        if (!stage.OptionalLines.Any(l => l.Terminal))
+        {
+            var gen = new StageGenerator(t.Movement, t.Flow, t.JumpSlam);
+            for (int s = 1; s <= 60 && exitSeed == 0; s++)
+                if (gen.Generate(new StageGenerationRequest(s, 0, world.Archetype)).OptionalLines.Any(l => l.Terminal)) exitSeed = s;
+            if (exitSeed > 0)
+            {
+                world.Regenerate(exitSeed);
+                foreach (var _ in Frames(3)) yield return null;
+                stage = world.Stage!;
+                verts = stage.PrimaryRoute.Vertices;
+                GD.Print($"[SELFTEST] branch exit: drive seed has no terminal line; using seed {exitSeed}/0 ({stage.Exits.Count} exits)");
+            }
+        }
+        if (stage.OptionalLines.FirstOrDefault(l => l.Terminal) is { } branch)
+        {
+            var exit = stage.Exits.First(e => e.LineIndex == stage.OptionalLines.IndexOf(branch));
+            // The path: the primary from 150 m before the fork, then the branch to its pad.
+            var path = new List<Vector3>();
+            for (int i = Mathf.Max(0, branch.JoinStart - 38); i < branch.JoinStart; i++) path.Add(verts[i].Position);
+            int rampEnd = path.Count + branch.IndexAtDistance(branch.Transition + branch.RampLength);
+            foreach (var bv in branch.Vertices) path.Add(bv.Position);
+            world.ResetStageProgress();
+            foreach (var _ in Settle(world.SurfacePoint(path[0].X, path[0].Z, t.Movement.BallRadius + 0.6f), 0.5f)) yield return null;
+            int pn = 0, pt = 0, plateauTicks = 0, plateauGrounded = 0; float maxOff = 0f;
+            while (pt++ < Engine.PhysicsTicksPerSecond * 60)
+            {
+                Vector3 p = _player.GlobalPosition;
+                float best = float.MaxValue;
+                for (int i = Mathf.Max(0, pn - 5); i < Mathf.Min(path.Count, pn + 60); i++)
+                {
+                    float d = new Vector2(path[i].X - p.X, path[i].Z - p.Z).LengthSquared();
+                    if (d < best) { best = d; pn = i; }
+                }
+                maxOff = Mathf.Max(maxOff, Mathf.Sqrt(best));
+                if (pn >= rampEnd) { plateauTicks++; if (_player.IsGrounded) plateauGrounded++; }
+                if (world.StageExitIndex >= 0) break;
+                var tg = path[Mathf.Min(path.Count - 1, pn + 15)];
+                _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
+                yield return null;
+            }
+            ReleaseAll();
+            float plateauFrac = plateauGrounded / (float)Mathf.Max(1, plateauTicks);
+            GD.Print($"[SELFTEST] branch exit: line {exit.LineIndex + 1} forks at {verts[branch.JoinStart].Distance:0} m ({branch.RidgeHeight:0} m up, floor {branch.Floor}); reached exit {(world.StageExitIndex >= 0 ? world.StageExitLabel : "none")} in {pt / (float)Engine.PhysicsTicksPerSecond:0.0} s, plateau grounded {plateauFrac:P0}, max {maxOff:0} m off the path");
+            Check("the follower takes a terminal line's ramp and the stage ends by that exit (D-105)", world.StageExitIndex == exit.Index, $"exit {(world.StageExitIndex >= 0 ? world.StageExitLabel : "none")} wanted {exit.Label}");
+            Check("the terminal line's plateau keeps the ball grounded to its pad", plateauFrac > 0.9f, $"{plateauFrac:P0}");
+        }
+        else Check("stage has a terminal line to ride", true, "none on this seed nor on seeds 1–60");
+
         // Node growth (08 §10): three regenerations of the same stage leave the tree the same size.
         {
-            if (tubeSeed > 0 || canyonSeed > 0 || skySeed > 0) { _debug.RestartSameSeed(); }   // back to the drive seed the regenerations rebuild
+            if (tubeSeed > 0 || canyonSeed > 0 || skySeed > 0 || exitSeed > 0) { _debug.RestartSameSeed(); }   // back to the drive seed the regenerations rebuild
             foreach (var _ in Frames(3)) yield return null;
             int nodesStage = GetTree().GetNodeCount();
             double orphansStage = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);

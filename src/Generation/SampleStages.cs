@@ -15,6 +15,7 @@ public static class SampleStages
         new("sky floor 3", TerrainArchetype.SkyTerraces, 30, "a floor-2 and floor-3 terrace stack (D-103)"),
         new("dune trains", TerrainArchetype.DuneSea, 1, "a three-crest dune train and a tube (D-099)"),
         new("gap + turns", TerrainArchetype.RollingHighlands, 8, "a mandatory gap and four committed banked turns (D-097)"),
+        new("three exits", TerrainArchetype.RollingHighlands, 4, "two terminal lines forking to exits B and C beside exit A (D-105)"),
     };
 
     /// <summary>The entry an index selects, or null for 0 / out of range.</summary>

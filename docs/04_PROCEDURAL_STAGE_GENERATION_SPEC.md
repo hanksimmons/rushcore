@@ -21,7 +21,8 @@ A normal RUSHCORE stage is:
 
 Each stage contains:
 
-- one guaranteed primary traversable region/route,
+- one guaranteed primary traversable region/route, ending at exit A,
+- up to two terminal lines ending at exits B and C (§5J, D-105),
 - approximately 1–3 meaningful optional lines/shortcuts,
 - many small local line choices,
 - hazards/enemies/rewards integrated into those lines,
@@ -288,7 +289,24 @@ at the model's speed and 0° off the axis, the lens outside the shell on every f
 to the ball against the terrain. Tubes appear on about 15% of Highlands, 7% of Canyon and 41% of Dune Sea
 seeds; edge and midair mouths, and exits onto other lines or floors, arrive with Sky Terraces.
 
-## 6. Archetypes
+### J — Exits and branching (D-105)
+
+A stage ends at whichever exit pad the ball reaches. The primary's pad is exit A. A **terminal line** is an
+optional line that never rejoins: it leaves the primary through the ridge family's S (200 m out over 290 m, on a
+straight, its fork clear of every feature), climbs its plateau (16–30 m over a 300 m cosine ramp; on Sky Terraces
+the line is a floor-2 terrace, 60 m up with its cliff draining onto the primary's flank), widens to 350 m off the
+primary over 300 m where the archetype allows (Highlands, Dune Sea; a canyon exit slot and a sky terrace keep the
+family offset), runs level for 200 m and ends on a pad flattened like the primary's. Up to two per stage, on
+opposite sides of the primary, forks at least 300 m apart, both inside the last 3 km before the terminal stop (the
+primary's pad, or a spiral pit's approach: a pit stage's exits fork before the set-piece, so taking one skips the
+finale). Terminal lines claim their spans first, from their own seed stream, and rejoining lines fill around them on
+the same side; on Sky Terraces the floors come first (a floor-3 stack needs those sections) and the terminal terraces
+fill around them. A line lies on the outside of every bend it shadows, so a stretch of alternating bends limits how
+many exits fit: measured 86% of Highlands, 97% of Canyon Run, 61% of Dune Sea and 73% of Sky Terraces seeds carry a
+second exit (29 / 38 / 14 / 15 % a third). Every exit pad sits inside the footprint with its radius to spare, is
+level (±3 m over ±30 m across and ±40 m along), and any two are 250 m apart. Entry is the drive-in ramp: the
+choice is steering (02 §3). Lids never roof a fork or a merge. The one heightfield carries it all: a terminal line
+is a stamp like any other line.
 
 ### Rolling Highlands
 
@@ -583,7 +601,8 @@ mouths may demand the full charge or the ceiling (D-096).
 - mandatory jumps fit base capability envelope (delivered D-097: every mandatory gap is crossable half-charged at the model's arrival speed, with the far rim's real height, plus the ball's diameter and 10 m),
 - spawn/exit/checkpoints have clearance,
 - no required route crosses unrecoverable invalid terrain,
-- vertical grammar (D-096): headroom, wall clearance, drains and tube clearance hold; every tube mouth is reachable per §5I and every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches the exit.
+- vertical grammar (D-096): headroom, wall clearance, drains and tube clearance hold; every tube mouth is reachable per §5I and every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches an exit,
+- exits (D-105): at least the primary's; every pad inside the footprint, level, and any two 250 m apart; a terminal line's pad is level over the pad radius and its profile never stalls.
 
 ### Secondary
 
@@ -704,9 +723,12 @@ zones), optional lines by floor (green ridges and floor 2, gold floor 3), checkp
 `World › Stage Debug Views` (off by default, 07 §11) adds corridor bounds on every line, challenge zones (a yellow
 line from a module's entrance to the end of its landing zone with posts at both ends, and over every committed
 bend), structure bounds (lid box outlines, tube mouth rings, the spiral pit's rim), floor bounds in the floor's
-colour and each terrace's drain (a red line along its cliff foot). The telemetry `seed` row carries the counts
-(lines, terraces, tubes, lids, the pit) and the validation status; the log prints every check and the phase
-timings; signs mark gaps, ramps, crests, tubes, tunnels, floors and the pit.
+colour and each terrace's drain (a red line along its cliff foot), and a ring at the pad radius around every exit
+(D-105). Terminal lines draw in their own colour. The telemetry `seed` row carries the counts (lines, terraces,
+tubes, lids, the pit, exits) and the validation status; the `stage` row names the exit reached; the log prints
+every check and the phase timings; signs mark gaps, ramps, crests, tubes, tunnels, floors, the pit, every exit pad
+(`EXIT A`, `EXIT B`, ...) and every fork (`EXIT B ↑` at the top of its S). `RUSHCORE_EXIT_TRACE=1` tallies why
+terminal candidates were rejected across a batch.
 
 ## Empirical validation items
 

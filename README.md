@@ -31,6 +31,9 @@ When documents disagree, the higher-authority document wins until the conflict i
 9. `docs/DECISIONS.md` — accepted decisions and empirical validation items.
 10. `CLAUDE.md` — coding-agent operating rules; it references the above and must not silently override them.
 
+`docs/handoff/` is the ledger of the parallel work track (packets, status, provisional decisions). It sits below
+`CLAUDE.md`: it can add work, never redefine behaviour; its P-numbers become decisions only when promoted to `DECISIONS.md`.
+
 ## Documentation rule
 
 Each detailed fact has **one owning document**. Other documents summarize or reference the owner instead of duplicating implementation detail.

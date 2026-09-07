@@ -267,4 +267,11 @@ Until the implementation plan advances:
 > per stage, and the pad reached decides the next stage). Phase 3's listed slices are all delivered; Gate G0 per archetype holds in the
 > harness and the manual sample is the user's. Difficulty stays parked until after Phase 4.
 
+**Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
+agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation
+measurements, sample-stage fixes) on `opus/` branches. D-105 is delivered on `feature/branching-exits`;
+`StageDefinition.Exits` is the list a stage's completion reads. Its contract, boundaries and reconciliation protocol are in
+`docs/handoff/README.md`; its state is `docs/handoff/STATUS.md`; it writes P-numbers, never D-numbers, and never edits
+this paragraph, `docs/09` or `DECISIONS.md`. On return the main track reconciles per that README §8.
+
 The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-095: the user's `manual-small-3` preset, D-091 plus the slam and VFX overrides, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

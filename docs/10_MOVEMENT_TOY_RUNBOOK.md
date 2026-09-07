@@ -64,6 +64,7 @@ Starter presets ship in `tuning/presets/` and are installed into `user://` on fi
 | `overdrive-rush` | top-speed fantasy: cap 80, higher bands, wide arcs, hungry boost |
 | `technical-lines` | line craft: cap 50, sharper steering, small tank |
 | `chunky-lowgrav` | scale probe (V-005): 1.5 m ball, low gravity, slower world |
+| `manual-small-2` | **the user's working preset (2026-09-06)**: small ball, close camera, Flow headroom 0.715, carve, higher steering and jump; see below; not the compiled baseline |
 
 Accepted baseline (playtest 2026-09-05, final preset `boost-finetune-final` promoted to compiled
 defaults verbatim, so the preset shows as "compiled defaults"; D-078): cap 148.5 m/s, steering
@@ -139,6 +140,35 @@ playtest:
   `Look-Ahead Max` with a short `Distance` can no longer put the camera ahead of the ball. For a
   small ball scale `Ground Clearance` and `Occlusion Margin` with the radius (0.66 m ball → 0.5 / 0.2)
   or the focus floor overrides a negative `Height Offset` on flat ground.
+
+## Working preset (2026-09-06): `manual-small-2`
+
+The user's current tuning after the Flow headroom, carve and framing slices, saved from the panel and
+checked in verbatim as `tuning/presets/manual-small-2.json`. It is **not promoted**: the compiled
+defaults are still the D-078 baseline (03 §15) and the toy launches on them; load this preset (or Save
+Override) to play the current feel. Promotion is one step away: the user names it final, it is
+promoted verbatim, and 03 §15 / DECISIONS record it. What it changes against the compiled defaults:
+
+| Value | Compiled | Preset | Note |
+|---|---:|---:|---|
+| Movement › Ball Radius | 2.125 | 0.66 | the visual-scale dial (smaller ball, closer camera) in place of a bigger world; V-005 re-opened |
+| Movement › Steering Lateral Accel | 151.25 | 222.66 | D-078 value; changes the turn radius ladder every generation input was derived from |
+| Jump › Max Jump Takeoff | 58.21 | 84.63 | D-078 value; hang 4.3 s at 39.4 m/s² |
+| Flow › Headroom | 0.33 | 0.715 | ceiling 254.7 m/s at full Flow |
+| Carve › Yaw Rate / Understeer | 220 / 0.25 | 190.34 / 0.459 | |
+| Camera › Distance / Speed Distance Gain | 26 / 10 | 18.8 / 0 | |
+| Camera › Pitch / Height Offset | −34 / 3 | −20.62 / 0.08 | |
+| Camera › FOV Min / Max | 62 / 78 | 45.63 / 62.7 | widens with speed again (the earlier 97.5 / 78 narrowed) |
+| Camera › Follow / Vertical / Yaw Follow Damping | 4.99 / 4 / 3 | 8 / 8 / 12.65 | |
+| Camera › Look-Ahead Max | 22 | 15.47 | inside the 70% reach bound at 18.8 m |
+| Camera › Yaw Follow Min Speed | 2.035 | 0.545 | |
+| Camera › Ground Clearance | 1.5 | 1.505 | |
+| Movement › Drag / Gravity / Crush / Min Ground Normal Dot | 0.077 / 39.38 / 95 / 0.499 | 0.076 / 39.39 / 94.99 / 0.498 | slider noise, within 1% |
+| VFX › Charge Effect | 1 | 3 | |
+
+Frame Band 22° / Frame Band H 30° / Pitch Release 6 are the compiled defaults and are not in the file.
+The earlier `manual-finetune-small` / `manual-finetune-punchy` files (and a `.before-framing` backup
+that the framing slice made) remain in `user://tuning_presets/` as history; `manual-small-2` supersedes them.
 
 ## Calibration terrain (seed-invariant)
 

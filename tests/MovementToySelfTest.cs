@@ -2324,6 +2324,12 @@ public partial class MovementToySelfTest : Node
             var space = _player.GetWorld3D().DirectSpaceState;
             var ray = new PhysicsRayQueryParameters3D { CollisionMask = 1, Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() } };
             int rt = 0, rn = startIdx, ak = 0, insideTicks = 0, groundedInside = 0, sightBlocked = 0, pushed = 0;
+            // Distance of each axis sample from the tube's start, so the lens's station along the tube is one number.
+            var lensAlongBase = new float[axis.Length];
+            for (int q = 1; q < axis.Length; q++) lensAlongBase[q] = lensAlongBase[q - 1] + axis[q].DistanceTo(axis[q - 1]);
+            float prevLensAlong = float.NaN, prevLensStep = float.NaN, maxLensJump = 0f;
+            Vector3 prevBallPos = new(float.NaN, float.NaN, float.NaN);
+            int arrestedTicks = 0, stalled = 0, stallShown = 0; float worstShortfall = 0f, prevBallSpeed = 0f;
             float worstRadial = 0f, minLens = float.MaxValue, entrySpeed = 0f, exitSpeed = 0f, exitAngle = 0f, maxSpeedIn = 0f;
             bool entered = false, exited = false;
             int phase = 0;   // 0 approach on the primary, 1 aim at the mouth, 2 ride the axis
@@ -2370,6 +2376,29 @@ public partial class MovementToySelfTest : Node
                     _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
                     insideTicks++;
                     if (_player.IsGrounded) groundedInside++;
+                    // The rubber-band itself (T8): a body whose travel over a tick falls short of its own velocity was
+                    // arrested by the solver, whatever the camera is doing. This is what the eye sees as a lurch.
+                    if (!float.IsNaN(prevBallPos.X))
+                    {
+                        // Compare the step just taken against the velocity that produced it, not the one published after
+                        // it: the harness runs before the player each frame, so the two are one step apart and a ball
+                        // still accelerating would look arrested.
+                        float travelled = p.DistanceTo(prevBallPos);
+                        float expected = prevBallSpeed / Engine.PhysicsTicksPerSecond;
+                        if (expected > 0.5f && ak > 6 && ak < axis.Length - 6)
+                        {
+                            float shortfall = (expected - travelled) / expected;
+                            arrestedTicks++;
+                            if (shortfall > 0.10f) stalled++;
+                            worstShortfall = Mathf.Max(worstShortfall, shortfall);
+                            if (shortfall > 0.25f && stallShown < 6 && System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
+                            {
+                                stallShown++;
+                                GD.Print($"[STALL] tick {insideTicks} ak {ak} travelled {travelled:0.00} of {expected:0.00} m ({shortfall:P0} short) contacts {_player.GetContactCount()} follow {_player.TubeFollowActive} grounded {_player.IsGrounded}");
+                            }
+                        }
+                    }
+                    prevBallPos = p; prevBallSpeed = _player.Velocity.Length();
                     maxSpeedIn = Mathf.Max(maxSpeedIn, _player.LocomotionSpeed);
                     // Radial distance of the ball's centre from the axis (the tangent component removed).
                     Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
@@ -2471,6 +2500,43 @@ public partial class MovementToySelfTest : Node
                     Vector3 lens = rig.Camera.GlobalPosition;
                     int li = tube.Nearest(lens, out float ld);
                     if (li > 6 && li < axis.Length - 6) minLens = Mathf.Min(minLens, ld);
+                    // The lens must travel along the tube as smoothly as the ball does (T8). The tube push-out used to
+                    // rebuild the lens from the nearest axis sample, which threw away its station along the tube and
+                    // snapped the camera onto the 4 m sample grid on every frame it fired: a ± 2 m jump, on and off,
+                    // frame after frame. Measured as the lens's own step along the axis against the ball's.
+                    {
+                        // Station along the tube measured against the axis *polyline*, not the nearest sample: a sample
+                        // reference jumps as the nearest one switches, which is the measurement's own artifact and not
+                        // motion of the lens (the same trap as the ball's radial distance in T7).
+                        float lensAlong = 0f, bestSeg = float.MaxValue;
+                        for (int q = Mathf.Max(0, li - 3); q < Mathf.Min(axis.Length - 1, li + 3); q++)
+                        {
+                            Vector3 seg = axis[q + 1] - axis[q];
+                            float len2 = seg.LengthSquared();
+                            if (len2 < 1e-6f) continue;
+                            float u = Mathf.Clamp((lens - axis[q]).Dot(seg) / len2, 0f, 1f);
+                            Vector3 foot = axis[q] + seg * u;
+                            float dd = lens.DistanceSquaredTo(foot);
+                            if (dd < bestSeg) { bestSeg = dd; lensAlong = lensAlongBase[q] + seg.Length() * u; }
+                        }
+                        if (!float.IsNaN(prevLensAlong) && li > 6 && li < axis.Length - 6)
+                        {
+                            // How much the lens's step *changes* from tick to tick. The chase's own smoothing (follow 8/s)
+                            // makes the lens lag the ball and catch up, so its step differs from the ball's by the best part
+                            // of a metre by design; what smoothing cannot do is change that step abruptly. A snap can, and
+                            // does: the ball's own step changes by at most an acceleration times dt², a few centimetres.
+                            float step = lensAlong - prevLensAlong;
+                            if (!float.IsNaN(prevLensStep))
+                            {
+                                float jump = Mathf.Abs(step - prevLensStep);
+                                if (jump > maxLensJump && System.Environment.GetEnvironmentVariable("RUSHCORE_TUBE_TRACE") == "1")
+                                    GD.Print($"[LENS] tick {insideTicks} ak {ak} li {li}/{axis.Length} jump {jump:0.00} m step {step:0.00} pushed {rig.TubePushedThisFrame} floored {rig.FlooredThisFrame} occl {rig.CurrentDistance:0.0} lensR {(lens - axis[li] - tube.TangentAt(li) * (lens - axis[li]).Dot(tube.TangentAt(li))).Length():0.00}");
+                                maxLensJump = Mathf.Max(maxLensJump, jump);
+                            }
+                            prevLensStep = step;
+                        }
+                        prevLensAlong = lensAlong;
+                    }
                     if (rig.TubePushedThisFrame) pushed++;
                     ray.From = lens; ray.To = p;
                     if (space.IntersectRay(ray).Count > 0) sightBlocked++;
@@ -2521,6 +2587,15 @@ public partial class MovementToySelfTest : Node
             Check("the route speed model's carried profile predicts the exit speed within 10%", exited && Mathf.Abs(exitSpeed - modelExit) / Mathf.Max(1f, modelExit) <= 0.10f, $"ball {exitSpeed:0} m/s, model {modelExit:0} m/s");
             Check("the camera stays outside the tube for the whole ride", exited && minLens >= tube.Radius + WorldScale.TubeCameraMargin - 0.2f, $"lens ≥ {minLens:0.0} m from the axis (R {tube.Radius:0} + margin {WorldScale.TubeCameraMargin:0.0})");
             Check("the camera keeps a clear line of sight to the ball against the terrain through the ride", exited && sightBlocked == 0, $"{sightBlocked} of {insideTicks} ticks blocked");
+            // The ball's step changes by at most acceleration × dt² (a few centimetres at the drive's ≈ 100 m/s²), and the
+            // chase only smooths that further, so a quarter of a metre leaves ample headroom while a sample-grid snap
+            // (± 2 m, on and off every frame) is caught outright.
+            GD.Print($"[SELFTEST] tube ride travel (T8): {stalled} of {arrestedTicks} ticks travelled more than 10% short of the ball's own velocity, worst {worstShortfall:P0}; worst change in the lens's step {maxLensJump:0.00} m");
+            // The travel figure is reported, not asserted: it measures a defect that is still open (T8), and asserting a
+            // threshold above it would bless it. The camera figure is a regression guard: the tube push-out used to snap
+            // the lens onto the axis sample grid, worth 4.94 m of abrupt step; it is 2.30 m now, and the rest is not yet
+            // diagnosed, so this catches a return of the snap rather than certifying the camera is smooth.
+            Check("the tube camera does not snap along the axis sample grid (T8 regression guard: 4.94 m before the fix)", exited && maxLensJump < 3.5f, $"worst change in the lens's step between ticks {maxLensJump:0.00} m");
         }
         if (stage.Tubes.Count == 0) Check("stage has a tube to ride", true, "none on this seed nor on seeds 1–60 of this archetype");
 

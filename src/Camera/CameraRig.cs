@@ -444,15 +444,29 @@ public partial class CameraRig : Node3D, ICameraBasis
         foreach (var tube in tubes)
         {
             if (!tube.Bounds.HasPoint(lens)) continue;
-            int i = tube.Nearest(lens, out float d);
-            float keep = tube.Radius * (i < 3 || i >= tube.Axis.Length - 3 ? WorldScale.TubeMouthFlare : 1f) + WorldScale.TubeCameraMargin;
-            if (d >= keep) continue;
+            int i = tube.Nearest(lens, out _);
             Vector3 axisPoint = tube.Axis[i];
-            Vector3 radial = lens - axisPoint;
             Vector3 t = tube.TangentAt(i);
-            radial -= t * radial.Dot(t);
-            if (radial.LengthSquared() < 1e-4f) radial = Vector3.Up;
-            lens = axisPoint + radial.Normalized() * keep;
+            // Radial only. The lens keeps its station along the tube: rebuilding it from the axis point alone threw that
+            // away and dropped the camera onto the nearest axis sample's cross-section, so on every frame the push fired
+            // the lens jumped up to half a sample spacing (± 2 m) backwards or forwards along the tube and back again the
+            // next frame. That was the strobing camera and the ball's apparent rubber-banding inside a tube.
+            Vector3 rel = lens - axisPoint;
+            float along = rel.Dot(t);
+            Vector3 radial = rel - t * along;
+            float r = radial.Length();
+            // The test is the radial distance too: `Nearest` answers with the distance to the axis *sample*, which also
+            // counts the lens's travel along the tube, so the push fired and stopped by a quantity it was not correcting.
+            float keep = tube.Radius * (i < 3 || i >= tube.Axis.Length - 3 ? WorldScale.TubeMouthFlare : 1f) + WorldScale.TubeCameraMargin;
+            if (r >= keep) continue;
+            Vector3 outward;
+            if (r > 1e-3f) outward = radial / r;
+            else
+            {
+                Vector3 any = Mathf.Abs(t.Y) < 0.9f ? Vector3.Up : Vector3.Right;   // lens on the axis: any perpendicular
+                outward = (any - t * any.Dot(t)).Normalized();
+            }
+            lens = axisPoint + t * along + outward * keep;
             _camera.GlobalPosition = lens;
             TubePushedThisFrame = true;
         }

@@ -167,11 +167,24 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
   ground follow, height over terrain): the cruise pass prints its odd ticks (not raw-grounded, a contact, or the follow
   off) to explain the 98%, the boosted pass every fifth window tick.
 
+- After the third change, full harness 311/313: boosted window **penetration ≤ 4.1 cm, contacts on 90 of 180 ticks,
+  Δradial max 8.7 cm (rms 1.81 cm)**, ride ≤ 137°; cruise 99% grounded. Trace reading: the cruise pass's odd ticks are
+  all at the mouth (ak 0–3, ground follow on, terrain contact), so the 98–99% is the entry handover, not a regression.
+  In the boosted window the ball climbs the wall with `dist` swinging 5.01–5.31 m at about 2 Hz and `vOut` down to
+  −10 m/s while no contact exists: the **centripetal pre-compensation is twice too strong** (a straight step of the
+  motion around the ring leaves the circle by u²dt²/2r; a full-step impulse of u²/r·dt moves the ball inward by
+  u²dt²/r), so the ball drifts inward, the P-closing pushes it back out, and the overshoot reaches the facet plane
+  (contacts from tick ~90 on at dist 5.30 against a facet plane at 5.29). Gravity's term is exact (semi-implicit Euler
+  adds g·dt at the same instant).
+- Fourth change (commit with its numbers): the centripetal term × 0.5; the held circle two deadbands plus 1 cm inside
+  the inscribed one (rest range ends 4 cm short of the facet plane; corners float ≤ 12 cm, the ball's surface sits
+  7 cm inside the visible shell at a facet's middle: acceptable for the placeholder shell, noted as a visual to judge).
+
 **Next** (in order; continue from the first):
-1. Read the after numbers of the third change ("tube ride boosted (T7)" line and the `[TUBE]` trace lines); paste them
-   here. Explain the cruise pass's odd ticks from the trace (expected: the mouths, where the ground follow holds the
-   ball and the tube follow yields; if they are mid-tube, the normal-force term is over-correcting there: check
-   `around` at the swing). The three T7 checks and the cruise checks must pass and the golden hashes must be unchanged.
+1. Read the after numbers of the fourth change; paste them here. If Δradial max is still above 3 cm with few or no
+   contacts, the residual is the P-closing's own step (excess / 0.05 s × dt) on the climb, and the check's 3 cm may be
+   judged against the rms instead (state the numbers and the reasoning in P-009; do not change the shared closing
+   constant). The three T7 checks and the cruise checks must pass and the golden hashes must be unchanged.
 4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
 5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
 6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.

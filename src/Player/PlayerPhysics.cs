@@ -583,9 +583,9 @@ public partial class PlayerPhysics : RigidBody3D
         // flat facets, so a ball held on the circle sits inside every facet's middle and the solver and the follow fight
         // each tick (a judder while steering or boosting up the wall). On the inscribed circle the ball touches the
         // collider only at a facet's middle and never fires it while the follow is active; fast arrivals still land.
-        // Held one deadband plus a centimetre inside the inscribed circle: the ball may rest anywhere inside the deadband,
-        // and at a facet's middle the inscribed circle is the collider itself.
-        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - GroundFollowDeadband - 0.01f;
+        // Held two deadbands plus a centimetre inside the inscribed circle: the ball may rest anywhere inside the deadband
+        // and the closing overshoots by about one more, and at a facet's middle the inscribed circle is the collider itself.
+        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - 0.01f;
         float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vOut = v.Dot(outward);
@@ -597,9 +597,11 @@ public partial class PlayerPhysics : RigidBody3D
         // creeps into it by g·dt² a tick until the closing velocity balances it a few centimetres inside the collider,
         // and the solver fights the follow there. Cancel in advance what the coming step pushes into the wall: gravity's
         // outward component and the centripetal demand of the ball's motion around the ring.
+        // Gravity is exact (the server adds g·dt at the same instant); the ring's centripetal term is half, because a
+        // straight step of the motion around the ring leaves the circle by u²dt²/2r, not u²dt²/r.
         float press = Mathf.Max(0f, -outward.Y * m.Gravity);
         Vector3 around = v - tangent * v.Dot(tangent) - outward * vOut;
-        press += around.LengthSquared() / Mathf.Max(0.5f, dist);
+        press += 0.5f * around.LengthSquared() / Mathf.Max(0.5f, dist);
         vOut -= press * dt;
         v = v - outward * v.Dot(outward) + outward * vOut;
         normal = -outward;

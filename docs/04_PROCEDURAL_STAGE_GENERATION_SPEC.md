@@ -97,6 +97,14 @@ a route may switch back, spiral or turn through more than 360°, and the only pl
 footprint. Spatial lookups bucket vertices by cell; progress, checkpoints and features already read route
 distance.
 
+Feature straights (D-097, D-099): a straight at the archetype's feature spacing hosts, by the archetype's
+mix, a launch crest, a mandatory gap, a launch ramp or (on a dune sea) a train of crests on the stage's wave,
+and is sized for the feature's body plus the ceiling's flight off it and the landing run. Two rules keep the
+chain intact (§12): a feature that no longer fits once the band or the closing point has clipped its straight
+leaves a plain straight (never a featureless run of the feature's length), and a bend the heading limit would
+clip below 10° turns the other way instead of being skipped (two straights with no bend between them are one
+chain gap).
+
 ### B — Archetype base heightfield
 
 Apply structured analytic functions that establish strategic identity:
@@ -305,6 +313,26 @@ Geometry:
 - occasional large set-piece dune,
 - wide landing zones.
 
+**Delivered 2026-09-07 (D-099):** the stage carries one seeded dune wave, a directional cosine train of
+wavelength 350–500 m whose crests stand 0.06–0.085 × λ (21–43 m) above the swells, its crest lines within
+10° of across the stage axis; the swell slope budget drops to 0.08 so the dunes are the relief. The skeleton
+builder draws the wave first (gameplay structure before noise) and makes most feature straights **dune
+trains**: two to four launch-crest features a wavelength apart, each placed on one of the wave's own crests,
+with the straight sized for the ceiling's flight off the last crest (plus a 15% margin) and the landing run.
+Inside a train the corridor profile adds the same crests, so the corridor rides the dunes exactly; every
+other section (bends, plain straights, modules) leaves the wave out and runs at the swale level between the
+dunes, because a wave under a bend would launch the ceiling ball inside it. Trains only take straights
+within 35° of the wave's travel direction (the corridor is level across; a seam of ≤ 4 m at the corridor
+edge is the residue), the route keeps within 12° of the axis so a 2 km train fits the route band, and a
+clipped train keeps as many crests as still fit. At the base cap every crest launches (v²/g·r ≈ 1.5): the
+flight lands on the same dune's downslope near the trough at 55–60 m/s down (a slam keeps Flow, anything
+else pays it, 03 §9), the ball climbs the next dune and launches again, which is the rhythm; a charged jump
+clears the next crest, which is the alignment. At the ceiling the ball leaves near each trough and flies
+over the next dune. The set-piece dune and the wide landing zones are not yet distinct: the whole dune field
+around a train is the corridor's own shape (no cut or fill), and the set piece waits on the aligned-relief
+bump. Palette: sand from the troughs to pale crests, lee faces darker. Selected by `World › Dune Sea
+(Phase 3)`, `-- --dunes` and `RUSHCORE_ARCHETYPE=dunes`.
+
 ### Sky Terraces (D-096)
 
 **Primary skill:** vertical commitment and fall management.
@@ -317,9 +345,10 @@ Geometry:
 - tubes and bridges linking floors and branching lines,
 - every fall lands on ground that drains back to the primary.
 
-Archetype rules (D-098): an `ArchetypeRules` record per archetype carries the wall height, the wall and
-inside falloffs, the bend mix, the straight lengths and the bank scale; the skeleton builder, the height
-field and the validators read it and nothing else differs between archetypes.
+Archetype rules (D-098, extended D-099): an `ArchetypeRules` record per archetype carries the wall height,
+the wall and inside falloffs, the bend mix, the straight lengths, the bank scale, the swell slope budget,
+the feature spacing / chance / mix, the dune-train crest count and the heading limit; the skeleton builder,
+the height field and the validators read it and nothing else differs between archetypes.
 
 ## 7. Archetype physics rule
 
@@ -546,6 +575,7 @@ Invisible anchors along the primary progression:
 - update only after legitimate player progress,
 - not immediately before unavoidable danger,
 - on a vertical stage the nearest-vertex match includes height, so a turn below or a floor above never aliases (D-096),
+- a module owns its whole straight and pushes the anchor past it; a launch crest owns only its own span, so the approach before it and the troughs of a dune train keep theirs (a restore at rest between two crests is safe, D-099); one anchor per pushed spacing, never a stack on the same vertex,
 - anchors never regress: after a fall the highest reached anchor stays armed; a stuck recovery restores there and a plain fall restores nothing.
 
 ## 14. Threading

@@ -4,12 +4,12 @@ using Rushcore.World;
 namespace Rushcore.Generation;
 
 /// <summary>
-/// Rolling Highlands height source (04 §5B–D, §6): analytic long swells whose summed crest
-/// curvature and slope are budgeted so a cruising ball keeps contact (04 §8) and the corridor
-/// stays under the route grade limit, bounded micro relief (04 §5C), and the guaranteed corridor
-/// stamped along the primary route: level across, smoothed along, banked on bends, launch
-/// crests on feature straights, flat start/exit pads. Pure data; render and collision both
-/// sample it (04 §9).
+/// Stage height source (04 §5B–D, §6): analytic long swells whose summed crest curvature and slope
+/// are budgeted so a cruising ball keeps contact (04 §8) and the corridor stays under the route grade
+/// limit, bounded micro relief (04 §5C), the archetype's own relief on top (a canyon's raised side
+/// terrain, a dune sea's wave), and the guaranteed corridor stamped along the primary route: level
+/// across, smoothed along, banked on bends, launch crests (or dune trains riding the wave) on feature
+/// straights, flat start/exit pads. Pure data; render and collision both sample it (04 §9).
 /// </summary>
 public sealed class StageHeightField : IHeightSource
 {
@@ -35,6 +35,8 @@ public sealed class StageHeightField : IHeightSource
     }
 
     private readonly Swell[] _swells;
+    /// <summary>A dune sea's wave (D-099), the skeleton's; zero elsewhere.</summary>
+    private readonly DuneWave _dunes;
     private readonly ulong _noiseSeedA, _noiseSeedB;
     private readonly float _noiseAmpA, _noiseAmpB;
 
@@ -196,6 +198,7 @@ public sealed class StageHeightField : IHeightSource
     public StageHeightField(RouteSkeleton route, ulong stageSeed, ArchetypeRules? rules = null)
     {
         _rules = rules ?? ArchetypeRules.RollingHighlands;
+        _dunes = route.Dunes;
         var rng = new SeededRandom(SeedChain.Derive(stageSeed, "relief"));
         WallHeight = _rules.WallHeightMax > 0f ? rng.Range(_rules.WallHeightMin, _rules.WallHeightMax) : 0f;
 
@@ -213,7 +216,7 @@ public sealed class StageHeightField : IHeightSource
             slope += amp * k;
         }
         // Two budgets: crest curvature (contact at the cap) and slope (corridor grade with a crest on top).
-        float scale = Mathf.Min(1f, Mathf.Min(SwellCurvatureShare / WorldScale.CruiseCrestRadius / curvature, WorldScale.LongSwellMaxSlope / slope));
+        float scale = Mathf.Min(1f, Mathf.Min(SwellCurvatureShare / WorldScale.CruiseCrestRadius / curvature, _rules.SwellMaxSlope / slope));
         if (scale < 1f)
         {
             for (int i = 0; i < _swells.Length; i++)
@@ -229,12 +232,15 @@ public sealed class StageHeightField : IHeightSource
         _noiseAmpA = 0.6f * remaining / (1.5f * Mathf.Pow(Mathf.Tau / 400f, 2f));   // ≈ 0.9 m at λ 400
         _noiseAmpB = 0.4f * remaining / (1.5f * Mathf.Pow(Mathf.Tau / 120f, 2f));   // ≈ 0.05 m at λ 120
 
-        // ---- D: corridor profile = relief along the route, smoothed, plus crests and pads ----
+        // ---- D: corridor profile = base relief along the route, smoothed, plus crests and pads. On a dune sea
+        // the wave is left out here and put back by the trains' crest stamps, which sit on its crests: a train
+        // straight rides the dunes exactly, every other section is the swale between them (a bend on the wave
+        // would launch the ceiling ball inside it).
         _primaryRoute = route;
         var v = route.Vertices;
         int n = v.Count;
         var raw = new float[n];
-        for (int i = 0; i < n; i++) raw[i] = Relief(v[i].Position.X, v[i].Position.Z);
+        for (int i = 0; i < n; i++) raw[i] = Base(v[i].Position.X, v[i].Position.Z);
         var rh = new float[n];
         int window = Mathf.Max(1, Mathf.RoundToInt(SmoothingHalfWindow / WorldScale.RouteSampleSpacing));
         var prefix = new float[n + 1];
@@ -266,6 +272,9 @@ public sealed class StageHeightField : IHeightSource
                 }
             }
         }
+        // Crests read the slope under them from the profile before any crest: the crests of a dune train share
+        // one straight, and one crest's face is not the ground the next one stands on.
+        var preCrest = (float[])rh.Clone();
         foreach (var f in route.Features)
         {
             if (f.Kind != RouteFeatureKind.LaunchCrest) continue;
@@ -274,7 +283,7 @@ public sealed class StageHeightField : IHeightSource
             for (int i = f.StartIndex + 1; i <= f.EndIndex; i++)
             {
                 float ds = v[i].Distance - v[i - 1].Distance;
-                if (ds > 1e-3f) localSlope = Mathf.Max(localSlope, Mathf.Abs(rh[i] - rh[i - 1]) / ds);
+                if (ds > 1e-3f) localSlope = Mathf.Max(localSlope, Mathf.Abs(preCrest[i] - preCrest[i - 1]) / ds);
             }
             float maxHeight = Mathf.Max(0f, (WorldScale.MaxRouteGrade * 0.9f - localSlope) * f.Wavelength / Mathf.Pi);
             f.Height = Mathf.Min(f.Height, maxHeight);
@@ -343,10 +352,16 @@ public sealed class StageHeightField : IHeightSource
         return best;
     }
 
-    /// <summary>Base landscape without the corridors: swells plus micro relief. A canyon's side terrain sits
-    /// <see cref="WallHeight"/> above this; the corridor profile is cut from the floor relief, so the channel
-    /// floor follows the valleys and the walls are the difference.</summary>
-    public float Relief(float x, float z)
+    /// <summary>Base landscape without the corridors: swells plus micro relief, plus a dune sea's wave. A canyon's
+    /// side terrain sits <see cref="WallHeight"/> above this; the corridor profile is cut from the floor relief, so
+    /// the channel floor follows the valleys and the walls are the difference.</summary>
+    public float Relief(float x, float z) => Base(x, z) + _dunes.At(x, z);
+
+    /// <summary>The wave of a dune sea at a point (0 elsewhere).</summary>
+    public float DuneHeight(float x, float z) => _dunes.At(x, z);
+
+    /// <summary>Swells plus micro relief: what the corridor profile is smoothed from.</summary>
+    private float Base(float x, float z)
     {
         float h = 0f;
         for (int i = 0; i < _swells.Length; i++)
@@ -401,6 +416,9 @@ public sealed class StageHeightField : IHeightSource
     private static readonly Color Track = new(0.50f, 0.44f, 0.36f);
     private static readonly Color CanyonRock = new(0.62f, 0.36f, 0.24f);
     private static readonly Color CanyonRim = new(0.80f, 0.60f, 0.40f);
+    private static readonly Color SandTrough = new(0.72f, 0.56f, 0.34f);
+    private static readonly Color SandCrest = new(0.93f, 0.80f, 0.52f);
+    private static readonly Color SandLee = new(0.58f, 0.42f, 0.26f);
     private static readonly Color StartPad = new(0.30f, 0.62f, 0.38f);
     private static readonly Color ExitPad = new(0.32f, 0.48f, 0.78f);
 
@@ -408,6 +426,16 @@ public sealed class StageHeightField : IHeightSource
     {
         float slope = 1f - Mathf.Clamp(normal.Y, 0f, 1f);
         Color c = TerrainHeightField.BasePalette(point.Y * 0.45f, slope);
+        if (_dunes.Exists)
+        {
+            // Dune palette (06 §3): sand from the troughs to the pale crests, the faces that lean away from the
+            // wave's travel darker, so the crest lines read at a glance and the wave's direction with them.
+            float up = Mathf.Clamp(_dunes.At(point.X, point.Z) / _dunes.Height, 0f, 1f);
+            float lean = normal.X * Mathf.Cos(_dunes.Angle) + normal.Z * Mathf.Sin(_dunes.Angle);
+            c = SandTrough.Lerp(SandCrest, Mathf.SmoothStep(0.1f, 0.9f, up));
+            c = c.Lerp(SandLee, Mathf.SmoothStep(0.02f, 0.2f, -lean) * 0.7f);
+            c = c.Lerp(TerrainHeightField.BasePalette(-20f, slope), Mathf.SmoothStep(0.25f, 0.5f, slope) * 0.5f);
+        }
         if (WallHeight > 0f)
         {
             // Canyon palette (06 §3): red rock on the walls, a paler rim on the side terrain, the floor unchanged.

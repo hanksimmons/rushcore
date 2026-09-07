@@ -192,6 +192,15 @@ regeneration-bound edge (three failed attempts, the fourth valid).
 hashes); the wall-clearance validator holds on every seed; `RUSHCORE_ARCHETYPE=canyon` drives a canyon
 stage in the drive case and two canyon seeds sit in the regression list. The manual sample is the user's.
 
+**Result (Dune Sea, D-099, 2026-09-07):** 100 dune seeds: 100 valid, 0 fallbacks, deterministic hashes, 259
+crests of which 102 trains of two or more on 83 seeds, 24 gaps / 32 ramps / 61 banked turns all passing, every
+train's crests meeting the relief wave within 2 m (the new dune validator), anchors ≥ 8; only 2 seeds needed a
+second attempt. `RUSHCORE_ARCHETYPE=dunes` drives a dune stage: the ball's time within 0.3% of the model over
+5.9 km, each crest launched exactly when v² > g·r (1.48–1.53), the three flights within 3 / 5 / 9% of the
+model's, landing 55–62 m/s down. Only 40 seeds carry a ridge line, because ridge lines avoid feature straights
+and a dune sea is mostly trains: the batch's optional-line floor is 30% for this archetype and a dune lane is
+the open gap. Three dune seeds sit in the regression list. The manual sample is the user's.
+
 ## 6. Combat — Gate C0
 
 Objective:

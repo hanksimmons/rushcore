@@ -54,7 +54,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public StageDefinition? Stage { get; private set; }
     /// <summary>Archetype of the built stage, and the one the world tuning asks for.</summary>
     public TerrainArchetype Archetype { get; private set; }
-    public TerrainArchetype WantedArchetype => _t.World.CanyonRun ? TerrainArchetype.CanyonRun : TerrainArchetype.RollingHighlands;
+    public TerrainArchetype WantedArchetype => _t.World.DuneSea ? TerrainArchetype.DuneSea : _t.World.CanyonRun ? TerrainArchetype.CanyonRun : TerrainArchetype.RollingHighlands;
     /// <summary>One-line generation summary for the telemetry seed row.</summary>
     public string StageSummary { get; private set; } = "";
     /// <summary>Furthest primary-route vertex the player has reached on a generated stage.</summary>
@@ -178,7 +178,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
             Stage = generator.Generate(new StageGenerationRequest(Seed, 0, Archetype));
             _field = Stage.HeightField!;
             var r = Stage.Report;
-            StageSummary = $"{(Archetype == TerrainArchetype.CanyonRun ? "canyon" : "highlands")} {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
+            StageSummary = $"{ArchetypeRules.Label(Archetype)} {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +

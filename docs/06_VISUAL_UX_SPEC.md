@@ -41,6 +41,9 @@ Enemy roles retain stable silhouettes/semantic treatments across stage palettes.
 
 Do not rely only on hue.
 
+Delivered palettes: Canyon Run is red rock on the walls with a pale rim (D-098); Dune Sea is sand from the troughs
+to pale crests with the lee faces darker, so the crest lines and the wave's direction read at a glance (D-099).
+
 Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
 above which the fog thickens into a layer the top floor sits in and a fall drops through; a see-through
 tube is a translucent shell with opaque ribs every 25 m, the ribs being the motion cue (§2) at speed.

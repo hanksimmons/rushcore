@@ -120,12 +120,16 @@ public sealed class StageGenerator
         var route = def.PrimaryRoute;
         var v = route.Vertices;
         float ballRadius = 2.125f;   // restore height uses the accepted ball radius (03 §15); the runtime re-floors it
+        float lastPlaced = float.NegativeInfinity;
         for (float d = WorldScale.CheckpointSpacing; d < route.Length - WorldScale.PadRadius * 2f; d += WorldScale.CheckpointSpacing)
         {
             float place = d;
             foreach (var f in route.Features)
             {
-                float fs = v[f.StartIndex].Distance, fe = f.ReservedEnd;
+                // A module owns its whole straight; a crest owns its own span, so the approach before it and the
+                // troughs of a dune train (a restore at rest between two crests, D-099) keep their anchors.
+                float fs = f.Kind == RouteFeatureKind.LaunchCrest ? f.CentreDistance - f.Wavelength * 0.5f + 40f : v[f.StartIndex].Distance;
+                float fe = f.ReservedEnd;
                 if (place >= fs && place <= fe) place = fe + 20f;
             }
             if (place >= route.Length - WorldScale.PadRadius * 2f) break;
@@ -134,6 +138,9 @@ public sealed class StageGenerator
             foreach (var b in route.Bends)
                 if (i >= b.StartIndex && i <= b.EndIndex) { i = Mathf.Min(v.Count - 1, b.EndIndex + 4); break; }
             if (v[i].Distance >= route.Length - WorldScale.PadRadius * 2f) break;
+            // Every spacing pushed past one long feature straight would land on the same vertex: one anchor there.
+            if (v[i].Distance < lastPlaced + WorldScale.CheckpointSpacing * 0.5f) continue;
+            lastPlaced = v[i].Distance;
             def.Checkpoints.Add(new Checkpoint
             {
                 Position = v[i].Position + Vector3.Up * (ballRadius + 0.6f),
@@ -258,6 +265,22 @@ public sealed class StageGenerator
 
         report.Add("base relief keeps contact at the cap", field.SwellCurvature <= 1f / WorldScale.CruiseCrestRadius + 1e-6f,
             $"swell crest radius ≥ {1f / Mathf.Max(1e-6f, field.SwellCurvature):0} m");
+        if (route.Dunes.Exists)
+        {
+            // Dune Sea (D-099): a train's crests are the wave's own, so the corridor there is the relief; its
+            // profile must meet the relief wave at every crest apex (a trimmed crest would leave a seam).
+            float worstSeam = 0f; int crests = 0, trains = 0; int lastStraight = -1;
+            foreach (var f in route.Features)
+            {
+                if (f.Kind != RouteFeatureKind.LaunchCrest) continue;
+                crests++;
+                if (f.StartIndex != lastStraight) { trains++; lastStraight = f.StartIndex; }
+                var p = v[route.IndexAtDistance(f.CentreDistance)].Position;
+                worstSeam = Mathf.Max(worstSeam, Mathf.Abs(f.Height - field.DuneHeight(p.X, p.Z)));
+            }
+            report.Add("dune trains ride the stage's wave (crest heights meet the relief wave at every apex)", worstSeam <= 2f,
+                $"wave λ {route.Dunes.Wavelength:0} m / H {route.Dunes.Height:0} m at {Mathf.RadToDeg(route.Dunes.Angle):+0;-0}°; {trains} trains, {crests} crests, worst seam {worstSeam:0.00} m");
+        }
 
         bool crestsClear = true;
         string crestDetail = "";

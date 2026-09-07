@@ -53,6 +53,9 @@ public partial class WorldDressing : Node3D
 
     public event Action<float>? BoostPickupCollected;
 
+    public StandardMaterial3D TubeShellMaterial { get; private set; } = null!;
+    public StandardMaterial3D TubeRibMaterial { get; private set; } = null!;
+
     protected void RaiseBoostPickup(float amount) => BoostPickupCollected?.Invoke(amount);
 
     public override void _Ready()
@@ -182,6 +185,21 @@ public partial class WorldDressing : Node3D
 
         _matInstanced = Flat(Colors.White);
         _matInstanced.VertexColorUseAsAlbedo = true;
+
+        // Tube shell (06 §3, D-096): a translucent skin seen from outside, opaque ribs as the motion cue at speed.
+        TubeShellMaterial = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.55f, 0.85f, 1.0f, 0.22f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            CullMode = BaseMaterial3D.CullModeEnum.Back,
+            DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Lambert,
+            SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+            Roughness = 0.4f,
+            EmissionEnabled = true,
+            Emission = new Color(0.25f, 0.5f, 0.7f),
+            EmissionEnergyMultiplier = 0.25f,
+        };
+        TubeRibMaterial = Glow(new Color(0.85f, 0.95f, 1.0f), 0.5f);
     }
 
     private static StandardMaterial3D Flat(Color albedo) => new()
@@ -265,11 +283,16 @@ public partial class WorldDressing : Node3D
         // Scale pillars are solid: they stand just outside the corridor, never inside it (04 §5G).
         BuildPillars(route.Start.X + 30f, route.Start.Z + StageHeightField.CorridorHalfWidth + 12f);
 
+        foreach (var tube in stage.Tubes)
+            AddSign(tube.Axis[0] + Vector3.Up * (tube.Radius * 2f + 8f), tube.Passed ? "TUBE" : "TUBE ✗", 7f);
+
         if (_t.World.RouteDebugLines)
         {
             BuildRouteLines(route);
             foreach (var line in stage.OptionalLines) BuildRouteLines(line, RouteOptionalColor);
             foreach (var cp in stage.Checkpoints) AddCheckpointPost(cp.Position);
+            // Structure view (04 §16): tube axes and mouths.
+            foreach (var tube in stage.Tubes) BuildPolyline(tube.Axis, RouteTubeColor, 0f);
         }
 
         // Cosmetic scatter never enters the corridor (04 §5G): keep clear of the stamp and its falloff.
@@ -291,6 +314,21 @@ public partial class WorldDressing : Node3D
     private static readonly Color RouteBendColor = new(1.0f, 0.62f, 0.2f);
     private static readonly Color RouteCrestColor = new(1.0f, 0.3f, 0.85f);
     private static readonly Color RouteOptionalColor = new(0.45f, 1.0f, 0.4f);
+    private static readonly Color RouteTubeColor = new(0.85f, 0.45f, 1.0f);
+
+    /// <summary>Unshaded line strip through world points, lifted by <paramref name="lift"/>.</summary>
+    private void BuildPolyline(Vector3[] points, Color color, float lift)
+    {
+        var mesh = new ImmediateMesh();
+        mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
+        foreach (var p in points) { mesh.SurfaceSetColor(color); mesh.SurfaceAddVertex(p + Vector3.Up * lift); }
+        mesh.SurfaceEnd();
+        _content.AddChild(new MeshInstance3D
+        {
+            Name = "StructureLine", Mesh = mesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            MaterialOverride = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true },
+        });
+    }
 
     /// <summary>Unshaded line strip 3 m above the route: cyan straights, orange bends, magenta crests.</summary>
     private void BuildRouteLines(RouteSkeleton route, Color? fixedColor = null)

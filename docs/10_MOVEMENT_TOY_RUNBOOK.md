@@ -20,6 +20,7 @@ RUSHCORE_BATCH_FAILS=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>   # tally wh
 RUSHCORE_LINE_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # for a dropped optional line, the polyline heights ±40 m around its first launch
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Archetype = 1)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --dunes --seed 1    # play a Dune Sea stage (World › Archetype = 2)
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 9            # a Highlands stage with a see-through tube at 1.1 km (D-101; Movement › Tube Contact)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
 

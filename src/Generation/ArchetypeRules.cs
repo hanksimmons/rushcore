@@ -32,26 +32,28 @@ public sealed record ArchetypeRules(
     int TrainCrestsMin, int TrainCrestsMax,
     /// <summary>Largest heading off the stage axis: 45° is the family's wander; a dune sea keeps to 12° so its
     /// 2 km train straights fit the route band.</summary>
-    float MaxHeading)
+    float MaxHeading,
+    /// <summary>Chance a clear section hosts a see-through tube (04 §5I, D-101); 0 = no tubes.</summary>
+    float TubeChance)
 {
     public bool HasDunes => TrainCrestsMax > 0;
 
     public static readonly ArchetypeRules RollingHighlands = new(
         TerrainArchetype.RollingHighlands, 0f, 0f, StageHeightField.FalloffWidth, StageHeightField.FalloffWidth,
         0.50f, 0.35f, 250f, 600f, 1f,
-        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f);
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0.6f);
 
     /// <summary>Canyon Run (04 §6): a winding low channel between walls, broad banked bends, the inside wall set back.</summary>
     public static readonly ArchetypeRules CanyonRun = new(
         TerrainArchetype.CanyonRun, WorldScale.CanyonWallHeightMin, WorldScale.CanyonWallHeightMax, WorldScale.CanyonWallFalloff, StageHeightField.FalloffWidth,
         0.45f, 0.45f, 200f, 450f, WorldScale.CanyonBankScale,
-        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f);
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0.6f);
 
     /// <summary>Dune Sea (04 §6): broad repeating waves, most straights a train of launch crests, cruise-heavy bends.</summary>
     public static readonly ArchetypeRules DuneSea = new(
         TerrainArchetype.DuneSea, 0f, 0f, StageHeightField.FalloffWidth, StageHeightField.FalloffWidth,
         0.60f, 0.30f, 250f, 600f, 1f,
-        WorldScale.DuneSwellMaxSlope, 300f, 0.85f, 0.7f, 0.15f, WorldScale.DuneTrainCrestsMin, WorldScale.DuneTrainCrestsMax, Mathf.Pi / 15f);
+        WorldScale.DuneSwellMaxSlope, 300f, 0.85f, 0.7f, 0.15f, WorldScale.DuneTrainCrestsMin, WorldScale.DuneTrainCrestsMax, Mathf.Pi / 15f, 0.6f);
 
     public static ArchetypeRules For(TerrainArchetype archetype) => archetype switch
     {

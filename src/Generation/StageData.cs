@@ -120,6 +120,54 @@ public sealed class RouteBend
 
 public enum RouteLineKind { Primary, Ridge }
 
+public enum MouthKind { Ground, Edge, Midair }
+
+/// <summary>
+/// A see-through tube (04 §5I, D-096; delivered D-101): a circle of <see cref="Radius"/> swept along a 3D axis that
+/// leaves a line through an entry mouth and rejoins it (or another line) through a flared exit mouth onto a landing
+/// zone. The ball inside is carried by the walls (no bend loss in the route speed model); the shell is a structure
+/// collider, never a second height layer. Axis points are spaced <see cref="WorldScale.RouteSampleSpacing"/> apart.
+/// </summary>
+public sealed class TubeDefinition
+{
+    public Vector3[] Axis = System.Array.Empty<Vector3>();
+    public float Radius;
+    public MouthKind EntryKind = MouthKind.Ground;
+    /// <summary>Primary-route vertex indices the tube leaves from and lands back at.</summary>
+    public int JoinStart, JoinEnd;
+    /// <summary>+1 left of the line, −1 right (the side the tube swings out to).</summary>
+    public float Side;
+    /// <summary>Height of the cruise above the corridor at the mouths.</summary>
+    public float CruiseHeight;
+    public float Length;
+    /// <summary>The carried profiles: base kit and ceiling, from the join's arrival speed.</summary>
+    public RouteSpeedProfile? Profile, CeilingProfile;
+    /// <summary>Steepest wall ride the base kit's speed asks of the tube's tightest turn (tan φ = v²κ / g), degrees.</summary>
+    public float MaxRideDegrees;
+    public bool Passed;
+    public string Detail = "";
+    /// <summary>Tangent of the axis at an axis index.</summary>
+    public Vector3 TangentAt(int i)
+    {
+        int a = Mathf.Max(0, i - 1), b = Mathf.Min(Axis.Length - 1, i + 1);
+        Vector3 t = Axis[b] - Axis[a];
+        return t.LengthSquared() > 1e-8f ? t.Normalized() : Vector3.Forward;
+    }
+    /// <summary>Nearest axis point to a world position (squared distance and index), linear over the axis.</summary>
+    public int Nearest(Vector3 p, out float distance)
+    {
+        int best = 0; float bestD = float.MaxValue;
+        for (int i = 0; i < Axis.Length; i++)
+        {
+            float d = Axis[i].DistanceSquaredTo(p);
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        distance = Mathf.Sqrt(bestD);
+        return best;
+    }
+    public Aabb Bounds { get; internal set; }
+}
+
 /// <summary>Macro route skeleton (04 §5A): a route as arcs and straights, sampled. Optional lines
 /// are skeletons too, joined to the primary at two of its vertices.</summary>
 public sealed class RouteSkeleton
@@ -214,6 +262,8 @@ public sealed class StageDefinition
     public string DroppedDetail { get; internal set; } = "";
     /// <summary>Challenge modules on the primary (04 §5E) with their validator verdicts.</summary>
     public List<ChallengeModule> Modules { get; } = new();
+    /// <summary>See-through tubes (04 §5I, D-101): the line graph's branches through the air.</summary>
+    public List<TubeDefinition> Tubes { get; } = new();
     public List<Checkpoint> Checkpoints { get; } = new();
     public ValidationReport Report { get; }
     /// <summary>The one logical height source for render and collision (04 §9); null only for skeleton-only builds.</summary>
@@ -243,6 +293,8 @@ public sealed class StageDefinition
         foreach (var line in OptionalLines)
             foreach (var v in line.Vertices) { Mix(v.Position.X); Mix(v.Position.Y); Mix(v.Position.Z); }
         foreach (var c in Checkpoints) { Mix(c.Position.X); Mix(c.Position.Y); Mix(c.Position.Z); }
+        foreach (var t in Tubes)
+            foreach (var a in t.Axis) { Mix(a.X); Mix(a.Y); Mix(a.Z); }
         return h;
     }
 }

@@ -1827,7 +1827,8 @@ public partial class MovementToySelfTest : Node
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
         int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
-        int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0;
+        int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0, tubes = 0, seedsWithTube = 0, tubesPassed = 0;
+        float rideMax = 0f; string exampleTube = "";
         string exampleGap = "", exampleRamp = "", exampleRegen = "", exampleTrain = "";
         double msSum = 0, msMax = 0;
         string firstFailure = "";
@@ -1861,6 +1862,10 @@ public partial class MovementToySelfTest : Node
             if (def.OptionalLines.Count > 0) withLines++;
             linesTotal += def.OptionalLines.Count;
             droppedLines += def.DroppedLines;
+            tubes += def.Tubes.Count;
+            tubesPassed += def.Tubes.Count(x => x.Passed);
+            foreach (var x in def.Tubes) rideMax = Mathf.Max(rideMax, x.MaxRideDegrees);
+            if (def.Tubes.Count > 0) { seedsWithTube++; if (exampleTube == "" || (req.StageIndex == 0 && !exampleTube.EndsWith("/0"))) exampleTube = $"{req.RunSeed}/{req.StageIndex}"; }
             minAnchors = Mathf.Min(minAnchors, def.Checkpoints.Count);
             belowSum += def.SpeedProfile.SecondsBelow(_debug.Tuning.Movement.HardMaxLocomotionSpeed * 0.98f);
             ceilFlights += def.CeilingProfile?.Flights.Count ?? 0;
@@ -1896,6 +1901,7 @@ public partial class MovementToySelfTest : Node
         sw.Stop();
         GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; {crests} crests, {trains} trains of ≥ 2 ({seedsWithTrain} seeds, e.g. {exampleTrain}); regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
+        GD.Print($"[SELFTEST] {A} tubes over the batch: {tubes} tubes on {seedsWithTube} seeds (e.g. {exampleTube}), {tubesPassed} pass, wall ride ≤ {rideMax:0}°");
         if (fallbackReasons.Count > 0) GD.Print($"[SELFTEST] {A} attempt failures: " + string.Join(", ", fallbackReasons.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
         GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
@@ -1918,6 +1924,7 @@ public partial class MovementToySelfTest : Node
         // Dune Sea (D-099): the archetype's identity is the crest-to-crest rhythm, so most seeds carry a train.
         if (archetype == TerrainArchetype.DuneSea)
             Check($"{A}: " + "most seeds carry a dune train of at least two crests", seedsWithTrain >= Count * 0.6f, $"{seedsWithTrain}/{Count} seeds, {trains} trains, {crests} crests");
+        Check($"{A}: " + "the batch places see-through tubes and every tube passes its validators (clearance, mouths, carried profile)", tubes > 0 && tubesPassed == tubes, $"{tubes} tubes, {tubesPassed} pass, {seedsWithTube} seeds");
         Check($"{A}: " + "route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
         Check($"{A}: " + "base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
@@ -2186,8 +2193,108 @@ public partial class MovementToySelfTest : Node
         }
         else Check("stage has an optional line to drive", true, "none on this seed (the default seed carries two; a chosen seed may carry none)");
 
+        // Tube ride (08 §5, D-101): drive into the first tube at the cap and assert the walls carry the ball through, it
+        // exits along the axis with no face crossed, and the camera stays outside the shell with a clear line of sight.
+        // A drive seed without a tube borrows the first seed of its archetype that has one (the node-growth block restores).
+        int tubeSeed = 0;
+        if (stage.Tubes.Count == 0)
+        {
+            var gen = new StageGenerator(t.Movement, t.Flow, t.JumpSlam);
+            for (int s = 1; s <= 60 && tubeSeed == 0; s++)
+                if (gen.Generate(new StageGenerationRequest(s, 0, world.Archetype)).Tubes.Count > 0) tubeSeed = s;
+            if (tubeSeed > 0)
+            {
+                world.Regenerate(tubeSeed);
+                foreach (var _ in Frames(3)) yield return null;
+                stage = world.Stage!;
+                verts = stage.PrimaryRoute.Vertices;
+                GD.Print($"[SELFTEST] tube ride: drive seed has no tube; using seed {tubeSeed}/0 ({stage.Tubes.Count} tubes)");
+            }
+        }
+        if (stage.Tubes.Count > 0)
+        {
+            var tube = stage.Tubes[0];
+            var axis = tube.Axis;
+            float entryD = verts[tube.JoinStart].Distance;
+            int startIdx = stage.PrimaryRoute.IndexAtDistance(Mathf.Max(0f, entryD - 700f));
+            foreach (var _ in Settle(verts[startIdx].Position + Vector3.Up * (m.BallRadius + 0.6f), 0.5f)) yield return null;
+            var rig = (Rushcore.Camera.CameraRig)_player.CameraBasis!;
+            var space = _player.GetWorld3D().DirectSpaceState;
+            var ray = new PhysicsRayQueryParameters3D { CollisionMask = 1, Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() } };
+            int rt = 0, rn = startIdx, ak = 0, insideTicks = 0, groundedInside = 0, sightBlocked = 0, pushed = 0;
+            float worstRadial = 0f, minLens = float.MaxValue, entrySpeed = 0f, exitSpeed = 0f, exitAngle = 0f, maxSpeedIn = 0f;
+            bool entered = false, exited = false;
+            int phase = 0;   // 0 approach on the primary, 1 aim at the mouth, 2 ride the axis
+            while (rt++ < Engine.PhysicsTicksPerSecond * 25 && !exited)
+            {
+                Vector3 p = _player.GlobalPosition;
+                if (phase == 0)
+                {
+                    float best = float.MaxValue;
+                    for (int i = Mathf.Max(0, rn - 5); i < Mathf.Min(verts.Count, rn + 60); i++)
+                    {
+                        float d = new Vector2(verts[i].Position.X - p.X, verts[i].Position.Z - p.Z).LengthSquared();
+                        if (d < best) { best = d; rn = i; }
+                    }
+                    if (verts[rn].Distance >= entryD - 160f) phase = 1;
+                    else { var tg = verts[Mathf.Min(verts.Count - 1, rn + 15)].Position; _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z); }
+                }
+                if (phase == 1)
+                {
+                    Vector3 mouth = axis[0];
+                    _worldDrive = new Vector3(mouth.X - p.X, 0f, mouth.Z - p.Z);
+                    if (new Vector2(mouth.X - p.X, mouth.Z - p.Z).Length() < 12f) { phase = 2; entered = true; entrySpeed = _player.LocomotionSpeed; }
+                }
+                if (phase == 2)
+                {
+                    float best = float.MaxValue;
+                    for (int i = Mathf.Max(0, ak - 5); i < Mathf.Min(axis.Length, ak + 40); i++)
+                    {
+                        float d = axis[i].DistanceSquaredTo(p);
+                        if (d < best) { best = d; ak = i; }
+                    }
+                    var tg = axis[Mathf.Min(axis.Length - 1, ak + 12)];
+                    _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
+                    insideTicks++;
+                    if (_player.IsGrounded) groundedInside++;
+                    maxSpeedIn = Mathf.Max(maxSpeedIn, _player.LocomotionSpeed);
+                    // Radial distance of the ball's centre from the axis (the tangent component removed).
+                    Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
+                    rel -= tan * rel.Dot(tan);
+                    if (ak > 6 && ak < axis.Length - 6) worstRadial = Mathf.Max(worstRadial, rel.Length());
+                    // Camera: lens outside the shell, ball visible against the terrain layer.
+                    Vector3 lens = rig.Camera.GlobalPosition;
+                    int li = tube.Nearest(lens, out float ld);
+                    if (li > 6 && li < axis.Length - 6) minLens = Mathf.Min(minLens, ld);
+                    if (rig.TubePushedThisFrame) pushed++;
+                    ray.From = lens; ray.To = p;
+                    if (space.IntersectRay(ray).Count > 0) sightBlocked++;
+                    if (ak >= axis.Length - 4)
+                    {
+                        exited = true;
+                        exitSpeed = _player.LocomotionSpeed;
+                        Vector3 vel = _player.Velocity;
+                        exitAngle = vel.LengthSquared() > 1f ? Mathf.RadToDeg(vel.Normalized().AngleTo(tube.TangentAt(axis.Length - 1))) : 180f;
+                    }
+                }
+                yield return null;
+            }
+            ReleaseAll();
+            float modelExit = tube.Profile!.Speed[^1];
+            GD.Print($"[SELFTEST] tube ride: entered {entered} at {entrySpeed:0} m/s, {insideTicks} ticks inside (grounded {groundedInside / (float)Mathf.Max(1, insideTicks):P0}, tube contact {(t.Movement.TubeContact ? "on" : "off")}), max {maxSpeedIn:0} m/s, " +
+                     $"radial ≤ {worstRadial:0.00} m of R {tube.Radius:0}, exit {exitSpeed:0} m/s (model {modelExit:0}) at {exitAngle:0}° to the axis; lens ≥ {minLens:0.0} m from the axis, pushed {pushed} frames, sight blocked {sightBlocked} ticks; {tube.Detail}");
+            Check("the ball enters the tube at the cap and is carried through to the exit", entered && exited && entrySpeed > m.HardMaxLocomotionSpeed * 0.9f, $"entered={entered} exited={exited} entry {entrySpeed:0} m/s");
+            Check("the ball never crosses a tube face (its centre stays inside the radius)", exited && worstRadial <= tube.Radius - m.BallRadius + 0.5f, $"radial ≤ {worstRadial:0.00} m, R {tube.Radius:0}");
+            Check("the ball exits along the tube axis", exited && exitAngle <= 20f, $"{exitAngle:0}°");
+            Check("the route speed model's carried profile predicts the exit speed within 10%", exited && Mathf.Abs(exitSpeed - modelExit) / Mathf.Max(1f, modelExit) <= 0.10f, $"ball {exitSpeed:0} m/s, model {modelExit:0} m/s");
+            Check("the camera stays outside the tube for the whole ride", exited && minLens >= tube.Radius + WorldScale.TubeCameraMargin - 0.2f, $"lens ≥ {minLens:0.0} m from the axis (R {tube.Radius:0} + margin {WorldScale.TubeCameraMargin:0.0})");
+            Check("the camera keeps a clear line of sight to the ball against the terrain through the ride", exited && sightBlocked == 0, $"{sightBlocked} of {insideTicks} ticks blocked");
+        }
+        else Check("stage has a tube to ride", true, "none on this seed nor on seeds 1–60 of this archetype");
+
         // Node growth (08 §10): three regenerations of the same stage leave the tree the same size.
         {
+            if (tubeSeed > 0) { _debug.RestartSameSeed(); }   // back to the drive seed the regenerations rebuild
             foreach (var _ in Frames(3)) yield return null;
             int nodesStage = GetTree().GetNodeCount();
             double orphansStage = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);

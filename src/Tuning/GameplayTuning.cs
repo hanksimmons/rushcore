@@ -52,6 +52,9 @@ public sealed class MovementTuning
     /// outward velocity is removed and the ball is treated as grounded, so the collider's flat
     /// facets no longer hop it. Off reproduces the contact-only D-091 controller exactly.</summary>
     public bool GroundFollow = true;
+    /// <summary>Tube contact (03 §3, V-015 resolved D-101): inside a tube every contact is ground whatever its normal,
+    /// because the walls carry the ball; outside tubes nothing changes. Off = the contact-only reading inside tubes.</summary>
+    public bool TubeContact = true;
     /// <summary>Metres above (or below) the surface within which the follow acts.</summary>
     public float GroundFollowSnapDistance = 0.5f;
     /// <summary>Speed bands are readability/Flow hooks only (02 §5); no physics reads them.
@@ -290,6 +293,7 @@ public sealed class GameplayTuning
         F(CatMovement, "Landing Cap Bleed", 2f, 400f, () => m.LandingCapBleed, v => m.LandingCapBleed = v);
         F(CatMovement, "Min Ground Normal Dot", 0.1f, 0.95f, () => m.MinGroundNormalDot, v => m.MinGroundNormalDot = v);
         B(CatMovement, "Ground Follow", () => m.GroundFollow, v => m.GroundFollow = v);
+        B(CatMovement, "Tube Contact", () => m.TubeContact, v => m.TubeContact = v);
         F(CatMovement, "Ground Follow Snap (m)", 0f, 2f, () => m.GroundFollowSnapDistance, v => m.GroundFollowSnapDistance = v);
         F(CatMovement, "Rush Threshold", 1f, 250f, () => m.RushThreshold, v => m.RushThreshold = v);
         F(CatMovement, "Crush Threshold", 1f, 250f, () => m.CrushThreshold, v => m.CrushThreshold = v);

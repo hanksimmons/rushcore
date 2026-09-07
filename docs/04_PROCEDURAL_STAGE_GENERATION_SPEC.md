@@ -266,6 +266,22 @@ along the axis. A tube never passes through terrain mass and keeps its axis clea
 walls by the camera clearance (§10), so the camera stays outside it; a tube through a wall is a wall tunnel
 (lid) instead. Forks inside a tube are not built.
 
+**Tubes as delivered (D-101, 2026-09-07):** a tube is an optional line through the air. It leaves the primary
+through a ground mouth 45 m to one side of the centreline (inside the level width, so the free path never
+enters it), climbs over that offset at a pitch under 14° to a cruise the camera clearance (30 m) above the
+highest ground under its path, swings out 200 m over a 500 m S (about r 270), cruises, swings back, descends
+and exits through a flared mouth 45 m off the centreline onto a 200 m straight landing zone; both mouth zones
+are primary straights clear of features, and the swing takes the outside of every bend in the section. The
+axis follows the primary's own geometry under a lateral and a height envelope, so both mouths land exactly on
+the line, and the builder rejects any tube whose floor would sink into the ground. The route speed model
+integrates the axis as carried (no corner limit, no launch); the controller adds the **tube follow**, the
+shell twin of the ground follow (03 §3): inside a tube any contact is ground, the ball is held to the analytic
+shell within the snap distance, and the wall's normal is its ground normal, so drive and charge work on the
+wall. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
+at the model's speed and 0° off the axis, the lens outside the shell on every frame with a clear line of sight
+to the ball against the terrain. Tubes appear on about 15% of Highlands, 7% of Canyon and 41% of Dune Sea
+seeds; edge and midair mouths, and exits onto other lines or floors, arrive with Sky Terraces.
+
 ## 6. Archetypes
 
 ### Rolling Highlands
@@ -444,7 +460,11 @@ Delivered forms (D-096): the lid is a `BoxShape3D` and a box mesh; the tube is a
 sides) whose triangles face inward, with a `ConcavePolygonShape3D` built from the same triangles and
 backface collision on so the ball never leaves through a face at the cap. Both sit on a structure physics
 layer; the tube's collider is additionally invisible to the camera's occlusion probe (06 §11). The harness
-verifies a tube carries the ball at the cap with CCD the way D-079 verified NaN holes.
+verifies a tube carries the ball at the cap with CCD the way D-079 verified NaN holes. Delivered D-101: the tube is a
+10-sided ring swept with a parallel-transported frame, flared ×2 over one diameter at each mouth, an indexed
+translucent shell with outward normals, opaque rib bands every 25 m, and a `ConcavePolygonShape3D` of the same
+triangles with backface collision on physics layer 2; the player's mask includes layer 2, the camera probe's
+does not.
 
 Do not default the entire terrain to one giant concave triangle collider.
 

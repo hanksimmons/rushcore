@@ -212,6 +212,14 @@ ramp reports a missing free flight any more (the launch window is the lip ease p
 lines dropped, ridge lines on 90% of Highlands and 70% of Canyon seeds (the batch floors), 11% of dune seeds
 (reported, not judged). One archetype selector (`World › Archetype`) replaces the per-archetype toggles.
 
+**Result (tubes, D-101, 2026-09-07):** the batch places tubes on every archetype (Highlands 16 on 15 seeds, Canyon
+7, Dune Sea 41) and every tube passes its validators (cruise clearance ≥ 30 m above the ground, mouths inside the
+level width, carried profile never stalls, graph acyclic); the harness drives the ball into a tube at the cap
+(Highlands seed 9/0, 2 040 m, borrowed when the drive seed has none; the dune drive seed has its own) and asserts
+it is carried through 100% grounded with its centre inside the radius, exits 0° off the axis at the carried
+model's speed, and that the camera stays outside the shell on every frame with a clear line of sight to the ball
+against the terrain layer; 285/285 Highlands, 284/284 dunes.
+
 ## 6. Combat — Gate C0
 
 Objective:

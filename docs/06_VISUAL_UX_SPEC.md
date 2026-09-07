@@ -46,7 +46,9 @@ to pale crests with the lee faces darker, so the crest lines and the wave's dire
 
 Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
 above which the fog thickens into a layer the top floor sits in and a fall drops through; a see-through
-tube is a translucent shell with opaque ribs every 25 m, the ribs being the motion cue (§2) at speed.
+tube is a translucent shell with opaque ribs every 25 m, the ribs being the motion cue (§2) at speed. Delivered
+(D-101): a pale blue skin at 22% alpha with a faint emission, back faces culled (the camera is always outside),
+ribs as glowing bands 0.6 m wide standing 0.25 m off the shell.
 
 ## 4. Terrain shading
 

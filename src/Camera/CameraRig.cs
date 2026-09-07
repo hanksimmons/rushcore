@@ -1,5 +1,6 @@
 using Godot;
 using Rushcore.Core;
+using Rushcore.Generation;
 using Rushcore.Player;
 using Rushcore.Tuning;
 
@@ -53,6 +54,10 @@ public partial class CameraRig : Node3D, ICameraBasis
     /// <summary>World height source used for the focus/camera floors. Terrain only;
     /// props are handled by the sphere casts.</summary>
     public Func<float, float, float>? GroundHeight { get; set; }
+    /// <summary>The stage's tubes (D-101): the lens is pushed radially out of any shell it would sit inside.</summary>
+    public Func<IReadOnlyList<Rushcore.Generation.TubeDefinition>>? Tubes { get; set; }
+    /// <summary>True on frames where the tube push-out moved the lens.</summary>
+    public bool TubePushedThisFrame { get; private set; }
 
     public Vector3 FlatForward { get; private set; } = Vector3.Forward;
     public Vector3 FlatRight { get; private set; } = Vector3.Right;
@@ -116,6 +121,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         _probe.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
         _probe.CollideWithAreas = false;
         _probe.CollideWithBodies = true;
+        _probe.CollisionMask = 1;            // terrain and props only: a tube's shell is see-through (04 §9, D-101)
 
         _yaw = 0f;                       // the bootstrap snaps it to the spawn facing
         UpdateOrientation();
@@ -392,6 +398,7 @@ public partial class CameraRig : Node3D, ICameraBasis
 
         // Last resort: never let the lens go below the heightfield.
         FlooredThisFrame = false;
+        PushOutOfTubes();
         if (GroundHeight is null) return;
         Vector3 gp = _camera.GlobalPosition;
         float minY = GroundHeight(gp.X, gp.Z) + c.GroundClearance;
@@ -401,6 +408,32 @@ public partial class CameraRig : Node3D, ICameraBasis
             _camera.GlobalPosition = gp;
             _camera.LookAt(_focus, Vector3.Up);
             FlooredThisFrame = true;
+        }
+    }
+
+    /// <summary>Tube camera rule (docs/11 §7e, D-101): the lens never sits inside a tube's shell. After the chase
+    /// placement it is pushed along the radial from the nearest axis point through the lens until it clears the
+    /// radius by the margin, so when the ball rides a wall or the ceiling the lens follows around the outside and
+    /// sees it through the see-through shell. The shell is invisible to the occlusion probe, so nothing pulls in.</summary>
+    private void PushOutOfTubes()
+    {
+        TubePushedThisFrame = false;
+        if (Tubes?.Invoke() is not { Count: > 0 } tubes) return;
+        Vector3 lens = _camera.GlobalPosition;
+        foreach (var tube in tubes)
+        {
+            if (!tube.Bounds.HasPoint(lens)) continue;
+            int i = tube.Nearest(lens, out float d);
+            float keep = tube.Radius * (i < 3 || i >= tube.Axis.Length - 3 ? WorldScale.TubeMouthFlare : 1f) + WorldScale.TubeCameraMargin;
+            if (d >= keep) continue;
+            Vector3 axisPoint = tube.Axis[i];
+            Vector3 radial = lens - axisPoint;
+            Vector3 t = tube.TangentAt(i);
+            radial -= t * radial.Dot(t);
+            if (radial.LengthSquared() < 1e-4f) radial = Vector3.Up;
+            lens = axisPoint + radial.Normalized() * keep;
+            _camera.GlobalPosition = lens;
+            TubePushedThisFrame = true;
         }
     }
 

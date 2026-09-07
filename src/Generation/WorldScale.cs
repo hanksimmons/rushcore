@@ -153,6 +153,29 @@ public static class WorldScale
     /// <summary>Swell slope budget on a dune sea: the dunes are the relief, the swells only tilt the field.</summary>
     public const float DuneSwellMaxSlope = 0.08f;
 
+    // ---- tubes (04 §5I, docs/11 §7d–e, D-101; provisional sizes V-016) ----
+    public const float TubeRadius = 6f;
+    /// <summary>Mouth flare: the radius doubles over one tube diameter at each end.</summary>
+    public const float TubeMouthFlare = 2f;
+    public const float TubeRibSpacing = 25f;
+    /// <summary>Axis clearance above the ground and from walls away from the mouths (the camera's room outside the shell).</summary>
+    public const float TubeClearance = 30f;
+    /// <summary>A ground mouth sits this far to the side of the line it leaves, inside the level width, so the free path never enters it.</summary>
+    public const float TubeMouthOffset = 45f;
+    /// <summary>Lateral offset of the cruise from the line it shadows.</summary>
+    public const float TubeLateralOffset = 200f;
+    /// <summary>A tube section in order: climb over the mouth offset, swing out, cruise, swing back, descent. The climb
+    /// keeps the pitch under about 14° (longer for a higher cruise); the swing is an S of the lateral offset over this
+    /// length (r ≈ 270 m: a 64° wall ride at the base cap, docs/11 §7d); the cruise is the straight between.</summary>
+    public const float TubeRampLength = 300f, TubeSwingLength = 500f, TubeCruiseLength = 200f;
+    /// <summary>Steepest climb pitch (tan) a tube asks: a driven ball climbs 35° without losing speed, this stays well under.</summary>
+    public const float TubeMaxPitch = 0.25f;
+    /// <summary>Straight required on the line before an entry mouth and after an exit mouth (the landing zone).</summary>
+    public const float TubeMouthStraight = 100f;
+    public const int TubesMax = 2;
+    /// <summary>The lens keeps this much more than the radius from a tube axis (docs/11 §7e).</summary>
+    public const float TubeCameraMargin = 1.5f;
+
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;
     /// <summary>Route polyline vertex spacing; equal to the cell size so relief and stamping see every facet.</summary>

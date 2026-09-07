@@ -72,6 +72,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _player.CameraBasis = _camera;
         _player.Ground = _world;
         _camera.GroundHeight = _world.SampleHeight;
+        _camera.Tubes = () => _world.Tubes;
+        _player.Structure = _world;
         _camera.SnapYawToward(_world.SpawnFacing);
         _camera.SnapToPlayer();
 

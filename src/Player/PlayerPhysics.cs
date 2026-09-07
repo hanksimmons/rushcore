@@ -90,6 +90,12 @@ public partial class PlayerPhysics : RigidBody3D
     public bool GroundFollowActive => _followActive;
     /// <summary>The terrain grid the ground follow reads; null (the default) disables the follow.</summary>
     public IGroundSurface? Ground { get; set; }
+    /// <summary>Structures whose walls carry the ball (tubes, D-101): the analytic shell the tube follow reads; null = none.</summary>
+    public IStructureSurface? Structure { get; set; }
+    /// <summary>True while the ball is inside a tube this tick (telemetry).</summary>
+    public bool InTube { get; private set; }
+    /// <summary>True while the tube follow is carrying the ball on the shell this tick.</summary>
+    public bool TubeFollowActive { get; private set; }
     public Vector3 GroundNormal => _groundNormal;
     public Vector3 Velocity { get; private set; }
     /// <summary>Grounded: ground-tangent speed. Airborne: world-XZ speed (03 §5).</summary>
@@ -164,6 +170,7 @@ public partial class PlayerPhysics : RigidBody3D
         AddChild(new CollisionShape3D { Shape = _shape, Name = "Collider" });
 
         Mass = 1.0f;
+        CollisionMask = 1 | Rushcore.World.MovementToyWorld.StructureLayer;   // terrain and props, plus lids and tubes (04 §9, D-101)
         ContinuousCd = true;                 // D-066: tunneling is a first-order risk
         CanSleep = false;                    // D-071
         ContactMonitor = true;               // D-067: grounded state reads direct contacts
@@ -463,10 +470,14 @@ public partial class PlayerPhysics : RigidBody3D
         Vector3 sum = Vector3.Zero;
         int hits = 0;
         int contacts = state.GetContactCount();
+        // Tube contact (V-015 → D-101): inside a tube the walls carry the ball, so any contact is ground; the
+        // normal it reports is the wall's, and drive and charge read from it.
+        InTube = Structure is not null && Structure.Nearest(state.Transform.Origin, out _, out _, out float tubeRadius, out float tubeDist) && tubeDist <= tubeRadius * 2f;
+        float minDot = InTube && _t.Movement.TubeContact ? -1f : _t.Movement.MinGroundNormalDot;
         for (int i = 0; i < contacts; i++)
         {
             Vector3 n = state.GetContactLocalNormal(i);
-            if (n.Dot(Vector3.Up) >= _t.Movement.MinGroundNormalDot)
+            if (n.Dot(Vector3.Up) >= minDot)
             {
                 sum += n;
                 hits++;
@@ -476,10 +487,12 @@ public partial class PlayerPhysics : RigidBody3D
         // The analytic follow reads the same terrain grid the collider is built from, so a facet
         // edge that would hop the ball for a few ticks reads as continuous ground instead (D-092).
         _followActive = TryGroundFollow(state, dt, ref v, out Vector3 followNormal);
-        _rawGrounded = (hits > 0 || _followActive) && _jumpLockout <= 0f;
+        Vector3 tubeNormal = Vector3.Up;
+        TubeFollowActive = !_followActive && TryTubeFollow(state, dt, ref v, out tubeNormal);
+        _rawGrounded = (hits > 0 || _followActive || TubeFollowActive) && _jumpLockout <= 0f;
         if (_rawGrounded)
         {
-            _groundNormal = _followActive ? followNormal : sum.Normalized();     // stable representative normal (03 §3)
+            _groundNormal = _followActive ? followNormal : TubeFollowActive ? tubeNormal : sum.Normalized();     // stable representative normal (03 §3)
             _groundStick = GroundStickSeconds;
         }
         else
@@ -543,6 +556,38 @@ public partial class PlayerPhysics : RigidBody3D
         vN = gap >= 0f ? Mathf.Min(vN, target) : Mathf.Max(vN, target);
         v = vT + n * vN;
         normal = n;
+        return true;
+    }
+
+    /// <summary>
+    /// Tube follow (D-101, the tube twin of the ground follow): the shell's collider is a ring of flat facets and
+    /// a ball at speed hops every facet edge, so inside a tube the controller reads the analytic shell (axis and
+    /// radius) instead: within the snap distance of the wall the outward-moving component away from the wall is
+    /// removed, the gap closes as a bounded velocity, and the ball counts as grounded with the wall's normal. A
+    /// concave wall can always carry the ball, so there is no curvature test. Never during jump lockout or a slam,
+    /// never against a ball arriving at the wall faster than one snap per tick (the solver lands that).
+    /// </summary>
+    private bool TryTubeFollow(PhysicsDirectBodyState3D state, float dt, ref Vector3 v, out Vector3 normal)
+    {
+        normal = Vector3.Up;
+        var m = _t.Movement;
+        if (Structure is null || !m.TubeContact || _jumpLockout > 0f || _slamActive) return false;
+        Vector3 c = state.Transform.Origin;
+        if (!Structure.Nearest(c, out Vector3 axisPoint, out Vector3 tangent, out float radius, out _)) return false;
+        Vector3 rel = c - axisPoint;
+        rel -= tangent * rel.Dot(tangent);
+        float dist = rel.Length();
+        if (dist < 1e-3f) return false;
+        Vector3 outward = rel / dist;
+        float gap = radius - m.BallRadius - dist;                   // > 0: inside, off the wall; < 0: pressed into it
+        if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
+        float vOut = v.Dot(outward);
+        if (vOut > m.GroundFollowSnapDistance / dt) return false;   // flying into the wall: a landing
+        float excess = Mathf.Max(0f, Mathf.Abs(gap) - GroundFollowDeadband) * Mathf.Sign(gap);
+        float target = excess / GroundFollowCloseSeconds;           // toward the wall (outward) when off it
+        vOut = gap >= 0f ? Mathf.Max(vOut, target) : Mathf.Min(vOut, target);
+        v = v - outward * v.Dot(outward) + outward * vOut;
+        normal = -outward;
         return true;
     }
 
@@ -826,6 +871,13 @@ public interface ICameraBasis
 
 /// <summary>The terrain grid the analytic ground follow reads (03 §3, D-092): the same samples the
 /// collider and the render mesh are built from, so the one height source stays one.</summary>
+/// <summary>A structure whose walls carry the ball (a tube): the nearest shell axis point to a position, its tangent and radius.</summary>
+public interface IStructureSurface
+{
+    /// <summary>False when the position is outside every structure's bounds.</summary>
+    bool Nearest(Vector3 position, out Vector3 axisPoint, out Vector3 tangent, out float radius, out float distance);
+}
+
 public interface IGroundSurface
 {
     float CellSize { get; }

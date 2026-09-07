@@ -17,9 +17,7 @@ public static class OptionalLineBuilder
         var rng = new SeededRandom(SeedChain.Derive(stageSeed, "optional"));
         var lines = new List<RouteSkeleton>();
         var v = primary.Vertices;
-        var turnSign = new float[v.Count];
-        foreach (var b in primary.Bends)
-            for (int i = b.StartIndex; i <= b.EndIndex; i++) turnSign[i] = Mathf.Sign(b.TurnAngle);
+        var turnSign = TurnSigns(primary);
 
         // A ridge shadows a bend, or a run of up to three (04 §6): it leaves the primary on the straight before the
         // first and rejoins on the straight after the last, both transitions wholly on straights (D-100: a transition
@@ -98,15 +96,30 @@ public static class OptionalLineBuilder
     {
         var v = primary.Vertices;
         float sectionLength = v[b].Distance - v[a].Distance;
+        return SideValid(primary, turnSign, a, b, side, i => WorldScale.RidgeOffset * Bump(v[i].Distance - v[a].Distance, sectionLength));
+    }
+
+    /// <summary>The same for any offset envelope (a tube's, D-101), given the offset at each primary vertex.</summary>
+    internal static bool SideValid(RouteSkeleton primary, float[] turnSign, int a, int b, float side, Func<int, float> offsetAt)
+    {
+        var v = primary.Vertices;
         for (int i = a; i <= b; i++)
         {
             if (turnSign[i] == 0f) continue;
             bool inside = side == turnSign[i];
             if (!inside) continue;
-            float offset = WorldScale.RidgeOffset * Bump(v[i].Distance - v[a].Distance, sectionLength);
-            if (offset > v[i].Radius - WorldScale.InsideOffsetMargin) return false;
+            if (offsetAt(i) > v[i].Radius - WorldScale.InsideOffsetMargin) return false;
         }
         return true;
+    }
+
+    /// <summary>Turn sense per primary vertex: ±1 inside a bend, 0 on straights.</summary>
+    internal static float[] TurnSigns(RouteSkeleton primary)
+    {
+        var turnSign = new float[primary.Vertices.Count];
+        foreach (var b in primary.Bends)
+            for (int i = b.StartIndex; i <= b.EndIndex; i++) turnSign[i] = Mathf.Sign(b.TurnAngle);
+        return turnSign;
     }
 
     /// <summary>Route length at each end of a ridge that must lie on a primary straight: the whole transition.</summary>

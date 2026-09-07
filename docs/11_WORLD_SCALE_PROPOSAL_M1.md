@@ -353,9 +353,17 @@ Wall ride: inside a bend of path radius R the ball rides to tan φ = v² / (g·R
 The ground-normal limit (0.498, about 60°) is crossed below a path radius of about 320 m at the base
 cap (and about 900 m at the ceiling), so the ball inside a tight tube bend reads airborne to the
 controller (V-015). A tube bend loses no speed in the route speed model (carried segment); the exit
-velocity runs along the axis into the landing zone.
+velocity runs along the axis into the landing zone. *Delivered (D-101):* the tube follow makes the wall ground
+at any angle (03 §3), so the limit no longer applies inside tubes; the swing is an S of 200 m over 500 m
+(r ≈ 270, a 64° ride at the base cap), the primary's own bends under the section push the worst ride to about
+80°, and the ride is reported per tube. Radius 6 m, mouth offset 45 m, climb pitch ≤ 14°, cruise clearance 30 m,
+section 1 800 m at the lowest cruise.
 
 ### 7e. Camera clearance
+
+*Delivered (D-101):* the lens is pushed radially to R + 1.5 m from the nearest axis point after the chase
+placement (×2 at the flared mouths), the shell is on a physics layer the occlusion probe ignores, and the harness
+holds the lens outside with a clear line of sight for a whole ride. The original derivation follows.
 
 The rig sits 17.6 m behind and 6.7 m above the ball. Inside a tube of radius R with the ball on the
 floor, the lens must clear the top of the shell by the occlusion margin, 2R + 0.6 m above the floor:

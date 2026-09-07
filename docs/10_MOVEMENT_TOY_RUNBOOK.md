@@ -313,6 +313,19 @@ current seed (F5 = new seed, T = back to the start pad; the strip toggle is igno
 What you see: a 6.0 × 2.0 km footprint; a green **START** pad and blue **EXIT** pad 5.8 km apart along
 +X; the stamped 150 m corridor (wider and banked on bends) as a lighter track; **CREST ▲** signs on
 launch-crest straights; boost rings on the line every 1.2 km; scatter kept out of the corridor.
+**Sample stages** (`World › Sample Stage` in the F1 panel, or the command lines below; `SampleStages.cs` is the list):
+
+| # | Name | Command | What to look at |
+|---|---|---|---|
+| 1 | tube | `-- --seed 9` | a see-through tube leaving the corridor at 1.1 km (D-101) |
+| 2 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102) |
+| 3 | sky floor 3 | `-- --sky --seed 30` | a floor-2 and floor-3 terrace stack (D-103) |
+| 4 | dune trains | `-- --dunes --seed 1` | a three-crest dune train and a tube (D-099) |
+| 5 | gap + turns | `-- --seed 8` | a mandatory gap and four committed banked turns (D-097) |
+
+Setting the selector picks the archetype and seed and rebuilds; the `seed` row shows the seed. Set it back to 0
+before F5 (a new random seed) or the archetype slider, or the sample re-applies when the selector changes again.
+
 `World › Route Debug Lines` (04 §16) draws the primary route 3 m up: cyan straights, orange bends,
 magenta feature zones, optional lines by floor, checkpoint posts and tube axes; `World › Stage Debug Views`
 (D-104, off by default, rebuilds the world) adds corridor bounds, challenge zones, lid and tube-mouth outlines,

@@ -8,21 +8,78 @@
 for seconds while **boosting through a tube**. Entry is fine; cruise without boost is fine. Not seen before the
 branching-exits merge, which touched no tube, player or camera code.
 
-## Hypothesis (unverified; verify before fixing)
+## Analysis (main track, 2026-09-07, from the code; not yet measured)
 
-The tube collider is a 10-sided polygon shell (`src/World/TubeMesh.cs`, `Sides = 10`, a `ConcavePolygonShape3D` with
-backface collision on the structure layer). The tube follow (`src/Player/PlayerPhysics.cs`, `TryTubeFollow`) holds the
-ball to the **analytic** circle: `gap = radius - BallRadius - dist` from `IStructureSurface.Nearest`, which returns
-`TubeDefinition.Radius`. Between a facet's middle and its corners the polygon is R·(1 − cos(π/10)) ≈ 0.29 m inside the
-circle. Boosting inside a tube raises the wall-ride angle and sweeps the ball across facet edges several times a
-second, so the collider pushes the ball inward at each corner and the follow pulls it back out over
-`GroundFollowCloseSeconds`. That is a judder that lasts exactly as long as the boost, on every archetype, and it is
-invisible at cruise, where the ball sits low on the wall and crosses no edge. The harness rode one tube at the cap
-without boost (D-101), which is why it passed.
+### The geometry that matters
 
-Alternative causes to rule out, in order: (2) the visual (`PlayerVisual` squash and roll from an alternating contact
-normal) rather than the body; (3) `TubeFollowActive` toggling because `vOut > GroundFollowSnapDistance / dt` trips at
-boost speeds on a bend; (4) physics interpolation against a body whose velocity is rewritten every tick.
+- **Collider:** `src/World/TubeMesh.cs` builds one ring of `Sides = 10` vertices per axis sample (axis resampled every
+  4 m, `TubeBuilder` line ~143) with a parallel-transported frame whose first normal is Up, so ring vertex `s = 0` is the
+  top of the tube and `s = 5` is the exact **bottom**. The same triangles are the `ConcavePolygonShape3D`. A regular
+  10-gon of circumradius R = 6 m has inradius R·cos(18°) = 5.706 m: the wall is 0.294 m inside the analytic circle at
+  every facet middle and on the circle only at the ten corners.
+- **Follow:** `PlayerPhysics.TryTubeFollow` holds the ball to the analytic circle: `gap = radius − BallRadius − dist`
+  with `radius = TubeDefinition.Radius` (6.0) from `MovementToyWorld.Nearest`, so the ball centre is driven to
+  5.34 m from the axis and its surface to exactly 6.0 m. At a corner that is the wall. At a facet middle it is
+  **0.29 m inside the collider**.
+- **Solver:** Jolt resolves that penetration with a position correction each tick; the follow reads the corrected
+  position (`dist` < 5.34, `gap` > 0) and sets the outward velocity to `(gap − 0.03) / 0.05 s` ≈ up to 5 m/s back
+  into the wall. Two authorities, opposite signs, every tick: that is a judder at the physics rate, visible because
+  the position correction moves the body transform, which interpolation cannot hide.
+
+### Why cruise is quiet and boosting is not
+
+At cruise on a straight the ball rests at the bottom, which is a **corner** of the polygon, so circle and collider
+agree to the millimetre and there is nothing to fight. The ball only leaves the corner when something holds it up the
+wall between corners (the next corners are 36° either side of the bottom):
+
+- a bend: tan φ = v²κ / g; the swing (200 m over 500 m, κ ≈ 0.0048) at the cap gives φ ≈ 70°, and D-101 reports rides
+  to 85–88°; the ball crosses several facets and the fight is brief at each,
+- **steering or boosting**: `ApplyBoost` accelerates along the blend of travel and the stick, and any lateral stick
+  inside a tube pushes the ball up the wall; boost sustains that lateral force against gravity, so the ball is parked
+  between corners for as long as boost is held. That is the "several seconds, continuous, on every archetype" report.
+
+Prediction the trace must confirm: judder ticks coincide with a ride angle away from a multiple of 36° and with
+`GetContactCount() > 0`; penetration depth follows 0.294·(1 − cos(phase)) with phase the angle to the nearest corner;
+at a corner (phase 0) the contact count is 0 or the penetration under 1 cm.
+
+### Things checked and ruled out from the code
+
+- **Nearest axis point** is the nearest *vertex* (4 m apart) with that vertex's tangent projected out. On a straight
+  axis the along-axis error vanishes; on the swing (ρ ≈ 200 m) the lateral error is ≈ 2²/(2·200) = 1 cm and changes
+  every 4 m of travel: a 1 cm ripple at 40–60 Hz, below the deadband, not the judder.
+- **Ground follow first** (`TubeFollowActive = !_followActive && ...`): the terrain is 30 m below the cruise, so the
+  ground follow cannot engage except at the mouths; entry is reported fine.
+- **Mouth flare** ×2 over one diameter: the follow keeps the analytic radius there while the collider is farther
+  out, so no fight at the mouths, only a hover.
+- **Camera** (`PushOutOfTubes`) also uses the nearest vertex and is pushed to R + 1.5 m every frame: a centimetre ripple
+  on the swing, possible but not the player-model judder.
+- **The cap** uses the wall normal's tangent plane; it does not oscillate.
+- **Frame twist:** the parallel transport keeps the bottom corner near the true bottom on the near-planar axes; a
+  twisted frame would put a facet middle at the bottom and give a *cruise* buzz. Measure the bottom corner's phase on
+  the tube you test; if it is off by more than 5°, that is a second defect (fix: start the frame from Up at every ring).
+
+### The fix and its numbers
+
+1. `TubeMesh.Sides` 10 → **24** (keep it even so the bottom stays a corner). Facet depth 0.294 m → 6·(1 − cos 7.5°) =
+   0.051 m. Vertices per tube ≈ 24 × (length / 4 m): about 12 k for a 2 km tube, trivial.
+2. `TryTubeFollow` holds the **inscribed** circle: `float wall = radius * Mathf.Cos(Mathf.Pi / TubeMesh.Sides);` then
+   `gap = wall − BallRadius − dist`. The ball centre sits at 5.949 − 0.66 = 5.29 m; its surface touches the collider
+   only at facet middles and is 5 cm inside it at corners, so with the 3 cm deadband the collider never fires while the
+   follow is active. Fast arrivals (`vOut > snap / dt`) still land on the collider as before.
+3. Do not change `GroundFollowCloseSeconds`, the deadband or the snap distance: they are shared with the ground follow
+   and part of D-092. Do not write the transform.
+
+Why not match the polygon exactly (target = inradius / cos(phase))? The ball would then ride the polygon, a 0.29 m
+(or 5 cm) wobble per facet that is real motion; the inscribed circle is smooth and the 5 cm corner gap is invisible.
+
+### Harness recipe
+
+In the tube ride, after the cruise pass and `RefillBoost(BoostCapacity)`: hold `InputBootstrap.Boost` and add a
+constant lateral `_worldDrive` (perpendicular to the axis tangent, toward one wall) for 3 s on a straight part of the
+cruise, then along the axis to the exit. Per tick record `dist` (radial), ride angle `atan2` in the ring frame, phase
+to the nearest corner, `GetContactCount()`, `TubeFollowActive`. Report: max tick-to-tick Δdist, RMS Δdist, contact
+ticks, follow flips. Before the fix expect Δdist ≈ 0.1–0.3 m at 10–30 Hz with contacts on most ticks; after, Δdist
+< 0.03 m, contacts ≈ 0, follow flips ≤ 2.
 
 ## Reproduce first
 

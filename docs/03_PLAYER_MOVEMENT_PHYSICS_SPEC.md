@@ -443,7 +443,10 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 **Accepted baseline** (Movement Toy playtest, 2026-09-05; the user's final preset
 `boost-finetune-final`, promoted verbatim on top of `manual-finetune-punchy`, sub-percent slider
 values included, so the preset reads as "compiled defaults"; D-078). **This table is the
-authoritative movement baseline.** These are the compiled defaults in `GameplayTuning`; the
+authoritative movement baseline.** A working preset that moves some of these
+values (`manual-small-2`, 2026-09-06: ball 0.66 m, steering 222.66, max jump 84.63, Flow headroom
+0.715, camera) is checked in and documented in the runbook; it is not promoted until the user names
+it final (V-014). These are the compiled defaults in `GameplayTuning`; the
 runtime panel edits the same values and persists overrides (D-075). Min ground-normal dot 0.499,
 camera yaw hold below 2.035 m/s, camera follow damping 4.99/s and terrain wavelength 1.005 are
 part of the same promotion.

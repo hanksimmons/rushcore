@@ -64,12 +64,13 @@ public sealed class StageGenerator
         var report = new ValidationReport { Attempts = attempt };
         var sw = Stopwatch.StartNew();
 
-        RouteSkeleton route = straight ? StraightRoute() : _routes.Build(routeSeed);
+        var rules = ArchetypeRules.For(request.Archetype);
+        RouteSkeleton route = straight ? StraightRoute() : _routes.Build(routeSeed, rules);
         report.Timings.Add(("route skeleton", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         // B–D: archetype relief and the stamped corridor become the one logical height source;
         // the route polyline is then lifted onto it so every later check sees real geometry.
-        var field = new StageHeightField(route, request.StageSeed);
+        var field = new StageHeightField(route, request.StageSeed, rules);
         var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed);
         foreach (var line in optional) field.AddLine(line);
         Lift(route, field);
@@ -210,7 +211,9 @@ public sealed class StageGenerator
         }
         foreach (var p in v) maxBand = Mathf.Max(maxBand, Mathf.Abs(p.Position.Z));
         report.Add("primary route is continuous", maxGap <= WorldScale.RouteSampleSpacing * 1.5f, $"max vertex gap {maxGap:0.00} m");
-        report.Add("route always progresses toward the exit", monotonic);
+        // Progress is route distance (D-096); the plan constraint is the footprint, and this archetype's band.
+        bool inFootprint = v.All(p => Mathf.Abs(p.Position.X) <= WorldScale.FootprintLength * 0.5f && Mathf.Abs(p.Position.Z) <= WorldScale.FootprintWidth * 0.5f);
+        report.Add("route stays inside the footprint and reaches the exit", inFootprint && monotonic, monotonic ? "" : "the Highlands wander doubled back");
         report.Add("route stays inside the route band", maxBand <= WorldScale.RouteBandHalfWidth, $"max |z| {maxBand:0} m");
 
         float minRadius = route.Bends.Count == 0 ? float.PositiveInfinity : route.Bends.Min(b => b.Radius);
@@ -232,8 +235,11 @@ public sealed class StageGenerator
         bool InsideModuleFace(float d)
         {
             foreach (var f in route.Features)
-                if (f.Kind != RouteFeatureKind.LaunchCrest && d >= f.CentreDistance - WorldScale.RouteSampleSpacing * 2f && d <= f.FeatureEnd + WorldScale.RouteSampleSpacing * 2f)
-                    return true;
+            {
+                if (f.Kind == RouteFeatureKind.LaunchCrest) continue;
+                float start = f.CentreDistance - (f.Kind == RouteFeatureKind.LaunchRamp ? f.Rise / f.Slope + WorldScale.RampEase : 0f);
+                if (d >= start - WorldScale.RouteSampleSpacing * 2f && d <= f.FeatureEnd + WorldScale.RouteSampleSpacing * 2f) return true;
+            }
             return false;
         }
         float maxGrade = 0f, maxDelta = 0f, prevGrade = 0f;
@@ -274,6 +280,25 @@ public sealed class StageGenerator
             crestDetail += $" [{f.Wavelength:0}/{f.Height:0} at {f.CentreDistance:0} m: {speed:0} m/s {(f.IsLaunch ? "launch" : "roll")}, landing {f.LandingDistance:0} m{(ok ? "" : " OVERRUNS")}]";
         }
         report.Add("launch crests keep a straight landing run", crestsClear, $"{route.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest)} crests{crestDetail}");
+
+        // Wall clearance (04 §10, D-096): out to the level width plus the setback the primary's stamp is still
+        // complete on both sides (its weight 1), so no wall face, and no side terrain, stands where the ground
+        // follow's lateral samples or a wide line would meet it. Inside a bend tighter than the reach the
+        // sample would cross the bend's own centre, so only the outside is read there.
+        float worstWeight = 1f;
+        var bendAt = new RouteBend?[v.Count];
+        foreach (var b in route.Bends) for (int i = b.StartIndex; i <= b.EndIndex; i++) bendAt[i] = b;
+        float reach = StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
+        for (int i = 0; i < v.Count; i += 5)
+        {
+            float lx = -Mathf.Sin(v[i].Heading), lz = Mathf.Cos(v[i].Heading);
+            foreach (float side in new[] { 1f, -1f })
+            {
+                if (bendAt[i] is { } bend && side * Mathf.Sign(bend.TurnAngle) > 0f && bend.Radius < reach + 10f) continue;
+                worstWeight = Mathf.Min(worstWeight, field.PrimaryWeight(v[i].Position.X + lx * reach * side, v[i].Position.Z + lz * reach * side));
+            }
+        }
+        report.Add("wall faces stay outside the corridor's level width plus the setback", worstWeight >= 0.99f, $"lowest stamp weight at {reach:0} m {worstWeight:0.000} (walls {field.WallHeight:0} m)");
 
         float startFlat = PadFlatness(field, v[0].Position), exitFlat = PadFlatness(field, v[^1].Position);
         report.Add("start and exit pads are flat", startFlat < 1.0f && exitFlat < 1.0f, $"height spread start {startFlat:0.00} m, exit {exitFlat:0.00} m");

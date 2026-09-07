@@ -14,7 +14,6 @@ public sealed class RouteSkeletonBuilder
     // Wander shape. Headings stay inside ±MaxHeading of +X so X is monotonic and the route
     // never doubles back; the band clamp keeps Z inside the route band.
     private const float MaxHeading = Mathf.Pi / 4f;                   // 45°
-    private const float StraightMin = 250f, StraightMax = 600f;
     private const float BendMin = Mathf.Pi / 9f, BendMax = 7f * Mathf.Pi / 18f;   // 20°..70°
     private const float MinUsefulBend = Mathf.Pi / 18f;               // < 10° of turn is not a bend
     private const float SoftBand = 300f;                              // beyond this the next bend turns back
@@ -80,8 +79,10 @@ public sealed class RouteSkeletonBuilder
         return Mathf.Max(CrestLanding, flight - wavelength * 0.5f + WorldScale.LandingRunAfterFlight);
     }
 
-    public RouteSkeleton Build(ulong routeSeed)
+    public RouteSkeleton Build(ulong routeSeed, ArchetypeRules? rules = null)
     {
+        rules ??= ArchetypeRules.RollingHighlands;
+        float StraightMin = rules.StraightMin, StraightMax = rules.StraightMax;
         var rng = new SeededRandom(routeSeed);
         var route = new RouteSkeleton();
         float entryX = -WorldScale.FootprintLength * 0.5f + WorldScale.EntryMargin;
@@ -156,7 +157,7 @@ public sealed class RouteSkeletonBuilder
             }
             if (pos.X >= closeX - 1e-3f) break;
 
-            float radius = PickRadius(ref rng);
+            float radius = PickRadius(ref rng, rules);
             float sign = Mathf.Abs(pos.Y) > SoftBand ? -Mathf.Sign(pos.Y)
                        : Mathf.Abs(heading) >= MaxHeading - 1e-3f ? -Mathf.Sign(heading)
                        : lastSign != 0f && rng.Chance(TurnPersistence) ? lastSign
@@ -180,11 +181,11 @@ public sealed class RouteSkeletonBuilder
         return route;
     }
 
-    private static float PickRadius(ref SeededRandom rng)
+    private static float PickRadius(ref SeededRandom rng, ArchetypeRules rules)
     {
         float r = rng.NextFloat();
-        return r < 0.50f ? WorldScale.CruiseBendRadius
-             : r < 0.85f ? WorldScale.FastBendRadius
+        return r < rules.CruiseWeight ? WorldScale.CruiseBendRadius
+             : r < rules.CruiseWeight + rules.FastWeight ? WorldScale.FastBendRadius
              : WorldScale.CommittedBendRadius;
     }
 

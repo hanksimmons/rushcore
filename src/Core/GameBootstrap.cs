@@ -52,6 +52,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
             int applied = _tuning.LoadOverride();
             if (applied < 0) GD.Print("[RUSHCORE] No tuning override; running compiled defaults.");
         }
+        // `-- --canyon` launches a Canyon Run stage (D-098), over whatever the override file says about the world.
+        if (HasFlag("--canyon")) { _tuning.World.GeneratedStage = true; _tuning.World.CanyonRun = true; GD.Print("[RUSHCORE] Canyon Run from command line"); }
 
         _world = new MovementToyWorld(_tuning, _seed);
         AddChild(_world);

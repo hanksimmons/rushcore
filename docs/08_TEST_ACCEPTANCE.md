@@ -187,6 +187,11 @@ with the model's (seed 1: ramp flight within 9%, whole route within 0.7%); `--se
 so a module seed can be chosen. Regression seeds now include a ramp seed, a gap seed and the
 regeneration-bound edge (three failed attempts, the fourth valid).
 
+**Result (Canyon Run, D-098, 2026-09-07):** the batch runs per archetype (100 canyon seeds: 100 valid,
+0 fallbacks, 52 gaps / 30 ramps / 97 banked turns all passing, 90 seeds with a ledge line, deterministic
+hashes); the wall-clearance validator holds on every seed; `RUSHCORE_ARCHETYPE=canyon` drives a canyon
+stage in the drive case and two canyon seeds sit in the regression list. The manual sample is the user's.
+
 ## 6. Combat — Gate C0
 
 Objective:

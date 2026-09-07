@@ -283,6 +283,16 @@ Geometry:
 - wall tunnels (lids) through spurs,
 - a spiral pit or spiral ramp as the set-piece (D-096).
 
+**Delivered 2026-09-07 (D-098):** the corridor is cut as a channel through side terrain raised 60–120 m
+above the floor relief (the channel floor follows the swells, the walls are the difference), with slot
+walls that blend over three cells (about 80° at 100 m) on straights and bend outsides and over the family's
+120 m on the inside of every bend (blind corners, §10). Every wall stands 8 m outside the corridor's level
+width (the ground follow's lateral samples never read it, `WorldScale.WallSetback`), the bend mix leans on
+the cruise and fast radii with a 1.5× berm, straights are 200–450 m, and the palette is red rock with a
+pale rim. Ridge lines become ledges cut into the wall 25–40 m above the floor. An `ArchetypeRules` record
+holds what an archetype changes (geometry only, §7); `World › Canyon Run (Phase 3)`, `-- --canyon` and
+`RUSHCORE_ARCHETYPE=canyon` select it. Wall tunnels (lids) and the spiral pit follow in their own slices.
+
 ### Dune Sea
 
 **Primary skill:** jump rhythm and landing alignment.
@@ -306,6 +316,10 @@ Geometry:
 - the top floor in the cloud band,
 - tubes and bridges linking floors and branching lines,
 - every fall lands on ground that drains back to the primary.
+
+Archetype rules (D-098): an `ArchetypeRules` record per archetype carries the wall height, the wall and
+inside falloffs, the bend mix, the straight lengths and the bank scale; the skeleton builder, the height
+field and the validators read it and nothing else differs between archetypes.
 
 ## 7. Archetype physics rule
 
@@ -408,7 +422,8 @@ Primary route segments expose tunable constraints:
 - **headroom** (D-096): nothing within the declared jump apex above any corridor (the full-charge apex from
   the local arrival speed and grade by default) unless the module declares a ceiling (lid, tube),
 - **wall clearance**: a wall face stands at least two cells outside the corridor's level width, so the ground
-  follow's lateral samples never read it,
+  follow's lateral samples never read it (delivered D-098 as "the primary's stamp weight is still 1 at the
+  level width plus the 8 m setback on both sides", the inside of a bend tighter than that reach excepted),
 - **drains**: below every edge of an upper floor the ground descends drivably to the primary: no wall foot,
   no NaN, grade within the route limit,
 - **tube clearance**: a tube axis stays at least the camera clearance (`docs/11 §7`) above the ground and

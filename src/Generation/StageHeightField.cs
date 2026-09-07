@@ -24,6 +24,10 @@ public sealed class StageHeightField : IHeightSource
     private const float CoarseCell = 16f;
     private const int RefineSpan = 12;
 
+    private readonly ArchetypeRules _rules;
+    /// <summary>Side terrain above the corridor floor (a canyon's walls); 0 on open landscapes.</summary>
+    public float WallHeight { get; }
+
     private readonly struct Swell
     {
         public readonly float Kx, Kz, Amp, Phase;
@@ -39,21 +43,24 @@ public sealed class StageHeightField : IHeightSource
     {
         public readonly int N;
         public readonly float[] X, Z, H, Heading, BankHeight, BankSide;
-        /// <summary>Stamp strength per vertex: 1 for the primary; optional lines fade in as they leave the primary corridor.</summary>
-        public readonly float[] Strength;
+        /// <summary>Extra half-width on bends, faded in and out with the bank so the wall line never jogs at a bend's ends.</summary>
+        public readonly float[] Extra;
         public readonly bool[] Bend;
         public readonly float HalfWidth;
         public readonly int Cx, Cz;
         public readonly int[] Coarse;
+        /// <summary>Vertex indices sorted by X: the coarse map scans an X window whatever order the route visits it in (D-096: no monotonic-X assumption).</summary>
+        private readonly int[] _byX;
+        private readonly float _wallFalloff, _insideFalloff;
 
-        public StampedLine(RouteSkeleton route, float[] profile, float sizeX, float sizeZ)
+        public StampedLine(RouteSkeleton route, float[] profile, float sizeX, float sizeZ, ArchetypeRules rules)
         {
+            _wallFalloff = rules.WallFalloff;
+            _insideFalloff = rules.InsideFalloff;
             var v = route.Vertices;
             N = v.Count;
             X = new float[N]; Z = new float[N]; H = profile; Heading = new float[N];
-            BankHeight = new float[N]; BankSide = new float[N]; Bend = new bool[N];
-            Strength = new float[N];
-            Array.Fill(Strength, 1f);
+            BankHeight = new float[N]; BankSide = new float[N]; Bend = new bool[N]; Extra = new float[N];
             HalfWidth = route.CorridorHalfWidth;
             for (int i = 0; i < N; i++)
             {
@@ -62,7 +69,7 @@ public sealed class StageHeightField : IHeightSource
             }
             foreach (var b in route.Bends)
             {
-                float height = WorldScale.BankHeightPerRadius * b.Radius;
+                float height = WorldScale.BankHeightPerRadius * b.Radius * rules.BankScale;
                 float side = -Mathf.Sign(b.TurnAngle);                    // outward is opposite the turn
                 float startD = v[b.StartIndex].Distance, endD = v[b.EndIndex].Distance;
                 for (int i = b.StartIndex; i <= b.EndIndex; i++)
@@ -71,14 +78,16 @@ public sealed class StageHeightField : IHeightSource
                     float fade = Mathf.Min(Mathf.SmoothStep(0f, BankFade, d - startD), Mathf.SmoothStep(0f, BankFade, endD - d));
                     BankHeight[i] = height * fade;
                     BankSide[i] = side;
+                    Extra[i] = BendExtraHalfWidth * fade;
                 }
             }
 
-            // Coarse nearest map: X is monotonic along every line, so each cell scans a window of X.
+            // Coarse nearest map: each cell scans the vertices whose X lies within reach, in X order.
+            _byX = Enumerable.Range(0, N).OrderBy(i => X[i]).ToArray();
             Cx = Mathf.CeilToInt(sizeX / CoarseCell) + 1;
             Cz = Mathf.CeilToInt(sizeZ / CoarseCell) + 1;
             Coarse = new int[Cx * Cz];
-            float reach = HalfWidth + BendExtraHalfWidth + FalloffWidth + CoarseCell * 2f;
+            float reach = HalfWidth + BendExtraHalfWidth + WorldScale.WallSetback + Mathf.Max(_wallFalloff, _insideFalloff) + CoarseCell * 2f;
             for (int cz = 0; cz < Cz; cz++)
             {
                 float z = cz * CoarseCell - sizeZ * 0.5f;
@@ -87,8 +96,9 @@ public sealed class StageHeightField : IHeightSource
                     float x = cx * CoarseCell - sizeX * 0.5f;
                     int lo = LowerBoundX(x - reach), hi = LowerBoundX(x + reach);
                     int best = -1; float bestD = float.MaxValue;
-                    for (int i = lo; i < hi; i++)
+                    for (int k = lo; k < hi; k++)
                     {
+                        int i = _byX[k];
                         float dx = X[i] - x, dz = Z[i] - z, dd = dx * dx + dz * dz;
                         if (dd < bestD) { bestD = dd; best = i; }
                     }
@@ -100,7 +110,7 @@ public sealed class StageHeightField : IHeightSource
         private int LowerBoundX(float x)
         {
             int lo = 0, hi = N;
-            while (lo < hi) { int mid = (lo + hi) >> 1; if (X[mid] < x) lo = mid + 1; else hi = mid; }
+            while (lo < hi) { int mid = (lo + hi) >> 1; if (X[_byX[mid]] < x) lo = mid + 1; else hi = mid; }
             return lo;
         }
 
@@ -121,7 +131,24 @@ public sealed class StageHeightField : IHeightSource
             return best;
         }
 
-        public float Width(int i) => HalfWidth + (Bend[i] ? BendExtraHalfWidth : 0f);
+        public float Width(int i) => HalfWidth + Extra[i];
+
+        /// <summary>Lateral offset of a point from the line at vertex i, positive on the outside of a bend (or the left on a straight).</summary>
+        public float Lateral(int i, float x, float z)
+        {
+            float lx = -Mathf.Sin(Heading[i]), lz = Mathf.Cos(Heading[i]);
+            float lateral = (x - X[i]) * lx + (z - Z[i]) * lz;
+            return BankSide[i] != 0f ? lateral * BankSide[i] : lateral;
+        }
+
+        /// <summary>Corridor weight at a point d metres from the line at vertex i: 1 inside the level width plus the
+        /// wall setback, then falling over the archetype's falloff, the long one on the inside of a bend (blind corners).</summary>
+        public float Weight(int i, float x, float z, float d)
+        {
+            float edge = Width(i) + WorldScale.WallSetback;
+            float falloff = BankSide[i] != 0f && Lateral(i, x, z) < 0f ? _insideFalloff : _wallFalloff;
+            return 1f - Mathf.SmoothStep(edge, edge + falloff, d);
+        }
 
         /// <summary>Corridor height at a point near vertex i: the profile interpolated along the route
         /// toward whichever neighbour the point lies toward (D-093: a nearest-vertex height was a 4 m
@@ -166,9 +193,11 @@ public sealed class StageHeightField : IHeightSource
     /// <summary>Summed crest curvature of the swell layer; contact at the cap needs ≤ 1 / cruise crest radius.</summary>
     public float SwellCurvature { get; }
 
-    public StageHeightField(RouteSkeleton route, ulong stageSeed)
+    public StageHeightField(RouteSkeleton route, ulong stageSeed, ArchetypeRules? rules = null)
     {
+        _rules = rules ?? ArchetypeRules.RollingHighlands;
         var rng = new SeededRandom(SeedChain.Derive(stageSeed, "relief"));
+        WallHeight = _rules.WallHeightMax > 0f ? rng.Range(_rules.WallHeightMin, _rules.WallHeightMax) : 0f;
 
         // ---- B: long swells, budgeted so the base landscape never launches a cruising ball ----
         _swells = new Swell[3];
@@ -267,7 +296,7 @@ public sealed class StageHeightField : IHeightSource
             rh[i] = Mathf.Lerp(exitH, rh[i], wExit);
         }
         _primaryProfile = rh;
-        _primary = new StampedLine(route, rh, SizeX, SizeZ);
+        _primary = new StampedLine(route, rh, SizeX, SizeZ, _rules);
         _lines.Add(_primary);
 
         SpawnXZ = new Vector3(v[0].Position.X, 0f, v[0].Position.Z);
@@ -276,6 +305,7 @@ public sealed class StageHeightField : IHeightSource
 
     /// <summary>Corridor centreline height of the primary route at a vertex.</summary>
     public float PrimaryHeight(int index) => _primaryProfile[index];
+    public ArchetypeRules Rules => _rules;
 
     /// <summary>
     /// Stamps an optional line. A ridge line rides the primary's profile between its joins, raised
@@ -291,12 +321,10 @@ public sealed class StageHeightField : IHeightSource
             int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
             profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(v[i].Distance, span);
         }
-        var stamped = new StampedLine(line, profile, SizeX, SizeZ);
-        for (int i = 0; i < v.Count; i++)
-        {
-            _primary.Nearest(v[i].Position.X, v[i].Position.Z, SizeX, SizeZ, out float away);
-            stamped.Strength[i] = Mathf.SmoothStep(WorldScale.OptionalStampFadeStart, WorldScale.OptionalStampFadeEnd, away);
-        }
+        // Full strength from the first vertex: inside the S-transition the ridge's height is the primary's own
+        // (the section avoids every feature and the plateau begins after the transition), so the overlap is
+        // seamless, and a fade would instead blend the ridge toward the side terrain a canyon raises.
+        var stamped = new StampedLine(line, profile, SizeX, SizeZ, _rules);
         _lines.Add(stamped);
     }
 
@@ -315,7 +343,9 @@ public sealed class StageHeightField : IHeightSource
         return best;
     }
 
-    /// <summary>Base landscape without the corridors: swells plus micro relief.</summary>
+    /// <summary>Base landscape without the corridors: swells plus micro relief. A canyon's side terrain sits
+    /// <see cref="WallHeight"/> above this; the corridor profile is cut from the floor relief, so the channel
+    /// floor follows the valleys and the walls are the difference.</summary>
     public float Relief(float x, float z)
     {
         float h = 0f;
@@ -329,6 +359,13 @@ public sealed class StageHeightField : IHeightSource
         return h;
     }
 
+    /// <summary>The primary's own stamp weight at a point: 1 wherever its profile is the ground.</summary>
+    public float PrimaryWeight(float x, float z)
+    {
+        int i = _primary.Nearest(x, z, SizeX, SizeZ, out float d);
+        return i < 0 ? 0f : _primary.Weight(i, x, z, d);
+    }
+
     /// <summary>Combined corridor weight at a point: 1 inside any corridor, 0 beyond every falloff.</summary>
     public float CorridorWeight(float x, float z)
     {
@@ -337,23 +374,24 @@ public sealed class StageHeightField : IHeightSource
         {
             int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
             if (i < 0) continue;
-            float hw = line.Width(i);
-            w = Mathf.Max(w, 1f - Mathf.SmoothStep(hw, hw + FalloffWidth, d));
+            w = Mathf.Max(w, line.Weight(i, x, z, d));
         }
         return w;
     }
 
     public float Sample(float x, float z)
     {
-        float h = Relief(x, z);
-        // Lines stamp in order (primary first); an optional line's profile meets the primary at its
-        // joins, so where their falloffs overlap the blend is continuous.
-        foreach (var line in _lines)
+        float h = Relief(x, z) + WallHeight;
+        // Optional lines stamp first and the primary last, so inside the primary corridor the primary's
+        // profile is exact (a ridge's transition beside it must never kink the centreline: a metre over a
+        // cell launches a ceiling ball) while a ridge's own centreline is its profile wherever the primary
+        // has faded. Their heights agree where both are full, so the overlap is continuous.
+        for (int k = _lines.Count - 1; k >= 0; k--)
         {
+            var line = _lines[k];
             int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
             if (i < 0) continue;
-            float hw = line.Width(i);
-            float w = (1f - Mathf.SmoothStep(hw, hw + FalloffWidth, d)) * line.Strength[i];
+            float w = line.Weight(i, x, z, d);
             if (w <= 0f) continue;
             h = Mathf.Lerp(h, line.Height(i, x, z), w);
         }
@@ -361,6 +399,8 @@ public sealed class StageHeightField : IHeightSource
     }
 
     private static readonly Color Track = new(0.50f, 0.44f, 0.36f);
+    private static readonly Color CanyonRock = new(0.62f, 0.36f, 0.24f);
+    private static readonly Color CanyonRim = new(0.80f, 0.60f, 0.40f);
     private static readonly Color StartPad = new(0.30f, 0.62f, 0.38f);
     private static readonly Color ExitPad = new(0.32f, 0.48f, 0.78f);
 
@@ -368,6 +408,13 @@ public sealed class StageHeightField : IHeightSource
     {
         float slope = 1f - Mathf.Clamp(normal.Y, 0f, 1f);
         Color c = TerrainHeightField.BasePalette(point.Y * 0.45f, slope);
+        if (WallHeight > 0f)
+        {
+            // Canyon palette (06 §3): red rock on the walls, a paler rim on the side terrain, the floor unchanged.
+            float above = Mathf.Clamp((point.Y - Relief(point.X, point.Z)) / WallHeight, 0f, 1f);
+            c = c.Lerp(CanyonRock, Mathf.SmoothStep(0.05f, 0.4f, above) * (0.55f + 0.45f * Mathf.SmoothStep(0.2f, 0.6f, slope)));
+            c = c.Lerp(CanyonRim, Mathf.SmoothStep(0.85f, 1f, above) * (1f - slope) * 0.6f);
+        }
         float track = 0f;
         foreach (var line in _lines)
         {

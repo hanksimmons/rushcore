@@ -257,6 +257,7 @@ Until the implementation plan advances:
 > Gate F0 with the G0 manual sample played with Flow on, and carries the vertical grammar (D-096: walls,
 > terraces, spiral pits, lids, see-through tubes, Sky Terraces; `docs/04 §5I`, `docs/11 §7`). Phase 3's
 > first slice, the challenge-module grammar with the mandatory gap, the launch ramp and the banked turn
-> under the two-price rule (D-097), is delivered.
+> under the two-price rule (D-097), is delivered, and so is Canyon Run (D-098: slot walls, banked lines,
+> `ArchetypeRules`).
 
 The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-095: the user's `manual-small-3` preset, D-091 plus the slam and VFX overrides, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

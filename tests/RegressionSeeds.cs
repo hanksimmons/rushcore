@@ -9,7 +9,7 @@ namespace Rushcore.Testing;
 /// </summary>
 public static class RegressionSeeds
 {
-    public readonly record struct Entry(int RunSeed, int StageIndex, string Why);
+    public readonly record struct Entry(int RunSeed, int StageIndex, string Why, Rushcore.Generation.TerrainArchetype Archetype = Rushcore.Generation.TerrainArchetype.RollingHighlands);
 
     public static readonly Entry[] All =
     {
@@ -24,5 +24,7 @@ public static class RegressionSeeds
         new(13, 5, "three attempts failed; the fourth recovers without the fallback (the regeneration bound's edge)"),
         new(90, 5, "two feature straights (a gap among them) and four banked turns: the longest reservations"),
         new(7, 4, "attempt 1 failed the ceiling bend clearance; attempt 2 recovers with a gap"),
+        new(20260905, 0, "the toy default seed as a Canyon Run (D-098): the first canyon playtest", Rushcore.Generation.TerrainArchetype.CanyonRun),
+        new(3, 0, "Canyon Run with slot walls through a gap module", Rushcore.Generation.TerrainArchetype.CanyonRun),
     };
 }

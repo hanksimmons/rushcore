@@ -127,10 +127,18 @@ Outcome:
 envelope and the strip/budget measurements; the feel verdicts and the frame-time reading are taken on the
 first generated stage instead of the strip.
 
-**M1 addendum (D-088, pending):** the Flow ceiling re-derives the safety side of the family. Measure on the
-strip at base cap × (1 + headroom): crest contact radius, turn radius, sightline, cell contact, landing run
-after a launch; the route speed model gains an airborne-and-landing phase calibrated there. Generation then
-reads two speeds (04 §12).
+**M1 addendum (D-088 → D-094, delivered 2026-09-06):** the Flow ceiling re-derives the safety side of the
+family at the D-091 baseline (`docs/11 §6`). The route speed model gained an airborne-and-landing phase
+(launch where v²κ ≥ g cos θ over a 3-cell window, the ground follow's own rule; ballistic flight under air
+control and drag; touchdown keeps the tangent component) and a ceiling mode (cap × (1 + headroom), steering
+saturated at the base cap). Measured by the harness every run: the ceiling bend radius (201 m) and the
+saturated ladder; a cliff flight against closed-form ballistics within 10%; turn radius at the ceiling on the
+turn pad (204 m measured against 201 m predicted (28.1° over 100 m at 254 m/s)); the hill stations at 254.7 m/s, real flights against the model over the same centreline
+(four flights in both, real [2048→2757 m, 53 m/s down → 198 m/s] [2777→3132, 41 → 166] [3151→3523, 53 → 134] [3735→4052, 67 → 151] against model [2029→2811, 56 → 212] [2815→3102, 47 → 181] [3148→3601, 52 → 141] [3763→4128, 72 → 153]: the ball keeps 7–9% less speed through each landing than the tangent rule and leaves the next facet later and lower, so the model's chained flights run up to 27% long (the safe direction for the validators), landing vertical speeds within 15%); the base-kit flights at each launch crest of the generated stage against the ball (ball 2456→2752 m, model 2457→2760 m (3%), landing 50 m/s down → 138 m/s).
+Cell contact is no longer a ceiling question (D-092: 100% at every cell size). Sightline at the ceiling is the
+user's Gate F0 verdict with Flow on. Generation now reads two speeds (04 §12): every report carries seconds
+below the base cap, the ceiling profile with its flights and hard landings, no bend inside a flight or its
+100 m landing run at either speed, and a chainable line on the primary (100 seeds: 100 valid, 0 fallbacks; seconds below the base cap 11.0 s average; 2.4 ceiling flights per stage, 3.7 s airborne; widest opportunity gap 1516 m against the 1528 m window).
 
 ## 5. Procedural Generation — Gate G0
 
@@ -145,7 +153,8 @@ Required:
 - mandatory jumps fit base capability envelope without required boost,
 - checkpoints have clearance,
 - primary corridor is not blocked,
-- archetype rules do not modify hidden player physics.
+- archetype rules do not modify hidden player physics,
+- two speeds (04 §12, D-094): the ceiling profile is computed for every stage; no bend sits inside a flight or its landing run at the base cap or at the ceiling; a chainable line exists on the primary; every report carries seconds below the base cap.
 
 Manual sample:
 

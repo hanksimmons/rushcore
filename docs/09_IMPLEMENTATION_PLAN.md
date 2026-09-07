@@ -100,7 +100,7 @@ route, so the speed-regaining verbs had nothing to buy. Deliver, in this order:
   removed the corridor stamp's 4 m staircase (D-093) — delivered 2026-09-06,
 - the ceiling addendum: strip measurements at the ceiling, route speed model airborne-and-landing
   phase, `WorldScale` ceiling constants, two-speed validators, chainable-line check, seconds below
-  the base cap in every report (08 §4 addendum),
+  the base cap in every report (08 §4 addendum, `docs/11 §6`, D-094) — delivered 2026-09-06,
 - the G0 manual sample is played with Flow on.
 
 Gate: **F0** — Flow preset named final; ceiling measured; harness green; the user's verdict that a

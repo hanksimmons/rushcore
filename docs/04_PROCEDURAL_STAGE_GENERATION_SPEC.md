@@ -309,7 +309,10 @@ Primary route segments expose tunable constraints:
 - no mandatory traversal dependent on boost availability,
 - no bend inside a launch's flight: after any crest or ramp the route speed model classifies as a
   launch, the route stays straight (radius ≥ the cruise bend) for the landing distance at the arrival
-  speed, because an airborne ball cannot brake to a corner limit.
+  speed, because an airborne ball cannot brake to a corner limit. Since D-094 this is checked from the
+  model's own flights at both speeds: no flight launches in or across a bend (beyond a 10 m drift),
+  and a bend starting inside the 100 m landing run must hold the landing speed after what the brake
+  sheds over that run; feature straights are sized for the ceiling flight over falling ground.
 
 Challenge modules may intentionally exceed ordinary safe constraints when their validator understands the exception.
 
@@ -392,6 +395,19 @@ chain and completable by one who never gains Flow. Two secondary checks follow: 
 exists** (consecutive Flow opportunities on some line are never further apart than the chain window
 at the ceiling speed), and every report carries **seconds below the base cap** on the primary, the
 one figure the Phase 4 difficulty reassessment reads.
+
+Delivered 2026-09-06 (D-094): the model integrates a **ceiling profile** (entry at the ceiling, cap
+base × (1 + headroom), steering saturated at the base cap) beside the base-kit profile, and both carry
+an **airborne-and-landing phase**: the ball leaves where the polyline's curvature demand exceeds
+gravity over a 3-cell window (the controller's ground-follow rule, 03 §3), flies under air control and
+drag, and lands where its path meets the polyline again, keeping the tangent component; each flight
+records launch, landing, hang time, landing vertical speed and the speed kept. Validators: no bend
+inside any flight or its 100 m landing run at either speed; a chainable line on the primary (launch
+crests and bends of ≥ 30° as the opportunities, never further apart than 6 s × the ceiling speed);
+notes for seconds below the base cap and the ceiling profile (flights, and how many land at or above
+the 30 m/s plain-landing loss, which only a slam avoids). Launch-crest landing runs now read the
+model's own flight when it is longer than the height-fall estimate. Reference numbers at D-091 are in
+`docs/11 §6`; `WorldScale` carries them as constants and the generator computes the live values.
 
 Do not initially build an AI agent that plays every stage. Add simulation validation only if real failures prove the numeric checks plus the route speed model insufficient.
 

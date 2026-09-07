@@ -123,7 +123,19 @@ Manual: the user boosts through the sample tubes (stages 1 and 4) and the judder
 (one sentence: the follow holds the inscribed radius), 11 §7d (side count), this packet, `STATUS.md`,
 `PROVISIONAL_DECISIONS.md` (P-entry: sides 24, inscribed-radius follow).
 
-## Delivery record (filled by the implementing agent)
+## Delivery record (running log; the main track started it, Opus continues it)
+
+**Done** (each with its commit; add the harness check if one is missing):
+- (nothing yet)
+
+**Next** (in order; continue from the first):
+1. Branch `opus/t7-tube-judder` off `develop-secondary`; build; data-only harness green.
+2. Harness reproduction: the boosted-and-steered pass in the tube ride with the per-tick trace; record the before numbers here.
+3. Confirm or refute the facet hypothesis against the prediction in the Analysis; check the bottom corner's phase.
+4. Fix: `TubeMesh.Sides` 24; `TryTubeFollow` on the inscribed circle; nothing else.
+5. After numbers; the acceptance checks; the cruise ride unchanged; golden hashes unchanged.
+6. Docs 04 §5I, 11 §7d; P-entry; STATUS row; full harness plus the three archetype runs; push; compare URL.
+
 
 - Branch / commits:
 - Harness (full run and the three archetype runs):

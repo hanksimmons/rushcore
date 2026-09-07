@@ -105,6 +105,22 @@ ride and the golden hashes are unchanged, docs 04 §5I and 11 §7d are updated, 
 row are filled, and the branch is pushed with its compare URL.
 ```
 
+**T7 — handover: the main track started the fix and was interrupted** (use this instead of the T7 kickoff)
+```text
+Your packet is docs/handoff/T7_TUBE_JUDDER.md. The main track (Fable) began this fix on branch opus/t7-tube-judder and
+was interrupted mid-work; you continue it. Do: git fetch && git checkout opus/t7-tube-judder && git pull, then git status.
+If the tree is dirty, read git diff first, then commit it as "WIP: main track interrupted (T7)" so nothing is lost. Read
+the packet top to bottom: its Analysis section is the reasoning you build on, and its Delivery record is a running log
+with "Done" and "Next" lists that the main track kept current at every commit; git log --oneline develop-secondary..HEAD
+and git diff develop-secondary --stat show the code. Rebuild and run the data-only harness before changing anything.
+Continue from the first item under "Next"; do not redo anything under "Done"; if a "Done" item has no harness check
+yet, add the check before moving on. Keep the packet's Delivery record and STATUS row current at every commit. Boundaries
+hold as the packet states: TryTubeFollow and TubeMesh only; no ground-follow, steering, boost, cap or compiled-default
+changes; the golden hashes must not change. Done means the boosted-ride acceptance lines are harness checks that pass,
+the cruise ride and golden hashes are unchanged, docs 04 §5I and 11 §7d are updated, the P-entry is written, the full
+harness and the three archetype runs are green, and the branch is pushed with its compare URL against develop-secondary.
+```
+
 ---
 
 ## Resume prompt (a later session on a packet already started)

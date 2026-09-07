@@ -122,6 +122,18 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 
 Gate: **G0** per archetype, plus the vertical-grammar checks in 08 §5.
 
+## Parallel track (2026-09-07)
+
+Between Phase 3 and Phase 4 a second agent works ahead on slices that do not touch route topology, generator rules or the
+frozen baseline; the packets, status and provisional decisions are in `docs/handoff/`. They deliver parts of later
+bullets early and are reconciled into this plan by the main track (`docs/handoff/README.md` §8): stage completion and
+the run seed / stage index (Phase 5 "start/exit", "completion transition", "clean stage lifecycle"), the HUD
+(Phase 5) with the health value (Phase 4), enemy and pickup visuals with the reward burst and combat VFX (Phase 4
+presentation only), prop scatter (Phase 3's last bullet), the generation measurements behind D-100..D-103's open gaps,
+and presentation fixes from the G0 manual sample. The main track keeps: branching stage exits (reserved D-105, a change
+to 02 §3/§4 pending the user's confirmation), the impact model and its Flow integration, the Sky Terraces second cut,
+the Dune Sea optional line, the spiral ramp, and Phase 6 run and route generation.
+
 ## Phase 4 — Movement Combat
 
 Deliver:

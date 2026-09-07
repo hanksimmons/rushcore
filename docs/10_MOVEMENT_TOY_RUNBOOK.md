@@ -78,7 +78,7 @@ steering 222.66 m/s² rising ×1.45 at the cap, gravity 39.39, drag 0.076, air c
 0.66 m, jump 2.03→84.63 m/s over 0.445 s, slam 42.95 m/s + 141.1 m/s², slam impact ×1.35 on every slam landing,
 landing burst ±0.10 s → ×1.15 of the current speed (D-088, was 80% of the cap), boost 88.64 m/s²,
 Overdrive at 141.06 m/s, chase camera 18.8 m / −20.6° (follow 8/s, yaw 12.65/s, FOV 45.6→62.7), Flow
-headroom 0.715 (ceiling 254.7 m/s), carve 190°/s with 0.459 understeer.
+headroom 0.715 (ceiling 254.7 m/s), carve 84°/s with 0.459 understeer (D-095).
 The first carve was removed (D-007); the drift carve of D-089 is a new verb on top of the baseline.
 `docs/03 §15` and `DECISIONS.md` carry the full register. Starter
 presets hold absolute values from before acceptance; they still load but read as variations on
@@ -149,7 +149,26 @@ playtest:
   small ball scale `Ground Clearance` and `Occlusion Margin` with the radius (0.66 m ball → 0.5 / 0.2)
   or the focus floor overrides a negative `Height Offset` on flat ground.
 
-## Locked preset (2026-09-06): `manual-small-2` = compiled defaults
+## Locked preset (2026-09-06 evening): `manual-small-3` = compiled defaults
+
+The user's override after playtesting the calibration course and a generated stage with the ground
+follow: `manual-small-2` plus nine values, checked in as `tuning/presets/manual-small-3.json` and
+**promoted verbatim on 2026-09-06 (D-095)**; the harness asserts the file applies with zero overrides.
+The override's world toggles (Calibration Strip, then Generated Stage) are instruments, not feel
+values, and were not promoted.
+
+| Value | D-091 | D-095 | Note |
+|---|---:|---:|---|
+| Jump / Slam › Slam Initial Speed | 42.95 | 90 | the slam reads as instant; slider widened to 0–150 |
+| Jump / Slam › Slam Downward Accel | 141.1 | 250 | slider widened to 0–400 |
+| Carve › Yaw Rate (deg/s) | 190.34 | 84.09 | a slower, longer swing |
+| VFX › Dust Intensity | 1 | 1.925 | |
+| VFX › Slam Effect | 1 | 3 | |
+| VFX › Burst Effect / Carve Effect | 1 / 1 | 1.73 / 2.275 | |
+| VFX › Squash / Stretch | 1 | 1.935 | |
+| VFX › Max Visual Roll (rev/s) | 3 | 3.285 | |
+
+## Locked preset (2026-09-06): `manual-small-2` = compiled defaults (superseded by `manual-small-3`)
 
 The user's tuning after the Flow headroom, carve and framing slices, saved from the panel, checked in
 verbatim as `tuning/presets/manual-small-2.json` and **promoted to the compiled defaults on 2026-09-06
@@ -211,12 +230,13 @@ x = +3110 facing −X; distance s is metres from the spawn, on every 100 m post.
 | 5080–5700 | Ramps 11 / 19 / 27° with 20 m lips in lanes z −180 / 0 / +180 | launch sizes, landing distance |
 | 5700–6300 | Turn pad: flat, painted rings r 80 / 160 / 240 m | turn radius at chosen speeds (≈100 m at the cap) |
 
-Reference envelope at the frozen baseline: turn radius ≈ 100 m at the cap; full-charge jump
-43 m up, 2.96 s hang, ≈ 180 m range at 60 m/s and ≈ 440 m at the cap; 0→cap **7.1 s / ≈ 580 m**
-unboosted (measured by the harness on the runway; the earlier paper figure of 5.3 s / 394 m
-ignored drag); landing burst → ×1.15 of the touchdown speed (D-088; the 118.8 m/s floor is gone).
-Flow ceiling 197.5 m/s at full Flow with headroom 0.33: turn radius ≈ 178 m, crest contact radius
-≈ 990 m; the ceiling addendum (08 §4) measures these on the strip.
+Reference envelope at the D-091 baseline: the base cap is held from a 68 m bend (turn-pad rings
+80 / 160 / 240 all read as full speed now); full-charge jump 91 m up, 4.30 s hang, ≈ 260 m range at
+60 m/s and ≈ 640 m at the cap; 0→cap **7.1 s / ≈ 580 m** unboosted (measured by the harness on the
+runway); landing burst → ×1.15 of the touchdown speed (D-088). Flow ceiling 254.7 m/s at full Flow
+with headroom 0.715: turn radius 201 m (measured 204 m measured against 201 m predicted (28.1° over 100 m at 254 m/s) on the turn pad), crest contact radius
+1647 m (every strip hill launches; measured flights four flights in both, real [2048→2757 m, 53 m/s down → 198 m/s] [2777→3132, 41 → 166] [3151→3523, 53 → 134] [3735→4052, 67 → 151] against model [2029→2811, 56 → 212] [2815→3102, 47 → 181] [3148→3601, 52 → 141] [3763→4128, 72 → 153]: the ball keeps 7–9% less speed through each landing than the tangent rule and leaves the next facet later and lower, so the model's chained flights run up to 27% long (the safe direction for the validators), landing vertical speeds within 15%), full-charge range ≈ 1090 m. The
+ceiling addendum (`docs/11 §6`, D-094) carries the ladders.
 
 ### Route speed model (D-081)
 
@@ -225,12 +245,20 @@ integrates the frozen baseline at a fixed 60 Hz step (gravity × grade, drive he
 solver friction as a constant slip loss, drag, the hard cap) and clamps every bend to the
 steering envelope's corner speed (v² = r·a_lat(v)). No boost, no burst, no airborne phases;
 a vertex it cannot reach reads speed 0 / time ∞. It is pure data, deterministic (profiles
-hash), and the harness calibrates it every run:
+hash), and the harness calibrates it every run. Since D-094 it also carries an **airborne-and-landing
+phase** (launch where v²κ ≥ g cos θ over three cells, ballistic flight under air control and drag,
+touchdown keeps the tangent component) and a **ceiling mode** (`new RouteSpeedModel(m, headroom)`:
+cap × (1 + headroom), steering saturated at the base cap); the generator integrates both profiles for
+every stage and the stage summary shows base-kit time, seconds below the cap and the ceiling time with
+its flight count:
 
 | Case | Real ball | Model | Error |
 |---|---|---|---|
 | Runway 0→cap, drive held | 7.1–7.2 s / 575–585 m | 7.06 s / 571 m | ≤ 0.8% at 50–500 m |
 | Grade fan 8° / 15° / 25° descents, drive held, at 25 / 50 / 75 m | 39–66 / 43–71 / 47–78 m/s | same to 0.3 m/s | ≤ 0.8% |
+| Cliff flight (50 m drop at the cap): hang / landing vertical speed | closed form 1.59 s / 63 m/s | 1.62 s / 64 m/s | ≤ 10% |
+| Strip hills at the ceiling (254.7 m/s), flights and landings | [2048→2757 m, 53 m/s down → 198 m/s] [2777→3132, 41 → 166] [3151→3523, 53 → 134] [3735→4052, 67 → 151] | [2029→2811, 56 → 212] [2815→3102, 47 → 181] [3148→3601, 52 → 141] [3763→4128, 72 → 153] (chained flights up to 27% long) | each flight's length within 35% (measured ≤ 27%) |
+| Stage launch crests at the base cap, flight length | ball 2456→2752 m, model 2457→2760 m (3%), landing 50 m/s down → 138 m/s | | within 20% |
 
 Without the slip term the model ran ≈ 2% fast on the runway and 4.4% long to the cap: the
 controller re-slips the ball every tick, so the "negligible" friction is a steady 0.79 m/s²
@@ -280,7 +308,9 @@ crest at the cap the ball skips for most of the last kilometre and reaches the e
 ground follow (D-092) the same drive reads 8.5% (ball 51.4 s, model 47.4 s) and raw contact 100 / 100 / 68 /
 100 / 99 / 72%: every kilometre without a launch crest must keep ≥ 97% raw contact, and each launch crest
 is logged with its radius, apex speed and v²/gr and must be left exactly when that ratio exceeds 1 (never
-glued, never faked). `RUSHCORE_CELL_SIZE=8` (or 16) in the environment builds and drives this one stage at
+glued, never faked). After the D-094 ceiling reservations the default seed carries one launch crest (its
+second feature straight no longer fits the band): drive 46.1 s vs model 46.5 s (0.7%), contact 100 / 100 /
+69 / 100 / 100 / 100%, and the model's own flight off that crest lands within 3% of the ball's. `RUSHCORE_CELL_SIZE=8` (or 16) in the environment builds and drives this one stage at
 that cell size; the cell re-measurement below came from it. The same case
 asserts no solid prop inside a corridor, that the SceneTree node count is flat across three regenerations
 and that neither generation nor the build writes to tuning or the rigid body (04 §7).
@@ -365,9 +395,9 @@ same v²/gr (2.4 and 1.9) at all three. Before D-093 the 4 m column read 8.5% an
 
 **Crest contact.** A ball leaves the ground at any crest whose radius is below v²/g:
 
-| Speed | 60 m/s | 100 m/s | 148.5 (base cap) | 197.5 (Flow ceiling) |
+| Speed | 60 m/s | 100 m/s | 148.5 (base cap) | 254.7 (Flow ceiling, D-091) |
 |---|---|---|---|---|
-| Minimum crest radius to stay grounded | 91 m | 254 m | 560 m | 990 m |
+| Minimum crest radius to stay grounded | 91 m | 254 m | 560 m | 1647 m |
 
 A cosine hill of wavelength λ and height H has crest radius λ²/(2π²H): the strip's 100/10,
 200/20, 400/40 and 800/80 stations keep contact only up to ≈ 45, 63, 89 and 126 m/s. Above

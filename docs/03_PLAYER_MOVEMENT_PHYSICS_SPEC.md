@@ -463,12 +463,12 @@ the raw physics transform. Teleports snap the camera and re-aim it along the spa
 
 ## 15. Tuning schema
 
-**Accepted baseline** (the user's `manual-small-2` preset, named final and promoted verbatim on
-2026-09-06, D-091, on top of `boost-finetune-final` of 2026-09-05, D-078; sub-percent slider values
-included, so the preset reads as "compiled defaults"). **This table is the authoritative movement
-baseline.** These are the compiled defaults in `GameplayTuning`; the runtime panel edits the same values
-and persists overrides (D-075). `tuning/presets/manual-small-2.json` is the promoted file; the harness
-asserts it loads with zero overrides. Min ground-normal dot 0.498, camera yaw hold below 0.545 m/s and
+**Accepted baseline** (the user's `manual-small-3` preset: `manual-small-2` of D-091 plus the slam and
+VFX overrides locked on 2026-09-06 evening, D-095; on top of `boost-finetune-final` of 2026-09-05, D-078;
+sub-percent slider values included, so the preset reads as "compiled defaults"). **This table is the
+authoritative movement baseline.** These are the compiled defaults in `GameplayTuning`; the runtime panel
+edits the same values and persists overrides (D-075). `tuning/presets/manual-small-3.json` is the promoted
+file; the harness asserts it loads with zero overrides. Min ground-normal dot 0.498, camera yaw hold below 0.545 m/s and
 terrain wavelength 1.005 are part of the same promotion.
 
 | Parameter | Accepted | Status |
@@ -488,8 +488,8 @@ terrain wavelength 1.005 are part of the same promotion.
 | Max jump takeoff vertical speed | 84.63 m/s | ACCEPTED (V-010, D-091; was 58.21) |
 | Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |
 | Charge release grace | 0.10 s | ACCEPTED |
-| Slam initial downward speed | 42.95 m/s | ACCEPTED |
-| Slam downward acceleration | 141.1 m/s² | ACCEPTED |
+| Slam initial downward speed | 90 m/s | ACCEPTED (D-095; was 42.95) |
+| Slam downward acceleration | 250 m/s² | ACCEPTED (D-095; was 141.1) |
 | Slam steering multiplier | 0.25 | ACCEPTED |
 | Slam lateral retention | 1.0 | ACCEPTED |
 | Slam impact multiplier | 1.35 on every slam landing | ACCEPTED (D-077) |
@@ -499,13 +499,14 @@ terrain wavelength 1.005 are part of the same promotion.
 | Flow gains: burst / slam landing / charged jump | 0.35 / 0.15 / 0.10 | ACCEPTED (D-088, D-091) |
 | Flow losses: brake per s / impact / plain landing | 1.0 / 0.5 (one-tick loss > 20 m/s) / 0.25 (vertical ≥ 30 m/s) | ACCEPTED (D-088, D-091) |
 | Flow chain window / idle decay | 6 s / 0.05 per s after it | ACCEPTED (D-088, D-091) |
-| Carve min speed / yaw rate / understeer | 15 m/s / 190.34°/s / 0.459 of steering authority | ACCEPTED (D-089, D-091) |
+| Carve min speed / yaw rate / understeer | 15 m/s / 84.09°/s / 0.459 of steering authority | ACCEPTED (D-089, D-091, D-095; yaw was 190.34) |
 | Carve Flow gain / min turn | 0.10 / 30° | ACCEPTED (D-089, D-091) |
 | Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
 | Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
 | Boost pickup refill | 35 | ACCEPTED (toy) |
 | Rush / Crush / Overdrive thresholds | 50 / 94.99 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush provisional ladder (V-004), readability/Flow hooks only |
+| VFX charge / slam / burst / carve / dust / squash / max visual roll | 3 / 3 / 1.73 / 2.275 / 1.925 / 1.935 / 3.285 rev/s (the rest 1) | ACCEPTED (D-091, D-095); presentation, no physics reads them |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 

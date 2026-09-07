@@ -78,8 +78,8 @@ public sealed class JumpSlamTuning
     public float MaxJumpChargeSeconds = 0.445f;
     public float ChargeReleaseGraceSeconds = 0.10f;
     /// <summary>Immediate downward velocity established on slam so it reads as instant.</summary>
-    public float SlamInitialDownwardSpeed = 42.95f;
-    public float SlamDownwardAcceleration = 141.1f;
+    public float SlamInitialDownwardSpeed = 90.0f;
+    public float SlamDownwardAcceleration = 250.0f;
     public float SlamSteeringMultiplier = 0.25f;
     /// <summary>Fraction of lateral (locomotion) velocity kept at slam start.</summary>
     public float SlamLateralRetention = 1.0f;
@@ -104,7 +104,7 @@ public sealed class CarveTuning
     /// <summary>Below this locomotion speed the carve button does nothing.</summary>
     public float MinSpeed = 15f;
     /// <summary>How fast the facing swings toward the input while carving, degrees per second.</summary>
-    public float YawRateDegrees = 190.339996337891f;
+    public float YawRateDegrees = 84.0899963378906f;
     /// <summary>Fraction of normal lateral authority the velocity keeps while carving (the understeer).</summary>
     public float Understeer = 0.459000021219254f;
     /// <summary>Flow granted at exit when the carve turned the heading by at least <see cref="FlowGainMinDegrees"/>.</summary>
@@ -201,17 +201,17 @@ public sealed class VfxTuning
     public float ChargeEffectStrength = 3.0f;
     public float JumpReleaseStrength = 1f;
     public float TrailIntensity = 1f;
-    public float DustIntensity = 1f;
-    public float SlamEffectStrength = 1f;
+    public float DustIntensity = 1.92499995231628f;
+    public float SlamEffectStrength = 3.0f;
     public float ImpactEffectStrength = 1f;
     /// <summary>Landing burst sparks, boom rings and flash (D-077).</summary>
-    public float BurstEffectStrength = 1f;
+    public float BurstEffectStrength = 1.73000001907349f;
     /// <summary>Carve debris (D-089): rocks and spray thrown to the outside of the corner.</summary>
-    public float CarveEffectStrength = 1f;
-    public float SquashStretchStrength = 1f;
+    public float CarveEffectStrength = 2.27499985694885f;
+    public float SquashStretchStrength = 1.93499994277954f;
     /// <summary>Visual-only cap on the ball's spin: a real 1 m ball at 60 m/s turns 9.5
     /// rev/s, which strobes at 60 fps. Collision is unaffected.</summary>
-    public float MaxVisualRollRevPerSecond = 3f;
+    public float MaxVisualRollRevPerSecond = 3.28499984741211f;
 }
 
 /// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>
@@ -299,8 +299,8 @@ public sealed class GameplayTuning
         F(CatJumpSlam, "Max Jump Takeoff", 1f, 100f, () => j.MaxJumpTakeoffVerticalSpeed, v => j.MaxJumpTakeoffVerticalSpeed = v);
         F(CatJumpSlam, "Max Charge Seconds", 0.05f, 2.5f, () => j.MaxJumpChargeSeconds, v => j.MaxJumpChargeSeconds = v);
         F(CatJumpSlam, "Charge Release Grace", 0f, 0.6f, () => j.ChargeReleaseGraceSeconds, v => j.ChargeReleaseGraceSeconds = v);
-        F(CatJumpSlam, "Slam Initial Speed", 0f, 90f, () => j.SlamInitialDownwardSpeed, v => j.SlamInitialDownwardSpeed = v);
-        F(CatJumpSlam, "Slam Downward Accel", 0f, 250f, () => j.SlamDownwardAcceleration, v => j.SlamDownwardAcceleration = v);
+        F(CatJumpSlam, "Slam Initial Speed", 0f, 150f, () => j.SlamInitialDownwardSpeed, v => j.SlamInitialDownwardSpeed = v);
+        F(CatJumpSlam, "Slam Downward Accel", 0f, 400f, () => j.SlamDownwardAcceleration, v => j.SlamDownwardAcceleration = v);
         F(CatJumpSlam, "Slam Steering Mult", 0f, 1.5f, () => j.SlamSteeringMultiplier, v => j.SlamSteeringMultiplier = v);
         F(CatJumpSlam, "Slam Lateral Retention", 0.3f, 1f, () => j.SlamLateralRetention, v => j.SlamLateralRetention = v);
         F(CatJumpSlam, "Slam Impact Mult", 1f, 4f, () => j.SlamImpactMultiplier, v => j.SlamImpactMultiplier = v);

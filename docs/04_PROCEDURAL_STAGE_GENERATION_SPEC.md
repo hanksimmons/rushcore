@@ -92,6 +92,11 @@ Generate:
 
 Primary route uses width, curvature, slope, and clearance constraints.
 
+The skeleton is ordered by route distance, not by stage X (D-096 amends D-084): headings are unbounded, so
+a route may switch back, spiral or turn through more than 360°, and the only plan constraint is the
+footprint. Spatial lookups bucket vertices by cell; progress, checkpoints and features already read route
+distance.
+
 ### B — Archetype base heightfield
 
 Apply structured analytic functions that establish strategic identity:
@@ -153,6 +158,14 @@ Initial modules:
 5. RidgeShortcut.
 6. BoostLine.
 
+Vertical grammar modules (D-096, §5I), each with the same seven fields:
+
+7. WallTunnel — a slot through a wall closed by a lid; the camera confines (06 §11); the roof refuses a charged jump, so the module declares its ceiling (§10 headroom).
+8. Tube — a see-through swept cylinder with flared mouths; entry from a ramp lip, an edge or midair, exit onto a landing zone of any line or floor; a branch point of the line graph.
+9. SpiralPit / SpiralRamp — a conical helix of banked bends, each turn at a different radius, descending into a pit or climbing a mesa; falling off the inner edge lands on the turn below.
+10. TerraceStep — a floor step of 100–200 m reached by a ramp and a charge, with a landing zone on the upper floor and a drain below its edge.
+11. Bridge — a lid used as a floor across a valley or a gap; falling off it lands on the drain.
+
 ### F — Gameplay object placement
 
 Place enemies/pickups as movement patterns:
@@ -183,6 +196,39 @@ Failure → bounded regeneration.
 
 Repeated failure → known-safe fallback configuration rather than broken stage load.
 
+### I — Vertical grammar (D-096)
+
+Three kinds of thing, and the ball drives on all of them:
+
+- **Ground**: the one single-valued heightfield (§9). Walls (a step of any height across one or two cells),
+  terraces (floor steps), slots (walls both sides of a corridor), cliff edges and spiral pits are all stamps
+  in it, because a heightfield is happy with a near-vertical face. Nothing here needs a second representation.
+- **Structures**: a separate generated mesh plus collider, as §9 allows for bridges and overhangs. Exactly
+  two: the **lid** (a box roof over a slot: a wall tunnel, or a bridge when used as a floor) and the
+  **tube** (a circle of radius 4–8 m swept along a 3D path of straights and arcs of any pitch, rendered as a
+  see-through shell with opaque ribs, inward-facing triangles for the collider). Structures are never a
+  second height layer: the ground follow, the route speed model's touchdown and the validators keep reading
+  the one heightfield, and the contact baseline carries the ball on a structure (03 §3).
+- **Floors**: terraces, not stacked layers. Floors reached by a ramp and a charge are 100–200 m apart
+  (`docs/11 §7`); the guaranteed primary route stays on the lowest floor (the free path of the two-price
+  rule), upper floors are paid lines, and under every edge of an upper floor the ground **drains**: every
+  cell below the edge has a descending drivable path back to the primary. The top floor may sit in the cloud
+  band (06 §3). Floors that share an XZ (a true helix inside a tower, a room under a room) are not built; if
+  the design ever needs them they are the same height-source abstraction instantiated per floor with a NaN
+  mask and a floor-aware follow, tracker and touchdown, and that is a separate decision.
+
+Tubes carry the line graph's branches. A tube leaves through a mouth on a ground line, at an edge or in
+midair (reachable from the take-off runway at the arrival speed with at most half a charge on a mandatory
+tube, a full charge or the ceiling on an optional one, the mouth radius as the aim tolerance) and exits
+through a flared mouth onto a 200 m landing zone of any line or floor; two tubes from one platform, or a
+tube exit onto a floor with its own lines, are the branches. Every line still rejoins the primary or
+reaches the exit and the graph is acyclic in route distance. Inside a tube the walls carry the ball (it
+rides up to tan φ = v²/(g·R)), so a tube path may bend tighter than the bend ladder: the route speed model
+treats tube segments as **carried** (no bend loss; grade, drag and cap only) and the exit velocity runs
+along the axis. A tube never passes through terrain mass and keeps its axis clear of the ground and of
+walls by the camera clearance (§10), so the camera stays outside it; a tube through a wall is a wall tunnel
+(lid) instead. Forks inside a tube are not built.
+
 ## 6. Archetypes
 
 ### Rolling Highlands
@@ -207,7 +253,10 @@ Geometry:
 - broad banked bends,
 - higher side terrain,
 - occasional upper ledge/shortcut,
-- wide enough to preserve sense of scale.
+- wide enough to preserve sense of scale,
+- slot walls beside the channel, on the outside of bends only until difficulty is reassessed (blind corners, §10),
+- wall tunnels (lids) through spurs,
+- a spiral pit or spiral ramp as the set-piece (D-096).
 
 ### Dune Sea
 
@@ -220,6 +269,18 @@ Geometry:
 - opportunities to land on downslopes,
 - occasional large set-piece dune,
 - wide landing zones.
+
+### Sky Terraces (D-096)
+
+**Primary skill:** vertical commitment and fall management.
+
+Geometry:
+
+- three floors of terraces 100–200 m apart, the primary on the lowest,
+- ramp-and-charge steps and midair tube mouths up; cliff edges and drains down,
+- the top floor in the cloud band,
+- tubes and bridges linking floors and branching lines,
+- every fall lands on ground that drains back to the primary.
 
 ## 7. Archetype physics rule
 
@@ -294,6 +355,12 @@ Verified 2026-09-05: the Godot 4.7 `HeightMapShape3D` class reference states "Ho
 
 Special non-heightfield structures such as bridges/ramps/overhangs can use separate generated meshes/colliders.
 
+Delivered forms (D-096): the lid is a `BoxShape3D` and a box mesh; the tube is a swept ring mesh (8–12
+sides) whose triangles face inward, with a `ConcavePolygonShape3D` built from the same triangles and
+backface collision on so the ball never leaves through a face at the cap. Both sit on a structure physics
+layer; the tube's collider is additionally invisible to the camera's occlusion probe (06 §11). The harness
+verifies a tube carries the ball at the cap with CCD the way D-079 verified NaN holes.
+
 Do not default the entire terrain to one giant concave triangle collider.
 
 ## 10. Route constraints
@@ -312,7 +379,17 @@ Primary route segments expose tunable constraints:
   speed, because an airborne ball cannot brake to a corner limit. Since D-094 this is checked from the
   model's own flights at both speeds: no flight launches in or across a bend (beyond a 10 m drift),
   and a bend starting inside the 100 m landing run must hold the landing speed after what the brake
-  sheds over that run; feature straights are sized for the ceiling flight over falling ground.
+  sheds over that run; feature straights are sized for the ceiling flight over falling ground,
+- **headroom** (D-096): nothing within the declared jump apex above any corridor (the full-charge apex from
+  the local arrival speed and grade by default) unless the module declares a ceiling (lid, tube),
+- **wall clearance**: a wall face stands at least two cells outside the corridor's level width, so the ground
+  follow's lateral samples never read it,
+- **drains**: below every edge of an upper floor the ground descends drivably to the primary: no wall foot,
+  no NaN, grade within the route limit,
+- **tube clearance**: a tube axis stays at least the camera clearance (`docs/11 §7`) above the ground and
+  clear of walls except at its mouths,
+- **blind corners**: a wall on the inside of a bend hides the read horizon; until difficulty is reassessed
+  after Phase 4, walls sit on the outside of bends.
 
 Challenge modules may intentionally exceed ordinary safe constraints when their validator understands the exception.
 
@@ -334,6 +411,9 @@ first-class speed source for optional lines: module preconditions that assume an
 stage clear-time targets, must account for a player who can reach 80% of the cap from any slam
 landing (D-077).
 
+A mandatory tube mouth or terrace step is a mandatory jump and obeys this section. Paid floors and midair
+mouths may demand the full charge or the ceiling (D-096).
+
 ## 12. Validation
 
 ### Mandatory
@@ -345,7 +425,8 @@ landing (D-077).
 - mandatory landing zones exist,
 - mandatory jumps fit base capability envelope,
 - spawn/exit/checkpoints have clearance,
-- no required route crosses unrecoverable invalid terrain.
+- no required route crosses unrecoverable invalid terrain,
+- vertical grammar (D-096): headroom, wall clearance, drains and tube clearance hold; every tube mouth is reachable per §5I and every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches the exit.
 
 ### Secondary
 
@@ -353,7 +434,8 @@ landing (D-077).
 - archetype-specific feature counts,
 - shortcuts are meaningfully distinct,
 - enemy density in range,
-- cosmetic props do not compromise corridor/readability.
+- cosmetic props do not compromise corridor/readability,
+- an upper floor is reachable by the base kit and worth its climb (reward placement joins in Phase 5).
 
 ### Route speed model (D-081)
 
@@ -419,7 +501,9 @@ Invisible anchors along the primary progression:
 - enough sphere clearance,
 - sensible continuation heading,
 - update only after legitimate player progress,
-- not immediately before unavoidable danger.
+- not immediately before unavoidable danger,
+- on a vertical stage the nearest-vertex match includes height, so a turn below or a floor above never aliases (D-096),
+- anchors never regress: after a fall the highest reached anchor stays armed; a stuck recovery restores there and a plain fall restores nothing.
 
 ## 14. Threading
 
@@ -452,6 +536,8 @@ Expose:
 - checkpoints,
 - spawn anchors,
 - slope/invalid-region visualization,
+- structure bounds (lids, tubes, tube paths and mouths),
+- floor ids and drains,
 - validation report,
 - generation phase timing.
 

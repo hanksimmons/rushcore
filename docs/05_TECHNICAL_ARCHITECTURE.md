@@ -191,6 +191,8 @@ Accepted baseline:
 - sphere collision,
 - control in `_IntegrateForces()`,
 - `HeightMapShape3D` static main terrain,
+- structure colliders (D-096): `BoxShape3D` lids, `ConcavePolygonShape3D` tubes with backface collision, on a structure physics layer; the ground follow reads the terrain heightfield only,
+- physics layers: terrain, structures, player, props; the camera occlusion probe masks terrain and lids and never tubes,
 - physics interpolation,
 - start at 60 physics ticks/sec.
 
@@ -234,7 +236,9 @@ Applies:
 - velocity look-ahead,
 - bounded zoom,
 - speed-responsive FOV/distance,
-- short shake impulses.
+- short shake impulses,
+- tube framing (D-096): with the ball inside a tube the chase placement is followed by a radial push of the lens out of the shell to at least the occlusion margin, and the shell is excluded from the occlusion probe; the framing bands (D-090) keep the ball in frame,
+- confined framing inside a wall tunnel: distance and pitch bounded to the tunnel's declared clearance.
 
 No manual camera rotation in MVP; yaw follows the trajectory (D-072).
 
@@ -248,7 +252,8 @@ Preferred tools:
 - primitive meshes where sufficient,
 - shared `ShaderMaterial`/materials,
 - `GPUParticles3D` for transient repeated effects,
-- `MultiMeshInstance3D` for high-count repeated static/cosmetic geometry when justified.
+- `MultiMeshInstance3D` for high-count repeated static/cosmetic geometry when justified,
+- tube shells (D-096): one shared translucent shell material and one rib material; ring meshes built per tube; the shell casts no shadow.
 
 Reuse Mesh/Material resources.
 

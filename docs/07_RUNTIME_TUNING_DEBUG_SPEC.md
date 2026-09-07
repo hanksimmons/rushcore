@@ -163,6 +163,8 @@ Toggles:
 - challenge zones,
 - spawn anchors,
 - invalid slopes/regions,
+- structures (lid and tube bounds, tube paths and mouths),
+- floors and drains,
 - player ground normal/contact (contact, raw, ground follow),
 - impact vector.
 

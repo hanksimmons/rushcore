@@ -48,6 +48,8 @@ Anything not required to prove that proposition is deferred.
 - Speed-responsive distance/FOV presentation.
 - Damped follow and bounded impact/slam shake.
 - Pitch/FOV/distance values were accepted at Movement Toy acceptance (03 §15).
+- Sees the player through a see-through tube from outside its shell; never enters a tube and is never pulled in by its walls (06 §11, D-096).
+- Confined, bounded framing inside a wall tunnel; never clips terrain.
 
 ### Stages/run
 
@@ -72,6 +74,7 @@ Initial archetypes:
 1. Rolling Highlands — terrain reading/momentum conversion.
 2. Canyon Run — high-speed steering/carving.
 3. Dune Sea — jump rhythm/landing alignment.
+4. Sky Terraces — vertical commitment and fall management (D-096).
 
 Initial reusable challenge modules:
 
@@ -80,7 +83,16 @@ Initial reusable challenge modules:
 - launch ramp,
 - banked turn,
 - ridge shortcut,
-- boost/pickup line.
+- boost/pickup line,
+- wall tunnel (a lid over a slot),
+- see-through tube (ground, edge or midair mouths; exits that branch the line graph),
+- spiral pit / spiral ramp,
+- terrace step (a floor reached by ramp and charge),
+- bridge.
+
+Vertical grammar (04 §5I, D-096): the ground stays one single-valued heightfield; walls, terraces, slots,
+cliff edges and spiral pits are stamps in it; lids and tubes are the only separate structures; floors are
+terraces whose edges drain back to the primary. Stacked floors that share an XZ are not built.
 
 Generation guarantees a primary traversable route by construction and validates it before play.
 
@@ -194,7 +206,7 @@ Unless later promoted:
 - weapon classes,
 - character roster,
 - cosmetic customization,
-- procedural caves/overhang worlds as a core system,
+- volumetric/voxel/SDF cave worlds and stacked floors that share an XZ (walls, terraces, slots, spiral pits, lids and see-through tubes are in scope as the vertical grammar, 04 §5I, D-096),
 - infinite-world streaming,
 - destructible terrain,
 - complex physics destruction,
@@ -218,8 +230,8 @@ Unless later promoted:
 
 | Content/system | MVP ceiling |
 |---|---:|
-| Terrain archetypes | 3 |
-| Challenge modules | 6 |
+| Terrain archetypes | 4 |
+| Challenge modules | 11 |
 | Normal enemy archetypes | 4 |
 | Elite modifier families | 1 |
 | Final encounters | 1 |

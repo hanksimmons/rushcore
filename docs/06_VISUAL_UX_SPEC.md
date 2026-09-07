@@ -41,6 +41,10 @@ Enemy roles retain stable silhouettes/semantic treatments across stage palettes.
 
 Do not rely only on hue.
 
+Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
+above which the fog thickens into a layer the top floor sits in and a fall drops through; a see-through
+tube is a translucent shell with opaque ribs every 25 m, the ribs being the motion cue (§2) at speed.
+
 ## 4. Terrain shading
 
 Initial direction:
@@ -194,6 +198,16 @@ At higher speed:
 - keep enough view ahead to read terrain.
 
 No extreme FOV distortion.
+
+### Structures (D-096)
+
+- Tubes: the camera stays outside the shell and sees the player through it. The tube's collider is invisible
+  to the occlusion probe; after the chase placement the lens is pushed radially out of the shell to at least
+  the occlusion margin; ribs are thin (≤ 0.5 m) and spaced so any occlusion is momentary. The camera never
+  enters a tube and is never pulled in by its walls.
+- Wall tunnels (lids): confined framing, distance and pitch bounded to the declared clearance (`docs/11 §7`),
+  still never clipping.
+- Floors: a fall keeps the yaw and the framing bands hold the ball; no cut, no fade.
 
 ### Camera shake
 

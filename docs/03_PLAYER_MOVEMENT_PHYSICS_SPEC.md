@@ -82,6 +82,14 @@ than the ground-normal limit, never on a ball arriving faster than one snap dist
 a landing, resolved by the solver), and never writes a transform. `Ground Follow` off reproduces the
 contact-only controller exactly, so the frozen baseline is unchanged by it.
 
+**Structures (D-096).** Lids, bridges and tubes (04 §5I) are separate colliders, not part of the height
+source, so on or under them the follow finds no carrying surface within the snap distance and returns
+false: the contact-only baseline runs there, on flat or cylindrical geometry that needs no follow. Inside a
+tube the ball rides the wall up to the angle where tan φ = v²/(g·R); above the ground-normal limit (about
+60°, bends under about 320 m at the base cap) that ride reads as airborne to the controller: no charge, air
+control instead of drive. Whether that is acceptable or a tube-contact rule is needed is V-015; any such
+rule is an addition scoped to tubes, never a change to the baseline.
+
 Track only the state required for behavior:
 
 - grounded,

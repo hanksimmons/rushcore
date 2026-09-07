@@ -216,14 +216,23 @@ public partial class CameraRig : Node3D, ICameraBasis
     {
         var c = _t.Camera;
         if (FlooredThisFrame) { _framePitch = 0f; _frameYaw = 0f; return; }   // the floor already re-aimed the lens
+        // Measure the ball as azimuth about world up (relative to the rig's flat forward) and
+        // elevation above the horizontal. Both are exact at any angle: the earlier rig-axis
+        // projection read a ball far to the side as far below, and pitched the lens into the
+        // ground once a carve slide reached the corner. The lens is then rebuilt as world yaw
+        // then pitch, so a sideways hold never rolls the horizon.
         Vector3 to = ballPos - _camera.GlobalPosition;
-        float ahead = to.Dot(-Basis.Z), up = to.Dot(Basis.Y), left = -to.Dot(Basis.X);   // against the untilted rig view
-        if (ahead <= 0.05f) return;
+        float ahead = to.Dot(FlatForward), left = -to.Dot(FlatRight);
+        float flat = Mathf.Sqrt(ahead * ahead + left * left);
+        if (flat < 0.05f) return;
+        float azimuth = Mathf.RadToDeg(Mathf.Atan2(left, ahead));          // + = left of the rig's forward
+        float elevation = Mathf.RadToDeg(Mathf.Atan2(to.Y, flat));         // + = above the horizontal
         float release = 1f - Mathf.Exp(-Mathf.Max(0.01f, c.PitchReleaseDamping) * dt);
-        _framePitch = Mathf.Clamp(Hold(_framePitch, Mathf.RadToDeg(Mathf.Atan2(up, ahead)), c.FrameBandDegrees, release), -80f, 80f);
+        _framePitch = Mathf.Clamp(Hold(_framePitch, elevation - c.PitchDegrees, c.FrameBandDegrees, release), -80f, 80f);
         // Sideways twin: a carve slide (03 §11) carries the ball across the screen; it parks on this edge.
-        _frameYaw = Mathf.Clamp(Hold(_frameYaw, Mathf.RadToDeg(Mathf.Atan2(left, ahead)), c.FrameBandHorizontalDegrees, release), -85f, 85f);
-        _camera.Rotation = new Vector3(Mathf.DegToRad(_framePitch), Mathf.DegToRad(_frameYaw), 0f);
+        _frameYaw = Mathf.Clamp(Hold(_frameYaw, azimuth, c.FrameBandHorizontalDegrees, release), -150f, 150f);
+        float pitch = Mathf.Clamp(c.PitchDegrees + _framePitch, -89f, 89f);
+        _camera.GlobalBasis = Basis.FromEuler(new Vector3(Mathf.DegToRad(pitch), _yaw + Mathf.DegToRad(_frameYaw), 0f));
     }
 
     /// <summary>Extra lens angle that keeps a ball seen at <paramref name="angle"/> inside ±band:

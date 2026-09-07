@@ -207,6 +207,11 @@ public sealed class StageDefinition
     public float WidestFlowGap { get; internal set; }
     public List<RouteSkeleton> OptionalLines { get; } = new();
     public List<RouteSpeedProfile> OptionalProfiles { get; } = new();
+    /// <summary>Each optional line at the Flow ceiling, chained from its join (D-100).</summary>
+    public List<RouteSpeedProfile> OptionalCeilingProfiles { get; } = new();
+    /// <summary>Optional lines the generator dropped because their base-kit flight could not hold a corner (D-100).</summary>
+    public int DroppedLines { get; internal set; }
+    public string DroppedDetail { get; internal set; } = "";
     /// <summary>Challenge modules on the primary (04 §5E) with their validator verdicts.</summary>
     public List<ChallengeModule> Modules { get; } = new();
     public List<Checkpoint> Checkpoints { get; } = new();

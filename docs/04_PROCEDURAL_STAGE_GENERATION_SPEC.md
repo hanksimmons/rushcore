@@ -185,7 +185,11 @@ ball's slam landing off the module's own launch; that launch (the far rim, the l
 the module's declared exception to the bend-clearance rule at the ceiling (§10): the base kit's flight
 must land on the straight, the ceiling's must land there with a slam pressed within 0.5 s, and the
 no-slam flight is reported, not enforced. Optional ridge lines ride the primary's pre-module profile, so
-a ridge beside a gap carries no copy of it. Measured 2026-09-06: 100 seeds, 0 fallbacks, 54 gaps, 16
+a ridge beside a gap carries no copy of it. A launch crest has the same two prices (D-100): its free path is
+the roll-off the model integrates, its paid path the full charge released at the apex at the arrival speed,
+which must land on the straight with its run; at the ceiling the slam landing off that jump must. The
+skeleton reserves crest straights for whichever of the four runs longest, and a dune train's roll-off is
+integrated over the train itself rather than one crest on flat ground. Measured 2026-09-06: 100 seeds, 0 fallbacks, 54 gaps, 16
 ramps and 134 banked turns all passing; the harness follower drives a ramp stage within 0.7% of the
 model and its uncharged lip flight lands within 9% of the model's.
 
@@ -275,6 +279,19 @@ Geometry:
 - crest launches,
 - valley safety vs ridge shortcuts,
 - long sweeping lines.
+
+**Ridge lines as delivered (D-086, redesigned D-100):** a ridge shadows a bend, or a run of up to three, on
+the outside: it leaves the primary on the straight before the first bend and rejoins on the straight after
+the last, each transition an S of 200 m over 290 m (r 70, the tightest that holds the base cap), then a
+cosine climb of 16–30 m over 300 m onto a short plateau and the mirror descent, 1 260 m in all. Both
+transitions lie wholly on primary straights and the ramps wholly outside the transitions: a transition
+through a banked bend rides the berm, and a ramp inside a transition is scaled by the primary's falloff
+blend into a convex knee; either launched the base kit into the transition's own turn, which no check had
+seen before D-100. Every optional line is now integrated at both speeds and judged on its own geometry: a
+line whose base-kit flight drifts through a turn or lands too fast for a corner in its run is dropped from
+the stage (not the stage from the batch); the ceiling verdict is reported, as the paid line's risk. With the
+family's 250–600 m straights about 90% of Highlands seeds and 70% of Canyon seeds carry a ridge; a Dune Sea
+rarely does and has no line design of its own yet.
 
 ### Canyon Run
 
@@ -459,6 +476,11 @@ Primary route segments expose tunable constraints:
   clear of walls except at its mouths,
 - **blind corners**: a wall on the inside of a bend hides the read horizon; until difficulty is reassessed
   after Phase 4, walls sit on the outside of bends.
+
+Optional lines (D-100) obey the flight rules on their own geometry at the base kit: no flight drifts more than the
+tolerance through a turn of the line (drift ≈ length × turn / 2) and every corner limit inside a landing run holds
+the landing speed after the brake's shed; a line that fails is dropped and the stage stands. At the ceiling the
+same reading is reported, not enforced (§11: a paid line may demand more).
 
 Challenge modules may intentionally exceed ordinary safe constraints when their validator understands the exception.
 Delivered exceptions (D-097): a module's own faces (a gap's rim and exit wall, a ramp's back face) are

@@ -80,18 +80,51 @@ public sealed class StageGenerator
         RouteSpeedProfile profile = _speed.Integrate(route.Polyline());
         // The ceiling profile: a standing start, then a full chain held wherever the bends allow (04 §12).
         RouteSpeedProfile ceiling = _ceiling.Integrate(route.Polyline(), chainFromBaseCap: true);
+        // An optional line whose base-kit flight cannot hold the corner it lands into is dropped, not the stage
+        // (D-100): the lines are optional, and the field is rebuilt once without it. Ridge lines are spaced, so
+        // the remaining lines' geometry does not change.
+        var dropped = new List<string>();
+        for (int k = optional.Count - 1; k >= 0; k--)
+        {
+            var line = optional[k];
+            var baseProfile = _speed.Integrate(line.Polyline(), profile.Speed[line.JoinStart]);
+            var verdict = FlightsHoldCorners(baseProfile, line.Polyline(), _speed);
+            if (!verdict.ok)
+            {
+                string trace = "";
+                if (System.Environment.GetEnvironmentVariable("RUSHCORE_LINE_TRACE") == "1" && baseProfile.Flights.Count > 0)
+                {
+                    float at = baseProfile.Flights[0].LaunchDistance;
+                    var lv = line.Vertices;
+                    for (int i = 0; i < lv.Count; i++) if (Mathf.Abs(lv[i].Distance - at) <= 40f) trace += $" {lv[i].Distance:0}:{lv[i].Position.Y:0.00}";
+                }
+                dropped.Add($"line {k + 1} at {route.Vertices[line.JoinStart].Distance:0} m: {verdict.detail}{trace}"); optional.RemoveAt(k);
+            }
+        }
+        if (dropped.Count > 0)
+        {
+            field = new StageHeightField(route, request.StageSeed, rules);
+            foreach (var line in optional) field.AddLine(line);
+            Lift(route, field);
+            foreach (var line in optional) Lift(line, field);
+            profile = _speed.Integrate(route.Polyline());
+            ceiling = _ceiling.Integrate(route.Polyline(), chainFromBaseCap: true);
+        }
         var def = new StageDefinition(request, route, profile, report) { RouteSeedUsed = routeSeed, HeightField = field, CeilingProfile = ceiling };
         foreach (var line in optional)
         {
             def.OptionalLines.Add(line);
             def.OptionalProfiles.Add(_speed.Integrate(line.Polyline(), profile.Speed[line.JoinStart]));
+            def.OptionalCeilingProfiles.Add(_ceiling.Integrate(line.Polyline(), ceiling.Speed[line.JoinStart], chainFromBaseCap: true));
         }
+        def.DroppedLines = dropped.Count;
+        def.DroppedDetail = string.Join("; ", dropped);
         report.Timings.Add(("speed profiles", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         PlaceCheckpoints(def);
         report.Timings.Add(("checkpoints", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
-        Validate(route, profile, field, report);
+        Validate(route, profile, ceiling, field, report);
         def.WidestFlowGap = ValidateTwoSpeeds(route, profile, ceiling, report);
         ValidateModules(def, report);
         ValidateOptionalLines(def, report);
@@ -176,6 +209,58 @@ public sealed class StageGenerator
             detail += $" [{line.Kind} {v[0].Distance:0}→{v[^1].Distance:0} m of {line.Length:0}, rise {rise:0} m, grade {maxGrade:0.00}, exit {prof.Speed[^1]:0} m/s{(ok ? "" : " FAIL")}]";
         }
         report.Add("optional lines are traversable, joined and distinct", allOk, $"{def.OptionalLines.Count} lines{detail}");
+        // Flights on an optional line are judged on its own geometry (it has no bend list): no flight drifts through a
+        // turn, and a landing holds the corner limits inside its run. The base kit is enforced (a failing line was
+        // dropped before this report); the ceiling is reported, as a module's no-slam flight is (04 §5E, D-100).
+        string ceilingDetail = ""; int ceilingFaults = 0;
+        for (int k = 0; k < def.OptionalLines.Count; k++)
+        {
+            var c = FlightsHoldCorners(def.OptionalCeilingProfiles[k], def.OptionalLines[k].Polyline(), _ceiling);
+            if (!c.ok) ceilingFaults++;
+            ceilingDetail += $" [line {k + 1}: {c.detail}]";
+        }
+        report.Add("optional lines' flights hold their corners at the base kit (a line that cannot is dropped)", true, $"{def.DroppedLines} dropped{(def.DroppedLines > 0 ? ": " + def.DroppedDetail : "")}");
+        report.Note("optional lines at the ceiling", $"{ceilingFaults} of {def.OptionalLines.Count} lines fly into a corner they cannot hold (the paid line's risk){ceilingDetail}");
+    }
+
+    /// <summary>Geometric flight check for any polyline (D-100): a flight's straight path may not drift more than the
+    /// tolerance off a path that turns under it (drift ≈ length × turn / 2), and the corner limits inside the landing
+    /// run must hold the landing speed after what the brake sheds over the run.</summary>
+    private static (bool ok, string detail) FlightsHoldCorners(RouteSpeedProfile p, Vector3[] poly, RouteSpeedModel model)
+    {
+        bool clear = true; string d = "";
+        foreach (var f in p.Flights)
+        {
+            int i0 = IndexAt(p, f.LaunchDistance), i1 = IndexAt(p, f.LandingDistance);
+            float turn = 0f;
+            for (int i = Mathf.Max(1, i0); i <= Mathf.Min(i1, poly.Length - 2); i++)
+            {
+                Vector2 a = new(poly[i].X - poly[i - 1].X, poly[i].Z - poly[i - 1].Z), b = new(poly[i + 1].X - poly[i].X, poly[i + 1].Z - poly[i].Z);
+                if (a.LengthSquared() > 1e-6f && b.LengthSquared() > 1e-6f) turn += Mathf.Abs(a.AngleTo(b));
+            }
+            string fault = "";
+            if (f.Length * turn * 0.5f > WorldScale.FlightDriftTolerance) fault = $" FLIES THROUGH A {Mathf.RadToDeg(turn):0}° TURN";
+            else
+            {
+                float runEnd = f.LandingDistance + WorldScale.LandingRunAfterFlight;
+                for (int i = i1; i < p.Count && p.Distance[i] <= runEnd; i++)
+                {
+                    float limit = p.CornerLimit[i];
+                    if (float.IsInfinity(limit)) continue;
+                    float shed = model.BrakeDeceleration * Mathf.Max(0f, p.Distance[i] - f.LandingDistance) / Mathf.Max(1f, f.LandingSpeed);
+                    if (f.LandingSpeed - shed > limit + 1f) { fault = $" LANDS TOO FAST FOR THE CORNER AT {p.Distance[i]:0} m ({limit:0} m/s after braking {shed:0})"; break; }
+                }
+            }
+            clear &= fault == "";
+            d += $" [{f.LaunchDistance:0}→{f.LandingDistance:0} m at {f.LaunchSpeed:0} m/s, lands {f.LandingVerticalSpeed:0} m/s down → {f.LandingSpeed:0} m/s{fault}]";
+        }
+        return (clear, $"{p.Flights.Count} flights{d}");
+    }
+
+    private static int IndexAt(RouteSpeedProfile p, float distance)
+    {
+        int i = Array.BinarySearch(p.Distance, distance);
+        return Mathf.Clamp(i >= 0 ? i : ~i, 0, p.Count - 1);
     }
 
     private static void ValidateCheckpoints(StageDefinition def, ValidationReport report)
@@ -198,7 +283,7 @@ public sealed class StageGenerator
     }
 
     /// <summary>Mandatory and secondary checks that apply to a skeleton (04 §12); more join with each slice.</summary>
-    private void Validate(RouteSkeleton route, RouteSpeedProfile profile, StageHeightField field, ValidationReport report)
+    private void Validate(RouteSkeleton route, RouteSpeedProfile profile, RouteSpeedProfile ceilingProfile, StageHeightField field, ValidationReport report)
     {
         var v = route.Vertices;
         float entryX = -WorldScale.FootprintLength * 0.5f + WorldScale.EntryMargin;
@@ -299,10 +384,16 @@ public sealed class StageGenerator
                     f.LandingDistance = Mathf.Max(f.LandingDistance, fl.LandingDistance - f.CentreDistance - f.Wavelength * 0.5f);
             float straightEnd = v[f.EndIndex].Distance;
             bool ok = f.CentreDistance + f.Wavelength * 0.5f + f.LandingDistance <= straightEnd + 1e-3f;
-            crestsClear &= ok;
-            crestDetail += $" [{f.Wavelength:0}/{f.Height:0} at {f.CentreDistance:0} m: {speed:0} m/s {(f.IsLaunch ? "launch" : "roll")}, landing {f.LandingDistance:0} m{(ok ? "" : " OVERRUNS")}]";
+            // The crest's paid path (04 §5E, D-100): a full charge released at the apex at the arrival speed must land
+            // on the straight with its run; at the ceiling the slam landing off that jump must (the two-price rule).
+            float paid = _speed.JumpRange(speed, _fullTakeoff, f.Height, 0f, 0f);
+            float ceilingSlam = _ceiling.SlamRange(ceilingProfile.SpeedAt(f.CentreDistance), _fullTakeoff, WorldScale.SlamReactionSeconds, _slamInitial, _slamAccel, f.Height);
+            bool paidOk = f.CentreDistance + paid + WorldScale.LandingRunAfterFlight <= straightEnd + 1e-3f
+                       && f.CentreDistance + ceilingSlam + WorldScale.LandingRunAfterFlight <= straightEnd + 1e-3f;
+            crestsClear &= ok && paidOk;
+            crestDetail += $" [{f.Wavelength:0}/{f.Height:0} at {f.CentreDistance:0} m: {speed:0} m/s {(f.IsLaunch ? "launch" : "roll")}, landing {f.LandingDistance:0} m{(ok ? "" : " OVERRUNS")}; full charge {paid:0} m, ceiling slam {ceilingSlam:0} m on {straightEnd - f.CentreDistance:0} m{(paidOk ? "" : " PAID PATH OVERRUNS")}]";
         }
-        report.Add("launch crests keep a straight landing run", crestsClear, $"{route.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest)} crests{crestDetail}");
+        report.Add("launch crests keep a straight landing run for the roll-off and the charged jump (two prices)", crestsClear, $"{route.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest)} crests{crestDetail}");
 
         // Wall clearance (04 §10, D-096): out to the level width plus the setback the primary's stamp is still
         // complete on both sides (its weight 1), so no wall face, and no side terrain, stands where the ground
@@ -539,8 +630,10 @@ public sealed class StageGenerator
         return _ceiling.SlamRange(speed * cos, speed * sin, WorldScale.SlamReactionSeconds, _slamInitial, _slamAccel, drop) + WorldScale.LandingRunAfterFlight;
     }
 
-    /// <summary>Metres either side of a module's launch point within which a flight is the module's own.</summary>
-    private const float ModuleLaunchWindow = 12f;
+    /// <summary>Metres either side of a module's launch point within which a flight is the module's own: the lip
+    /// ease (12 m) plus the three-cell span the launch curvature is read over, so a launch the model fires a few
+    /// cells past the lip is still the ramp's (D-100; at 12 m one ramp in twenty reported no free flight).</summary>
+    private const float ModuleLaunchWindow = WorldScale.RampEase + WorldScale.RouteSampleSpacing * 3f;
 
     private static float PadFlatness(StageHeightField field, Vector3 centre)
     {

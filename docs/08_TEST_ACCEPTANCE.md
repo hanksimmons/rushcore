@@ -201,6 +201,17 @@ model's, landing 55–62 m/s down. Only 40 seeds carry a ridge line, because rid
 and a dune sea is mostly trains: the batch's optional-line floor is 30% for this archetype and a dune lane is
 the open gap. Three dune seeds sit in the regression list. The manual sample is the user's.
 
+**Gap closure (D-100, 2026-09-07):** every optional line is integrated at both speeds and judged on its own
+geometry (no flight through a turn, landings hold the corners in their run); the check found that every ridge
+launched the base kit at the top of its 200 m climb (knee radius 170 m against the cap's 560 m) and that a
+transition through a banked bend rode the berm, so the ridge was redesigned (cosine ramps outside the
+transitions, transitions on straights, r 70 S-curves) and a failing line is dropped rather than the stage.
+Launch crests carry the two prices (the charged jump lands on the straight; the ceiling's slam landing does)
+and dune trains are integrated as trains. Measured after the closure: 100 / 0 on all three archetypes, no
+ramp reports a missing free flight any more (the launch window is the lip ease plus the curvature span), 0
+lines dropped, ridge lines on 90% of Highlands and 70% of Canyon seeds (the batch floors), 11% of dune seeds
+(reported, not judged). One archetype selector (`World › Archetype`) replaces the per-archetype toggles.
+
 ## 6. Combat — Gate C0
 
 Objective:

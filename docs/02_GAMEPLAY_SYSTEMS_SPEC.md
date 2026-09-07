@@ -71,6 +71,11 @@ A stage is a **broad directional traversal landscape**:
 
 It is neither a narrow race corridor nor an unstructured open sandbox.
 
+A stage may be vertical (D-096): floors are terraces, and the guaranteed primary route stays on the lowest
+one. Upper floors, tubes and wall tunnels are optional lines that rejoin the primary or reach the exit; a
+tube's exit may open onto a different area, so tubes are where the line graph branches. Falling from a
+floor lands on ground that drains back to the primary: it costs time and Flow, never a restore.
+
 The mandatory primary route must remain viable without requiring a stocked boost meter. Boost creates better/faster/riskier optional opportunities.
 
 ## 5. Speed bands
@@ -312,6 +317,10 @@ No selling, crafting, reputation, inventory management, or separate reroll econo
 6. reset momentum to a safe recoverable value.
 
 Fall is not automatic run death.
+
+A fall onto a lower floor is not a failure state at all (D-096): no restore, no health penalty; the landing
+itself prices it (03 §9 hard-impact and plain-landing rules, a slam avoids the loss) and the drive back is
+the cost. Only the kill plane and a declared abyss (a NaN hole, 04 §9) are unrecoverable falls.
 
 ### Environmental crashes
 

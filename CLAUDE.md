@@ -169,7 +169,8 @@ Current accepted direction:
 - `CustomIntegrator` left disabled initially so standard Jolt gravity/damping remain active,
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
 - the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
-- `HeightMapShape3D` main terrain.
+- `HeightMapShape3D` main terrain,
+- structures (D-096): lids as `BoxShape3D`, tubes as inward-facing `ConcavePolygonShape3D` with backface collision, on a structure layer; the ground follow reads the terrain heightfield only and the contact baseline carries the ball on a structure.
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
 
@@ -186,6 +187,7 @@ Start at 60 physics Hz. Only test/raise to 120 if measured high-speed behavior r
 - 1–3 meaningful optional lines,
 - mandatory traversal cannot require a stocked boost meter,
 - one logical height source for render/collision,
+- the ground is one single-valued heightfield; walls, terraces, slots and spirals are stamps in it; lids and tubes are the only structures (04 §5I, D-096); never a second height layer,
 - bounded validators/regeneration,
 - regression seeds for fixed failures.
 
@@ -252,6 +254,7 @@ Until the implementation plan advances:
 > Phase 3. The preset is locked (D-091 + D-095: headroom 0.715, ball 0.66 m, steering 222.66, jump
 > 84.63, slam 90 + 250, carve 84°/s, camera), the analytic ground follow is in (D-092) and the ceiling addendum
 > (D-094: two-speed generation, the model's airborne phase, `docs/11 §6`) is delivered. Phase 3 opens at
-> Gate F0 with the G0 manual sample played with Flow on.
+> Gate F0 with the G0 manual sample played with Flow on, and carries the vertical grammar (D-096: walls,
+> terraces, spiral pits, lids, see-through tubes, Sky Terraces; `docs/04 §5I`, `docs/11 §7`).
 
 The accepted movement baseline in `docs/03 §15` and `DECISIONS.md` (D-095: the user's `manual-small-3` preset, D-091 plus the slam and VFX overrides, promoted verbatim on 2026-09-06 on top of D-078) is frozen input to generation. Do not retune it; a change only enters through a saved preset that the user names final, promoted verbatim and logged. Flow headroom (D-088) is part of that baseline (0.715); with headroom 0 the controller is the base-cap kit.

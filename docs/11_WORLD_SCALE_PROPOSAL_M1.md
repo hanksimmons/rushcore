@@ -268,3 +268,87 @@ ballistics; the turn radius at the ceiling on the turn pad (204 m measured again
 ceiling, flights and landings against the model over the same centreline (four flights in both, real [2048→2757 m, 53 m/s down → 198 m/s] [2777→3132, 41 → 166] [3151→3523, 53 → 134] [3735→4052, 67 → 151] against model [2029→2811, 56 → 212] [2815→3102, 47 → 181] [3148→3601, 52 → 141] [3763→4128, 72 → 153]: the ball keeps 7–9% less speed through each landing than the tangent rule and leaves the next facet later and lower, so the model's chained flights run up to 27% long (the safe direction for the validators), landing vertical speeds within 15%); on the
 generated stage the base-kit flights at each launch crest against the ball (ball 2456→2752 m, model 2457→2760 m (3%), landing 50 m/s down → 138 m/s); and over
 the 100-seed batch the two-speed figures (100 seeds: 100 valid, 0 fallbacks; seconds below the base cap 11.0 s average; 2.4 ceiling flights per stage, 3.7 s airborne; widest opportunity gap 1516 m against the 1528 m window).
+
+## 7. Vertical ladder at the D-091 baseline (D-096)
+
+Written 2026-09-06 for the vertical grammar (04 §5I). The family above is unchanged; this section adds
+the sizes that walls, floors, tubes and lids need, derived from the same frozen inputs (g 39.39, full
+charge 84.63 m/s, half charge 43.3 m/s, base cap 148.5, ceiling 254.7, ball 0.66 m, rig 18.8 m at
+−20.6°). Every size is provisional until measured (V-016); the reach rows assume the charge adds along
+the ramp normal and are measured on the strip ramps before any floor is placed.
+
+### 7a. Reach: how far up one move goes
+
+| Move | Vertical takeoff | Apex above the launch |
+|---|---:|---:|
+| Full charge from flat | 84.6 m/s | 91 m |
+| Half charge from flat | 43.3 m/s | 24 m |
+| 11° ramp at the base cap + full charge | 112 m/s | 159 m |
+| 19° ramp at the base cap + half charge | 90 m/s | 103 m |
+| 19° ramp at the base cap + full charge | 129 m/s | 211 m |
+| 19° ramp at the ceiling + full charge | 164 m/s | 342 m |
+
+**Floor step band 100–200 m.** One 19° ramp and a full charge at the base cap reaches a 200 m step; a
+half charge reaches 100 m. A mandatory terrace step therefore stays at 100 m (half charge, 04 §11) and
+paid floors use the full band. A midair tube mouth is placed inside the reachable set from its runway
+at the arrival speed, with the mouth radius as the aim tolerance; the hang time at 129 m/s of vertical
+is 6.5 s, so the horizontal reach at the same height is about 900 m and never binds.
+
+### 7b. Falls
+
+| Drop | Landing vertical speed |
+|---|---:|
+| 100 m | 89 m/s |
+| 200 m | 126 m/s |
+| 300 m | 154 m/s |
+
+Every floor fall lands above the 30 m/s plain-landing loss and sheds more than 20 m/s in a tick: a
+slam keeps the Flow, anything else pays it (03 §9). The drain under an edge is drivable ground at or
+below the route grade limit with no wall foot and no NaN, and the kill plane stays at the stage
+minimum minus 120 m, so a fall is never a restore.
+
+### 7c. Walls, slots and spirals
+
+- A wall of height H across one 4 m cell is a face of atan(H / 4): 100 m reads as 88°. Two cells is
+  the readable minimum for the low-poly silhouette.
+- Wall margin: 2 cells (8 m) outside the corridor's level width, so the ground follow's ±1 cell lateral
+  sample never reads the face. The 150 m corridor already leaves 75 m; slots at the 75 m minimum are
+  the case to measure.
+- Sightline: a wall on the inside of a bend hides the 445 m (base cap) / 764 m (ceiling) read horizon.
+  Walls sit on the outside of bends until difficulty is reassessed after Phase 4.
+- Spiral pit / ramp: successive turns differ in radius by Δr ≥ 200 m (150 m corridor plus both wall
+  margins and the face). Turns from r 800 down to r 200 hold the ceiling everywhere (201 m); the 50 m
+  committed radius appears only as the top turn of a spiral ramp. A drop of 100–200 m per turn at r 200
+  is a grade ≤ 0.16, far inside the 0.40 route limit.
+
+### 7d. Tubes
+
+| Quantity | Provisional value |
+|---|---:|
+| Tube radius | 4–8 m |
+| Mouth flare | ×2 over one tube diameter |
+| Rib spacing / thickness | 25 m / ≤ 0.5 m |
+| Path radius | ≥ 3 × tube radius (the sweep never self-intersects) |
+| Tube length | 150–800 m |
+| Axis clearance above ground and from walls | ≥ 30 m except at the mouths |
+
+Wall ride: inside a bend of path radius R the ball rides to tan φ = v² / (g·R).
+
+| Path radius at the base cap | 100 m | 300 m | 600 m |
+|---|---:|---:|---:|
+| Ride angle | 80° | 62° | 43° |
+
+The ground-normal limit (0.498, about 60°) is crossed below a path radius of about 320 m at the base
+cap (and about 900 m at the ceiling), so the ball inside a tight tube bend reads airborne to the
+controller (V-015). A tube bend loses no speed in the route speed model (carried segment); the exit
+velocity runs along the axis into the landing zone.
+
+### 7e. Camera clearance
+
+The rig sits 17.6 m behind and 6.7 m above the ball. Inside a tube of radius R with the ball on the
+floor, the lens must clear the top of the shell by the occlusion margin, 2R + 0.6 m above the floor:
+at R 6 that is a radial push of about 5 m. The push is applied after the chase placement along the
+radial from the tube axis through the lens, so when the ball rides a wall or the ceiling the lens
+follows around the outside. A tube axis therefore needs 2R + 7 m plus margin of clear space on every
+side; 30 m covers R 8. Lid tunnels use the confined framing instead: clearance ≥ 15 m above the ball,
+width ≥ 75 m (the minimum corridor), length ≤ 300 m provisional.

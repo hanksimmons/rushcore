@@ -15,7 +15,7 @@ Everything the parallel track does must be reconcilable with the pre-existing pl
 directory is the ledger: one packet per task, one status table, one file of provisional decisions. If it is not written
 here, it did not happen.
 
-## 2. Start-of-session prompt (paste verbatim)
+## 2. Start-of-session prompt (paste verbatim; `PROMPTS.md` has the per-packet kickoff, resume and reconcile prompts)
 
 ```text
 Resume RUSHCORE (Godot .NET 4.7.2, C#, macOS arm64, repo ~/rushcore). You are the parallel track described in
@@ -127,5 +127,8 @@ hash; the check runs in the 35 s data-only mode, so run it after every edit near
 | `T4_PROP_SCATTER.md` | Archetype-aware prop scatter on generated stages | `opus/t4-prop-scatter` | none |
 | `T5_MEASUREMENTS.md` | Generation instruments: wall probe, tube ride, floor-3 room, landing run | `opus/t5-measurements` | none |
 | `T6_SAMPLE_FIXES.md` | Presentation fixes from the user's sample-stage playtest | `opus/t6-sample-fixes` | the user's notes |
+| `T7_TUBE_JUDDER.md` | Bug: the ball judders while boosting through a tube | `opus/t7-tube-judder` | none |
 
-Suggested order: T1, T4, T5 (independent, quick to merge), then T2, T3, then T6 when the notes exist.
+Suggested order: T7 (a bug the user sees), T1, T4, T5 (independent, quick to merge), then T2, T3, then T6 when the notes exist.
+
+The prompts to paste for each session are in `PROMPTS.md`.

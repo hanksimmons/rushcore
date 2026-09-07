@@ -11,6 +11,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | not started | — | — | — | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
+| T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | in progress (main track started 2026-09-07; Opus continues via the T7 handover prompt) | — | — | — | — |
 
 ## Baseline at handoff
 

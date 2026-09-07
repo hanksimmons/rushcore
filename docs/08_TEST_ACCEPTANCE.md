@@ -179,6 +179,14 @@ baseline with the ground follow (D-092) and the interpolated corridor profile (D
 reads 0.5% (ball 47.2 s, model 47.4 s) with raw contact 100 / 100 / 67 / 100 / 100 / 75% per kilometre;
 the two low readings are the launch crests, each left exactly when v² > g·r.
 
+**Modules (D-097, 2026-09-06):** the batch asserts every challenge module passes its validator and that
+gaps, ramps and banked turns all occur (100 seeds: 54 / 16 / 134, 0 fallbacks, 96 seeds with a ridge
+line); the mandatory-jump envelope check is live (half charge at the model's arrival speed). The drive
+case treats every feature as a launcher and compares the ball's flight off a ramp lip or a gap's far rim
+with the model's (seed 1: ramp flight within 9%, whole route within 0.7%); `--seed N` drives stage N/0
+so a module seed can be chosen. Regression seeds now include a ramp seed, a gap seed and the
+regeneration-bound edge (three failed attempts, the fourth valid).
+
 ## 6. Combat — Gate C0
 
 Objective:

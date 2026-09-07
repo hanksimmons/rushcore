@@ -151,12 +151,35 @@ Each module defines:
 
 Initial modules:
 
-1. ModerateGap.
+1. ModerateGap — delivered 2026-09-06 (D-097).
 2. LargeShortcutGap.
-3. LaunchRamp.
-4. BankedTurn.
+3. LaunchRamp — delivered 2026-09-06 (D-097).
+4. BankedTurn — delivered 2026-09-06 (D-097).
 5. RidgeShortcut.
 6. BoostLine.
+
+**Delivered grammar (D-097).** A module is a reserved feature straight on the skeleton (§5A) plus a stamp
+on the corridor profile plus a validator that fills the seven fields from the two speed profiles
+(`ChallengeModule` in the stage definition; `challenge modules pass their validators` in every report).
+The **two-price rule** governs each one: the *free path* (drive into the pit and ride its exit wall out,
+fly off the lip uncharged, take the bend at its corner limit) never stops and never drops the model below
+2/3 of the base cap; the *paid path* (a half-charged jump across the gap, a full charge off the lip, a
+carve through the bend) grants Flow and must land on the reserved straight. Mandatory gaps are 40–120 m
+wide and 12–20 m deep behind a 150 m runway; the exit wall is the gentlest the opening allows (never over
+the family's 25°), and the depth is trimmed to keep it so, because a ball riding out of the pit leaves
+the far rim like a ramp. Launch ramps are 11° or 19° lips of 20 m after a 100 m approach with a 45° back
+face. Banked turns are the committed 50 m bends with their family bank and at least 100 m of straight
+before them. Modules are stamped on the corridor profile as it slopes (a level module would need eases
+whose convexity launches a ball before the rim); the validator reads the real rim heights, so a gap on a
+0.18 grade demands the jump its far rim actually needs. The straight after a gap or a ramp is sized for
+the base kit's full-charge flight at the cap over falling ground (about 850 m) and for the ceiling
+ball's slam landing off the module's own launch; that launch (the far rim, the lip taken uncharged) is
+the module's declared exception to the bend-clearance rule at the ceiling (§10): the base kit's flight
+must land on the straight, the ceiling's must land there with a slam pressed within 0.5 s, and the
+no-slam flight is reported, not enforced. Optional ridge lines ride the primary's pre-module profile, so
+a ridge beside a gap carries no copy of it. Measured 2026-09-06: 100 seeds, 0 fallbacks, 54 gaps, 16
+ramps and 134 banked turns all passing; the harness follower drives a ramp stage within 0.7% of the
+model and its uncharged lip flight lands within 9% of the model's.
 
 Vertical grammar modules (D-096, §5I), each with the same seven fields:
 
@@ -394,6 +417,9 @@ Primary route segments expose tunable constraints:
   after Phase 4, walls sit on the outside of bends.
 
 Challenge modules may intentionally exceed ordinary safe constraints when their validator understands the exception.
+Delivered exceptions (D-097): a module's own faces (a gap's rim and exit wall, a ramp's back face) are
+outside the grade and grade-delta checks; a module's own launch at the ceiling is judged by its slam
+landing (§5E) instead of the bend-clearance rule.
 
 ## 11. Mandatory jump envelope
 
@@ -425,7 +451,7 @@ mouths may demand the full charge or the ceiling (D-096).
 - corridor width above minimum,
 - slope constraints pass,
 - mandatory landing zones exist,
-- mandatory jumps fit base capability envelope,
+- mandatory jumps fit base capability envelope (delivered D-097: every mandatory gap is crossable half-charged at the model's arrival speed, with the far rim's real height, plus the ball's diameter and 10 m),
 - spawn/exit/checkpoints have clearance,
 - no required route crosses unrecoverable invalid terrain,
 - vertical grammar (D-096): headroom, wall clearance, drains and tube clearance hold; every tube mouth is reachable per §5I and every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches the exit.

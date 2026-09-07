@@ -154,6 +154,9 @@ public sealed class StageHeightField : IHeightSource
     private readonly StampedLine _primary;
     private readonly List<StampedLine> _lines = new();
     private readonly float[] _primaryProfile;
+    /// <summary>The primary's smoothed profile before any feature or module stamp: optional lines ride this,
+    /// so a ridge beside a gap or a ramp does not carry a copy of it (D-097).</summary>
+    private float[] _primaryBase = System.Array.Empty<float>();
     private readonly RouteSkeleton _primaryRoute;
 
     public float SizeX => WorldScale.FootprintLength;
@@ -212,6 +215,28 @@ public sealed class StageHeightField : IHeightSource
             int lo = Mathf.Max(0, i - window), hi = Mathf.Min(n - 1, i + window);
             rh[i] = (prefix[hi + 1] - prefix[lo]) / (hi - lo + 1);
         }
+        // Modules (04 §5E, D-097) are stamped on the corridor profile as it slopes (≤ 0.18 by the swell
+        // budget): a level module would need eases whose convexity launches a ball before the rim, so
+        // the validator reads the real rim heights instead. A gap's exit wall is the gentlest the
+        // opening allows (never over the family's 25°), because a ball riding it out leaves like a ramp.
+        _primaryBase = (float[])rh.Clone();
+        foreach (var f in route.Features)
+        {
+            if (f.Kind == RouteFeatureKind.LaunchCrest) continue;
+            if (f.Kind == RouteFeatureKind.Gap)
+                f.Depth = Mathf.Min(f.Depth, (f.Opening - WorldScale.GapRimFace) * WorldScale.GapExitWallMaxSlope);
+            for (int i = f.StartIndex; i <= f.EndIndex; i++)
+            {
+                float rel = v[i].Distance - f.CentreDistance;
+                if (f.Kind == RouteFeatureKind.Gap)
+                    rh[i] -= f.Depth * Chasm(rel, f.Opening, f.Depth);
+                else
+                {
+                    float run = f.Rise / f.Slope;   // lip height = slope × run, so the ramp meets the lip exactly
+                    rh[i] += f.Slope * SmoothClamp(rel + run, run, WorldScale.RampEase) - SmoothClamp(rel, f.Rise, WorldScale.RampBackFaceEase);
+                }
+            }
+        }
         foreach (var f in route.Features)
         {
             if (f.Kind != RouteFeatureKind.LaunchCrest) continue;
@@ -264,7 +289,7 @@ public sealed class StageHeightField : IHeightSource
         for (int i = 0; i < v.Count; i++)
         {
             int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
-            profile[i] = _primaryProfile[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(v[i].Distance, span);
+            profile[i] = _primaryBase[pi] + line.RidgeHeight * OptionalLineBuilder.Plateau(v[i].Distance, span);
         }
         var stamped = new StampedLine(line, profile, SizeX, SizeZ);
         for (int i = 0; i < v.Count; i++)
@@ -357,6 +382,34 @@ public sealed class StageHeightField : IHeightSource
         c = c.Lerp(StartPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dStart)));
         c = c.Lerp(ExitPad, 0.7f * (1f - Mathf.SmoothStep(WorldScale.PadRadius - 10f, WorldScale.PadRadius, dExit)));
         return TerrainHeightField.FacetJitter(c, point);
+    }
+
+    /// <summary>0 outside the gap, 1 at its deepest: a steep take-off rim over <see cref="WorldScale.GapRimFace"/> metres,
+    /// then an exit wall rising over the rest of the opening (drivable out: the free path never stops).</summary>
+    private static float Chasm(float d, float opening, float depth)
+    {
+        float exitRun = Mathf.Max(1f, opening - WorldScale.GapRimFace);
+        float a = d / WorldScale.GapRimFace;
+        float b = (opening - d) / exitRun;
+        float t = Mathf.Clamp(Mathf.Min(a, b), 0f, 1f);
+        return t * t * (3f - 2f * t);
+    }
+
+    /// <summary>C1 smooth max(v, 0), exact outside a ± e/2 window around zero.</summary>
+    private static float SoftMax0(float v, float e)
+    {
+        float t = v + e * 0.5f;
+        if (t <= 0f) return 0f;
+        return t < e ? t * t / (2f * e) : t - e * 0.5f;
+    }
+
+    /// <summary>C1 clamp of v into [0, hi] with slope exactly 1 in the middle: the ramp face keeps its stated
+    /// gradient while the foot, the lip and the back face are rounded over e metres (the lab's ramps).</summary>
+    private static float SmoothClamp(float v, float hi, float e)
+    {
+        e = Mathf.Min(e, hi * 0.9f);
+        if (e <= 1e-4f) return Mathf.Clamp(v, 0f, hi);
+        return hi - SoftMax0(hi - SoftMax0(v, e), e);
     }
 
     /// <summary>Seeded lattice value noise in [−1, 1] with smoothstep interpolation.</summary>

@@ -12,6 +12,8 @@ dotnet build                                                    # offline: Godot
 /Applications/Godot_mono.app/Contents/MacOS/godot --headless --fixed-fps 60 --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0; ~30 s
 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>                    # pure-data cases only (generation batch, regression seeds, model closed forms)
 RUSHCORE_CELL_SIZE=8 <same command>                             # the stage case at another cell size (8 or 16)
+<same command> --seed 8                                         # the stage case drives stage 8/0 (pick a seed with a gap or a ramp)
+RUSHCORE_DRIVE_TRACE=3020 <same command> --seed 8               # per-tick ball trace ±120 m around that route metre
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
 

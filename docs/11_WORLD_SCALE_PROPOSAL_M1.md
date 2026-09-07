@@ -97,6 +97,13 @@ Landing zone after any mandatory gap: ≥ 200 m long past the far rim (the half-
 spread at 100 m/s is 153 → 296 m) and at least the corridor width. Take-off rims flat for ≥ 150 m
 (the strip's runways); exit walls ≤ 25° so a short landing recovers.
 
+*Delivered 2026-09-06 (D-097):* the exit wall is as gentle as the opening allows (the depth is trimmed
+so it never exceeds 25°), because a ball riding it out leaves the far rim like a ramp: at the base cap
+that flight is about 300 m, at the ceiling over a kilometre, so the straight past a gap is sized for the
+base kit's full-charge flight at the cap over falling ground (≈ 850 m) and for the ceiling ball's slam
+landing off the far rim; module straights therefore run about 1 km. Rims sit on the sloped corridor
+profile and the validator reads their real heights.
+
 ### 3d. Ramps
 
 Strip lips (rise 20 m; slopes 0.20 / 0.35 / 0.50 = 11.3° / 19.3° / 26.6°; lengths 100 / 57 / 40 m):

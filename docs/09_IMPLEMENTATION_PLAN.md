@@ -110,7 +110,7 @@ perfect chain feels faster and faster and a mistake never feels slow.
 
 Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 
-- challenge-module grammar (04 §5E) with the gap, launch ramp and banked bend as Flow opportunities under the two-price rule,
+- challenge-module grammar (04 §5E) with the gap, launch ramp and banked bend as Flow opportunities under the two-price rule — delivered 2026-09-06 (D-097),
 - the route skeleton ordered by route distance (headings unbounded, cell buckets), wall and terrace stamps, and the headroom / wall-clearance / drain validators,
 - Canyon Run: slots, wall tunnels (lids with the confined camera), the spiral pit set-piece,
 - Dune Sea,

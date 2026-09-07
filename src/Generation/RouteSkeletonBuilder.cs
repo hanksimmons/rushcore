@@ -21,21 +21,53 @@ public sealed class RouteSkeletonBuilder
     /// <summary>Straights stop here; a bend can carry the route ≤ r·(1 − cos 45°) ≈ 47 m further.</summary>
     private const float HardBand = WorldScale.RouteBandHalfWidth - 120f;
     private const float FinalRunway = 200f;
-    // Launch-crest feature straights: approach, the crest itself, then a straight landing run.
+    // Feature straights (04 §5A, §5E): a launch crest (approach, crest, landing run), a mandatory gap
+    // (take-off runway, opening, landing zone) or a launch ramp (approach, ramp, back face, landing zone).
     private const float CrestApproach = 150f, CrestLanding = 300f;
-    private const float CrestChance = 0.5f;
+    /// <summary>Chance a straight at the feature spacing hosts a feature; then crest / gap / ramp by the weights below.</summary>
+    private const float FeatureChance = 0.6f;
+    private const float CrestWeight = 0.4f, GapWeight = 0.35f;   // the rest are ramps
     /// <summary>Chance a free bend keeps the previous turn sense: longer same-sense arcs give ridge lines room (04 §2).</summary>
     private const float TurnPersistence = 0.7f;
 
     private readonly RouteSpeedModel _speed;
     private readonly RouteSpeedModel? _ceiling;
+    private readonly float _fullTakeoff;
+    private readonly float _slamInitial, _slamAccel;
 
     /// <summary>With a ceiling model the feature straights also hold the ceiling flight off their crest
-    /// plus the landing run (two speeds, 04 §12, D-094).</summary>
-    public RouteSkeletonBuilder(RouteSpeedModel speed, RouteSpeedModel? ceiling = null)
+    /// plus the landing run (two speeds, 04 §12, D-094). <paramref name="fullChargeTakeoff"/> sizes the
+    /// gap and ramp straights for the base kit's full-charge flight at the cap (D-097).</summary>
+    public RouteSkeletonBuilder(RouteSpeedModel speed, RouteSpeedModel? ceiling = null, float fullChargeTakeoff = 0f, float slamInitial = 0f, float slamAccel = 0f)
     {
         _speed = speed;
         _ceiling = ceiling;
+        _fullTakeoff = fullChargeTakeoff;
+        _slamInitial = slamInitial;
+        _slamAccel = slamAccel;
+    }
+
+    /// <summary>The ceiling ball's slam landing off a launch at the given angle, from the ceiling speed.</summary>
+    private float CeilingSlamRun(float launchSlope, float drop)
+    {
+        if (_ceiling is null) return 0f;
+        float cos = 1f / Mathf.Sqrt(1f + launchSlope * launchSlope), sin = launchSlope * cos;
+        return _ceiling.SlamRange(_ceiling.Cap * cos, _ceiling.Cap * sin, WorldScale.SlamReactionSeconds, _slamInitial, _slamAccel, drop) + WorldScale.LandingRunAfterFlight;
+    }
+
+    /// <summary>Straight a gap needs past its far rim: the landing zone, or the base kit's full-charge flight
+    /// at the cap plus the landing run when longer (the mandatory jump stays on a straight, 04 §10).</summary>
+    private float GapLandingFor() => Mathf.Max(WorldScale.LandingZoneLength,
+        Mathf.Max(_speed.JumpRange(_speed.Cap, _fullTakeoff, 0f, 0f, WorldScale.LongSwellMaxSlope) + WorldScale.LandingRunAfterFlight,
+                  CeilingSlamRun(WorldScale.GapExitWallMaxSlope, 0f)));
+
+    /// <summary>Straight a ramp needs past the foot of its back face: the same rule from the lip, over the lip's drop.</summary>
+    private float RampLandingFor(float slope, float lipHeight)
+    {
+        float cos = 1f / Mathf.Sqrt(1f + slope * slope), sin = slope * cos;
+        float flight = _speed.JumpRange(_speed.Cap * cos, _fullTakeoff, lipHeight, _speed.Cap * sin, WorldScale.LongSwellMaxSlope);
+        float back = lipHeight + WorldScale.RampBackFaceEase * 0.5f;
+        return Mathf.Max(WorldScale.LandingZoneLength, Mathf.Max(flight - back + WorldScale.LandingRunAfterFlight, CeilingSlamRun(slope, lipHeight) - back));
     }
 
     /// <summary>Landing run a crest needs: the accepted 300 m, or the ceiling flight plus its run when longer.</summary>
@@ -66,12 +98,25 @@ public sealed class RouteSkeletonBuilder
 
         while (true)
         {
-            // A feature straight hosts a launch crest: approach + crest + landing (04 §10: no bend in the flight).
-            bool wantCrest = pos.X - lastCrestX >= WorldScale.LaunchCrestSpacing && rng.Chance(CrestChance);
+            // A feature straight hosts a crest, a gap or a ramp: approach + feature + landing (04 §10: no bend in the flight).
+            bool wantFeature = pos.X - lastCrestX >= WorldScale.LaunchCrestSpacing && rng.Chance(FeatureChance);
+            float kindRoll = rng.NextFloat();
+            RouteFeatureKind kind = kindRoll < CrestWeight ? RouteFeatureKind.LaunchCrest
+                                  : kindRoll < CrestWeight + GapWeight ? RouteFeatureKind.Gap : RouteFeatureKind.LaunchRamp;
             float wavelength = rng.Range(WorldScale.LaunchCrestWavelengthMin, WorldScale.LaunchCrestWavelengthMax);
             float crestHeight = wavelength * rng.Range(0.08f, 0.12f);   // requested; the height field trims it to the grade limit
-            float crestLanding = wantCrest ? CrestLandingFor(wavelength, crestHeight) : CrestLanding;
-            float length = wantCrest ? CrestApproach + wavelength + crestLanding : rng.Range(StraightMin, StraightMax);
+            float opening = rng.Range(WorldScale.MandatoryGapMin, WorldScale.MandatoryGapMax);
+            float depth = rng.Range(WorldScale.MandatoryGapDepthMin, WorldScale.MandatoryGapDepthMax);
+            float slope = rng.Chance(0.5f) ? WorldScale.RouteRampSlope : WorldScale.ModuleRampSlope;
+            float rampRun = WorldScale.RampRise / slope + WorldScale.RampEase * 0.5f;
+            float lipHeight = slope * rampRun;
+            float featureLanding = !wantFeature ? CrestLanding
+                                 : kind == RouteFeatureKind.LaunchCrest ? CrestLandingFor(wavelength, crestHeight)
+                                 : kind == RouteFeatureKind.Gap ? GapLandingFor() : RampLandingFor(slope, lipHeight);
+            float featureBody = kind == RouteFeatureKind.LaunchCrest ? CrestApproach + wavelength
+                              : kind == RouteFeatureKind.Gap ? WorldScale.TakeoffRunwayLength + opening
+                              : WorldScale.RampApproachLength + rampRun + lipHeight + WorldScale.RampBackFaceEase * 0.5f;
+            float length = wantFeature ? featureBody + featureLanding : rng.Range(StraightMin, StraightMax);
             float sin = Mathf.Sin(heading);
             if (Mathf.Abs(sin) > 1e-4f)
             {
@@ -84,21 +129,29 @@ public sealed class RouteSkeletonBuilder
             if (room <= WorldScale.RouteSampleSpacing) break;
             if (length > room) length = room;
 
-            bool crest = wantCrest && length >= CrestApproach + wavelength + crestLanding - 1e-3f;
+            bool feature = wantFeature && length >= featureBody + featureLanding - 1e-3f;
             int startIndex = route.Vertices.Count - 1;
             float startDistance = route.Vertices[^1].Distance;
             pos = EmitStraight(route, pos, heading, length);
-            if (crest)
+            if (feature)
             {
-                route.Features.Add(new RouteFeature
+                var f = new RouteFeature { Kind = kind, StartIndex = startIndex, EndIndex = route.Vertices.Count - 1 };
+                switch (kind)
                 {
-                    Kind = RouteFeatureKind.LaunchCrest,
-                    StartIndex = startIndex,
-                    EndIndex = route.Vertices.Count - 1,
-                    CentreDistance = startDistance + CrestApproach + wavelength * 0.5f,
-                    Wavelength = wavelength,
-                    Height = crestHeight,
-                });
+                    case RouteFeatureKind.LaunchCrest:
+                        f.CentreDistance = startDistance + CrestApproach + wavelength * 0.5f;
+                        f.Wavelength = wavelength; f.Height = crestHeight;
+                        break;
+                    case RouteFeatureKind.Gap:
+                        f.CentreDistance = startDistance + WorldScale.TakeoffRunwayLength;
+                        f.Opening = opening; f.Depth = depth; f.LandingDistance = featureLanding;
+                        break;
+                    default:
+                        f.CentreDistance = startDistance + WorldScale.RampApproachLength + rampRun;
+                        f.Slope = slope; f.Rise = lipHeight; f.LandingDistance = featureLanding;
+                        break;
+                }
+                route.Features.Add(f);
                 lastCrestX = pos.X;
             }
             if (pos.X >= closeX - 1e-3f) break;

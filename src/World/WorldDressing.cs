@@ -254,7 +254,13 @@ public partial class WorldDressing : Node3D
         foreach (var f in route.Features)
         {
             var c = route.Vertices[route.IndexAtDistance(f.CentreDistance)];
-            AddSign(_world.SurfacePoint(c.Position.X, c.Position.Z, 30f), f.IsLaunch ? "CREST ▲" : "crest", 7f);
+            string label = f.Kind switch
+            {
+                RouteFeatureKind.Gap => $"GAP {f.Opening:0} m",
+                RouteFeatureKind.LaunchRamp => $"RAMP {Mathf.RadToDeg(Mathf.Atan(f.Slope)):0}°",
+                _ => f.IsLaunch ? "CREST ▲" : "crest",
+            };
+            AddSign(_world.SurfacePoint(c.Position.X, c.Position.Z, 30f), label, 7f);
         }
         // Scale pillars are solid: they stand just outside the corridor, never inside it (04 §5G).
         BuildPillars(route.Start.X + 30f, route.Start.Z + StageHeightField.CorridorHalfWidth + 12f);

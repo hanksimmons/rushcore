@@ -57,6 +57,26 @@ public static class WorldScale
     public const float SetPieceRampSlope = 0.50f;        // 26.6°
     public const float RampRise = 20f;
     public const float MicroRampRise = 10f;
+    /// <summary>Flat approach before a launch ramp's foot.</summary>
+    public const float RampApproachLength = 100f;
+    /// <summary>Rounding at the ramp's foot and lip (metres of route), and of the 45° back face.</summary>
+    public const float RampEase = 12f, RampBackFaceEase = 18f;
+    /// <summary>Route length of the gap's take-off rim face (steep, so the rim is a launch, never a slope).</summary>
+    public const float GapRimFace = 8f;
+    /// <summary>A mandatory gap must be crossable half-charged with this much to spare past the far rim (04 §11).</summary>
+    public const float MandatoryGapMargin = 10f;
+
+    // ---- challenge modules: the two-price rule (04 §5E, D-097) ----
+    /// <summary>The free path through any module never drops the model below this fraction of the base cap.</summary>
+    public const float FreePathSpeedFraction = 2f / 3f;
+    /// <summary>A module's corridor profile eases from the relief to its level over this much route each side.</summary>
+    public const float ModuleFlattenEase = 150f;
+    /// <summary>A banked turn wants this much straight before it so the carve can be set up.</summary>
+    public const float BankedTurnApproach = 100f;
+    /// <summary>A module's own launch (a gap's exit wall, a ramp's lip taken uncharged) is the module's declared
+    /// exception to the bend-clearance rule at the ceiling: the safe landing is the slam, pressed within this
+    /// reaction time; the no-slam flight is reported, not enforced.</summary>
+    public const float SlamReactionSeconds = 0.5f;
 
     // ---- corridor (docs/11 §3e) ----
     public const float OpenCorridorWidth = 300f;

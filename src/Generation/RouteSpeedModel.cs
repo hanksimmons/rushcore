@@ -396,6 +396,60 @@ public sealed class RouteSpeedModel
         return best;
     }
 
+    /// <summary>
+    /// Flight length of a jump from a lip (D-097): the release sets the vertical to
+    /// max(<paramref name="lipVertical"/>, <paramref name="verticalTakeoff"/>) (03 §6: v.Y = max(current, takeoff)),
+    /// the horizontal runs under air drive and drag as in the airborne phase, and the flight ends once the
+    /// ball is <paramref name="drop"/> below the lip and falling. Route distance over flat ground past the lip.
+    /// </summary>
+    /// <param name="descentAfter">Grade (tan) the ground may fall away at past the landing zone: the swell under a
+    /// module straight descends at most this much, and a flight over falling ground is longer.</param>
+    public float JumpRange(float horizontalSpeed, float verticalTakeoff, float drop = 0f, float lipVertical = 0f, float descentAfter = 0f)
+    {
+        float g = _m.Gravity;
+        float airDrive = _m.GroundDriveAcceleration * _m.AirControlMultiplier;
+        float dragKeep = Mathf.Max(0f, 1f - _m.DragCoefficient * TickSeconds);
+        float v = Mathf.Clamp(horizontalSpeed, 0f, Cap), vy = Mathf.Max(lipVertical, verticalTakeoff);
+        if (drop < 0f && vy * vy / (2f * g) < -drop) return 0f;   // a rise the apex never reaches: unreachable
+        float x = 0f, y = 0f;
+        for (int i = 0; i < MaxTicks; i++)
+        {
+            v = Mathf.Min((v + airDrive * TickSeconds) * dragKeep, Cap);
+            vy -= g * TickSeconds;
+            x += v * TickSeconds;
+            y += vy * TickSeconds;
+            if (vy < 0f && y <= -drop - descentAfter * x) break;
+        }
+        return x;
+    }
+
+    /// <summary>
+    /// Where a launched ball lands if the player slams after <paramref name="reactionSeconds"/> of flight
+    /// (03 §8: the vertical becomes min(current, −slam initial) and then falls at the slam acceleration plus
+    /// gravity; the horizontal keeps flying). The safe landing a module's launch relies on at the ceiling
+    /// (D-097): route distance from the launch, flat ground assumed past it.
+    /// </summary>
+    public float SlamRange(float horizontalSpeed, float verticalLaunch, float reactionSeconds, float slamInitial, float slamAccel, float drop = 0f)
+    {
+        float g = _m.Gravity;
+        float airDrive = _m.GroundDriveAcceleration * _m.AirControlMultiplier;
+        float dragKeep = Mathf.Max(0f, 1f - _m.DragCoefficient * TickSeconds);
+        float v = Mathf.Clamp(horizontalSpeed, 0f, Cap), vy = verticalLaunch;
+        float x = 0f, y = 0f, t = 0f;
+        bool slamming = false;
+        for (int i = 0; i < MaxTicks; i++)
+        {
+            t += TickSeconds;
+            v = Mathf.Min((v + airDrive * TickSeconds) * dragKeep, Cap);
+            if (!slamming && t >= reactionSeconds) { slamming = true; vy = Mathf.Min(vy, -slamInitial); }
+            vy -= (g + (slamming ? slamAccel : 0f)) * TickSeconds;
+            x += v * TickSeconds;
+            y += vy * TickSeconds;
+            if (vy < 0f && y <= -drop) break;
+        }
+        return x;
+    }
+
     /// <summary>Straight, flat polyline of the given length at the given vertex spacing.</summary>
     public static Vector3[] StraightPolyline(Vector3 start, Vector3 direction, float length, float spacing = 1f)
     {

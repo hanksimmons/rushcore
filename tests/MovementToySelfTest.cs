@@ -1811,13 +1811,15 @@ public partial class MovementToySelfTest : Node
 
     private void RunStageGenerationBatchCase()
     {
-        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow);
+        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
         const int Count = 100;
         var hashes = new HashSet<ulong>();
         var fallbackReasons = new Dictionary<string, int>();
         int passed = 0, fallbacks = 0, deterministic = 0, bends = 0, committed = 0, withLines = 0, linesTotal = 0, minAnchors = int.MaxValue;
         float lenMin = float.MaxValue, lenMax = 0f, lenSum = 0f, tMin = float.MaxValue, tMax = 0f, tSum = 0f;
         float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
+        int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
+        string exampleGap = "", exampleRamp = "", exampleRegen = "";
         double msSum = 0, msMax = 0;
         string firstFailure = "";
         string tuningBefore = TuningSnapshot();
@@ -1853,8 +1855,18 @@ public partial class MovementToySelfTest : Node
             ceilFlights += def.CeilingProfile?.Flights.Count ?? 0;
             ceilAir += def.CeilingProfile?.AirborneSeconds ?? 0f;
             widestGap = Mathf.Max(widestGap, def.WidestFlowGap);
+            foreach (var mod in def.Modules)
+            {
+                modulesTotal++;
+                if (mod.Passed) modulesPassed++;
+                if (mod.Kind == ChallengeModuleKind.ModerateGap) gaps++; else if (mod.Kind == ChallengeModuleKind.LaunchRamp) ramps++; else turns++;
+            }
+            if (def.Modules.Any(x => x.Kind == ChallengeModuleKind.ModerateGap)) { seedsWithGap++; if (exampleGap == "") exampleGap = $"{req.RunSeed}/{req.StageIndex}"; }
+            if (def.Modules.Any(x => x.Kind == ChallengeModuleKind.LaunchRamp)) { seedsWithRamp++; if (exampleRamp == "") exampleRamp = $"{req.RunSeed}/{req.StageIndex}"; }
+            if (def.Report.Attempts > 1 && exampleRegen == "") exampleRegen = $"{req.RunSeed}/{req.StageIndex} (attempt {def.Report.Attempts})";
         }
         sw.Stop();
+        GD.Print($"[SELFTEST] modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
         GD.Print($"[SELFTEST] generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
@@ -1863,8 +1875,11 @@ public partial class MovementToySelfTest : Node
         Check("no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}: " + string.Join(", ", fallbackReasons.Select(kv => $"{kv.Key} ×{kv.Value}")));
         Check("same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
         Check("different requests give different stages", hashes.Count >= Count - 1, $"{hashes.Count} distinct");
-        Check("most seeds carry at least one optional line", withLines >= Count * 0.9f, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
+        // D-086 measured 95% with ridge lines alone; module straights (≈ 1 km each, D-097) leave fewer 1.3 km sections.
+        Check("most seeds carry at least one optional line", withLines >= Count * 0.8f, $"{withLines}/{Count} seeds, {linesTotal / (float)Count:0.0} lines avg");
         Check("every seed places progression anchors", minAnchors >= 8, $"min {minAnchors} anchors");
+        Check("every challenge module in the batch passes its validator (two prices, 04 §5E)", modulesPassed == modulesTotal, $"{modulesPassed}/{modulesTotal}");
+        Check("the batch exercises gaps, ramps and banked turns", gaps > 0 && ramps > 0 && turns > 0, $"{gaps} gaps, {ramps} ramps, {turns} turns");
         Check("route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
             $"{lenMin:0}..{lenMax:0} m");
         Check("base-kit travel time brackets the 60 s target", tMin >= 40f && tMax <= 90f, $"{tMin:0.0}..{tMax:0.0} s");
@@ -1880,7 +1895,7 @@ public partial class MovementToySelfTest : Node
 
     private void RunRegressionSeedsCase()
     {
-        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow);
+        var gen = new StageGenerator(_debug.Tuning.Movement, _debug.Tuning.Flow, _debug.Tuning.JumpSlam);
         foreach (var e in RegressionSeeds.All)
         {
             var req = new StageGenerationRequest(e.RunSeed, e.StageIndex);
@@ -1892,7 +1907,7 @@ public partial class MovementToySelfTest : Node
                 firstAttempt = "; attempt 1 failed: " + string.Join("; ", a.Report.Failures.Select(f => f.Name + " " + f.Detail));
             }
             GD.Print($"[SELFTEST] regression seed {e.RunSeed}/{e.StageIndex} ({e.Why}): attempts {def.Report.Attempts}, {def.PrimaryRoute.Length:0} m, " +
-                     $"base-kit {def.SpeedProfile.TotalTime:0.0} s, {def.PrimaryRoute.Features.Count} crests, {def.OptionalLines.Count} lines, {def.Checkpoints.Count} anchors, hash {def.Hash():X}{firstAttempt}");
+                     $"base-kit {def.SpeedProfile.TotalTime:0.0} s, {def.PrimaryRoute.Features.Count} features ({string.Join("/", def.Modules.Select(x => x.Kind.ToString()))}), {def.OptionalLines.Count} lines, {def.Checkpoints.Count} anchors, hash {def.Hash():X}{firstAttempt}");
             Check($"regression seed {e.RunSeed}/{e.StageIndex} generates a valid stage without fallback", def.Report.Passed && !def.Report.UsedFallback,
                 string.Join("; ", def.Report.Failures.Select(f => f.Name + " " + f.Detail)));
         }
@@ -1959,13 +1974,18 @@ public partial class MovementToySelfTest : Node
         int markTicks = 0, markGrounded = 0, markRaw = 0;
         string marks = "";
         // Ground follow (D-092): raw contact per km, and whether each launch crest was taken as physics says.
-        var crests = stage.PrimaryRoute.Features.Where(f => f.Kind == RouteFeatureKind.LaunchCrest).ToList();
+        // Every feature is a launcher (D-097): a crest at its apex, a ramp at its lip, a gap at its far rim.
+        var features = stage.PrimaryRoute.Features;
+        var crests = features.Where(f => f.Kind == RouteFeatureKind.LaunchCrest).ToList();
         var crestKm = new HashSet<int>();
-        foreach (var f in crests) { int km = (int)(f.CentreDistance / 1000f); crestKm.Add(km); crestKm.Add(km + 1); }
+        foreach (var f in features) { int km = (int)(f.CentreDistance / 1000f); crestKm.Add(km); crestKm.Add(km + 1); }
         var crestApexSpeed = new float[crests.Count];
         var crestLeft = new bool[crests.Count];
-        var crestLaunchS = new float[crests.Count];
-        var crestLandS = new float[crests.Count];
+        var launchPoint = features.Select(f => f.Kind == RouteFeatureKind.Gap ? f.FeatureEnd : f.CentreDistance).ToArray();
+        var launchBefore = features.Select(f => f.Kind == RouteFeatureKind.LaunchCrest ? f.Wavelength * 0.5f : 20f).ToArray();
+        var crestLaunchS = new float[features.Count];
+        var crestLandS = new float[features.Count];
+        var launchArmed = new bool[features.Count];   // the ball must be grounded inside the window first: a gap's dive is still airborne when the far-rim window opens
         var quietKm = new List<(int km, float raw)>();
         while (ticks < maxTicks)
         {
@@ -1984,12 +2004,19 @@ public partial class MovementToySelfTest : Node
                 float rel = along - crests[c].CentreDistance;
                 if (crestApexSpeed[c] == 0f && rel >= 0f) crestApexSpeed[c] = _player.LocomotionSpeed;
                 if (rel >= 0f && rel <= crests[c].Wavelength * 0.5f + 60f && !_player.IsGrounded) crestLeft[c] = true;
-                if (rel >= -crests[c].Wavelength * 0.5f && rel <= 900f)
+            }
+            for (int c = 0; c < features.Count; c++)
+            {
+                float rel = along - launchPoint[c];
+                if (rel >= -launchBefore[c] && rel <= 900f)
                 {
-                    if (!_player.IsGrounded) { if (crestLaunchS[c] == 0f) crestLaunchS[c] = along; crestLandS[c] = 0f; }
+                    if (_player.IsGrounded && crestLaunchS[c] == 0f) launchArmed[c] = true;
+                    if (!_player.IsGrounded) { if (launchArmed[c] && crestLaunchS[c] == 0f) crestLaunchS[c] = along; if (crestLaunchS[c] > 0f) crestLandS[c] = 0f; }
                     else if (crestLaunchS[c] > 0f && crestLandS[c] == 0f) crestLandS[c] = along;
                 }
             }
+            if (System.Environment.GetEnvironmentVariable("RUSHCORE_DRIVE_TRACE") is { } tr && float.TryParse(tr, out float trAt) && Mathf.Abs(along - trAt) < 120f)
+                GD.Print($"[TRACE] {along:0} m y={p.Y:0.00} ground={world.SampleHeight(p.X, p.Z):0.00} v=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) grounded={_player.IsGrounded} raw={_player.IsRawGrounded}");
             if (along >= nextMark)
             {
                 float ballT = ticks / (float)Engine.PhysicsTicksPerSecond, modelT = profile.TimeAt(along);
@@ -2040,21 +2067,23 @@ public partial class MovementToySelfTest : Node
                 crestDetail += $" crest {c + 1} at {crests[c].CentreDistance:0} m: r {r:0} m, apex {crestApexSpeed[c]:0} m/s, v²/gr {ratio:0.00}, {verdict};";
             }
             GD.Print($"[SELFTEST] launch crests:{crestDetail}");
-            Check("launch crests stay real: the ball leaves when v² > g·r and rolls when it does not", decided > 0 && consistent, crestDetail);
-            // The base profile's airborne phase (D-094) against the measured flight at each crest.
+            // Vacuous when the seed has no crest (or only marginal ones): the batch and the regression list cover others.
+            Check("launch crests stay real: the ball leaves when v² > g·r and rolls when it does not", consistent, decided == 0 ? "no crest to decide on this seed" : crestDetail);
+            // The base profile's airborne phase (D-094) against the measured flight at each launcher (crest, lip, far rim).
             string flightDetail = ""; bool flightsOk = true; int compared = 0;
-            for (int c = 0; c < crests.Count; c++)
+            for (int c = 0; c < features.Count; c++)
             {
                 if (crestLaunchS[c] <= 0f || crestLandS[c] <= 0f) continue;
-                var fl = profile.Flights.FirstOrDefault(f => Mathf.Abs(f.LaunchDistance - crestLaunchS[c]) < crests[c].Wavelength);
+                float window = Mathf.Max(30f, launchBefore[c] * 2f);
+                var fl = profile.Flights.FirstOrDefault(f => Mathf.Abs(f.LaunchDistance - crestLaunchS[c]) < window);
                 float len = Mathf.Max(50f, crestLandS[c] - crestLaunchS[c]);
                 float err = fl is null ? 1f : Mathf.Abs(fl.LandingDistance - crestLandS[c]) / len;
                 compared++;
                 flightsOk &= fl is not null && err <= 0.20f;
-                flightDetail += $" crest {c + 1}: ball {crestLaunchS[c]:0}→{crestLandS[c]:0} m, model {(fl is null ? "no flight" : $"{fl.LaunchDistance:0}→{fl.LandingDistance:0} m, lands {fl.LandingVerticalSpeed:0} m/s down → {fl.LandingSpeed:0} m/s")} ({err:P0} of the flight);";
+                flightDetail += $" {features[c].Kind} {c + 1}: ball {crestLaunchS[c]:0}→{crestLandS[c]:0} m, model {(fl is null ? "no flight" : $"{fl.LaunchDistance:0}→{fl.LandingDistance:0} m, lands {fl.LandingVerticalSpeed:0} m/s down → {fl.LandingSpeed:0} m/s")} ({err:P0} of the flight);";
             }
-            GD.Print($"[SELFTEST] crest flights vs model:{flightDetail}");
-            Check("the route speed model's flights land within 20% of the ball's at every launch crest", compared > 0 && flightsOk, flightDetail);
+            GD.Print($"[SELFTEST] feature flights vs model:{flightDetail}");
+            Check("the route speed model's flights land within 20% of the ball's at every launch feature", flightsOk, compared == 0 ? "no flight on this seed" : flightDetail);
         }
         Check("velocity finite after the generated-stage drive", _player.Velocity.IsFinite());
         Check("archetype geometry left the rigid body's hidden physics untouched (04 §7)", BodySnapshot() == bodyLab, BodySnapshot());

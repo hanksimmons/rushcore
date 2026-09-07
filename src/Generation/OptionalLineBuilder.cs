@@ -97,13 +97,16 @@ public static class OptionalLineBuilder
         return Mathf.SmoothStep(up0, up0 + WorldScale.RidgeRampLength, d) * (1f - Mathf.SmoothStep(down1 - WorldScale.RidgeRampLength, down1, d));
     }
 
+    /// <summary>A ridge's joins and S-transitions (where it still meets the primary's stamp) must clear every
+    /// feature; its plateau may shadow a module straight from 200 m away, riding the pre-module profile (D-097).</summary>
     private static bool OverlapsFeature(RouteSkeleton primary, float dStart, float dEnd)
     {
         var v = primary.Vertices;
         foreach (var f in primary.Features)
         {
             float fs = v[f.StartIndex].Distance, fe = v[f.EndIndex].Distance;
-            if (dStart < fe && dEnd > fs) return true;
+            if (dStart < fe && dStart + WorldScale.RidgeTransition + WorldScale.RidgeRampLength > fs) return true;
+            if (dEnd - WorldScale.RidgeTransition - WorldScale.RidgeRampLength < fe && dEnd > fs) return true;
         }
         return false;
     }

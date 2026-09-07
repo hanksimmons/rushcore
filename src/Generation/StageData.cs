@@ -33,19 +33,67 @@ public struct RouteVertex
     public RouteSegmentKind Kind;
 }
 
-public enum RouteFeatureKind { LaunchCrest }
+public enum RouteFeatureKind { LaunchCrest, Gap, LaunchRamp }
 
-/// <summary>A reserved zone on the route (04 §5A): a straight long enough to host a feature and its landing.</summary>
+/// <summary>
+/// A reserved zone on the route (04 §5A): a straight long enough to host a feature and its landing.
+/// Since D-097 the zone hosts a challenge module (04 §5E) as well as a launch crest: a mandatory gap
+/// (take-off runway, opening, landing zone) or a launch ramp (approach, lip, back face, landing zone).
+/// </summary>
 public sealed class RouteFeature
 {
     public RouteFeatureKind Kind;
     public int StartIndex, EndIndex;
-    /// <summary>Route distance of the feature centre (crest apex).</summary>
+    /// <summary>Route distance of the feature centre: the crest apex, the gap's take-off rim, the ramp's lip.</summary>
     public float CentreDistance;
+    /// <summary>Crest: cosine wavelength and height.</summary>
     public float Wavelength, Height;
-    /// <summary>Filled by validation from the speed profile: straight run needed after the apex.</summary>
+    /// <summary>Gap: opening (rim to rim) and floor depth.</summary>
+    public float Opening, Depth;
+    /// <summary>Ramp: slope (tan) and lip height above the approach.</summary>
+    public float Slope, Rise;
+    /// <summary>Straight run needed after <see cref="FeatureEnd"/>: reserved by the skeleton for a gap or a ramp
+    /// (the full-charge flight at the cap plus the landing run), filled by validation for a crest.</summary>
     public float LandingDistance;
     public bool IsLaunch;
+    /// <summary>Route distance where the geometry ends: the far rim, the foot of the back face, the crest's end.</summary>
+    public float FeatureEnd => Kind switch
+    {
+        RouteFeatureKind.Gap => CentreDistance + Opening,
+        RouteFeatureKind.LaunchRamp => CentreDistance + Rise + WorldScale.RampBackFaceEase * 0.5f,
+        _ => CentreDistance + Wavelength * 0.5f,
+    };
+    /// <summary>End of everything the feature reserves on the route.</summary>
+    public float ReservedEnd => FeatureEnd + LandingDistance;
+}
+
+public enum ChallengeModuleKind { ModerateGap, LaunchRamp, BankedTurn }
+
+/// <summary>
+/// A challenge module's seven fields (04 §5E), filled by validation from the route speed model: what the
+/// entrance assumes, what the geometry is, the expected speed at both speeds, required or optional,
+/// the landing zone, where the Flow opportunity is taken, and the validator's verdict. Two prices
+/// (D-097): the free path never stops or drops below the free-path fraction of the base cap; the paid
+/// path grants Flow.
+/// </summary>
+public sealed class ChallengeModule
+{
+    public ChallengeModuleKind Kind;
+    public bool Required;
+    /// <summary>Route distance of the feature: the rim, the lip, the bend's start.</summary>
+    public float Distance;
+    public string Geometry = "";
+    public string Entrance = "";
+    /// <summary>The model's arrival speed at the feature, base kit and ceiling.</summary>
+    public float EntrySpeed, CeilingEntrySpeed;
+    public float LandingStart, LandingEnd;
+    /// <summary>Free path: the model's speed at the landing zone's end.</summary>
+    public float FreeExitSpeed;
+    /// <summary>Paid path: the flight the module's jump makes at the entry speed (half charge for a mandatory gap, full for a ramp).</summary>
+    public float PaidRange;
+    public float FlowDistance;
+    public bool Passed;
+    public string Detail = "";
 }
 
 public sealed class RouteBend
@@ -143,6 +191,8 @@ public sealed class StageDefinition
     public float WidestFlowGap { get; internal set; }
     public List<RouteSkeleton> OptionalLines { get; } = new();
     public List<RouteSpeedProfile> OptionalProfiles { get; } = new();
+    /// <summary>Challenge modules on the primary (04 §5E) with their validator verdicts.</summary>
+    public List<ChallengeModule> Modules { get; } = new();
     public List<Checkpoint> Checkpoints { get; } = new();
     public ValidationReport Report { get; }
     /// <summary>The one logical height source for render and collision (04 §9); null only for skeleton-only builds.</summary>

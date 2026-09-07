@@ -12,41 +12,68 @@ namespace Rushcore.Generation;
 public static class OptionalLineBuilder
 {
 
-    public static List<RouteSkeleton> Build(RouteSkeleton primary, ulong stageSeed)
+    /// <summary>Geometry of one kind of offset line: a ridge (D-100) or a terrace floor (D-103).</summary>
+    private readonly record struct LineShape(RouteLineKind Kind, int Floor, float Offset, float Transition, float Ramp, float HeightMin, float HeightMax)
     {
+        public float Length => 2f * Transition + 2f * Ramp + 80f;
+    }
+
+    private static readonly LineShape Ridge = new(RouteLineKind.Ridge, 1, WorldScale.RidgeOffset, WorldScale.RidgeTransition, WorldScale.RidgeRampLength, WorldScale.RidgeHeightMin, WorldScale.RidgeHeightMax);
+    private static readonly LineShape Floor2 = new(RouteLineKind.Terrace, 2, WorldScale.Floor2Offset, WorldScale.Floor2Transition, WorldScale.Floor2Ramp, WorldScale.FloorStep, WorldScale.FloorStep);
+    private static readonly LineShape Floor3 = new(RouteLineKind.Terrace, 3, WorldScale.Floor3Offset, WorldScale.Floor3Transition, WorldScale.Floor3Ramp, 2f * WorldScale.FloorStep, 2f * WorldScale.FloorStep);
+
+    public static List<RouteSkeleton> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules? rules = null)
+    {
+        rules ??= ArchetypeRules.RollingHighlands;
         var rng = new SeededRandom(SeedChain.Derive(stageSeed, "optional"));
         var lines = new List<RouteSkeleton>();
         var v = primary.Vertices;
-        var turnSign = new float[v.Count];
-        foreach (var b in primary.Bends)
-            for (int i = b.StartIndex; i <= b.EndIndex; i++) turnSign[i] = Mathf.Sign(b.TurnAngle);
+        var turnSign = TurnSigns(primary);
+        // Sky Terraces (D-103): the lines are terrace floors: a section carries floor 2 and, where its longer climb fits,
+        // floor 3 stacked beyond it (floor 2's outer edge is then the cliff up to floor 3).
+        int floorsWanted = rules.Floors;
 
-        // A ridge shadows a bend, or a run of up to three (04 §6): it leaves the primary on the straight before the
+        // A line shadows a bend, or a run of up to three (04 §6): it leaves the primary on the straight before the
         // first and rejoins on the straight after the last, both transitions wholly on straights (D-100: a transition
-        // through a banked bend rides the berm and launches), the plateau on the outside. The section is the family's
-        // ridge length, placed anywhere the two straights allow.
+        // through a banked bend rides the berm and launches, and D-103 found the S's own curvature adding to a bend's
+        // into a corner the cap cannot hold), the plateau on the outside; the ramps lie outside the transitions.
         float lastEnd = 500f - WorldScale.OptionalLineSpacing;   // leave the start alone
         var bends = primary.Bends;
-        float T = WorldScale.RidgeTransition, L = WorldScale.RidgeLength;
+        float stop = primary.Spiral is { } pit ? pit.ApproachDistance - 100f : primary.Length - 400f;
         for (int k = 0; k < bends.Count && lines.Count < WorldScale.OptionalLinesMax; k++)
         {
             float bs = v[bends[k].StartIndex].Distance;
             float ps = k == 0 ? 0f : v[bends[k - 1].EndIndex].Distance;
             bool placed = false;
+            // The tallest stack first (a floor-3 section carries its floor 2), then a lone floor 2, or the ridge.
+            for (int tier = floorsWanted >= 3 ? 3 : floorsWanted >= 2 ? 2 : 1; tier >= 1 && !placed; tier--)
             for (int extra = 0; extra <= 2 && k + extra < bends.Count && !placed; extra++)
             {
+                if (floorsWanted >= 2 && tier == 1) break;
+                var shape = tier == 3 ? Floor3 : tier == 2 ? Floor2 : Ridge;
+                float T = shape.Transition, L = shape.Length;
                 float beLast = v[bends[k + extra].EndIndex].Distance;
                 float ne = k + extra + 1 < bends.Count ? v[bends[k + extra + 1].StartIndex].Distance : primary.Length;
                 float dLo = Mathf.Max(Mathf.Max(ps, beLast + T - L), lastEnd + WorldScale.OptionalLineSpacing);
-                float dHi = Mathf.Min(bs - T, Mathf.Min(ne - L, primary.Length - 400f - L));
+                float dHi = Mathf.Min(bs - T, Mathf.Min(ne - L, stop - L));
                 if (dHi < dLo) continue;
                 float d = 0.5f * (dLo + dHi), dEnd = d + L;
                 int a = primary.IndexAtDistance(d), b = primary.IndexAtDistance(dEnd);
-                float first = rng.Sign();
-                float side = SideValid(primary, turnSign, a, b, first) ? first : SideValid(primary, turnSign, a, b, -first) ? -first : 0f;
-                if (side == 0f || OverlapsFeature(primary, d, dEnd) || !JoinsOnStraights(primary, a, b)) continue;
-                var line = BuildLine(primary, a, b, side, rng.Range(WorldScale.RidgeHeightMin, WorldScale.RidgeHeightMax));
+                // A terrace prefers the side toward the axis (its long falloff needs the room); a ridge picks at random.
+                float first = shape.Kind == RouteLineKind.Terrace ? -Mathf.Sign(v[a].Position.Z + v[b].Position.Z + 1e-3f) : rng.Sign();
+                float Offset(int i) => shape.Offset * Bump(v[i].Distance - v[a].Distance, v[b].Distance - v[a].Distance, shape.Transition);
+                float side = SideValid(primary, turnSign, a, b, first, Offset) ? first : SideValid(primary, turnSign, a, b, -first, Offset) ? -first : 0f;
+                if (side == 0f || OverlapsFeature(primary, d, dEnd) || !JoinsOnStraights(primary, a, b, T)) continue;
+                var line = BuildLine(primary, a, b, side, shape, rng.Range(shape.HeightMin, shape.HeightMax));
                 if (line is null) continue;
+                if (tier == 3)
+                {
+                    // Floor 2 under floor 3 on the same section: its outer edge is the cliff up to floor 3.
+                    var lower = BuildLine(primary, a, b, side, Floor2, WorldScale.FloorStep);
+                    if (lower is null) continue;
+                    lower.OuterFalloff = WorldScale.TerraceCliffFalloff;
+                    lines.Add(lower);
+                }
                 lines.Add(line);
                 lastEnd = dEnd;
                 placed = true;
@@ -55,26 +82,34 @@ public static class OptionalLineBuilder
         return lines;
     }
 
-    /// <summary>The offset line between two primary vertices, or null if it leaves the optional band.</summary>
-    private static RouteSkeleton? BuildLine(RouteSkeleton primary, int a, int b, float side, float ridgeHeight)
+    /// <summary>The offset line between two primary vertices, or null if it leaves the optional band (a terrace's long
+    /// falloff counts toward the band).</summary>
+    private static RouteSkeleton? BuildLine(RouteSkeleton primary, int a, int b, float side, LineShape shape, float height)
     {
         var v = primary.Vertices;
         {
             var line = new RouteSkeleton
             {
-                Kind = RouteLineKind.Ridge,
+                Kind = shape.Kind,
+                Floor = shape.Floor,
                 JoinStart = a,
                 JoinEnd = b,
                 CorridorHalfWidth = WorldScale.MinCorridorWidth * 0.5f,
-                RidgeHeight = ridgeHeight,
+                RidgeHeight = height,
+                Offset = shape.Offset, Transition = shape.Transition, RampLength = shape.Ramp,
+                Side = side,
+                InnerFalloff = shape.Kind == RouteLineKind.Terrace ? WorldScale.TerraceCliffFalloff : 0f,
+                OuterFalloff = shape.Kind == RouteLineKind.Terrace ? WorldScale.TerraceOuterFalloff(height) : 0f,
             };
             float sectionLength = v[b].Distance - v[a].Distance;
+            // A terrace's own falloff may run into the scenery margin; its level width may not.
+            float bandRoom = shape.Kind == RouteLineKind.Terrace ? WorldScale.MinCorridorWidth * 0.5f + WorldScale.WallSetback + 100f : 0f;
             for (int i = a; i <= b; i++)
             {
-                float offset = WorldScale.RidgeOffset * Bump(v[i].Distance - v[a].Distance, sectionLength);
+                float offset = shape.Offset * Bump(v[i].Distance - v[a].Distance, sectionLength, shape.Transition);
                 float h = v[i].Heading;
                 var p = v[i].Position + new Vector3(-Mathf.Sin(h), 0f, Mathf.Cos(h)) * (offset * side);
-                if (Mathf.Abs(p.Z) > WorldScale.OptionalBandHalfWidth) return null;
+                if (Mathf.Abs(p.Z) + bandRoom > WorldScale.OptionalBandHalfWidth) return null;
                 float dist = line.Vertices.Count == 0 ? 0f : line.Vertices[^1].Distance + line.Vertices[^1].Position.DistanceTo(p);
                 line.Vertices.Add(new RouteVertex { Position = p, Heading = h, Radius = float.PositiveInfinity, Distance = dist, Kind = RouteSegmentKind.Straight });
             }
@@ -94,47 +129,53 @@ public static class OptionalLineBuilder
     /// A side is valid when the offset line never crosses a bend's centre: on the outside of a bend
     /// anything goes; on the inside the offset at that point must leave the inside margin of radius.
     /// </summary>
-    private static bool SideValid(RouteSkeleton primary, float[] turnSign, int a, int b, float side)
+    /// <summary>The same for any offset envelope (a tube's, D-101), given the offset at each primary vertex.</summary>
+    internal static bool SideValid(RouteSkeleton primary, float[] turnSign, int a, int b, float side, Func<int, float> offsetAt)
     {
         var v = primary.Vertices;
-        float sectionLength = v[b].Distance - v[a].Distance;
         for (int i = a; i <= b; i++)
         {
             if (turnSign[i] == 0f) continue;
             bool inside = side == turnSign[i];
             if (!inside) continue;
-            float offset = WorldScale.RidgeOffset * Bump(v[i].Distance - v[a].Distance, sectionLength);
-            if (offset > v[i].Radius - WorldScale.InsideOffsetMargin) return false;
+            if (offsetAt(i) > v[i].Radius - WorldScale.InsideOffsetMargin) return false;
         }
         return true;
     }
 
-    /// <summary>Route length at each end of a ridge that must lie on a primary straight: the whole transition.</summary>
-    private const float JoinStraightLength = WorldScale.RidgeTransition;
+    /// <summary>Turn sense per primary vertex: ±1 inside a bend, 0 on straights.</summary>
+    internal static float[] TurnSigns(RouteSkeleton primary)
+    {
+        var turnSign = new float[primary.Vertices.Count];
+        foreach (var b in primary.Bends)
+            for (int i = b.StartIndex; i <= b.EndIndex; i++) turnSign[i] = Mathf.Sign(b.TurnAngle);
+        return turnSign;
+    }
 
-    /// <summary>Both transitions lie on primary straights (the ridge leaves before the bend it shadows and rejoins
+    /// <summary>Both transitions lie on primary straights (the line leaves before the bend it shadows and rejoins
     /// after it): a transition crossing a banked bend rides the berm, whose full height reaches into the falloff
     /// the transition crosses, and that bump launched the base kit into the transition's own turn (D-100).</summary>
-    private static bool JoinsOnStraights(RouteSkeleton primary, int a, int b)
+    private static bool JoinsOnStraights(RouteSkeleton primary, int a, int b, float transition)
     {
         var v = primary.Vertices;
-        for (int i = a; i < v.Count && v[i].Distance <= v[a].Distance + JoinStraightLength; i++) if (v[i].Kind == RouteSegmentKind.Bend) return false;
-        for (int i = b; i >= 0 && v[i].Distance >= v[b].Distance - JoinStraightLength; i--) if (v[i].Kind == RouteSegmentKind.Bend) return false;
+        for (int i = a; i < v.Count && v[i].Distance <= v[a].Distance + transition; i++) if (v[i].Kind == RouteSegmentKind.Bend) return false;
+        for (int i = b; i >= 0 && v[i].Distance >= v[b].Distance - transition; i--) if (v[i].Kind == RouteSegmentKind.Bend) return false;
         return true;
     }
 
     /// <summary>Lateral offset envelope along a line of the given length: 0 at both joins, 1 between the transitions.</summary>
-    public static float Bump(float d, float length) =>
-        Mathf.SmoothStep(0f, WorldScale.RidgeTransition, d) * (1f - Mathf.SmoothStep(length - WorldScale.RidgeTransition, length, d));
+    public static float Bump(float d, float length) => Bump(d, length, WorldScale.RidgeTransition);
+    public static float Bump(float d, float length, float transition) =>
+        Mathf.SmoothStep(0f, transition, d) * (1f - Mathf.SmoothStep(length - transition, length, d));
 
-    /// <summary>Ridge plateau envelope: climbs once the line has left the primary, drops back before it rejoins.
-    /// Cosine ramps: their knee curvature (π² H / 2L²) is 18% under a smoothstep's, and with the family's ridge
-    /// height and ramp length the knee radius clears the cap's contact radius, so the climb never launches.</summary>
-    public static float Plateau(float d, float length)
+    /// <summary>Plateau envelope: climbs once the line has left the primary, drops back before it rejoins.
+    /// Cosine ramps: their knee curvature (π² H / 2L²) is 18% under a smoothstep's, and with each line's height and
+    /// ramp length the knee radius clears the cap's contact radius, so the climb never launches.</summary>
+    public static float Plateau(float d, float length, float transition, float ramp)
     {
-        float up0 = WorldScale.RidgeTransition;
-        float down1 = length - WorldScale.RidgeTransition;
-        return CosineStep(up0, up0 + WorldScale.RidgeRampLength, d) * (1f - CosineStep(down1 - WorldScale.RidgeRampLength, down1, d));
+        float up0 = transition;
+        float down1 = length - transition;
+        return CosineStep(up0, up0 + ramp, d) * (1f - CosineStep(down1 - ramp, down1, d));
     }
 
     private static float CosineStep(float a, float b, float d)

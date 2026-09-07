@@ -153,6 +153,74 @@ public static class WorldScale
     /// <summary>Swell slope budget on a dune sea: the dunes are the relief, the swells only tilt the field.</summary>
     public const float DuneSwellMaxSlope = 0.08f;
 
+    // ---- Sky Terraces (04 §6, §5I; docs/11 §7a–b; D-103) ----
+    /// <summary>A floor step: each terrace stands this much above the floor below, so every drain (a step over its
+    /// falloff, <see cref="TerraceFalloff"/>) stays at the route grade limit. The bottom of the jump-step band (docs/11 §7a).</summary>
+    public const float FloorStep = 60f;
+    /// <summary>Route length a floor step drains over: a smoothstep's steepest grade is 1.5× its mean, so the step over
+    /// the route grade times 1.5 keeps every drain (and every terrace's outer falloff, scaled by its height) at the limit.</summary>
+    public const float TerraceFalloff = 1.5f * FloorStep / MaxRouteGrade;      // 225 m per 60 m step
+    /// <summary>The primary's own falloff on a terraced stage: short enough that floor 2's cliff foot lies beyond it on the flat flank.</summary>
+    public const float SkyPrimaryFalloff = 60f;
+    /// <summary>A terrace's inner edge, toward the floor below, is a cliff (a wall of the family kind, docs/11 §7c): the ball falls
+    /// onto that floor, which is the drain.</summary>
+    public const float TerraceCliffFalloff = 12f;
+    /// <summary>A terrace's outer falloff allows for the relief under it sitting a half swell below the primary's base.</summary>
+    public const float TerraceOuterMargin = LongSwellHeightMax * 0.5f;
+    /// <summary>Floor 2: 60 m up, 200 m to the side (the ridge offset: its cliff foot lies just beyond the primary's falloff), an
+    /// S of 290 m at r 70, a 420 m cosine climb (knee radius 2L²/π²H above the cap's contact radius).</summary>
+    public const float Floor2Offset = 200f, Floor2Ramp = 420f, Floor2Transition = 290f;
+    /// <summary>Floor 3: 120 m up, 300 m to the side (floor 2's outer edge plus a cliff and a half width), an S of 360 m, a 600 m
+    /// climb; it shares its section with a floor 2, whose outer edge is then the cliff up to it.</summary>
+    public const float Floor3Offset = 300f, Floor3Ramp = 600f, Floor3Transition = 360f;
+    /// <summary>Outer falloff of a terrace of the given height: the height plus the relief margin, over the grade limit, times the smoothstep's 1.5.</summary>
+    public static float TerraceOuterFalloff(float height) => 1.5f * (height + TerraceOuterMargin) / MaxRouteGrade;
+    /// <summary>The cloud band begins this far above the primary's mean height: the top floor sits in it (06 §3).</summary>
+    public const float CloudBandHeight = 130f;
+
+    // ---- spiral pit (04 §6 Canyon Run set-piece, docs/11 §7c, D-102) ----
+    /// <summary>The outermost turn's radius: the band holds it with its corridor once the approach has moved the centre near the axis.</summary>
+    public const float SpiralOuterRadius = 380f;
+    /// <summary>Radius shed per full turn: two level widths on bends plus their setbacks plus a face for the cliff between turns.</summary>
+    public const float SpiralRadiusPerTurn = 230f;
+    public const float SpiralTurns = 1f;
+    /// <summary>Depth of the pit floor below the entry: the cliff between turns, and the fall onto the turn below.</summary>
+    public const float SpiralDepth = 120f;
+    /// <summary>Largest berm any bend carries: the family bank grows with radius and a 380 m turn would otherwise carry 70 m.</summary>
+    public const float MaxBankHeight = 30f;
+
+    // ---- lids: wall tunnels (04 §5I, docs/11 §7e, D-102; provisional sizes V-016) ----
+    /// <summary>Clearance between the corridor and the roof's underside; the rig's 6.7 m rise fits under it.</summary>
+    public const float LidClearance = 15f;
+    public const float LidLengthMin = 150f, LidLengthMax = 300f;
+    public const float LidThickness = 6f;
+    public const int LidsMax = 2;
+    /// <summary>The lens keeps this much below a roof it is under.</summary>
+    public const float LidCameraMargin = 1.5f;
+
+    // ---- tubes (04 §5I, docs/11 §7d–e, D-101; provisional sizes V-016) ----
+    public const float TubeRadius = 6f;
+    /// <summary>Mouth flare: the radius doubles over one tube diameter at each end.</summary>
+    public const float TubeMouthFlare = 2f;
+    public const float TubeRibSpacing = 25f;
+    /// <summary>Axis clearance above the ground and from walls away from the mouths (the camera's room outside the shell).</summary>
+    public const float TubeClearance = 30f;
+    /// <summary>A ground mouth sits this far to the side of the line it leaves, inside the level width, so the free path never enters it.</summary>
+    public const float TubeMouthOffset = 45f;
+    /// <summary>Lateral offset of the cruise from the line it shadows.</summary>
+    public const float TubeLateralOffset = 200f;
+    /// <summary>A tube section in order: climb over the mouth offset, swing out, cruise, swing back, descent. The climb
+    /// keeps the pitch under about 14° (longer for a higher cruise); the swing is an S of the lateral offset over this
+    /// length (r ≈ 270 m: a 64° wall ride at the base cap, docs/11 §7d); the cruise is the straight between.</summary>
+    public const float TubeRampLength = 300f, TubeSwingLength = 500f, TubeCruiseLength = 200f;
+    /// <summary>Steepest climb pitch (tan) a tube asks: a driven ball climbs 35° without losing speed, this stays well under.</summary>
+    public const float TubeMaxPitch = 0.25f;
+    /// <summary>Straight required on the line before an entry mouth and after an exit mouth (the landing zone).</summary>
+    public const float TubeMouthStraight = 100f;
+    public const int TubesMax = 2;
+    /// <summary>The lens keeps this much more than the radius from a tube axis (docs/11 §7e).</summary>
+    public const float TubeCameraMargin = 1.5f;
+
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;
     /// <summary>Route polyline vertex spacing; equal to the cell size so relief and stamping see every facet.</summary>

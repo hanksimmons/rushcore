@@ -71,7 +71,7 @@ public sealed class StageGenerator
         // B–D: archetype relief and the stamped corridor become the one logical height source;
         // the route polyline is then lifted onto it so every later check sees real geometry.
         var field = new StageHeightField(route, request.StageSeed, rules);
-        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed);
+        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed, rules);
         foreach (var line in optional) field.AddLine(line);
         Lift(route, field);
         foreach (var line in optional) Lift(line, field);
@@ -84,6 +84,16 @@ public sealed class StageGenerator
         // (D-100): the lines are optional, and the field is rebuilt once without it. Ridge lines are spaced, so
         // the remaining lines' geometry does not change.
         var dropped = new List<string>();
+        // A terrace whose drain fails goes too, with the other floor of its section (they share it).
+        var badSections = new HashSet<int>();
+        foreach (var line in optional)
+            if (line.Kind == RouteLineKind.Terrace && !TerraceDrains(line, field, route, optional).ok) badSections.Add(line.JoinStart);
+        for (int k = optional.Count - 1; k >= 0; k--)
+            if (optional[k].Kind == RouteLineKind.Terrace && badSections.Contains(optional[k].JoinStart))
+            {
+                dropped.Add($"floor {optional[k].Floor} at {route.Vertices[optional[k].JoinStart].Distance:0} m: {TerraceDrains(optional[k], field, route, optional).detail}");
+                optional.RemoveAt(k);
+            }
         for (int k = optional.Count - 1; k >= 0; k--)
         {
             var line = optional[k];
@@ -119,6 +129,15 @@ public sealed class StageGenerator
         }
         def.DroppedLines = dropped.Count;
         def.DroppedDetail = string.Join("; ", dropped);
+        // Tubes (04 §5I, D-101) branch off the lifted primary; their carried profiles start at the join's arrival speed.
+        if (!straight)
+            foreach (var tube in TubeBuilder.Build(route, field, request.StageSeed, rules, optional))
+            {
+                tube.Profile = _speed.Integrate(tube.Axis, profile.Speed[tube.JoinStart], carried: true);
+                tube.CeilingProfile = _ceiling.Integrate(tube.Axis, ceiling.Speed[tube.JoinStart], chainFromBaseCap: true, carried: true);
+                def.Tubes.Add(tube);
+            }
+        if (!straight) def.Lids.AddRange(LidBuilder.Build(route, request.StageSeed, rules, def.Tubes));
         report.Timings.Add(("speed profiles", sw.Elapsed.TotalMilliseconds)); sw.Restart();
 
         PlaceCheckpoints(def);
@@ -128,6 +147,8 @@ public sealed class StageGenerator
         def.WidestFlowGap = ValidateTwoSpeeds(route, profile, ceiling, report);
         ValidateModules(def, report);
         ValidateOptionalLines(def, report);
+        ValidateTubes(def, report);
+        ValidateStructuresAndHeadroom(def, report);
         ValidateCheckpoints(def, report);
         report.Timings.Add(("validation", sw.Elapsed.TotalMilliseconds));
         return def;
@@ -220,7 +241,162 @@ public sealed class StageGenerator
             ceilingDetail += $" [line {k + 1}: {c.detail}]";
         }
         report.Add("optional lines' flights hold their corners at the base kit (a line that cannot is dropped)", true, $"{def.DroppedLines} dropped{(def.DroppedLines > 0 ? ": " + def.DroppedDetail : "")}");
+
+        // Drains (04 §10, D-103): reported here; a terrace whose drain fails was dropped before this report, like a line
+        // whose flight cannot hold a corner (D-100).
+        var field = def.HeightField!;
+        string drainDetail = ""; int terraces = 0;
+        for (int k = 0; k < def.OptionalLines.Count; k++)
+        {
+            var line = def.OptionalLines[k];
+            if (line.Kind != RouteLineKind.Terrace) continue;
+            terraces++;
+            var verdict = TerraceDrains(line, field, def.PrimaryRoute, def.OptionalLines);
+            drainDetail += $" [{verdict.detail}]";
+        }
+        report.Add("terrace edges drain: every cliff foot lands on the floor below and the outer slopes stay inside the route grade (04 §10)", true, $"{terraces} terraces{drainDetail}");
         report.Note("optional lines at the ceiling", $"{ceilingFaults} of {def.OptionalLines.Count} lines fly into a corner they cannot hold (the paid line's risk){ceilingDetail}");
+    }
+
+    /// <summary>
+    /// Terrace drains (04 §10, D-103): the inner edge is a cliff whose foot lands on the floor below (the primary's flank
+    /// or floor 2), at most a few metres above that floor's profile; from the foot to the floor below the ground never
+    /// steps up more than relief noise; the outer edge (when it is not the cliff up to floor 3) descends into the relief
+    /// at or under the route grade. Read on lateral cuts every 100 m of plateau.
+    /// </summary>
+    private static (bool ok, string detail) TerraceDrains(RouteSkeleton line, StageHeightField field, RouteSkeleton primaryRoute, IReadOnlyList<RouteSkeleton> lines)
+    {
+        var primary = primaryRoute.Vertices;
+        var lv = line.Vertices;
+        float worstFoot = 0f, worstOut = 0f, riseIn = 0f;
+        RouteSkeleton? below = line.Floor == 3 ? lines.FirstOrDefault(o => o.Floor == 2 && o.JoinStart == line.JoinStart) : null;
+        for (int i = 0; i < lv.Count; i += 25)
+        {
+            float d = lv[i].Distance;
+            if (d < line.Transition + line.RampLength || d > line.Length - line.Transition - line.RampLength) continue;
+            float lx = -Mathf.Sin(lv[i].Heading), lz = Mathf.Cos(lv[i].Heading);
+            float inward = -line.Side;
+            float edge = line.CorridorHalfWidth + WorldScale.WallSetback + WorldScale.TerraceCliffFalloff + 6f;
+            float floorY = below is not null ? below.Vertices[Mathf.Min(below.Vertices.Count - 1, i)].Position.Y : primary[Mathf.Min(primary.Count - 1, line.JoinStart + i)].Position.Y;
+            float foot = field.Sample(lv[i].Position.X + lx * inward * edge, lv[i].Position.Z + lz * inward * edge);
+            worstFoot = Mathf.Max(worstFoot, foot - floorY);
+            float prev = foot;
+            float reach = below is not null ? line.Offset - below.Offset - edge : line.Offset - edge;
+            for (float s2 = edge + 4f; s2 <= reach; s2 += 4f)
+            {
+                float h = field.Sample(lv[i].Position.X + lx * inward * s2, lv[i].Position.Z + lz * inward * s2);
+                riseIn = Mathf.Max(riseIn, h - prev);
+                prev = h;
+            }
+            if (line.OuterFalloff >= WorldScale.TerraceCliffFalloff + 1f)
+            {
+                float oe = line.CorridorHalfWidth + WorldScale.WallSetback;
+                prev = field.Sample(lv[i].Position.X - lx * inward * oe, lv[i].Position.Z - lz * inward * oe);
+                for (float s2 = oe + 4f; s2 <= oe + line.OuterFalloff + 40f; s2 += 4f)
+                {
+                    float h = field.Sample(lv[i].Position.X - lx * inward * s2, lv[i].Position.Z - lz * inward * s2);
+                    worstOut = Mathf.Max(worstOut, (prev - h) / 4f);
+                    prev = h;
+                }
+            }
+        }
+        bool ok = worstFoot <= 15f && riseIn <= 4f && worstOut <= WorldScale.MaxRouteGrade + 0.02f;
+        return (ok, $"floor {line.Floor} at {primary[line.JoinStart].Distance:0} m, {line.RidgeHeight:0} m up: cliff foot at most {worstFoot:0.0} m above the floor below, step up {riseIn:0.0} m on the way down, outer grade ≤ {worstOut:0.00}{(ok ? "" : " FAIL")}");
+    }
+
+    /// <summary>
+    /// Tubes (04 §5I, §10, §12; D-101): the axis keeps the camera clearance above the ground along the cruise and never
+    /// dips below its own radius over the ground; a ground mouth sits inside the line's level width and the exit lands
+    /// on a straight (by construction, reported); the carried profile never stalls; the graph stays acyclic (every tube
+    /// rejoins further along its line). The steepest wall ride the base kit asks of the tube is reported (V-015).
+    /// </summary>
+    private void ValidateTubes(StageDefinition def, ValidationReport report)
+    {
+        var field = def.HeightField!;
+        var v = def.PrimaryRoute.Vertices;
+        bool allOk = true, acyclic = true;
+        string detail = "";
+        foreach (var t in def.Tubes)
+        {
+            float worstCruise = float.MaxValue, worstAny = float.MaxValue;
+            float span = v[t.JoinEnd].Distance - v[t.JoinStart].Distance, ramp = TubeBuilder.RampLength(t.CruiseHeight);
+            float along = 0f;
+            for (int i = 0; i < t.Axis.Length; i++)
+            {
+                if (i > 0) along += t.Axis[i].DistanceTo(t.Axis[i - 1]);
+                float clearance = t.Axis[i].Y - field.Sample(t.Axis[i].X, t.Axis[i].Z);
+                worstAny = Mathf.Min(worstAny, clearance);
+                // The envelope runs in the primary's distance; the axis is a little longer, so read it by fraction.
+                if (TubeBuilder.HeightEnvelope(along / Mathf.Max(1f, t.Length) * span, span, ramp) > 0.9f) worstCruise = Mathf.Min(worstCruise, clearance);
+            }
+            // Wall ride (docs/11 §7d): tan φ = v² κ / g with the axis's plan curvature over ±3 points.
+            float ride = 0f;
+            var p = t.Profile!;
+            for (int i = 3; i + 3 < t.Axis.Length; i++)
+            {
+                Vector2 a = new(t.Axis[i - 3].X, t.Axis[i - 3].Z), b = new(t.Axis[i].X, t.Axis[i].Z), c = new(t.Axis[i + 3].X, t.Axis[i + 3].Z);
+                Vector2 ab = b - a, bc = c - b;
+                if (ab.LengthSquared() < 1e-6f || bc.LengthSquared() < 1e-6f) continue;
+                float turn = Mathf.Abs(ab.AngleTo(bc)), len = 0.5f * (ab.Length() + bc.Length());
+                float kappa = turn / Mathf.Max(1e-3f, len);
+                float speed = p.Speed[Mathf.Min(i, p.Count - 1)];
+                ride = Mathf.Max(ride, Mathf.RadToDeg(Mathf.Atan(speed * speed * kappa / _gravity)));
+            }
+            t.MaxRideDegrees = ride;
+            float mouthEdge = WorldScale.TubeMouthOffset + t.Radius * WorldScale.TubeMouthFlare;
+            bool mouthsOk = mouthEdge <= StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
+            // The builder guaranteed the clearance on its own samples; the resampled axis reads it within a few metres.
+            bool clearOk = worstCruise >= t.Radius + WorldScale.TubeClearance - 5f && worstAny >= t.Radius - 3f;
+            bool profileOk = !p.Stalled;
+            if (t.JoinEnd <= t.JoinStart) acyclic = false;
+            t.Passed = mouthsOk && clearOk && profileOk;
+            allOk &= t.Passed;
+            t.Detail = $"{t.Length:0} m from {v[t.JoinStart].Distance:0} m, cruise {t.CruiseHeight:0} m up, clearance ≥ {worstCruise:0} m (min {worstAny:0.0}), " +
+                       $"entry {p.Speed[0]:0} → exit {p.Speed[^1]:0} m/s (ceiling {t.CeilingProfile!.Speed[^1]:0}), wall ride ≤ {ride:0}°";
+            detail += $" [{t.Detail}{(t.Passed ? "" : clearOk ? mouthsOk ? " STALLS" : " MOUTH OUTSIDE THE LEVEL WIDTH" : " AXIS TOO LOW")}]";
+        }
+        report.Add("tube axes keep the camera clearance above the ground and their mouths sit on the line (04 §10)", allOk, $"{def.Tubes.Count} tubes{detail}");
+        report.Add("the line graph is acyclic in route distance (every tube and line rejoins further along)", acyclic && def.OptionalLines.All(l => l.JoinEnd > l.JoinStart));
+    }
+
+    /// <summary>
+    /// Lids and headroom (04 §10, D-102): every lid keeps the family's clearance over the corridor under it and spans the
+    /// slot; nothing else stands within the full-charge apex above the primary's centreline (a tube axis near the
+    /// centreline below the apex would be an undeclared ceiling), so only lids declare a ceiling.
+    /// </summary>
+    private void ValidateStructuresAndHeadroom(StageDefinition def, ValidationReport report)
+    {
+        var v = def.PrimaryRoute.Vertices;
+        bool lidsOk = true; string lidDetail = "";
+        foreach (var lid in def.Lids)
+        {
+            float clearance = float.MaxValue;
+            for (int i = lid.StartIndex; i <= lid.EndIndex; i++) clearance = Mathf.Min(clearance, lid.RoofBottom - v[i].Position.Y);
+            lid.Clearance = clearance;
+            lid.Passed = clearance >= WorldScale.LidClearance - 0.5f && lid.Width >= WorldScale.MinCorridorWidth;
+            lidsOk &= lid.Passed;
+            lid.Detail = $"{lid.Length:0} m from {v[lid.StartIndex].Distance:0} m, roof {lid.RoofBottom:0} m, clearance {clearance:0.0} m, {lid.Width:0} m wide";
+            lidDetail += $" [{lid.Detail}{(lid.Passed ? "" : " LOW")}]";
+        }
+        report.Add("lids keep the declared clearance over the corridor and span the slot (04 §10)", lidsOk, $"{def.Lids.Count} lids{lidDetail}");
+
+        float apex = _fullTakeoff * _fullTakeoff / (2f * _gravity) + 2f * _ballRadius;
+        float worst = float.MaxValue; string where = "";
+        foreach (var t in def.Tubes)
+            foreach (var a in t.Axis)
+            {
+                int i = def.PrimaryRoute.IndexAtDistance(0f);   // nearest by plan distance over the tube's join span
+                float best = float.MaxValue; int bi = t.JoinStart;
+                for (int k = t.JoinStart; k <= t.JoinEnd; k += 2)
+                {
+                    float d = new Vector2(v[k].Position.X - a.X, v[k].Position.Z - a.Z).LengthSquared();
+                    if (d < best) { best = d; bi = k; }
+                }
+                float lateral = Mathf.Sqrt(best), above = a.Y - t.Radius - v[bi].Position.Y;
+                if (lateral < 20f + t.Radius && above < apex && above < worst) { worst = above; where = $"tube (joins {v[t.JoinStart].Distance:0}–{v[t.JoinEnd].Distance:0} m, side {t.Side:+0;-0}, cruise {t.CruiseHeight:0}) axis {above:0} m above the centreline, {lateral:0.0} m off it in plan, at {v[bi].Distance:0} m; axis ({a.X:0},{a.Y:0},{a.Z:0}) vertex ({v[bi].Position.X:0},{v[bi].Position.Y:0},{v[bi].Position.Z:0}) heading {Mathf.RadToDeg(v[bi].Heading):0}°"; }
+            }
+        report.Add("headroom: nothing but a declared lid stands within the jump apex above the primary's centreline (04 §10)", worst == float.MaxValue,
+            worst == float.MaxValue ? $"apex {apex:0} m clear; {def.Lids.Count} declared ceilings" : where);
     }
 
     /// <summary>Geometric flight check for any polyline (D-100): a flight's straight path may not drift more than the
@@ -289,23 +465,22 @@ public sealed class StageGenerator
         float entryX = -WorldScale.FootprintLength * 0.5f + WorldScale.EntryMargin;
         float exitX = WorldScale.FootprintLength * 0.5f - WorldScale.ExitMargin;
 
-        report.Add("start and exit exist", v.Count >= 2
-            && Mathf.Abs(v[0].Position.X - entryX) < 1f && Mathf.Abs(v[^1].Position.X - exitX) < 1f,
-            $"start x={v[0].Position.X:0} exit x={v[^1].Position.X:0}");
+        // A spiral pit finale (D-102) ends on the pit floor, wherever the turn leaves it; the footprint check bounds it.
+        bool exitOk = route.Spiral is { } spx ? new Vector2(v[^1].Position.X - spx.Centre.X, v[^1].Position.Z - spx.Centre.Z).Length() <= spx.OuterRadius : Mathf.Abs(v[^1].Position.X - exitX) < 1f;
+        report.Add("start and exit exist", v.Count >= 2 && Mathf.Abs(v[0].Position.X - entryX) < 1f && exitOk,
+            $"start x={v[0].Position.X:0} exit x={v[^1].Position.X:0}{(route.Spiral is { } sp ? $" on the floor of a spiral pit at ({sp.Centre.X:0}, {sp.Centre.Z:0}), r {sp.OuterRadius:0}→{sp.InnerRadius:0}, {sp.Depth:0} m deep" : "")}");
 
         float maxGap = 0f, maxBand = 0f;
-        bool monotonic = true;
         for (int i = 1; i < v.Count; i++)
         {
             // Plan spacing: a module's rim face is a real drop between two samples, not a break in the route.
             maxGap = Mathf.Max(maxGap, new Vector2(v[i].Position.X - v[i - 1].Position.X, v[i].Position.Z - v[i - 1].Position.Z).Length());
-            if (v[i].Position.X < v[i - 1].Position.X - 1e-3f) monotonic = false;
         }
         foreach (var p in v) maxBand = Mathf.Max(maxBand, Mathf.Abs(p.Position.Z));
         report.Add("primary route is continuous", maxGap <= WorldScale.RouteSampleSpacing * 1.5f, $"max vertex gap {maxGap:0.00} m");
-        // Progress is route distance (D-096); the plan constraint is the footprint, and this archetype's band.
+        // Progress is route distance and headings are unbounded (D-096, D-102): the plan constraint is the footprint alone.
         bool inFootprint = v.All(p => Mathf.Abs(p.Position.X) <= WorldScale.FootprintLength * 0.5f && Mathf.Abs(p.Position.Z) <= WorldScale.FootprintWidth * 0.5f);
-        report.Add("route stays inside the footprint and reaches the exit", inFootprint && monotonic, monotonic ? "" : "the Highlands wander doubled back");
+        report.Add("route stays inside the footprint", inFootprint);
         report.Add("route stays inside the route band", maxBand <= WorldScale.RouteBandHalfWidth, $"max |z| {maxBand:0} m");
 
         float minRadius = route.Bends.Count == 0 ? float.PositiveInfinity : route.Bends.Min(b => b.Radius);

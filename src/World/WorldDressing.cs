@@ -53,6 +53,10 @@ public partial class WorldDressing : Node3D
 
     public event Action<float>? BoostPickupCollected;
 
+    public StandardMaterial3D TubeShellMaterial { get; private set; } = null!;
+    public StandardMaterial3D TubeRibMaterial { get; private set; } = null!;
+    public StandardMaterial3D LidMaterial { get; private set; } = null!;
+
     protected void RaiseBoostPickup(float amount) => BoostPickupCollected?.Invoke(amount);
 
     public override void _Ready()
@@ -182,6 +186,22 @@ public partial class WorldDressing : Node3D
 
         _matInstanced = Flat(Colors.White);
         _matInstanced.VertexColorUseAsAlbedo = true;
+
+        // Tube shell (06 §3, D-096): a translucent skin seen from outside, opaque ribs as the motion cue at speed.
+        TubeShellMaterial = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.55f, 0.85f, 1.0f, 0.22f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            CullMode = BaseMaterial3D.CullModeEnum.Back,
+            DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Lambert,
+            SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+            Roughness = 0.4f,
+            EmissionEnabled = true,
+            Emission = new Color(0.25f, 0.5f, 0.7f),
+            EmissionEnergyMultiplier = 0.25f,
+        };
+        TubeRibMaterial = Glow(new Color(0.85f, 0.95f, 1.0f), 0.5f);
+        LidMaterial = Flat(new Color(0.48f, 0.30f, 0.22f));
     }
 
     private static StandardMaterial3D Flat(Color albedo) => new()
@@ -265,12 +285,50 @@ public partial class WorldDressing : Node3D
         // Scale pillars are solid: they stand just outside the corridor, never inside it (04 §5G).
         BuildPillars(route.Start.X + 30f, route.Start.Z + StageHeightField.CorridorHalfWidth + 12f);
 
+        foreach (var tube in stage.Tubes)
+            AddSign(tube.Axis[0] + Vector3.Up * (tube.Radius * 2f + 8f), tube.Passed ? "TUBE" : "TUBE ✗", 7f);
+        foreach (var lid in stage.Lids)
+        {
+            var e = route.Vertices[lid.StartIndex];
+            AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, lid.RoofBottom - e.Position.Y - 4f), "TUNNEL", 6f);
+        }
+        foreach (var line in stage.OptionalLines)
+        {
+            if (line.Kind != RouteLineKind.Terrace) continue;
+            var c = line.Vertices[Mathf.Min(line.Vertices.Count - 1, line.Vertices.Count / 6)];
+            AddSign(c.Position + Vector3.Up * 30f, $"FLOOR {line.Floor} ↑", 8f);
+        }
+        if (stage.HeightField is { } hf && hf.Rules.Floors >= 2)
+        {
+            // The cloud band (06 §3, D-103): two translucent sheets above the primary's mean height; the top floor sits in it.
+            float mean = route.Vertices.Average(x => x.Position.Y);
+            for (int i = 0; i < 2; i++)
+                _content.AddChild(new MeshInstance3D
+                {
+                    Name = $"CloudBand{i}",
+                    Mesh = new PlaneMesh { Size = new Vector2(_world.HalfX * 2.2f, _world.HalfZ * 2.2f) },
+                    Position = new Vector3(0f, mean + WorldScale.CloudBandHeight + i * 30f, 0f),
+                    MaterialOverride = new StandardMaterial3D
+                    {
+                        AlbedoColor = new Color(0.95f, 0.96f, 0.98f, i == 0 ? 0.55f : 0.35f),
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+                    },
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                });
+        }
+        if (stage.PrimaryRoute.Spiral is { } pit)
+            AddSign(_world.SurfacePoint(route.Vertices[pit.StartIndex].Position.X, route.Vertices[pit.StartIndex].Position.Z, 30f), "PIT ↓", 8f);
+
         if (_t.World.RouteDebugLines)
         {
             BuildRouteLines(route);
-            foreach (var line in stage.OptionalLines) BuildRouteLines(line, RouteOptionalColor);
+            foreach (var line in stage.OptionalLines) BuildRouteLines(line, line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : RouteOptionalColor);
             foreach (var cp in stage.Checkpoints) AddCheckpointPost(cp.Position);
+            foreach (var tube in stage.Tubes) BuildPolyline(tube.Axis, RouteTubeColor, 0f);
         }
+        if (_t.World.StageDebugViews) BuildStageDebugViews(stage);
 
         // Cosmetic scatter never enters the corridor (04 §5G): keep clear of the stamp and its falloff.
         float clearance = StageHeightField.CorridorHalfWidth + StageHeightField.BendExtraHalfWidth + StageHeightField.FalloffWidth * 0.5f;
@@ -291,6 +349,143 @@ public partial class WorldDressing : Node3D
     private static readonly Color RouteBendColor = new(1.0f, 0.62f, 0.2f);
     private static readonly Color RouteCrestColor = new(1.0f, 0.3f, 0.85f);
     private static readonly Color RouteOptionalColor = new(0.45f, 1.0f, 0.4f);
+    private static readonly Color RouteTubeColor = new(0.85f, 0.45f, 1.0f);
+    private static readonly Color FloorTwoColor = new(0.55f, 1.0f, 0.75f);
+    private static readonly Color FloorThreeColor = new(1.0f, 0.85f, 0.35f);
+    private static readonly Color CorridorColor = new(0.35f, 0.65f, 0.75f);
+    private static readonly Color ChallengeColor = new(1.0f, 0.95f, 0.25f);
+    private static readonly Color StructureColor = new(1.0f, 0.55f, 0.85f);
+    private static readonly Color DrainColor = new(0.95f, 0.45f, 0.35f);
+
+    /// <summary>A collider-free post: debug markers may stand inside a corridor.</summary>
+    private void AddMarker(Vector3 at, float height, Material material)
+    {
+        Vector3 basePos = _world.SurfacePoint(at.X, at.Z);
+        _content.AddChild(new MeshInstance3D { Mesh = _postMesh, MaterialOverride = material, Position = basePos + Vector3.Up * height * 0.5f, Scale = new Vector3(1.2f, height, 1.2f) });
+    }
+
+    /// <summary>
+    /// Stage debug views (04 §16, 07 §11; D-104): corridor bounds on every line (its level width, wider on bends),
+    /// challenge zones (a yellow line over each module's straight from its entrance to the end of its landing zone,
+    /// posts at both ends), structure bounds (lid box outlines, tube mouth rings), floors (terrace bounds in the
+    /// floor's colour) and drains (a red line along a terrace's cliff foot on the floor below). Off by default.
+    /// </summary>
+    private void BuildStageDebugViews(StageDefinition stage)
+    {
+        var route = stage.PrimaryRoute;
+        var v = route.Vertices;
+        var bendAt = new bool[v.Count];
+        foreach (var b in route.Bends) for (int i = b.StartIndex; i <= b.EndIndex; i++) bendAt[i] = true;
+        // Corridor bounds: the primary's level width, plus the bend extra; optional lines at their own width.
+        foreach (float side in new[] { 1f, -1f })
+        {
+            var pts = new Vector3[v.Count];
+            for (int i = 0; i < v.Count; i++)
+            {
+                float w = StageHeightField.CorridorHalfWidth + (bendAt[i] ? StageHeightField.BendExtraHalfWidth : 0f);
+                float x = v[i].Position.X - Mathf.Sin(v[i].Heading) * w * side, z = v[i].Position.Z + Mathf.Cos(v[i].Heading) * w * side;
+                pts[i] = _world.SurfacePoint(x, z, 1.5f);
+            }
+            BuildPolyline(pts, CorridorColor, 0f);
+        }
+        foreach (var line in stage.OptionalLines)
+        {
+            var lv = line.Vertices;
+            Color c = line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : CorridorColor;
+            foreach (float side in new[] { 1f, -1f })
+            {
+                var pts = new Vector3[lv.Count];
+                for (int i = 0; i < lv.Count; i++)
+                    pts[i] = _world.SurfacePoint(lv[i].Position.X - Mathf.Sin(lv[i].Heading) * line.CorridorHalfWidth * side, lv[i].Position.Z + Mathf.Cos(lv[i].Heading) * line.CorridorHalfWidth * side, 1.5f);
+                BuildPolyline(pts, c, 0f);
+            }
+            if (line.Kind == RouteLineKind.Terrace)
+            {
+                // The drain: the cliff foot on the floor below, along the plateau.
+                float foot = line.CorridorHalfWidth + WorldScale.WallSetback + WorldScale.TerraceCliffFalloff + 6f;
+                var pts = new List<Vector3>();
+                for (int i = 0; i < lv.Count; i += 4)
+                {
+                    float d = lv[i].Distance;
+                    if (d < line.Transition + line.RampLength || d > line.Length - line.Transition - line.RampLength) continue;
+                    float inward = -line.Side;
+                    pts.Add(_world.SurfacePoint(lv[i].Position.X - Mathf.Sin(lv[i].Heading) * foot * inward, lv[i].Position.Z + Mathf.Cos(lv[i].Heading) * foot * inward, 1.5f));
+                }
+                if (pts.Count > 1) BuildPolyline(pts.ToArray(), DrainColor, 0f);
+            }
+        }
+        // Challenge zones.
+        foreach (var f in route.Features)
+        {
+            if (f.Kind == RouteFeatureKind.LaunchCrest) continue;
+            float start = f.Kind == RouteFeatureKind.Gap ? f.CentreDistance - WorldScale.TakeoffRunwayLength : f.CentreDistance - WorldScale.RampApproachLength - f.Rise / Mathf.Max(0.01f, f.Slope);
+            float end = f.FeatureEnd + WorldScale.LandingZoneLength;
+            var pts = new List<Vector3>();
+            for (int i = route.IndexAtDistance(start); i < v.Count && v[i].Distance <= end; i += 2) pts.Add(v[i].Position + Vector3.Up * 6f);
+            if (pts.Count > 1) BuildPolyline(pts.ToArray(), ChallengeColor, 0f);
+            // Markers only: a debug post inside the corridor must never be a collider (04 §5G, 08 §5).
+            AddMarker(v[route.IndexAtDistance(start)].Position, 10f, _matBandLight);
+            AddMarker(v[Mathf.Min(v.Count - 1, route.IndexAtDistance(end))].Position, 10f, _matBandDark);
+        }
+        foreach (var b in route.Bends)
+        {
+            if (b.Radius > WorldScale.CommittedBendRadius + 1e-3f) continue;
+            var pts = new List<Vector3>();
+            for (int i = Mathf.Max(0, b.StartIndex - 25); i <= b.EndIndex; i += 2) pts.Add(v[i].Position + Vector3.Up * 6f);
+            BuildPolyline(pts.ToArray(), ChallengeColor, 0f);
+        }
+        // Structure bounds.
+        foreach (var lid in stage.Lids)
+        {
+            Vector3 a = new(Mathf.Cos(lid.Heading), 0f, Mathf.Sin(lid.Heading)), s = new(-Mathf.Sin(lid.Heading), 0f, Mathf.Cos(lid.Heading));
+            Vector3 c = new(lid.Centre.X, lid.RoofBottom, lid.Centre.Z);
+            float hl = lid.Length * 0.5f, hw = lid.Width * 0.5f;
+            foreach (float y in new[] { 0f, lid.Thickness })
+            {
+                Vector3 up = Vector3.Up * y;
+                BuildPolyline(new[] { c + a * hl + s * hw + up, c - a * hl + s * hw + up, c - a * hl - s * hw + up, c + a * hl - s * hw + up, c + a * hl + s * hw + up }, StructureColor, 0f);
+            }
+        }
+        foreach (var tube in stage.Tubes)
+        {
+            foreach (int end in new[] { 0, tube.Axis.Length - 1 })
+            {
+                Vector3 t = tube.TangentAt(end);
+                Vector3 n = Mathf.Abs(t.Y) < 0.9f ? Vector3.Up - t * t.Y : Vector3.Right;
+                n = n.Normalized();
+                Vector3 bnorm = t.Cross(n).Normalized();
+                float r = tube.Radius * WorldScale.TubeMouthFlare;
+                var ring = new Vector3[25];
+                for (int i = 0; i < 25; i++) ring[i] = tube.Axis[end] + (n * Mathf.Cos(Mathf.Tau * i / 24f) + bnorm * Mathf.Sin(Mathf.Tau * i / 24f)) * r;
+                BuildPolyline(ring, StructureColor, 0f);
+            }
+        }
+        if (route.Spiral is { } pit)
+        {
+            var ring = new Vector3[49];
+            for (int i = 0; i < 49; i++)
+            {
+                float ang = Mathf.Tau * i / 48f;
+                float x = pit.Centre.X + Mathf.Cos(ang) * pit.OuterRadius, z = pit.Centre.Z + Mathf.Sin(ang) * pit.OuterRadius;
+                ring[i] = _world.SurfacePoint(x, z, 3f);
+            }
+            BuildPolyline(ring, StructureColor, 0f);
+        }
+    }
+
+    /// <summary>Unshaded line strip through world points, lifted by <paramref name="lift"/>.</summary>
+    private void BuildPolyline(Vector3[] points, Color color, float lift)
+    {
+        var mesh = new ImmediateMesh();
+        mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
+        foreach (var p in points) { mesh.SurfaceSetColor(color); mesh.SurfaceAddVertex(p + Vector3.Up * lift); }
+        mesh.SurfaceEnd();
+        _content.AddChild(new MeshInstance3D
+        {
+            Name = "StructureLine", Mesh = mesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            MaterialOverride = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true },
+        });
+    }
 
     /// <summary>Unshaded line strip 3 m above the route: cyan straights, orange bends, magenta crests.</summary>
     private void BuildRouteLines(RouteSkeleton route, Color? fixedColor = null)

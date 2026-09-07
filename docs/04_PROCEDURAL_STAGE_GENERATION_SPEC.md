@@ -266,6 +266,28 @@ along the axis. A tube never passes through terrain mass and keeps its axis clea
 walls by the camera clearance (§10), so the camera stays outside it; a tube through a wall is a wall tunnel
 (lid) instead. Forks inside a tube are not built.
 
+**Headroom as delivered (D-102):** the validator scans every tube axis point against the primary's
+centreline; nothing but a declared lid may stand within the full-charge apex (plus a ball) above the
+centreline within 20 m plus the tube radius in plan, and a tube whose path would cross another part of the
+primary is rejected by its builder. The check found the first tubes swinging back across their own corridor
+(a sign applied to half the offset) before any ball did.
+
+**Tubes as delivered (D-101, 2026-09-07):** a tube is an optional line through the air. It leaves the primary
+through a ground mouth 45 m to one side of the centreline (inside the level width, so the free path never
+enters it), climbs over that offset at a pitch under 14° to a cruise the camera clearance (30 m) above the
+highest ground under its path, swings out 200 m over a 500 m S (about r 270), cruises, swings back, descends
+and exits through a flared mouth 45 m off the centreline onto a 200 m straight landing zone; both mouth zones
+are primary straights clear of features, and the swing takes the outside of every bend in the section. The
+axis follows the primary's own geometry under a lateral and a height envelope, so both mouths land exactly on
+the line, and the builder rejects any tube whose floor would sink into the ground. The route speed model
+integrates the axis as carried (no corner limit, no launch); the controller adds the **tube follow**, the
+shell twin of the ground follow (03 §3): inside a tube any contact is ground, the ball is held to the analytic
+shell within the snap distance, and the wall's normal is its ground normal, so drive and charge work on the
+wall. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
+at the model's speed and 0° off the axis, the lens outside the shell on every frame with a clear line of sight
+to the ball against the terrain. Tubes appear on about 15% of Highlands, 7% of Canyon and 41% of Dune Sea
+seeds; edge and midair mouths, and exits onto other lines or floors, arrive with Sky Terraces.
+
 ## 6. Archetypes
 
 ### Rolling Highlands
@@ -315,8 +337,25 @@ walls that blend over three cells (about 80° at 100 m) on straights and bend ou
 width (the ground follow's lateral samples never read it, `WorldScale.WallSetback`), the bend mix leans on
 the cruise and fast radii with a 1.5× berm, straights are 200–450 m, and the palette is red rock with a
 pale rim. Ridge lines become ledges cut into the wall 25–40 m above the floor. An `ArchetypeRules` record
-holds what an archetype changes (geometry only, §7); `World › Canyon Run (Phase 3)`, `-- --canyon` and
-`RUSHCORE_ARCHETYPE=canyon` select it. Wall tunnels (lids) and the spiral pit follow in their own slices.
+holds what an archetype changes (geometry only, §7); `World › Archetype`, `-- --canyon` and
+`RUSHCORE_ARCHETYPE=canyon` select it.
+
+**Wall tunnels and the spiral pit, delivered 2026-09-07 (D-102).** A **lid** roofs a plain slot straight
+150–300 m long, wall to wall (190 m), its underside 15 m above the highest corridor point under it and 6 m
+thick; the module declares its ceiling (§10 headroom: the roof refuses a charged jump), the camera confines
+under it (06 §11), and the roof is a floor from above. Half of Canyon Run stages end in a **spiral pit**: after
+the wander the route crosses to the far side of the band, runs one outer radius straight, then turns one full
+turn inward through four quarter arcs of shrinking radius (380 → 150 m, 230 m shed per turn: two level widths on
+bends, two setbacks and the cliff face between a turn and the one below it), descending 120 m as a perfect helix
+on the entry level (a swell under two kilometres of bends would launch the ceiling ball inside them). The pit's
+surface replaces the relief and side terrain inside the rim: the entry level out to the outer turn, then a cone
+down to the pit floor at the inner radius, the rim a cliff to the side terrain; the corridor's turns are
+terraces cut into the cone, no berm on the pads, and the exit pad sits on the pit floor. Headings run unbounded
+through the turn (D-096): the plan constraint is the footprint alone and the exit lies wherever the turn ends
+inside the disc. Measured: 100 canyon seeds valid, 193 lids and 53 pits; the spiral drives to the exit pad at
+134–149 m/s fully grounded, a charged jump under a lid never puts the ball above the roof, the roof carries the
+ball as a floor, the lens stays under the roof through the tunnel, and a ball dropped off a turn's inner edge
+lands on the turn below and drives on to the exit.
 
 ### Dune Sea
 
@@ -361,6 +400,26 @@ Geometry:
 - the top floor in the cloud band,
 - tubes and bridges linking floors and branching lines,
 - every fall lands on ground that drains back to the primary.
+
+**Delivered 2026-09-07 (D-103), the first cut:** the Highlands family with 500–900 m straights and its
+optional lines as **terrace floors**: floor 2 is a corridor 60 m above the primary and 200 m to its side,
+floor 3 a corridor 120 m up and 300 m out, stacked beyond floor 2 on the same section. A terrace leaves the
+primary through an S-transition on a straight (290 m for floor 2, 360 m for floor 3), climbs a cosine ramp a
+driven ball takes without losing speed and whose knee never launches at the cap (420 m for 60 m, 600 m for
+120 m), runs its plateau past the bend it shadows, and returns the same way; every terrace therefore rejoins
+the primary and the graph stays acyclic. Its inner edge is a **cliff** (a 12 m face) whose foot lands on the
+floor below: the primary's flank for floor 2, floor 2's plateau for floor 3, so a fall from any floor is a
+setback of one step (60 m, a slam landing) onto drivable ground that leads back to the primary; its outer
+edge, where no floor stands beyond it, descends into the relief at the route grade (a smoothstep of the
+height plus half a swell over the grade limit, times the smoothstep's 1.5). The drain validator reads lateral
+cuts every 100 m of plateau: the cliff foot within 15 m of the floor below, no step up over relief noise on
+the way down, the outer slope inside the grade; a terrace that fails is dropped with its section (like a line
+whose flight cannot hold a corner). Tubes appear as on the other archetypes, cruising above the terraces.
+The cloud band is two translucent sheets 130 and 160 m above the primary's mean height, so floor 3 sits in
+it. Measured: 100 seeds valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped.
+Floor 3 is rare because its section needs about 2 km bounded by straights; branching floor 3 from floor 2,
+the jump step (a lip and a full charge onto a landing zone rather than a ramp), edge and midair tube mouths,
+bridges between floors and a second primary floor are the open work of this archetype.
 
 Archetype rules (D-098, extended D-099): an `ArchetypeRules` record per archetype carries the wall height,
 the wall and inside falloffs, the bend mix, the straight lengths, the bank scale, the swell slope budget,
@@ -444,7 +503,11 @@ Delivered forms (D-096): the lid is a `BoxShape3D` and a box mesh; the tube is a
 sides) whose triangles face inward, with a `ConcavePolygonShape3D` built from the same triangles and
 backface collision on so the ball never leaves through a face at the cap. Both sit on a structure physics
 layer; the tube's collider is additionally invisible to the camera's occlusion probe (06 §11). The harness
-verifies a tube carries the ball at the cap with CCD the way D-079 verified NaN holes.
+verifies a tube carries the ball at the cap with CCD the way D-079 verified NaN holes. Delivered D-101: the tube is a
+10-sided ring swept with a parallel-transported frame, flared ×2 over one diameter at each mouth, an indexed
+translucent shell with outward normals, opaque rib bands every 25 m, and a `ConcavePolygonShape3D` of the same
+triangles with backface collision on physics layer 2; the player's mask includes layer 2, the camera probe's
+does not.
 
 Do not default the entire terrain to one giant concave triangle collider.
 
@@ -635,6 +698,15 @@ Expose:
 - floor ids and drains,
 - validation report,
 - generation phase timing.
+
+Delivered (D-104): `World › Route Debug Lines` draws the primary (cyan straights, orange bends, magenta feature
+zones), optional lines by floor (green ridges and floor 2, gold floor 3), checkpoint posts and tube axes;
+`World › Stage Debug Views` (off by default, 07 §11) adds corridor bounds on every line, challenge zones (a yellow
+line from a module's entrance to the end of its landing zone with posts at both ends, and over every committed
+bend), structure bounds (lid box outlines, tube mouth rings, the spiral pit's rim), floor bounds in the floor's
+colour and each terrace's drain (a red line along its cliff foot). The telemetry `seed` row carries the counts
+(lines, terraces, tubes, lids, the pit) and the validation status; the log prints every check and the phase
+timings; signs mark gaps, ramps, crests, tubes, tunnels, floors and the pit.
 
 ## Empirical validation items
 

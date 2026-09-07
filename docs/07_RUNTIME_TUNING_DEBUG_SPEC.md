@@ -168,7 +168,9 @@ Toggles:
 - player ground normal/contact (contact, raw, ground follow),
 - impact vector.
 
-Disabled by default.
+Disabled by default. Delivered (D-104): `World › Route Debug Lines` (route, optional lines by floor, checkpoints,
+tube axes; on by default in the toy) and `World › Stage Debug Views` (corridor bounds, challenge zones, structure
+bounds, floors and drains; off by default). Player contact and impact vectors remain in the telemetry rows.
 
 ## 12. Debug actions
 

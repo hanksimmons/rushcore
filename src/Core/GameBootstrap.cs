@@ -55,6 +55,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         // `-- --canyon` launches a Canyon Run stage (D-098), over whatever the override file says about the world.
         if (HasFlag("--canyon")) { _tuning.World.GeneratedStage = true; _tuning.World.Archetype = (int)Rushcore.Generation.TerrainArchetype.CanyonRun; GD.Print("[RUSHCORE] Canyon Run from command line"); }
         if (HasFlag("--dunes")) { _tuning.World.GeneratedStage = true; _tuning.World.Archetype = (int)Rushcore.Generation.TerrainArchetype.DuneSea; GD.Print("[RUSHCORE] Dune Sea from command line"); }
+        if (HasFlag("--sky")) { _tuning.World.GeneratedStage = true; _tuning.World.Archetype = (int)Rushcore.Generation.TerrainArchetype.SkyTerraces; GD.Print("[RUSHCORE] Sky Terraces from command line"); }
 
         _world = new MovementToyWorld(_tuning, _seed);
         AddChild(_world);
@@ -72,6 +73,9 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _player.CameraBasis = _camera;
         _player.Ground = _world;
         _camera.GroundHeight = _world.SampleHeight;
+        _camera.Tubes = () => _world.Tubes;
+        _camera.LidOver = _world.LidOver;
+        _player.Structure = _world;
         _camera.SnapYawToward(_world.SpawnFacing);
         _camera.SnapToPlayer();
 

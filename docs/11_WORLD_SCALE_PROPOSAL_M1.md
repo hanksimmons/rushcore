@@ -296,6 +296,10 @@ lip's rise (20 m) does add. Measured on the strip ramps before any floor is plac
 | 19° ramp at the ceiling, charged or not | 84.2 m/s | 90 m |
 | 27° ramp at the ceiling, charged or not | 114 m/s | 165 m |
 
+*Delivered (D-103):* the floor step is 60 m, taken by a ramp a driven ball climbs (420 m for 60 m, 600 m for
+120 m, knees above the cap's contact radius) and given back by a cliff onto the floor below (a 60 m fall lands
+at 69 m/s: a slam keeps Flow); the jump step onto a terrace is not yet built.
+
 **Jump step band 60–90 m.** A full charge lifts the ball 91 m above the lip at any speed, so a floor
 step taken by a jump is 60–90 m (plus the lip); a mandatory step is at most 20 m (half charge, 04
 §11), which is a lip rather than a floor. Larger lifts are not jumps: a driven ball climbs any grade up
@@ -331,7 +335,9 @@ minimum minus 120 m, so a fall is never a restore.
 - Spiral pit / ramp: successive turns differ in radius by Δr ≥ 200 m (150 m corridor plus both wall
   margins and the face). Turns from r 800 down to r 200 hold the ceiling everywhere (201 m); the 50 m
   committed radius appears only as the top turn of a spiral ramp. A drop of 100–200 m per turn at r 200
-  is a grade ≤ 0.16, far inside the 0.40 route limit.
+  is a grade ≤ 0.16, far inside the 0.40 route limit. *Delivered (D-102):* one turn from r 380 to r 150 (230 m
+  shed: on a bend the level width is 100 m each side plus the 8 m setback, leaving a 14 m cliff face), 120 m
+  deep (grade 0.07), the family bank capped at 30 m (it grows with radius), the exit pad on the pit floor.
 
 ### 7d. Tubes
 
@@ -353,9 +359,17 @@ Wall ride: inside a bend of path radius R the ball rides to tan φ = v² / (g·R
 The ground-normal limit (0.498, about 60°) is crossed below a path radius of about 320 m at the base
 cap (and about 900 m at the ceiling), so the ball inside a tight tube bend reads airborne to the
 controller (V-015). A tube bend loses no speed in the route speed model (carried segment); the exit
-velocity runs along the axis into the landing zone.
+velocity runs along the axis into the landing zone. *Delivered (D-101):* the tube follow makes the wall ground
+at any angle (03 §3), so the limit no longer applies inside tubes; the swing is an S of 200 m over 500 m
+(r ≈ 270, a 64° ride at the base cap), the primary's own bends under the section push the worst ride to about
+80°, and the ride is reported per tube. Radius 6 m, mouth offset 45 m, climb pitch ≤ 14°, cruise clearance 30 m,
+section 1 800 m at the lowest cruise.
 
 ### 7e. Camera clearance
+
+*Delivered (D-101):* the lens is pushed radially to R + 1.5 m from the nearest axis point after the chase
+placement (×2 at the flared mouths), the shell is on a physics layer the occlusion probe ignores, and the harness
+holds the lens outside with a clear line of sight for a whole ride. The original derivation follows.
 
 The rig sits 17.6 m behind and 6.7 m above the ball. Inside a tube of radius R with the ball on the
 floor, the lens must clear the top of the shell by the occlusion margin, 2R + 0.6 m above the floor:

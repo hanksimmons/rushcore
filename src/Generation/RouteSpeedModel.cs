@@ -182,7 +182,8 @@ public sealed class RouteSpeedModel
     /// <param name="chainFromBaseCap">Ceiling safety case (04 §12): once the base kit could have reached
     /// the base cap, assume a full chain and hold the ceiling wherever the bends allow; bends still
     /// clamp to their corner limits and the ceiling returns right after them.</param>
-    public RouteSpeedProfile Integrate(IReadOnlyList<Vector3> polyline, float entrySpeed = 0f, bool driveHeld = true, bool chainFromBaseCap = false)
+    /// <param name="carried">A tube (04 §5I, D-101): the walls carry the ball, so no corner limit and no launch; grade, drag and the cap only.</param>
+    public RouteSpeedProfile Integrate(IReadOnlyList<Vector3> polyline, float entrySpeed = 0f, bool driveHeld = true, bool chainFromBaseCap = false, bool carried = false)
     {
         int n = polyline.Count;
         if (n < 2) throw new ArgumentException("A route needs at least two vertices.", nameof(polyline));
@@ -208,7 +209,7 @@ public sealed class RouteSpeedModel
         {
             float turn = flatDir[i - 1] == Vector2.Zero || flatDir[i] == Vector2.Zero ? 0f : flatDir[i - 1].AngleTo(flatDir[i]);
             turn = Mathf.Abs(turn);
-            if (turn < 1e-3f) { profile.CornerLimit[i] = float.PositiveInfinity; continue; }
+            if (turn < 1e-3f || carried) { profile.CornerLimit[i] = float.PositiveInfinity; continue; }
             float radius = 0.5f * (segLen[i - 1] + segLen[i]) / turn;
             profile.CornerLimit[i] = CornerSpeedLimit(radius);
         }
@@ -294,7 +295,7 @@ public sealed class RouteSpeedModel
                     arrival = Mathf.Min(arrival, profile.CornerLimit[vi]);
                     vNew = Mathf.Min(vNew, profile.CornerLimit[vi]);
                     // Launch test at the vertex: the surface curves away faster than gravity follows.
-                    if (launchDemand[vi] < 0f && arrival * arrival * -launchDemand[vi] >= g * cosSlope[vi])
+                    if (!carried && launchDemand[vi] < 0f && arrival * arrival * -launchDemand[vi] >= g * cosSlope[vi])
                     {
                         float sinUp = -sinGrade[seg];                // the segment just travelled sets the launch angle
                         float cosUp = Mathf.Sqrt(Mathf.Max(0f, 1f - sinUp * sinUp));

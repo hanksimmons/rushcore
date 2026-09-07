@@ -12,7 +12,7 @@ namespace Rushcore.World;
 /// active <see cref="IHeightSource"/> (<see cref="TerrainHeightField"/> lab, or the
 /// <see cref="ScaleStripHeightField"/> for Gate M1) and <see cref="WorldDressing"/>.
 /// </summary>
-public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
+public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, Rushcore.Player.IStructureSurface
 {
     /// <summary>Lab default: metres between height samples, also the size of one rendered facet.</summary>
     public const float DefaultCellSize = 4f;
@@ -27,6 +27,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     private int _nx = Samples, _nz = Samples;
     private WorldDressing _dressing = null!;
     private Node3D _terrainRoot = null!;
+    private Node3D _structureRoot = null!;
     private StaticBody3D _terrainBody = null!;
     private CollisionShape3D _terrainCollider = null!;
     private HeightMapShape3D _terrainShape = null!;
@@ -54,7 +55,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public StageDefinition? Stage { get; private set; }
     /// <summary>Archetype of the built stage, and the one the world tuning asks for.</summary>
     public TerrainArchetype Archetype { get; private set; }
-    public TerrainArchetype WantedArchetype => (TerrainArchetype)Mathf.Clamp(Mathf.RoundToInt(_t.World.Archetype), 0, (int)TerrainArchetype.DuneSea);
+    public TerrainArchetype WantedArchetype => (TerrainArchetype)Mathf.Clamp(Mathf.RoundToInt(_t.World.Archetype), 0, (int)TerrainArchetype.SkyTerraces);
     /// <summary>One-line generation summary for the telemetry seed row.</summary>
     public string StageSummary { get; private set; } = "";
     /// <summary>Furthest primary-route vertex the player has reached on a generated stage.</summary>
@@ -115,8 +116,10 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     {
         bool wantStage = _t.World.GeneratedStage;
         bool wantStrip = !wantStage && _t.World.CalibrationStrip;
-        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype);
+        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype) && _t.World.StageDebugViews == BuiltDebugViews;
     }
+    /// <summary>Whether the last dressing build drew the stage debug views (the toggle rebuilds the world).</summary>
+    public bool BuiltDebugViews { get; private set; }
     /// <summary>Half extents of the active terrain in metres.</summary>
     public float HalfX { get; private set; } = Extent * 0.5f;
     public float HalfZ { get; private set; } = Extent * 0.5f;
@@ -150,6 +153,8 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
 
         _terrainRoot = new Node3D { Name = "TerrainMesh" };
         AddChild(_terrainRoot);
+        _structureRoot = new Node3D { Name = "Structures" };
+        AddChild(_structureRoot);
 
         _dressing = new WorldDressing(_t, this);
         AddChild(_dressing);
@@ -182,7 +187,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +
-                           $"{Stage.OptionalLines.Count} lines, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
+                           $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Tubes.Count} tubes, {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
             GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
             foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
         }
@@ -218,12 +223,14 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         _terrainShape.MapData = _heights;
 
         BuildTerrainTiles(_dressing.CreateTerrainMaterial());
+        BuildStructures();
 
         Bounds = new Aabb(new Vector3(-HalfX, _minHeight, -HalfZ), new Vector3(_field.SizeX, _maxHeight - _minHeight, _field.SizeZ));
         KillPlaneY = _minHeight - 120f;
         SpawnPoint = _field.SpawnXZ with { Y = SampleHeight(_field.SpawnXZ.X, _field.SpawnXZ.Z) + 4f };
 
         _dressing.Rebuild();
+        BuiltDebugViews = _t.World.StageDebugViews;
         BuildMillis = Time.GetTicksMsec() - start;
         GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
                  $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +
@@ -254,6 +261,79 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     // IGroundSurface (D-092): the ground follow reads the grid the collider and mesh are built from.
     float Rushcore.Player.IGroundSurface.Height(float x, float z) => SampleHeight(x, z);
     bool Rushcore.Player.IGroundSurface.Contains(float x, float z) => Mathf.Abs(x) <= HalfX && Mathf.Abs(z) <= HalfZ;
+
+    /// <summary>Physics layer of structures (lids, tubes): the ball collides with it, the camera's occlusion probe does not (04 §9).</summary>
+    public const uint StructureLayer = 2;
+    /// <summary>The built stage's tubes, for the camera push-out and the harness; empty outside a stage.</summary>
+    public IReadOnlyList<TubeDefinition> Tubes => Stage?.Tubes ?? (IReadOnlyList<TubeDefinition>)System.Array.Empty<TubeDefinition>();
+
+    // IStructureSurface (D-101): the tube follow reads the analytic shell.
+    public bool Nearest(Vector3 p, out Vector3 axisPoint, out Vector3 tangent, out float radius, out float distance)
+    {
+        axisPoint = Vector3.Zero; tangent = Vector3.Forward; radius = 0f; distance = float.MaxValue;
+        foreach (var tube in Tubes)
+        {
+            if (!tube.Bounds.HasPoint(p)) continue;
+            int i = tube.Nearest(p, out float d);
+            if (d >= distance) continue;
+            distance = d; axisPoint = tube.Axis[i]; tangent = tube.TangentAt(i); radius = tube.Radius;
+        }
+        return distance < float.MaxValue;
+    }
+
+    /// <summary>Structures (04 §5I, §9): each tube is a swept see-through shell with opaque ribs and an inward-facing
+    /// concave collider with backface collision, on the structure layer. Rebuilt with the terrain.</summary>
+    private void BuildStructures()
+    {
+        foreach (Node child in _structureRoot.GetChildren())
+        {
+            _structureRoot.RemoveChild(child);
+            child.QueueFree();
+        }
+        if (Stage is null) return;
+        int k = 0;
+        foreach (var tube in Stage.Tubes)
+        {
+            var built = TubeMesh.Build(tube);
+            var shell = new MeshInstance3D { Name = $"Tube{k}Shell", Mesh = built.Shell, MaterialOverride = _dressing.TubeShellMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            var ribs = new MeshInstance3D { Name = $"Tube{k}Ribs", Mesh = built.Ribs, MaterialOverride = _dressing.TubeRibMaterial };
+            var body = new StaticBody3D
+            {
+                Name = $"Tube{k}Body",
+                CollisionLayer = StructureLayer,
+                CollisionMask = 0,
+                PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+            };
+            body.AddChild(new CollisionShape3D { Shape = new ConcavePolygonShape3D { Data = built.CollisionTriangles, BackfaceCollision = true } });
+            _structureRoot.AddChild(shell);
+            _structureRoot.AddChild(ribs);
+            _structureRoot.AddChild(body);
+            k++;
+        }
+        int j = 0;
+        foreach (var lid in Stage.Lids)
+        {
+            var size = new Vector3(lid.Length, lid.Thickness, lid.Width);
+            var xf = new Transform3D(Basis.FromEuler(new Vector3(0f, -lid.Heading, 0f)), new Vector3(lid.Centre.X, lid.RoofBottom + lid.Thickness * 0.5f, lid.Centre.Z));
+            _structureRoot.AddChild(new MeshInstance3D { Name = $"Lid{j}", Mesh = new BoxMesh { Size = size }, MaterialOverride = _dressing.LidMaterial, Transform = xf });
+            var body = new StaticBody3D
+            {
+                Name = $"Lid{j}Body", CollisionLayer = StructureLayer, CollisionMask = 0, Transform = xf,
+                PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+            };
+            body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
+            _structureRoot.AddChild(body);
+            j++;
+        }
+    }
+
+    /// <summary>The lid whose roof a plan position is under, if any (the confined camera, D-102).</summary>
+    public LidDefinition? LidOver(float x, float z)
+    {
+        if (Stage is null) return null;
+        foreach (var lid in Stage.Lids) if (lid.Covers(x, z)) return lid;
+        return null;
+    }
 
     /// <summary>One ArrayMesh per tile: each allocation is bounded (~4 MB at 128 cells) and the
     /// renderer culls tiles the camera cannot see. Collision stays a single heightfield.</summary>

@@ -212,6 +212,31 @@ ramp reports a missing free flight any more (the launch window is the lip ease p
 lines dropped, ridge lines on 90% of Highlands and 70% of Canyon seeds (the batch floors), 11% of dune seeds
 (reported, not judged). One archetype selector (`World › Archetype`) replaces the per-archetype toggles.
 
+**Result (tubes, D-101, 2026-09-07):** the batch places tubes on every archetype (Highlands 16 on 15 seeds, Canyon
+7, Dune Sea 41) and every tube passes its validators (cruise clearance ≥ 30 m above the ground, mouths inside the
+level width, carried profile never stalls, graph acyclic); the harness drives the ball into a tube at the cap
+(Highlands seed 9/0, 2 040 m, borrowed when the drive seed has none; the dune drive seed has its own) and asserts
+it is carried through 100% grounded with its centre inside the radius, exits 0° off the axis at the carried
+model's speed, and that the camera stays outside the shell on every frame with a clear line of sight to the ball
+against the terrain layer; 285/285 Highlands, 284/284 dunes.
+
+**Result (wall tunnels and the spiral pit, D-102, 2026-09-07):** the canyon batch places lids and pits (193 lids all
+keeping their 15 m clearance, 53 of 100 stages ending in a pit; 100 valid, 0 fallbacks), the headroom validator
+holds on every archetype (it caught the first tubes crossing their own corridor); the canyon harness borrows a seed
+with both (2/0) and asserts a charged jump under a lid never puts the ball above the roof, the roof carries the
+ball as a floor, the lens stays under the roof through the tunnel, the spiral drives to the exit pad on the pit
+floor at 134–149 m/s fully grounded, and a ball dropped off a turn's inner edge lands on the turn below and drives
+on to the exit; a canyon tube (seed 31/0, 2 594 m with a 141 m cruise over the walls) rides 99% grounded to the
+model's exit speed.
+
+**Result (Sky Terraces, first cut, D-103, 2026-09-07):** the sky batch places terraces on floor 2 and floor 3
+(100 seeds: 100 valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped by the drain or
+corner checks) with the drain validator holding on every kept terrace; the sky drive (`RUSHCORE_ARCHETYPE=sky`)
+follows the primary within 0.4% of the model, drives a floor-2 terrace 1.3 km grounded 88%, rides a tube, and,
+borrowing seed 30/0 for a floor 3, drops the ball off the top floor's inner edge (123 m) onto floor 2 (64 m) and
+drives it back to within 30 m of the primary in 4.3 s; 302/302. The cloud band and the manual read of the stage
+from top to bottom are the user's.
+
 ## 6. Combat — Gate C0
 
 Objective:

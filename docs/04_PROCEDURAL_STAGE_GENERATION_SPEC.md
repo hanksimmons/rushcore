@@ -266,6 +266,12 @@ along the axis. A tube never passes through terrain mass and keeps its axis clea
 walls by the camera clearance (§10), so the camera stays outside it; a tube through a wall is a wall tunnel
 (lid) instead. Forks inside a tube are not built.
 
+**Headroom as delivered (D-102):** the validator scans every tube axis point against the primary's
+centreline; nothing but a declared lid may stand within the full-charge apex (plus a ball) above the
+centreline within 20 m plus the tube radius in plan, and a tube whose path would cross another part of the
+primary is rejected by its builder. The check found the first tubes swinging back across their own corridor
+(a sign applied to half the offset) before any ball did.
+
 **Tubes as delivered (D-101, 2026-09-07):** a tube is an optional line through the air. It leaves the primary
 through a ground mouth 45 m to one side of the centreline (inside the level width, so the free path never
 enters it), climbs over that offset at a pitch under 14° to a cruise the camera clearance (30 m) above the
@@ -331,8 +337,25 @@ walls that blend over three cells (about 80° at 100 m) on straights and bend ou
 width (the ground follow's lateral samples never read it, `WorldScale.WallSetback`), the bend mix leans on
 the cruise and fast radii with a 1.5× berm, straights are 200–450 m, and the palette is red rock with a
 pale rim. Ridge lines become ledges cut into the wall 25–40 m above the floor. An `ArchetypeRules` record
-holds what an archetype changes (geometry only, §7); `World › Canyon Run (Phase 3)`, `-- --canyon` and
-`RUSHCORE_ARCHETYPE=canyon` select it. Wall tunnels (lids) and the spiral pit follow in their own slices.
+holds what an archetype changes (geometry only, §7); `World › Archetype`, `-- --canyon` and
+`RUSHCORE_ARCHETYPE=canyon` select it.
+
+**Wall tunnels and the spiral pit, delivered 2026-09-07 (D-102).** A **lid** roofs a plain slot straight
+150–300 m long, wall to wall (190 m), its underside 15 m above the highest corridor point under it and 6 m
+thick; the module declares its ceiling (§10 headroom: the roof refuses a charged jump), the camera confines
+under it (06 §11), and the roof is a floor from above. Half of Canyon Run stages end in a **spiral pit**: after
+the wander the route crosses to the far side of the band, runs one outer radius straight, then turns one full
+turn inward through four quarter arcs of shrinking radius (380 → 150 m, 230 m shed per turn: two level widths on
+bends, two setbacks and the cliff face between a turn and the one below it), descending 120 m as a perfect helix
+on the entry level (a swell under two kilometres of bends would launch the ceiling ball inside them). The pit's
+surface replaces the relief and side terrain inside the rim: the entry level out to the outer turn, then a cone
+down to the pit floor at the inner radius, the rim a cliff to the side terrain; the corridor's turns are
+terraces cut into the cone, no berm on the pads, and the exit pad sits on the pit floor. Headings run unbounded
+through the turn (D-096): the plan constraint is the footprint alone and the exit lies wherever the turn ends
+inside the disc. Measured: 100 canyon seeds valid, 193 lids and 53 pits; the spiral drives to the exit pad at
+134–149 m/s fully grounded, a charged jump under a lid never puts the ball above the roof, the roof carries the
+ball as a floor, the lens stays under the roof through the tunnel, and a ball dropped off a turn's inner edge
+lands on the turn below and drives on to the exit.
 
 ### Dune Sea
 

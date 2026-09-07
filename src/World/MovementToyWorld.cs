@@ -307,6 +307,29 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
             _structureRoot.AddChild(body);
             k++;
         }
+        int j = 0;
+        foreach (var lid in Stage.Lids)
+        {
+            var size = new Vector3(lid.Length, lid.Thickness, lid.Width);
+            var xf = new Transform3D(Basis.FromEuler(new Vector3(0f, -lid.Heading, 0f)), new Vector3(lid.Centre.X, lid.RoofBottom + lid.Thickness * 0.5f, lid.Centre.Z));
+            _structureRoot.AddChild(new MeshInstance3D { Name = $"Lid{j}", Mesh = new BoxMesh { Size = size }, MaterialOverride = _dressing.LidMaterial, Transform = xf });
+            var body = new StaticBody3D
+            {
+                Name = $"Lid{j}Body", CollisionLayer = StructureLayer, CollisionMask = 0, Transform = xf,
+                PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+            };
+            body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
+            _structureRoot.AddChild(body);
+            j++;
+        }
+    }
+
+    /// <summary>The lid whose roof a plan position is under, if any (the confined camera, D-102).</summary>
+    public LidDefinition? LidOver(float x, float z)
+    {
+        if (Stage is null) return null;
+        foreach (var lid in Stage.Lids) if (lid.Covers(x, z)) return lid;
+        return null;
     }
 
     /// <summary>One ArrayMesh per tile: each allocation is bounded (~4 MB at 128 cells) and the

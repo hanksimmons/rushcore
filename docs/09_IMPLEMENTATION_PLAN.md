@@ -112,7 +112,7 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 
 - challenge-module grammar (04 §5E) with the gap, launch ramp and banked bend as Flow opportunities under the two-price rule — delivered 2026-09-06 (D-097),
 - the route skeleton ordered by route distance (headings unbounded, cell buckets), wall and terrace stamps, and the headroom / wall-clearance / drain validators — the stamp map, the footprint validator, the height-aware progress tracker, the wall stamp and the wall-clearance validator delivered with Canyon Run 2026-09-07 (D-098); the unbounded-heading builder arrives with the spiral pit, terrace stamps with the drain validator arrive with Sky Terraces, headroom with the lids,
-- Canyon Run: slots and banked lines — delivered 2026-09-07 (D-098); wall tunnels (lids with the confined camera) and the spiral pit set-piece follow as their own slices,
+- Canyon Run: slots and banked lines — delivered 2026-09-07 (D-098); wall tunnels (lids with the confined camera) and the spiral pit set-piece — delivered 2026-09-07 (D-102, with the unbounded-heading finale and the headroom validator),
 - Dune Sea — delivered 2026-09-07 (D-099: the seeded dune wave, dune trains riding it, the swale between; the set-piece dune and a dune-specific optional line remain open),
 - tubes: the swept see-through shell and its collider, carried segments in the route speed model, mouths and branching exits, the tube camera rule, the harness ride check — delivered 2026-09-07 (D-101) as ground-mouth optional lines with the tube follow; edge and midair mouths and exits onto floors arrive with Sky Terraces,
 - Sky Terraces: terrace steps, drains, the cloud band, tubes and bridges between floors,

@@ -331,7 +331,9 @@ minimum minus 120 m, so a fall is never a restore.
 - Spiral pit / ramp: successive turns differ in radius by Δr ≥ 200 m (150 m corridor plus both wall
   margins and the face). Turns from r 800 down to r 200 hold the ceiling everywhere (201 m); the 50 m
   committed radius appears only as the top turn of a spiral ramp. A drop of 100–200 m per turn at r 200
-  is a grade ≤ 0.16, far inside the 0.40 route limit.
+  is a grade ≤ 0.16, far inside the 0.40 route limit. *Delivered (D-102):* one turn from r 380 to r 150 (230 m
+  shed: on a bend the level width is 100 m each side plus the 8 m setback, leaving a 14 m cliff face), 120 m
+  deep (grade 0.07), the family bank capped at 30 m (it grows with radius), the exit pad on the pit floor.
 
 ### 7d. Tubes
 

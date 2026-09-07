@@ -123,7 +123,7 @@ public static class TubeBuilder
             {
                 var pv = v[a + i];
                 float dist = pv.Distance - v[a].Distance;
-                float offset = WorldScale.TubeMouthOffset + (WorldScale.TubeLateralOffset - WorldScale.TubeMouthOffset) * LateralEnvelope(dist, span, ramp) * side;
+                float offset = (WorldScale.TubeMouthOffset + (WorldScale.TubeLateralOffset - WorldScale.TubeMouthOffset) * LateralEnvelope(dist, span, ramp)) * side;
                 Vector3 p = pv.Position + new Vector3(-Mathf.Sin(pv.Heading), 0f, Mathf.Cos(pv.Heading)) * offset;
                 if (Mathf.Abs(p.Z) > WorldScale.OptionalBandHalfWidth) return null;
                 float e = HeightEnvelope(dist, span, ramp);
@@ -132,6 +132,9 @@ public static class TubeBuilder
                 float ground = field.Sample(p.X, p.Z);
                 // Ground under the path relative to the corridor: the cruise must clear its highest point by the clearance.
                 needed = Mathf.Max(needed, ground - pv.Position.Y + WorldScale.TubeClearance);
+                // Headroom (04 §10): the path may not pass over another part of the primary (an undeclared ceiling there).
+                int near = field.Nearest(p.X, p.Z, out float toPrimary);
+                if (near >= 0 && (near < a - 5 || near > b + 5) && toPrimary < StageHeightField.CorridorHalfWidth + R) return null;
                 // Nowhere may the floor of the tube sink below the ground (inside the climb the mouth offset keeps it over the level corridor).
                 if (y - ground < R - 1f) ok = false;
             }

@@ -220,6 +220,15 @@ it is carried through 100% grounded with its centre inside the radius, exits 0°
 model's speed, and that the camera stays outside the shell on every frame with a clear line of sight to the ball
 against the terrain layer; 285/285 Highlands, 284/284 dunes.
 
+**Result (wall tunnels and the spiral pit, D-102, 2026-09-07):** the canyon batch places lids and pits (193 lids all
+keeping their 15 m clearance, 53 of 100 stages ending in a pit; 100 valid, 0 fallbacks), the headroom validator
+holds on every archetype (it caught the first tubes crossing their own corridor); the canyon harness borrows a seed
+with both (2/0) and asserts a charged jump under a lid never puts the ball above the roof, the roof carries the
+ball as a floor, the lens stays under the roof through the tunnel, the spiral drives to the exit pad on the pit
+floor at 134–149 m/s fully grounded, and a ball dropped off a turn's inner edge lands on the turn below and drives
+on to the exit; a canyon tube (seed 31/0, 2 594 m with a 141 m cruise over the walls) rides 99% grounded to the
+model's exit speed.
+
 ## 6. Combat — Gate C0
 
 Objective:

@@ -37,6 +37,8 @@ public sealed class StageHeightField : IHeightSource
     private readonly Swell[] _swells;
     /// <summary>A dune sea's wave (D-099), the skeleton's; zero elsewhere.</summary>
     private readonly DuneWave _dunes;
+    /// <summary>A canyon's spiral pit (D-102), the skeleton's; null elsewhere.</summary>
+    private readonly SpiralPit? _spiral;
     private readonly ulong _noiseSeedA, _noiseSeedB;
     private readonly float _noiseAmpA, _noiseAmpB;
 
@@ -71,13 +73,16 @@ public sealed class StageHeightField : IHeightSource
             }
             foreach (var b in route.Bends)
             {
-                float height = WorldScale.BankHeightPerRadius * b.Radius * rules.BankScale;
+                float height = Mathf.Min(WorldScale.MaxBankHeight, WorldScale.BankHeightPerRadius * b.Radius * rules.BankScale);
                 float side = -Mathf.Sign(b.TurnAngle);                    // outward is opposite the turn
                 float startD = v[b.StartIndex].Distance, endD = v[b.EndIndex].Distance;
+                float routeEnd = v[N - 1].Distance;
                 for (int i = b.StartIndex; i <= b.EndIndex; i++)
                 {
                     float d = v[i].Distance;
                     float fade = Mathf.Min(Mathf.SmoothStep(0f, BankFade, d - startD), Mathf.SmoothStep(0f, BankFade, endD - d));
+                    // No berm on the pads: a route ending on a bend (the pit floor, D-102) still lands on level ground.
+                    fade *= Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, routeEnd - d) * Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, d);
                     BankHeight[i] = height * fade;
                     BankSide[i] = side;
                     Extra[i] = BendExtraHalfWidth * fade;
@@ -199,6 +204,7 @@ public sealed class StageHeightField : IHeightSource
     {
         _rules = rules ?? ArchetypeRules.RollingHighlands;
         _dunes = route.Dunes;
+        _spiral = route.Spiral;
         var rng = new SeededRandom(SeedChain.Derive(stageSeed, "relief"));
         WallHeight = _rules.WallHeightMax > 0f ? rng.Range(_rules.WallHeightMin, _rules.WallHeightMax) : 0f;
 
@@ -292,6 +298,21 @@ public sealed class StageHeightField : IHeightSource
                 float d = v[i].Distance - f.CentreDistance;
                 if (Mathf.Abs(d) <= f.Wavelength * 0.5f)
                     rh[i] += f.Height * 0.5f * (1f + Mathf.Cos(Mathf.Tau * d / f.Wavelength));
+            }
+        }
+        // Spiral pit (D-102): over the straight into the pit the corridor blends from the relief to the entry level, then
+        // descends the pit's depth as a perfect helix (a swell under two kilometres of bends would launch the ceiling
+        // ball inside them); its turns are terraces cut into the cone the pit surface carries (Sample), the exit pad on
+        // the pit floor.
+        if (_spiral is { } pit)
+        {
+            pit.EntryHeight = rh[pit.StartIndex];
+            for (int i = 0; i < n; i++)
+            {
+                float d = v[i].Distance;
+                float wIn = Mathf.SmoothStep(pit.ApproachDistance, pit.StartDistance, d);
+                float descent = pit.Depth * Mathf.SmoothStep(0f, 1f, Mathf.Clamp((d - pit.StartDistance) / Mathf.Max(1f, pit.Length), 0f, 1f));
+                rh[i] = Mathf.Lerp(rh[i], pit.EntryHeight, wIn) - descent;
             }
         }
         float startH = rh[0], exitH = rh[n - 1];
@@ -398,9 +419,23 @@ public sealed class StageHeightField : IHeightSource
         return w;
     }
 
+    /// <summary>The spiral pit's surface (D-102) at a point inside its rim, or NaN outside: the entry level out to the
+    /// outer turn, then a cone down to the pit floor at the inner radius; the rim itself is a cliff to the side terrain.</summary>
+    public float PitSurface(float x, float z)
+    {
+        if (_spiral is not { } pit) return float.NaN;
+        float r = new Vector2(x - pit.Centre.X, z - pit.Centre.Z).Length();
+        float rim = pit.OuterRadius + CorridorHalfWidth + BendExtraHalfWidth + WorldScale.WallSetback + 2f;
+        if (r >= rim) return float.NaN;
+        float cone = pit.Depth * Mathf.Clamp((pit.OuterRadius - r) / Mathf.Max(1f, pit.OuterRadius - pit.InnerRadius), 0f, 1f);
+        return pit.EntryHeight - cone;
+    }
+
     public float Sample(float x, float z)
     {
         float h = Relief(x, z) + WallHeight;
+        float pitH = PitSurface(x, z);
+        if (!float.IsNaN(pitH)) h = pitH;
         // Optional lines stamp first and the primary last, so inside the primary corridor the primary's
         // profile is exact (a ridge's transition beside it must never kink the centreline: a metre over a
         // cell launches a ceiling ball) while a ridge's own centreline is its profile wherever the primary

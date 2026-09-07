@@ -58,6 +58,10 @@ public partial class CameraRig : Node3D, ICameraBasis
     public Func<IReadOnlyList<Rushcore.Generation.TubeDefinition>>? Tubes { get; set; }
     /// <summary>True on frames where the tube push-out moved the lens.</summary>
     public bool TubePushedThisFrame { get; private set; }
+    /// <summary>The lid over a plan position, for the confined framing (D-102); null = none.</summary>
+    public Func<float, float, Rushcore.Generation.LidDefinition?>? LidOver { get; set; }
+    /// <summary>True on frames where the lid confinement lowered the lens.</summary>
+    public bool LidConfinedThisFrame { get; private set; }
 
     public Vector3 FlatForward { get; private set; } = Vector3.Forward;
     public Vector3 FlatRight { get; private set; } = Vector3.Right;
@@ -399,6 +403,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         // Last resort: never let the lens go below the heightfield.
         FlooredThisFrame = false;
         PushOutOfTubes();
+        ConfineUnderLids();
         if (GroundHeight is null) return;
         Vector3 gp = _camera.GlobalPosition;
         float minY = GroundHeight(gp.X, gp.Z) + c.GroundClearance;
@@ -409,6 +414,22 @@ public partial class CameraRig : Node3D, ICameraBasis
             _camera.LookAt(_focus, Vector3.Up);
             FlooredThisFrame = true;
         }
+    }
+
+    /// <summary>Confined framing (06 §11, D-102): under a lid the lens stays below the roof by the margin, so a wall
+    /// tunnel never puts the camera in the rock above it; a ball on top of the roof (a bridge) lifts the rule.</summary>
+    private void ConfineUnderLids()
+    {
+        LidConfinedThisFrame = false;
+        if (LidOver is null) return;
+        Vector3 lens = _camera.GlobalPosition;
+        var lid = LidOver(lens.X, lens.Z);
+        if (lid is null || _player.GlobalPosition.Y > lid.RoofBottom) return;
+        float maxY = lid.RoofBottom - WorldScale.LidCameraMargin;
+        if (lens.Y <= maxY) return;
+        lens.Y = maxY;
+        _camera.GlobalPosition = lens;
+        LidConfinedThisFrame = true;
     }
 
     /// <summary>Tube camera rule (docs/11 §7e, D-101): the lens never sits inside a tube's shell. After the chase

@@ -210,7 +210,7 @@ No extreme FOV distortion.
   to the occlusion probe; after the chase placement the lens is pushed radially out of the shell to at least
   the occlusion margin; ribs are thin (≤ 0.5 m) and spaced so any occlusion is momentary. The camera never
   enters a tube and is never pulled in by its walls.
-- Wall tunnels (lids): confined framing, distance and pitch bounded to the declared clearance (`docs/11 §7`),
+- Wall tunnels (lids): confined framing, distance and pitch bounded to the declared clearance (`docs/11 §7`) — delivered D-102 as a lens ceiling: under a roof the lens stays 1.5 m below its underside, lifted when the ball is on top of the roof,
   still never clipping.
 - Floors: a fall keeps the yaw and the framing bands hold the ball; no cut, no fade.
 

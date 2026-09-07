@@ -108,8 +108,12 @@ public sealed class RouteSkeletonBuilder
                                        rng.Range(-WorldScale.DuneWaveAngleMax, WorldScale.DuneWaveAngleMax), rng.Range(0f, Mathf.Tau));
         }
 
-        // Leave room for the closing bend (≤ r·sin 45°) and a final straight before the exit.
-        float closeX = exitX - (WorldScale.CruiseBendRadius * Mathf.Sin(MaxHeading) + FinalRunway);
+        // Leave room for the closing bend (≤ r·sin 45°) and a final straight before the exit; a spiral pit finale
+        // (D-102) needs its approach S, a straight the disc cannot cross, and the disc itself instead.
+        bool spiral = rules.SpiralChance > 0f && rng.Chance(rules.SpiralChance);
+        float R0 = WorldScale.SpiralOuterRadius;
+        float closeX = spiral ? exitX - (2f * R0 + SpiralApproach + R0 + 60f)
+                              : exitX - (WorldScale.CruiseBendRadius * Mathf.Sin(MaxHeading) + FinalRunway);
 
         while (true)
         {
@@ -245,8 +249,63 @@ public sealed class RouteSkeletonBuilder
         if (Mathf.Abs(heading) > 1e-3f)
             pos = EmitBend(route, pos, ref heading, WorldScale.CruiseBendRadius, -Mathf.Sign(heading), Mathf.Abs(heading));
         heading = 0f;
+        if (spiral) { EmitSpiral(route, pos, ref rng); return route; }
         if (exitX - pos.X > 0f) pos = EmitStraight(route, pos, heading, exitX - pos.X);
         return route;
+    }
+
+    /// <summary>X room for the S that carries the route to the spiral's entry side (two r 200 quarter arcs) plus the straight before the disc.</summary>
+    private const float SpiralApproach = 400f + WorldScale.SpiralOuterRadius;
+
+    /// <summary>
+    /// Spiral pit finale (04 §6, D-102): an S moves the route to the side of the band opposite the pit's centre, a
+    /// straight as long as the outer radius keeps the disc behind the entry clear of the route, then one full turn
+    /// of quarter arcs with shrinking radius descends into the pit; the route ends on the pit floor. Headings run
+    /// unbounded through the turn (D-096): only the footprint constrains the plan.
+    /// </summary>
+    private void EmitSpiral(RouteSkeleton route, Vector2 pos, ref SeededRandom rng)
+    {
+        float R0 = WorldScale.SpiralOuterRadius;
+        float heading = 0f;
+        // The centre sits R0 to the side of the entry; keep it within ~100 m of the axis so the disc stays inside the band.
+        float s = pos.Y >= 0f ? -1f : 1f;                        // turn toward the axis
+        float targetZ = -s * (R0 - 100f);                        // entry side: the centre (target + s·R0) lands 100 m past the axis
+        float dz = targetZ - pos.Y;
+        if (Mathf.Abs(dz) > 1f)
+        {
+            // An S of two equal arcs: lateral = 2r(1 − cos θ); r grows with the move so θ never exceeds 90°.
+            float r = Mathf.Max(WorldScale.CruiseBendRadius, Mathf.Abs(dz) * 0.5f);
+            float theta = Mathf.Acos(Mathf.Clamp(1f - Mathf.Abs(dz) / (2f * r), -1f, 1f));
+            float sgn = Mathf.Sign(dz);
+            pos = EmitBend(route, pos, ref heading, r, sgn, theta);
+            pos = EmitBend(route, pos, ref heading, r, -sgn, theta);
+            heading = 0f;
+        }
+        float approachDistance = route.Vertices[^1].Distance;
+        pos = EmitStraight(route, pos, heading, R0);
+        var pit = new SpiralPit
+        {
+            ApproachDistance = approachDistance,
+            Centre = new Vector3(pos.X, 0f, pos.Y + s * R0),
+            OuterRadius = R0,
+            StartIndex = route.Vertices.Count - 1,
+            StartDistance = route.Vertices[^1].Distance,
+            Depth = WorldScale.SpiralDepth,
+        };
+        // Quarter arcs of shrinking radius: each arc starts where the last ended, so the shrink accumulates over the
+        // arcs and the turn's radial spacing is the whole shed by the last quarter (two level widths, two setbacks
+        // and the cliff face between a turn and the one below it, docs/11 §7c).
+        int quarters = Mathf.Max(2, Mathf.RoundToInt(WorldScale.SpiralTurns * 4f));
+        float r0 = R0, dr = WorldScale.SpiralTurns * WorldScale.SpiralRadiusPerTurn / (quarters - 1);
+        for (int q = 0; q < quarters; q++)
+        {
+            float radius = r0 - dr * q;
+            pos = EmitBend(route, pos, ref heading, radius, s, Mathf.Pi / 2f);
+        }
+        pit.InnerRadius = r0 - dr * (quarters - 1);
+        pit.EndIndex = route.Vertices.Count - 1;
+        pit.Length = route.Vertices[^1].Distance - pit.StartDistance;
+        route.Spiral = pit;
     }
 
     private static float PickRadius(ref SeededRandom rng, ArchetypeRules rules)

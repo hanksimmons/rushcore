@@ -3,7 +3,7 @@ using Godot;
 namespace Rushcore.Generation;
 
 /// <summary>Terrain archetypes (04 §6). Rolling Highlands (D-085), Canyon Run (D-098) and Dune Sea (D-099); Sky Terraces follows.</summary>
-public enum TerrainArchetype { RollingHighlands, CanyonRun, DuneSea }
+public enum TerrainArchetype { RollingHighlands, CanyonRun, DuneSea, SkyTerraces }
 
 /// <summary>
 /// The dune wave of a Dune Sea stage (04 §6, D-099): one directional cosine train across the whole stage,
@@ -118,7 +118,54 @@ public sealed class RouteBend
     public float CornerLimit;
 }
 
-public enum RouteLineKind { Primary, Ridge }
+public enum RouteLineKind { Primary, Ridge, Terrace }
+
+/// <summary>
+/// A spiral pit (04 §5I, §6; D-102): the primary's last section turns inward through one full turn of shrinking
+/// radius, descending <see cref="Depth"/> into a conical pit cut through the canyon's side terrain, the exit pad on
+/// its floor. Between two turns the cone is a cliff: falling off the inner edge lands on the turn below.
+/// </summary>
+public sealed class SpiralPit
+{
+    public Vector3 Centre;
+    /// <summary>Radius of the outermost turn (the entry) and of the innermost (the exit terrace).</summary>
+    public float OuterRadius, InnerRadius;
+    public float Depth;
+    /// <summary>Primary vertex indices of the spiral's first and last vertex.</summary>
+    public int StartIndex, EndIndex;
+    /// <summary>Route distance the descent begins at, and the spiral's route length.</summary>
+    public float StartDistance, Length;
+    /// <summary>Route distance the straight into the pit begins at: the corridor blends from the relief to the pit's entry level over it.</summary>
+    public float ApproachDistance;
+    /// <summary>Corridor height at the entry, the level the pit's rim floor and cone are cut from (set by the height field).</summary>
+    public float EntryHeight;
+}
+
+/// <summary>
+/// A lid (04 §5I, D-096; delivered D-102): a box roof over a slot section of the primary, a wall tunnel. The module
+/// declares its ceiling (the roof refuses a charged jump, §10 headroom) and the camera confines under it (06 §11).
+/// </summary>
+public sealed class LidDefinition
+{
+    public int StartIndex, EndIndex;
+    /// <summary>Plan centre of the roof and the straight's heading.</summary>
+    public Vector3 Centre;
+    public float Heading, Length, Width, Thickness;
+    /// <summary>Height of the roof's underside; the clearance above the corridor under it is at least the family's.</summary>
+    public float RoofBottom;
+    /// <summary>Smallest clearance between the corridor and the roof along the tunnel.</summary>
+    public float Clearance;
+    public bool Passed;
+    public string Detail = "";
+    /// <summary>True when a plan position lies under the roof.</summary>
+    public bool Covers(float x, float z)
+    {
+        float dx = x - Centre.X, dz = z - Centre.Z;
+        float along = dx * Mathf.Cos(Heading) + dz * Mathf.Sin(Heading);
+        float across = -dx * Mathf.Sin(Heading) + dz * Mathf.Cos(Heading);
+        return Mathf.Abs(along) <= Length * 0.5f && Mathf.Abs(across) <= Width * 0.5f;
+    }
+}
 
 public enum MouthKind { Ground, Edge, Midair }
 
@@ -177,10 +224,17 @@ public sealed class RouteSkeleton
     public int JoinStart = -1, JoinEnd = -1;
     /// <summary>Stamped corridor half-width for this line.</summary>
     public float CorridorHalfWidth = WorldScale.TypicalCorridorWidth * 0.5f;
-    /// <summary>Ridge lines: extra height above the primary profile at the plateau.</summary>
+    /// <summary>Ridge and terrace lines: extra height above the primary profile at the plateau.</summary>
     public float RidgeHeight;
+    /// <summary>Offset lines (D-100, D-103): lateral offset from the primary, the S-transition length at each end, and the
+    /// climb / descent ramp length just inside the transitions.</summary>
+    public float Offset = WorldScale.RidgeOffset, Transition = WorldScale.RidgeTransition, RampLength = WorldScale.RidgeRampLength;
+    /// <summary>Sky Terraces (D-103): the floor this line is (1 = the primary's floor, 2 and 3 the terraces above it).</summary>
+    public int Floor = 1;
     /// <summary>Primary route of a Dune Sea stage: the wave its dune trains ride (D-099).</summary>
     public DuneWave Dunes;
+    /// <summary>Canyon Run's set-piece (04 §6, D-102): the spiral pit the route descends into at its end; null when the stage has none.</summary>
+    public SpiralPit? Spiral;
     public List<RouteVertex> Vertices { get; } = new();
     public List<RouteBend> Bends { get; } = new();
     public List<RouteFeature> Features { get; } = new();
@@ -264,6 +318,8 @@ public sealed class StageDefinition
     public List<ChallengeModule> Modules { get; } = new();
     /// <summary>See-through tubes (04 §5I, D-101): the line graph's branches through the air.</summary>
     public List<TubeDefinition> Tubes { get; } = new();
+    /// <summary>Lids (04 §5I, D-102): wall tunnels over slot sections.</summary>
+    public List<LidDefinition> Lids { get; } = new();
     public List<Checkpoint> Checkpoints { get; } = new();
     public ValidationReport Report { get; }
     /// <summary>The one logical height source for render and collision (04 §9); null only for skeleton-only builds.</summary>
@@ -295,6 +351,7 @@ public sealed class StageDefinition
         foreach (var c in Checkpoints) { Mix(c.Position.X); Mix(c.Position.Y); Mix(c.Position.Z); }
         foreach (var t in Tubes)
             foreach (var a in t.Axis) { Mix(a.X); Mix(a.Y); Mix(a.Z); }
+        foreach (var l in Lids) { Mix(l.Centre.X); Mix(l.Centre.Z); Mix(l.RoofBottom); Mix(l.Length); }
         return h;
     }
 }

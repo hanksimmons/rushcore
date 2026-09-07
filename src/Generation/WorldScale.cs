@@ -153,6 +153,37 @@ public static class WorldScale
     /// <summary>Swell slope budget on a dune sea: the dunes are the relief, the swells only tilt the field.</summary>
     public const float DuneSwellMaxSlope = 0.08f;
 
+    // ---- Sky Terraces (04 §6, §5I; docs/11 §7a–b; D-103) ----
+    /// <summary>Floor 2: a terrace 60–90 m above the primary (the jump-step band), 200 m to the side, climbed over 500 m
+    /// (cosine ramp: the knee radius 2L²/π²H stays above the cap's contact radius at 90 m).</summary>
+    public const float Floor2HeightMin = 60f, Floor2HeightMax = 90f, Floor2Offset = 200f, Floor2Ramp = 500f, Floor2Transition = 290f;
+    /// <summary>Floor 3: 150–200 m up, 550 m to the side (its drain to floor 2 then stays inside the route grade), climbed over 850 m.</summary>
+    public const float Floor3HeightMin = 150f, Floor3HeightMax = 200f, Floor3Offset = 550f, Floor3Ramp = 850f, Floor3Transition = 480f;
+    /// <summary>Every terrace edge drains at or under the route grade limit: the corridor falloff on this archetype is the tallest step over that grade.</summary>
+    public const float TerraceFalloff = 190f;
+    /// <summary>The cloud band begins this far above the primary's mean height: the top floor sits in it (06 §3).</summary>
+    public const float CloudBandHeight = 130f;
+
+    // ---- spiral pit (04 §6 Canyon Run set-piece, docs/11 §7c, D-102) ----
+    /// <summary>The outermost turn's radius: the band holds it with its corridor once the approach has moved the centre near the axis.</summary>
+    public const float SpiralOuterRadius = 380f;
+    /// <summary>Radius shed per full turn: two level widths on bends plus their setbacks plus a face for the cliff between turns.</summary>
+    public const float SpiralRadiusPerTurn = 230f;
+    public const float SpiralTurns = 1f;
+    /// <summary>Depth of the pit floor below the entry: the cliff between turns, and the fall onto the turn below.</summary>
+    public const float SpiralDepth = 120f;
+    /// <summary>Largest berm any bend carries: the family bank grows with radius and a 380 m turn would otherwise carry 70 m.</summary>
+    public const float MaxBankHeight = 30f;
+
+    // ---- lids: wall tunnels (04 §5I, docs/11 §7e, D-102; provisional sizes V-016) ----
+    /// <summary>Clearance between the corridor and the roof's underside; the rig's 6.7 m rise fits under it.</summary>
+    public const float LidClearance = 15f;
+    public const float LidLengthMin = 150f, LidLengthMax = 300f;
+    public const float LidThickness = 6f;
+    public const int LidsMax = 2;
+    /// <summary>The lens keeps this much below a roof it is under.</summary>
+    public const float LidCameraMargin = 1.5f;
+
     // ---- tubes (04 §5I, docs/11 §7d–e, D-101; provisional sizes V-016) ----
     public const float TubeRadius = 6f;
     /// <summary>Mouth flare: the radius doubles over one tube diameter at each end.</summary>

@@ -55,6 +55,7 @@ public partial class WorldDressing : Node3D
 
     public StandardMaterial3D TubeShellMaterial { get; private set; } = null!;
     public StandardMaterial3D TubeRibMaterial { get; private set; } = null!;
+    public StandardMaterial3D LidMaterial { get; private set; } = null!;
 
     protected void RaiseBoostPickup(float amount) => BoostPickupCollected?.Invoke(amount);
 
@@ -200,6 +201,7 @@ public partial class WorldDressing : Node3D
             EmissionEnergyMultiplier = 0.25f,
         };
         TubeRibMaterial = Glow(new Color(0.85f, 0.95f, 1.0f), 0.5f);
+        LidMaterial = Flat(new Color(0.48f, 0.30f, 0.22f));
     }
 
     private static StandardMaterial3D Flat(Color albedo) => new()
@@ -285,6 +287,13 @@ public partial class WorldDressing : Node3D
 
         foreach (var tube in stage.Tubes)
             AddSign(tube.Axis[0] + Vector3.Up * (tube.Radius * 2f + 8f), tube.Passed ? "TUBE" : "TUBE ✗", 7f);
+        foreach (var lid in stage.Lids)
+        {
+            var e = route.Vertices[lid.StartIndex];
+            AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, lid.RoofBottom - e.Position.Y - 4f), "TUNNEL", 6f);
+        }
+        if (stage.PrimaryRoute.Spiral is { } pit)
+            AddSign(_world.SurfacePoint(route.Vertices[pit.StartIndex].Position.X, route.Vertices[pit.StartIndex].Position.Z, 30f), "PIT ↓", 8f);
 
         if (_t.World.RouteDebugLines)
         {

@@ -27,6 +27,23 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 - Main-track reservations: Phase 4 impact model and Flow integration; Sky Terraces second cut; Dune Sea optional line;
   spiral ramp; Phase 6 run and route generation (the route cards on the fork signs, the next-stage seed from the exit taken).
 
+## Open for the user's read (collected)
+
+Questions this track cannot answer, because they are judgements about how something looks or feels in play and no AI
+agent plays stages. Copied from the packets' Delivery records so a playtest session can pick them all up at once.
+
+- **T4, Dune Sea scatter density:** about 190 instances a stage against Highlands' 1264, because the rule puts things
+  on wave crests only. Accents on the crest lines, or a bare stage? Lever: the `DuneSea` branch of `WorldDressing.Suits`.
+- **T4, Canyon Run scatter shape:** no crystals at all, 1458 rocks, every one on a wall top, none on the slot floors.
+  Does the bare floor beside the corridor read as a canyon or as a fence? Lever: the `CanyonRun` branch of `Suits`.
+- **T4, frame time at density 0.19 and 1.0:** cannot be measured headless. `godot --path . -- --seed 8`, F2, read the
+  `frame` row at both densities; at 1.0 the stage carries 2700 instances (the caps).
+- **T1, the completion outro:** whether it reads as "done" rather than a freeze, and whether anything of the finished
+  stage shows through the fade.
+
+Each is also written up where it happened, with the numbers: `T4_PROP_SCATTER.md` and `T1_STAGE_LIFECYCLE.md`, under
+Open items. `T6_SAMPLE_FIXES.md` carries them into the sample playtest so they are asked while the samples are open.
+
 ## Needs main track (collected)
 
 Items the parallel track could not close inside its boundaries. Copied here from the packets' Delivery records so the

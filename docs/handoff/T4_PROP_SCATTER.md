@@ -137,10 +137,30 @@ fields to generation data; report which), or if any check reveals a line, module
 - **P-entries written:** P-013 (new); P-008 implemented as written.
 - **Spec sections edited:** 04 §5G (the keep-out, delivered), 06 §16 (what each archetype scatters), 07 §5 (the
   density slider and the caps), 10 (the runbook line and the build-log format).
-- **Open items:** Dune Sea is the sparse one by design and lands at about 190 instances a stage; whether that reads
-  as scenery or as emptiness at speed is the user's call. Canyon puts everything on the wall tops and carries no
-  crystals at all, which is the packet's rule — worth a look in play. No LOD (the packet's instruction); the caps
-  are never reached at the shipped density, so nothing pops.
+- **Open items:** three, all waiting on the user's read in play. Each names the lever, so any of them is a small
+  edit once the verdict exists.
+
+  1. **Dune Sea is very sparse: about 190 instances across a 6 × 2 km stage** (133 rocks, 54 tufts), against 1264 on
+     Highlands. That is the packet's rule — crests only, sparse — and the crest ribbons are a small part of the
+     footprint, so the rule and the emptiness are the same thing. Whether it reads as accents on the crest lines or
+     as a bare stage at speed is the user's call. Lever: the `DuneSea` branch of `WorldDressing.Suits` — the crest
+     threshold (`DuneHeight > 0.6 × wave height`), the slope limit (0.12) and the sparsity lottery (0.7). It was
+     first cut at 0.8 / 0.09 / 0.45, which gave 100 instances; the current numbers gave 187. Filling the swales
+     instead of only the crests would be a rule change, not a number change, and needs the user's word.
+  2. **Canyon Run carries no crystals at all and is heavy on rocks** (1458 slabs and fins, every one on a wall top;
+     zero on the slot floors). Both are the packet's rule ("slab rocks and fins on the wall tops only, none on slot
+     floors"), so this is a question about whether the rule is right, not whether it was followed: a canyon with a
+     bare floor beside the corridor and a dense rim may read well or may read as a fence. Lever: the `CanyonRun`
+     branch of `Suits` — it sets `crystal = false` unconditionally and requires the point to stand above 60% of the
+     wall height. Allowing crystals, or lowering that fraction to let scatter down the wall face, are both one line.
+  3. **Frame time at density 0.19 and 1.0 was not measured.** The packet asks for the debug overlay's frame row on
+     Highlands seed 8 at both densities. The harness is headless, so there is no renderer to time, and no AI agent
+     plays stages (the standing rule), so this figure cannot come from this track at all. What is measured instead:
+     instance counts, collider counts and scatter milliseconds per archetype, in the table below. To close it the
+     user runs `godot --path . -- --seed 8`, F2 for telemetry, and reads the `frame` row at `World › Prop Density`
+     0.19 and again at 1.0 (2700 instances, the caps). If 1.0 costs frames, the caps are the dial.
+
+  Also open: no LOD (the packet's instruction); the caps are never reached at the shipped density, so nothing pops.
 - **Needs main track:** nothing new.
 
 ### Measured (density 0.19 unless stated)

@@ -43,6 +43,18 @@ Already known and **out of scope** here: "maps do not truly branch, every stage 
 - Exit signs and forks (D-105, sample 6): whether `EXIT A/B/C` on a pad and `EXIT B ↑` at the top of a fork's S read as
   a choice from the primary at speed, and whether the exit-pad colour reads as an ending.
 
+**Questions T4 left for this playtest** (the scatter is on every sample; `STATUS.md` collects them):
+
+- Sample 4, dune trains: the scatter is deliberately sparse — about 190 stones and tufts on the wave's crests across
+  the whole stage. Do the crest lines read as decorated, or does the stage read as bare? A number, not a rule, if it
+  only needs more.
+- Sample 2, tunnels + pit: Canyon Run puts every prop on the wall tops and carries no crystals, so the slot floor
+  beside the corridor is bare and the rim is dense. Canyon, or fence?
+- Any sample: `World › Prop Density` at 0.19 and at 1.0 with F2 open — the `frame` row at both. This is the only way
+  the scatter's frame cost can be read; the harness is headless.
+- Any sample: the level-width posts every 200 m of straight route. Do they read as the edge of the drivable width, or
+  as obstacles? They carry no collider, so they can never be hit.
+
 ## Rules for a fix
 
 - Presentation only: materials, meshes, signs, marker placement, cloud sheets, sizes of dressing. Camera push-out

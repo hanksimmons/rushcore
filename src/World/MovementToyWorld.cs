@@ -339,9 +339,9 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         foreach (var tube in Tubes)
         {
             if (!tube.Bounds.HasPoint(p)) continue;
-            int i = tube.Nearest(p, out float d);
+            tube.NearestOnAxis(p, out Vector3 q, out Vector3 t, out float d);
             if (d >= distance) continue;
-            distance = d; axisPoint = tube.Axis[i]; tangent = tube.TangentAt(i); radius = tube.Radius;
+            distance = d; axisPoint = q; tangent = t; radius = tube.Radius;
         }
         return distance < float.MaxValue;
     }

@@ -70,6 +70,10 @@ Open items. `T6_SAMPLE_FIXES.md` carries them into the sample playtest so they a
 Items the parallel track could not close inside its boundaries. Copied here from the packets' Delivery records so the
 reconciliation sees them in one place.
 
+- **CLOSED (T8b, 2026-09-07):** `TubeDefinition.NearestOnAxis` now answers with the nearest point on the axis
+  polyline and its segment direction, so the follow and the camera read a reference good to millimetres;
+  `TubeAxisUncertainty` fell from 5 cm to 1 cm and the ball rides about 8 cm off the glass instead of 12. The
+  original entry follows, for the record.
 - **T7:** `TubeDefinition.Nearest` / `MovementToyWorld.Nearest` answer with the nearest axis *sample* and its tangent
   rather than the nearest point on the axis. Measured error against the axis polyline: 1.4 cm (Dune Sea tube), 3.5 cm
   (Highlands), **21 cm** (Sky, which climbs steeply). The tube follow has to hold the ball clear of that error, so the

@@ -212,6 +212,37 @@ public sealed class TubeDefinition
         distance = Mathf.Sqrt(bestD);
         return best;
     }
+
+    /// <summary>
+    /// The nearest point on the axis *polyline*, not the nearest sample of it, with the direction of the segment
+    /// it lies on. The axis is sampled every few metres, so answering with a vertex puts the reference (Δs/2)²/2ρ
+    /// off the real axis on a curving tube — 1.4 cm on a Dune Sea tube, 3.5 cm on a Highlands one and 21 cm on a
+    /// steeply climbing Sky one. Everything that measures a radius from the axis inherits that error: the tube
+    /// follow has to hold the ball clear of it, and the camera's push-out reads the same query.
+    /// </summary>
+    public void NearestOnAxis(Vector3 p, out Vector3 point, out Vector3 tangent, out float distance)
+    {
+        int i = Nearest(p, out _);
+        point = Axis[i];
+        tangent = TangentAt(i);
+        distance = float.MaxValue;
+        // The nearest point lies on one of the two segments meeting at the nearest vertex.
+        for (int k = i - 1; k <= i; k++)
+        {
+            if (k < 0 || k + 1 >= Axis.Length) continue;
+            Vector3 a = Axis[k], seg = Axis[k + 1] - a;
+            float len2 = seg.LengthSquared();
+            if (len2 < 1e-9f) continue;
+            float t = Mathf.Clamp((p - a).Dot(seg) / len2, 0f, 1f);
+            Vector3 q = a + seg * t;
+            float d = q.DistanceTo(p);
+            if (d >= distance) continue;
+            distance = d;
+            point = q;
+            tangent = seg / Mathf.Sqrt(len2);
+        }
+        if (distance == float.MaxValue) distance = point.DistanceTo(p);
+    }
     public Aabb Bounds { get; internal set; }
 }
 

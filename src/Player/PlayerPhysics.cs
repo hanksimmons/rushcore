@@ -73,10 +73,11 @@ public partial class PlayerPhysics : RigidBody3D
     /// <summary>Ground follow (03 §3, D-092): gaps inside the deadband are left to the solver; larger
     /// gaps close over this horizon as a velocity, never as a transform write.</summary>
     private const float GroundFollowDeadband = 0.03f;
-    /// <summary>How far the nearest-vertex axis reference can be from the real tube axis (T7); the tube follow keeps this
-    /// much clear of the shell on top of its rest band. It shrinks to nothing once the structure query interpolates the
-    /// axis between its samples instead of answering with the nearest sample.</summary>
-    private const float TubeAxisUncertainty = 0.05f;
+    /// <summary>How far the axis reference can be from the real tube axis; the tube follow keeps this much clear of the
+    /// shell on top of its rest band. It was 5 cm while the structure query answered with the nearest axis *sample*
+    /// (21 cm out on a steeply climbing Sky tube); the query now returns the nearest point on the axis polyline (T8),
+    /// so what is left is the polyline's own departure from the true curve, a few millimetres at this sampling.</summary>
+    private const float TubeAxisUncertainty = 0.01f;
     private const float GroundFollowCloseSeconds = 0.05f;
     private const float JumpLockoutSeconds = 0.08f;
     private const float CheckpointIntervalSeconds = 0.75f;

@@ -121,3 +121,22 @@ the ground under the mouth is `field.Sample(p.X, p.Z)` at the tube's lateral off
 mouth height from the ground under the mouth point, or tightening that validator at the mouths, would close it, but
 either changes tube geometry and therefore every stage hash, so it is the main track's to make. The harness reports
 the entry cost and does not assert a threshold on it: asserting one above the remaining lip would bless it.
+
+
+## The axis reference, closed (2026-09-07)
+
+Circumscribing the collided rings moved every tube face 5 cm outward, and on Sky that put the T7 penetration guard
+from 0.7–0.9 cm (already within a hair of its 1.0 cm threshold) to a reproducible 1.6 cm — twice, deterministically.
+Sky is where the reference error lives: `TubeDefinition.Nearest` answered with the nearest axis *sample*, 21 cm off
+the real axis on a steeply climbing tube, and everything that measures a radius from the axis inherited it.
+
+`TubeDefinition.NearestOnAxis` now returns the nearest point on the axis *polyline* and the direction of the segment
+it lies on; `MovementToyWorld.Nearest` uses it, so the follow and the camera's push-out both read a reference good
+to a few millimetres instead of 21 cm. `PlayerPhysics.TubeAxisUncertainty` drops from 5 cm to 1 cm with it, which is
+what the T7 record said would happen ("the constant goes to zero once the structure query interpolates the axis").
+The ball now rides about 8 cm off the glass rather than 12.
+
+Measured after: Sky 370/370 with penetration 0.5 cm (was 1.6 with the new collider, 0.9 before it); default
+369/369 with penetration 0.0 cm; canyon 365/365; dunes 369/369. The mouth entry holds at 2% of the entry speed.
+This closes the "Needs main track" item T7 opened; the 12 cm mouth lip in `TubeBuilder` is still open and still the
+main track's.

@@ -97,7 +97,7 @@ fields to generation data; report which), or if any check reveals a line, module
 
 ## Delivery record (filled by the implementing agent)
 
-- **Branch / commits:** `opus/t4-prop-scatter` off `develop-secondary` (5d940c3).
+- **Branch / commits:** `opus/t4-prop-scatter` off `develop-secondary` (5d940c3); 524dc21.
 - **Harness (full run and the three archetype runs):** 323/323 default (82 s), canyon 320/320, dunes 323/323,
   sky 324/324. Golden hashes unchanged (the scatter reads the cosmetic stream and never touches generation data).
 - **Files changed:** `src/World/StageScatter.cs` (new), `src/World/WorldDressing.cs`, `src/World/MovementToyWorld.cs`

@@ -93,7 +93,7 @@ if the palette in 06 §3 has to change to make the HUD readable.
 
 ## Delivery record (filled by the implementing agent)
 
-- **Branch / commits:** `opus/t2-hud` off `develop-secondary` (004894b, T1 and T4 merged).
+- **Branch / commits:** `opus/t2-hud` off `develop-secondary` (004894b, T1 and T4 merged); 8a2f069.
 - **Harness (full run, count and wall time):** 365/365 default (105 s), canyon 362/362, dunes 365/365. **The sky run
   fails one check this packet did not touch, which flakes on the base branch too** — see "Needs main track". Golden
   hashes unchanged.

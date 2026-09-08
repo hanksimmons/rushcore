@@ -6,7 +6,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | Task | Packet | Branch | State | Last commit | Harness (full run) | P-entries | Reconciled |
 |---|---|---|---|---|---|---|---|
 | T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | **merged** into `develop-secondary` | 4db5348 | 337/337; canyon 334/334, dunes 337/337, sky 338/338 | P-012 (P-003, P-010, P-011 implemented) | — |
-| T2 | `T2_HUD.md` | `opus/t2-hud` | pushed | (first commit) | 365/365; canyon 362/362, dunes 365/365; **sky red on one unrelated flaky guard** (see Needs main track) | none new (P-004, P-005 implemented) | — |
+| T2 | `T2_HUD.md` | `opus/t2-hud` | pushed | 8a2f069 | 365/365; canyon 362/362, dunes 365/365; **sky red on one unrelated flaky guard** (see Needs main track) | none new (P-004, P-005 implemented) | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | not started | — | — | — | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |

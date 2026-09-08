@@ -55,6 +55,8 @@ which is how the slam-dive framing lag was found (D-090 amendment).
 | T | teleport to spawn |
 | E | teleport 200 m short of exit A, on the primary (T1; the panel's "Teleport Near Exit") |
 | B | refill boost |
+| K | kill the player (health to 0 → recover to the checkpoint → refill on arrival; T2) |
+| H | heal to full (T2) |
 
 Falling below the kill plane recovers automatically. Recovery resets physics interpolation.
 
@@ -64,6 +66,11 @@ the same run is built and the ball spawns on its start pad and the fade lifts (`
 boost both carry across it (P-010); the exit taken picks the next stage's archetype, exit A continuing the one just
 played and B or C landing in a different landscape (P-011). Nine stages, then it wraps to stage 0 with a log line.
 `E` teleports 200 m short of exit A to reach it quickly.
+
+**Player HUD** (T2): health bottom-left, boost bottom-centre, Flow bottom-right (it pulses on a gain), the stage
+number and a progress line top-centre, the wallet top-right. `HUD › Visible`, `HUD › Scale` and `HUD › Band Word`
+(the `ROLL / RUSH / CRUSH / OVERDRIVE` word, off by default) are in the F1 panel. It carries no numbers: m/s, caps and
+takeoff stay on the F2 telemetry, which also gained a `health` row.
 
 **Prop scatter** (`World › Prop Density`, default 0.19; T4): scenery on a generated stage is archetype-aware —
 highlands rocks and crystals off the corridor edge, canyon slabs and fins on the wall tops, dune stones and tufts on

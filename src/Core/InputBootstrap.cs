@@ -24,6 +24,8 @@ public static class InputBootstrap
     public const string DebugRegenerateWorld = "rc_debug_regen_world";
     public const string DebugTeleportStart = "rc_debug_teleport_start";
     public const string DebugTeleportNearExit = "rc_debug_teleport_exit";
+    public const string DebugKillPlayer = "rc_debug_kill";
+    public const string DebugHealPlayer = "rc_debug_heal";
     public const string DebugTogglePhysicsHz = "rc_debug_toggle_physics_hz";
 
     public static void Register()
@@ -44,6 +46,8 @@ public static class InputBootstrap
         Key(DebugRegenerateWorld, Godot.Key.F5);
         Key(DebugTeleportStart, Godot.Key.T);
         Key(DebugTeleportNearExit, Godot.Key.E);
+        Key(DebugKillPlayer, Godot.Key.K);
+        Key(DebugHealPlayer, Godot.Key.H);
         Key(DebugTogglePhysicsHz, Godot.Key.F4);
 
         // Gamepad parity for the movement verbs.

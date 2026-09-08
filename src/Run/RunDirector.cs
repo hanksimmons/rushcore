@@ -25,6 +25,14 @@ public sealed class RunDirector
     public int EnteredByExit { get; private set; } = -1;
     /// <summary>Stages completed since the run started; the run wrap resets nothing else.</summary>
     public int StagesCompleted { get; private set; }
+    /// <summary>The run's wallet (02 §14, T2's HUD reads it). T3's reward burst is what fills it; nothing spends
+    /// it yet, and the shop that will is Phase 8.</summary>
+    public int Currency { get; private set; }
+
+    public void AddCurrency(int amount)
+    {
+        if (amount > 0) Currency += amount;
+    }
     /// <summary>
     /// Debug and harness affordance (P-012): with this off, reaching an exit still raises completion and
     /// still prints, but no outro runs and no next stage is built, so one stage can be driven repeatedly.
@@ -38,6 +46,7 @@ public sealed class RunDirector
         StageIndex = System.Math.Clamp(stageIndex, 0, StageCount - 1);
         EnteredByExit = -1;
         StagesCompleted = 0;
+        Currency = 0;
     }
 
     /// <summary>The generation request for the current stage of the current run.</summary>

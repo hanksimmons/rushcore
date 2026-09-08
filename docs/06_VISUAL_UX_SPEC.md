@@ -239,6 +239,14 @@ Normal HUD does **not** need exact m/s.
 
 Speed state is communicated primarily through player/camera/VFX; a small qualitative indicator is optional if playtests need it.
 
+Delivered (T2, `src/UI/PlayerHud.cs`): health bottom-left, boost bottom-centre (brightening while it fires), Flow
+bottom-right (a bar with a 0.3 s pulse on a gain, dim at zero, never a number), the stage number and a thin primary
+progress line top-centre, the run's wallet top-right. Flat unshaded colours, one monospaced font at 14 px at scale 1
+(never below 12 px), an outline for contrast rather than a plate behind the text, and no raw m/s — those stay in the
+F2 telemetry (07 §10). `HUD › Visible`, `HUD › Scale` (0.6–1.6) and `HUD › Band Word` (the qualitative
+`ROLL / RUSH / CRUSH / OVERDRIVE` word, off by default, P-005) are the handles. The HUD is built once on the UI layer
+and a world rebuild never touches it; it reads player and run state and writes nothing.
+
 ## 13. Stage/inter-stage UX
 
 On normal stage completion, resolve needed safe-state interactions without building a long stack of menus.

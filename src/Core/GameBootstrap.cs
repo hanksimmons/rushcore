@@ -5,6 +5,7 @@ using Rushcore.Generation;
 using Rushcore.Player;
 using Rushcore.Run;
 using Rushcore.Testing;
+using Rushcore.UI;
 using Rushcore.Tuning;
 using Rushcore.World;
 
@@ -25,6 +26,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private TuningPanel _tuningPanel = null!;
     private TelemetryOverlay _telemetry = null!;
     private ColorRect _fade = null!;
+    private PlayerHud _hud = null!;
+    private readonly PlayerHealth _health = new();
     private readonly RunDirector _director = new(DefaultSeed);
     private int _sampleSeen;
     private float _cellSizeSeen, _cellSizeDwell;
@@ -39,6 +42,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public PlayerPhysics Player => _player;
     public MovementToyWorld World => _world;
     public RunDirector Run => _director;
+    public PlayerHealth Health => _health;
+    public PlayerHud Hud => _hud;
     public bool StageOutroActive => _outro != OutroPhase.None;
     /// <summary>Run seed and stage index (T1). The clipboard copies the run seed alone, for `--seed N`.</summary>
     public string SeedText => $"{_director.RunSeed}/{_director.StageIndex}";
@@ -87,6 +92,11 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _player.SetCheckpoint(_world.SpawnPoint);
         _player.AddChild(new PlayerVisual(_tuning, _player));
         _player.AddChild(new PlayerVfx(_tuning, _player));
+        // Health has no damage source yet (T2, P-004): reaching zero recovers to the checkpoint, and the value
+        // comes back when the ball arrives rather than in the same instant.
+        _health.Died += () => GD.Print("[RUSHCORE] Player down; recovering to the checkpoint.");
+        _health.Died += _player.RequestRecovery;
+        _player.Recovered += () => { if (_health.IsDead) _health.Refill(); };
 
         _camera = new CameraRig(_tuning, _player);
         AddChild(_camera);
@@ -107,6 +117,10 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _fade = new ColorRect { Name = "StageFade", Color = new Color(0f, 0f, 0f, 0f), MouseFilter = Control.MouseFilterEnum.Ignore };
         _fade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         ui.AddChild(_fade);
+        // The player HUD sits under the developer overlays: the panel and the telemetry plate stay legible over it.
+        _hud = new PlayerHud(this, _health);
+        ui.AddChild(_hud);
+        ui.MoveChild(_hud, 0);
         _tuningPanel = new TuningPanel(this) { Visible = false };
         ui.AddChild(_tuningPanel);
 
@@ -200,6 +214,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (Input.IsActionJustPressed(InputBootstrap.DebugRegenerateWorld)) RestartNewSeed();
         if (Input.IsActionJustPressed(InputBootstrap.DebugTeleportStart)) TeleportToStart();
         if (Input.IsActionJustPressed(InputBootstrap.DebugTeleportNearExit)) TeleportNearExit();
+        if (Input.IsActionJustPressed(InputBootstrap.DebugKillPlayer)) KillPlayer();
+        if (Input.IsActionJustPressed(InputBootstrap.DebugHealPlayer)) HealPlayer();
         if (Input.IsActionJustPressed(InputBootstrap.DebugTogglePhysicsHz))
         {
             // V-007: 60 Hz is the baseline; 120 is only to be tried if high-speed
@@ -418,6 +434,10 @@ public partial class GameBootstrap : Node3D, IDebugActions
     }
 
     public void RefillBoost() => _player.RefillBoost(_tuning.Boost.BoostCapacity);
+
+    public void KillPlayer() => _health.Kill();
+
+    public void HealPlayer() => _health.Refill();
 
     public void CopySeedToClipboard() => DisplayServer.ClipboardSet(_director.RunSeed.ToString());
 }

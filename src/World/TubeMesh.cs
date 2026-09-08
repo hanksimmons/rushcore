@@ -53,9 +53,22 @@ public static class TubeMesh
         for (int i = 1; i < n; i++) along[i] = along[i - 1] + axis[i].DistanceTo(axis[i - 1]);
         float total = along[n - 1];
 
-        // Shell: indexed ring strip.
+        // Shell: indexed ring strip. The rendered rings flare at the mouths so an entrance reads as an entrance
+        // (06 §3); the collided rings never do. The flare is 2R over 2R of axis, so a flared ring's floor sits R
+        // *below* the axis's own R above the corridor — a cone buried six metres under the ground at a ground
+        // mouth, with backface collision on, lying across the line a ball rolls in on. The follow models the
+        // constant-radius cylinder the generator validated (`TubeBuilder`: axis at corridor + R, floor flush), so
+        // colliding the flare also put the two surfaces up to R apart exactly where the ball arrives. Collide the
+        // cylinder, draw the flare.
+        // The collided ring is circumscribed about the analytic circle, so the flat facet a ball rests on lies at
+        // exactly the radius the generator validated and the follow models, rather than R·cos(pi/Sides) inside it.
+        // At a ground mouth that difference is the height of a step across the entrance: 5 cm at R = 6 m, met at
+        // the cap. The ball still never reaches a facet while the follow holds it, because the follow holds the
+        // inscribed circle, which is now the analytic one.
+        float solidRadius = tube.Radius / Mathf.Cos(Mathf.Pi / Sides);
         var verts = new Vector3[n * Sides];
         var norms = new Vector3[n * Sides];
+        var solid = new Vector3[n * Sides];
         for (int i = 0; i < n; i++)
         {
             float r = Radius(along[i], total - along[i]);
@@ -64,6 +77,7 @@ public static class TubeMesh
                 float a = Mathf.Tau * s / Sides;
                 Vector3 radial = frames[i].n * Mathf.Cos(a) + frames[i].b * Mathf.Sin(a);
                 verts[i * Sides + s] = axis[i] + radial * r;
+                solid[i * Sides + s] = axis[i] + radial * solidRadius;
                 norms[i * Sides + s] = radial;
             }
         }
@@ -76,8 +90,8 @@ public static class TubeMesh
                 int s1 = (s + 1) % Sides;
                 int a = i * Sides + s, b = i * Sides + s1, c = (i + 1) * Sides + s, d = (i + 1) * Sides + s1;
                 // Godot front faces are clockwise: order each quad so its face normal points outward (along the radial).
-                AddFace(idx, tris, verts, norms, a, c, b);
-                AddFace(idx, tris, verts, norms, b, c, d);
+                AddFace(idx, tris, verts, solid, norms, a, c, b);
+                AddFace(idx, tris, verts, solid, norms, b, c, d);
             }
         }
         var shell = new ArrayMesh();
@@ -119,13 +133,15 @@ public static class TubeMesh
         return new Built(shell, ribs, tris.ToArray());
     }
 
-    private static void AddFace(List<int> idx, List<Vector3> tris, Vector3[] v, Vector3[] n, int a, int b, int c)
+    /// <summary>One face of the sweep: the index into the drawn ring strip, and the collided triangle, which is
+    /// taken from the unflared rings (<paramref name="solid"/>) rather than the drawn ones.</summary>
+    private static void AddFace(List<int> idx, List<Vector3> tris, Vector3[] v, Vector3[] solid, Vector3[] n, int a, int b, int c)
     {
         Vector3 faceN = (v[b] - v[a]).Cross(v[c] - v[a]);
         Vector3 outward = n[a] + n[b] + n[c];
         if (faceN.Dot(outward) < 0f) (b, c) = (c, b);
         idx.Add(a); idx.Add(b); idx.Add(c);
-        tris.Add(v[a]); tris.Add(v[b]); tris.Add(v[c]);
+        tris.Add(solid[a]); tris.Add(solid[b]); tris.Add(solid[c]);
     }
 
     private static void AddQuad(List<Vector3> v, List<Vector3> n, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 nrm)

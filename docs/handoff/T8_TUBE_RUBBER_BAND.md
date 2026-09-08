@@ -81,3 +81,43 @@ because the ball is inside a concave surface.
 - Numbers after:
 - Open items:
 - Needs main track:
+
+
+## Mouth entry (the Session A playtest note, 2026-09-07)
+
+**Reported:** "when entering the tubes we often get a disruptive collision that slows the player down, just rolling
+from the ground into the tube along the bottom."
+
+**Found.** Two separate steps stood across a ground mouth, and the ball met both at the cap.
+
+1. **The mouth flare was in the collider.** `TubeMesh.Build` flares every ring to `2R` over the first and last `2R`
+   of axis so an entrance reads as an entrance (06 §3). The collision triangles were built from those same flared
+   rings, so at the mouth ring the shell's floor sat `2R` below the axis — and `TubeBuilder` puts the axis exactly
+   `R` above the corridor, so the collided floor was `R` (six metres) *below* the terrain, a cone buried under the
+   ground with backface collision on, whose walls cross the surface exactly where a ball rolls in. The follow
+   models a constant-radius cylinder and never hears about the flare, so the two surfaces disagreed by up to `R`
+   at the one place the ball arrives. **Fix:** collide the unflared rings; draw the flare.
+2. **The collided facet sat 5 cm inside the analytic circle.** The rings were inscribed, so the flat facet a ball
+   rests on lay at `R·cos(pi/24)` — 5 cm above the corridor at a mouth whose floor should be flush. **Fix:** build
+   the collided rings circumscribed about the analytic circle, so the facet's nearest point to the axis is exactly
+   `R`. The follow then holds `R` rather than `R·cos(pi/24)`, and its T7 property is unchanged: the ball is still
+   held inside the collider's inscribed circle, which is now the analytic one.
+
+**Measured** (Highlands seed 9, the tube sample, rolling in at the cap):
+
+| | Speed at the mouth | At the end of the 12 m flare | Worst one-tick loss | Ticks in contact |
+|---|---|---|---|---|
+| Before | 148.5 m/s | 125.0 m/s (16% gone) | 15.1 m/s | 6 of 11 |
+| After | 148.5 m/s | 145.1 m/s (2% gone) | 4.5 m/s | 10 of 12 |
+
+T7's numbers are unharmed: penetration under the follow still 0.0 cm over 180 on-wall ticks, one grazing contact,
+zero follow flips. The harness's penetration reference was corrected with the collider (the facet plane is now at
+`R`, not `R·cos(pi/24)`); that is a correction to the measurement, not a loosened tolerance.
+
+**Needs main track — the remaining 12 cm.** What is left of the entry cost is a lip the generator leaves:
+`TubeBuilder.Make` sets the mouth axis from the *route vertex* height (`y = pv.Position.Y + R + cruise * e`) while
+the ground under the mouth is `field.Sample(p.X, p.Z)` at the tube's lateral offset, and the two differ — measured
+12 cm on this seed. The validator tolerates up to a metre of it (`if (y - ground < R - 1f) ok = false`). Taking the
+mouth height from the ground under the mouth point, or tightening that validator at the mouths, would close it, but
+either changes tube geometry and therefore every stage hash, so it is the main track's to make. The harness reports
+the entry cost and does not assert a threshold on it: asserting one above the remaining lip would bless it.

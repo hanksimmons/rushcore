@@ -11,6 +11,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
+| T8b | `T8_TUBE_RUBBER_BAND.md` (Mouth entry) | `opus/t8-tube-mouth` | pushed | (first commit) | 347/347 | P-014 | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |
 | T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | **merged** into `develop-secondary` (play verdict given: the rubber-banding is gone) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
 
@@ -51,6 +52,11 @@ Each is also written up where it happened, with the numbers: `T4_PROP_SCATTER.md
 Open items. `T6_SAMPLE_FIXES.md` carries them into the sample playtest so they are asked while the samples are open.
 
 ## Needs main track (collected)
+
+- **T8b: the tube mouth lip is the generator's.** `TubeBuilder.Make` sets the mouth axis height from the route
+  vertex rather than the ground under the mouth point, leaving the tube floor 12 cm above the terrain on the tube
+  sample (the validator allows up to a metre). It is the last of the entry collision the user reported; the world
+  layer's share is fixed (P-014). Closing it changes tube geometry and therefore every stage hash.
 
 Items the parallel track could not close inside its boundaries. Copied here from the packets' Delivery records so the
 reconciliation sees them in one place.

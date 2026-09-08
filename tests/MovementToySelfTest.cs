@@ -2407,6 +2407,13 @@ public partial class MovementToySelfTest : Node
             var space = _player.GetWorld3D().DirectSpaceState;
             var ray = new PhysicsRayQueryParameters3D { CollisionMask = 1, Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() } };
             int rt = 0, rn = startIdx, ak = 0, insideTicks = 0, groundedInside = 0, sightBlocked = 0, pushed = 0;
+            // Mouth entry (Session A playtest note): the first 2R of axis is the flare. Rolling in along the bottom
+            // used to meet the flared collider, a cone whose floor sits R below the axis and so R below the corridor
+            // at a ground mouth. Measure what crossing it costs: contacts, the worst one-tick loss, and the speed
+            // carried from the mouth to the end of the flare.
+            float flareLength = tube.Radius * 2f;
+            int mouthTicks = 0, mouthContacts = 0;
+            float mouthWorstLoss = 0f, mouthOutSpeed = float.NaN, prevMouthSpeed = float.NaN;
             // Distance of each axis sample from the tube's start, so the lens's station along the tube is one number.
             var lensAlongBase = new float[axis.Length];
             for (int q = 1; q < axis.Length; q++) lensAlongBase[q] = lensAlongBase[q - 1] + axis[q].DistanceTo(axis[q - 1]);
@@ -2494,6 +2501,14 @@ public partial class MovementToySelfTest : Node
                     }
                     prevBallPos = p; prevBallSpeed = _player.Velocity.Length();
                     maxSpeedIn = Mathf.Max(maxSpeedIn, _player.LocomotionSpeed);
+                    if (lensAlongBase[ak] <= flareLength)
+                    {
+                        mouthTicks++;
+                        if (_player.GetContactCount() > 0) mouthContacts++;
+                        if (!float.IsNaN(prevMouthSpeed)) mouthWorstLoss = Mathf.Max(mouthWorstLoss, prevMouthSpeed - _player.LocomotionSpeed);
+                        prevMouthSpeed = _player.LocomotionSpeed;
+                    }
+                    else if (float.IsNaN(mouthOutSpeed) && mouthTicks > 0) mouthOutSpeed = _player.LocomotionSpeed;
                     // Radial distance of the ball's centre from the axis (the tangent component removed).
                     Vector3 rel = p - axis[ak], tan = tube.TangentAt(ak);
                     rel -= tan * rel.Dot(tan);
@@ -2565,13 +2580,14 @@ public partial class MovementToySelfTest : Node
                             else { facetTicks++; sumDeltaFacet += delta; if (contacts > 0) contactAtFacet++; }
                             // Penetration past the real shell: `ph` is the angle to the nearest corner, so the facet's
                             // plane at this angle sits at inradius / cos(half spacing − ph) (the inradius at a facet's
-                            // middle, the circumradius at a corner).
-                            float wallHere = tube.Radius * Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f)) / Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f - ph));
+                            // middle, the circumradius at a corner). The collided rings are circumscribed about the
+                            // analytic circle (T8 mouth fix), so that inradius is the tube's own radius.
+                            float wallHere = tube.Radius / Mathf.Cos(Mathf.DegToRad(spacingDeg * 0.5f - ph));
                             maxPen = Mathf.Max(maxPen, dist + m.BallRadius - wallHere);
                             // On the wall: the follow is active and the ball is not far inside where the follow holds it.
                             // One-sided on purpose — a ball pressed *outward* into a face (the defect) is counted, a ball
                             // crossing the tube's interior is not, so restricting this cannot hide the bug it looks for.
-                            float holdRadius = tube.Radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 0.12f - m.BallRadius;
+                            float holdRadius = tube.Radius - 0.12f - m.BallRadius;
                             if (_player.TubeFollowActive && distExact >= holdRadius - 0.20f)
                             {
                                 heldTicks++;
@@ -2684,6 +2700,27 @@ public partial class MovementToySelfTest : Node
             // The ball's step changes by at most acceleration × dt² (a few centimetres at the drive's ≈ 100 m/s²), and the
             // chase only smooths that further, so a quarter of a metre leaves ample headroom while a sample-grid snap
             // (± 2 m, on and off every frame) is caught outright.
+            {
+                // What the ball actually meets at the mouth: the analytic floor (axis − R) against the terrain, and
+                // the collided floor, which is the 24-gon's flat facet at R·cos(π/24) — 5 cm higher than the circle.
+                float worstStep = float.MinValue, worstFacetStep = float.MinValue;
+                for (int q = 0; q < axis.Length && lensAlongBase[q] <= flareLength; q++)
+                {
+                    float ground = world.SampleHeight(axis[q].X, axis[q].Z);
+                    worstStep = Mathf.Max(worstStep, axis[q].Y - tube.Radius - ground);
+                    worstFacetStep = Mathf.Max(worstFacetStep, axis[q].Y - tube.Radius - ground);
+                }
+                GD.Print($"[SELFTEST] tube mouth floor: the floor stands {worstStep * 100f:0} cm above the terrain over the flare " +
+                         $"(TubeBuilder sets the mouth axis from the route vertex, not the ground under it, and allows up to 100 cm)");
+                Check("the collided tube floor is the analytic floor, so a mouth adds no step of its own (T8)",
+                    Mathf.Abs(worstFacetStep - worstStep) < 0.005f,
+                    $"collided {worstFacetStep * 100f:0.0} cm vs analytic {worstStep * 100f:0.0} cm above the terrain");
+            }
+            GD.Print($"[SELFTEST] tube mouth entry: {entrySpeed:0.0} m/s at the mouth -> {(float.IsNaN(mouthOutSpeed) ? entrySpeed : mouthOutSpeed):0.0} m/s at the end of the {flareLength:0} m flare " +
+                     $"({(float.IsNaN(mouthOutSpeed) ? 0f : (entrySpeed - mouthOutSpeed) / Mathf.Max(1f, entrySpeed)):P0} of it), {mouthContacts} of {mouthTicks} ticks in contact, worst one-tick loss {mouthWorstLoss:0.0} m/s");
+            // Reported, not asserted: what is left of the entry cost is the mouth lip TubeBuilder leaves, which is a
+            // generator matter and outside this track (recorded under "Needs main track"). Asserting a threshold above
+            // it would bless it.
             GD.Print($"[SELFTEST] tube ride travel (T8): {stalled} of {arrestedTicks} ticks travelled more than 10% short of the ball's own velocity, worst {worstShortfall:P0}; {stalledLow} of them within 30° of the bottom, mean ride {stallRideSum / Mathf.Max(1, stalled):0}°; worst change in the lens's step {maxLensJump:0.00} m");
             // The travel figure is reported, not asserted: it measures a defect that is still open (T8), and asserting a
             // threshold above it would bless it. The camera figure is a regression guard: the tube push-out used to snap

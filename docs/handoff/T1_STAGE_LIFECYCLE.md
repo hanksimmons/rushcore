@@ -64,11 +64,20 @@ the completion event so Phase 6 can seed the next stage from it.
 
 ## Pre-answered choices
 
-Use these defaults; if you deviate, write the P-entry and say why in the Delivery record.
+**The user answered the three that mattered on 2026-09-07. These are decisions, not defaults: implement them as written.**
 
-- Flow resets to 0, boost carries (P-001).
-- Next stage keeps the archetype; wrap after stage 9 (P-002).
-- Outro 0.7 s, fade out 0.5 s, fade in 0.4 s (P-003).
+- **Flow and boost both carry across a stage transition** (P-010, replacing P-001). A run is one continuous chain across
+  all nine stages; a transition is not a chain boundary. Nothing about Flow is reset by reaching an exit. Recovery still
+  ends Flow inside a stage, as 02 §8 says — that rule is untouched.
+- **The exit taken picks the next stage's archetype** (P-011, replacing P-002). Exit A (index 0, the primary's pad)
+  continues the archetype just played. Each further exit selects a different one, deterministically from the seed chain
+  so the same run and exit always give the same next stage: derive it with `SeedChain.Derive(stageSeed, "route", exitIndex)`
+  and take it modulo the archetype count, re-rolling while it equals the current archetype so a fork always changes the
+  landscape. This is the payoff of D-105 and a stub for Phase 6's route cards: the forks mean something the moment they
+  are played. Still wraps to stage 0 after stage 9 with the placeholder print.
+- Outro 0.7 s, fade out 0.5 s, fade in 0.4 s (P-003, unchanged).
+- The user's answer on the exits: **build on `StageDefinition.Exits` as it stands.** They may still refine the exit
+  geometry later; T1 only reads the list, so that will not force a rewrite.
 - Completion also fires in the harness (no special-casing); the harness asserts on it.
 - `RestartSameSeed` rebuilds the *current* stage index; `RestartNewSeed` picks a new run seed and index 0.
 
@@ -89,8 +98,11 @@ Add to the generated-stage case, after the existing full-route drive:
 - During the outro, injected Space and W do nothing (no charge started, no drive change), and the ball keeps rolling
   (speed at outro end ≥ 50% of speed at the trigger, or grounded and slowing on the pad; state the rule you used).
 - After the transition: `StageIndex == 1`, the stage hash differs from stage 0's, `StageClock == 0`,
-  `StageExitTime == 0`, `StageCheckpointIndex == -1`, Flow 0, boost equal to the value before the transition, the
-  ball within `PadRadius` of the new spawn with speed < 1 m/s, the camera yaw within 10° of the spawn facing.
+  `StageExitTime == 0`, `StageCheckpointIndex == -1`, **Flow and boost both equal to their values before the transition**
+  (P-010), the ball within `PadRadius` of the new spawn with speed < 1 m/s, the camera yaw within 10° of the spawn facing.
+- The archetype after the transition follows the exit taken (P-011): exiting by A keeps it, exiting by B or C changes it,
+  and the same run seed with the same exit gives the same next archetype twice running. Drive a seed with a terminal
+  line (sample stage 6, Highlands seed 4) to exit B and assert both.
 - Node count after the transition equals the count after the first build (± 0; the existing flat-count check).
 - `--stage 3` (self-test can set the flag through the same code path) builds index 3; its hash equals a direct
   `StageGenerationRequest(seed, 3, archetype)` build.

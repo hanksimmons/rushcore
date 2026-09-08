@@ -28,7 +28,7 @@ public partial class TelemetryOverlay : Control
     private enum Row
     {
         Frame, Physics, State, Band, Ground, Normal, Velocity, Locomotion, Vertical,
-        Charge, Takeoff, Slam, Burst, Carve, Flow, Boost, Steering, Input, Impact,
+        Charge, Takeoff, Slam, Burst, Carve, Flow, Health, Boost, Steering, Input, Impact,
         Position, Checkpoint, Camera, Seed, Stage, Tuning, Count,
     }
 
@@ -86,6 +86,7 @@ public partial class TelemetryOverlay : Control
         AddRow(Row.Burst, "burst");
         AddRow(Row.Carve, "carve");
         AddRow(Row.Flow, "flow");
+        AddRow(Row.Health, "health");
         AddRow(Row.Boost, "boost");
         AddRow(Row.Steering, "steering");
         AddRow(Row.Input, "input");
@@ -163,6 +164,7 @@ public partial class TelemetryOverlay : Control
             : $"idle (Alt / LB)   count {p.CarveCount}");
         Set(Row.Flow, $"{p.Flow,5:0.00}   cap {p.FlowCap:0.0} m/s (headroom {_debug.Tuning.Flow.Headroom:P0})   " +
                       $"chain {(float.IsPositiveInfinity(p.SinceFlowGain) ? "—" : $"{p.SinceFlowGain:0.0} s")}   impacts {p.ImpactCount}");
+        Set(Row.Health, $"{_debug.Health.Current,6:0} / {Rushcore.Player.PlayerHealth.Max:0}{(_debug.Health.IsDead ? "   DOWN" : "")}");
         Set(Row.Boost, $"{p.BoostAmount,6:0.0} ({p.Boost01:0.00}) {(p.BoostActive ? "FIRING" : "")}");
         Set(Row.Steering, $"{p.SteeringAuthority:0.0} m/s2");
         Set(Row.Input, $"{input.X,6:0.00} {input.Y,6:0.00}");

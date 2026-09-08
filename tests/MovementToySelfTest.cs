@@ -1284,6 +1284,12 @@ public partial class MovementToySelfTest : Node
             foreach (var _ in Frames(3)) yield return null;
         }
 
+        // ---- T2: the player HUD and the health value ----
+        // Runs after the stage cases on purpose: every tick before the 6.5 km stage drive changes where the ball
+        // meets the tube, and the T8 camera guard is measured on that ride. The HUD case has nothing to do with
+        // the drive, so it stands after it rather than shifting it.
+        foreach (var e in RunHudCase()) yield return e;
+
         // ---- fall recovery ----
         foreach (var _ in Seconds(0.5f)) yield return null;
         _player.SetCheckpoint(PlatformCenter + Vector3.Up * 3f);
@@ -2587,7 +2593,7 @@ public partial class MovementToySelfTest : Node
                             // On the wall: the follow is active and the ball is not far inside where the follow holds it.
                             // One-sided on purpose — a ball pressed *outward* into a face (the defect) is counted, a ball
                             // crossing the tube's interior is not, so restricting this cannot hide the bug it looks for.
-                            float holdRadius = tube.Radius - 0.12f - m.BallRadius;
+                            float holdRadius = tube.Radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 0.12f - m.BallRadius;
                             if (_player.TubeFollowActive && distExact >= holdRadius - 0.20f)
                             {
                                 heldTicks++;
@@ -3010,6 +3016,176 @@ public partial class MovementToySelfTest : Node
         Check("lab node count returns to its pre-stage value", GetTree().GetNodeCount() == nodesLab, $"{nodesLab} -> {GetTree().GetNodeCount()}");
     }
 
+
+    // ---------------- T2: the player HUD and the health value (06 §12; 07 §12; 08 §7, §9) ----------------
+
+    /// <summary>
+    /// The HUD reads player and run state and draws it: every bar is measured as the width it actually renders,
+    /// not as the value it was handed. Health is a value with debug kill and heal and no damage source yet
+    /// (P-004). Run on the lab platform, so what moves is only what the HUD is asked to show.
+    /// </summary>
+    private IEnumerable RunHudCase()
+    {
+        var t = _debug.Tuning;
+        var hud = _debug.Hud;
+        var health = _debug.Health;
+        int uiNodes = 0;
+
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        Check("the HUD is built on the UI layer and visible by default", hud is not null && hud.Visible && t.Hud.Visible,
+            $"visible={hud?.Visible}");
+
+        // Boost: the bar is the meter, on the frame after it changes.
+        _debug.RefillBoost();
+        foreach (var _ in Frames(2)) yield return null;
+        Check("the boost bar draws the boost meter", Mathf.Abs(hud.BoostShown - _player.Boost01) < 0.01f,
+            $"bar {hud.BoostShown:0.000} vs boost {_player.Boost01:0.000}");
+        {
+            // Spend some, and watch the bar come down with it.
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            foreach (var _ in Seconds(0.8f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Boost);
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the boost bar follows the meter down while boosting",
+                _player.Boost01 < 0.95f && Mathf.Abs(hud.BoostShown - _player.Boost01) < 0.01f,
+                $"bar {hud.BoostShown:0.000} vs boost {_player.Boost01:0.000}");
+        }
+
+        // Flow: a charged jump grants Flow on release (02 §8), which the bar shows and the pulse announces.
+        {
+            float flowBefore = _player.Flow;
+            Input.ActionPress(InputBootstrap.Jump, 1f);
+            foreach (var _ in Seconds(t.JumpSlam.MaxJumpChargeSeconds + 0.08f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            foreach (var _ in Frames(3)) yield return null;
+            Check("a charged jump raises Flow and the Flow bar draws it",
+                _player.Flow > flowBefore && Mathf.Abs(hud.FlowShown - _player.Flow) < 0.01f,
+                $"flow {flowBefore:0.00} -> {_player.Flow:0.00}, bar {hud.FlowShown:0.000}");
+            Check("the Flow bar pulses on a gain (06 §7: escalation reads, and never as a number)",
+                hud.FlowPulseActive, "pulse not lit");
+            ReleaseAll();
+            foreach (var _ in Seconds(2.5f)) yield return null;
+        }
+
+        // Health: a value, a bar that tracks it, and kill/heal from the debug actions (07 §12, P-004).
+        {
+            Check("health starts full", Mathf.IsEqualApprox(health.Current, PlayerHealth.Max), $"{health.Current:0}");
+            health.Damage(30f);
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the health bar appears once something has taken health off full, and tracks the value",
+                Mathf.Abs(health.Fraction - 0.7f) < 0.001f && Mathf.Abs(hud.HealthShown - health.Fraction) < 0.01f &&
+                hud.HealthBarVisible,
+                $"health {health.Current:0}, bar {hud.HealthShown:0.000}, visible {hud.HealthBarVisible}");
+
+            int recoveredBefore = _recoveredCount;
+            _debug.KillPlayer();
+            Check("kill takes health to zero and leaves it there until the recovery lands",
+                health.IsDead && health.Current == 0f, $"{health.Current:0}");
+            int guard = 0;
+            while (_recoveredCount == recoveredBefore && guard++ < 240) yield return null;
+            foreach (var _ in Frames(3)) yield return null;
+            Check("death recovers the player and health comes back full on arrival (P-004)",
+                _recoveredCount > recoveredBefore && Mathf.IsEqualApprox(health.Current, PlayerHealth.Max) &&
+                Mathf.Abs(hud.HealthShown - 1f) < 0.01f,
+                $"recoveries {_recoveredCount - recoveredBefore}, health {health.Current:0}, bar {hud.HealthShown:0.000}");
+
+            health.Damage(45f);
+            _debug.HealPlayer();
+            foreach (var _ in Frames(2)) yield return null;
+            Check("heal returns the value to full and the bar stands down again (P-015: the corner is the dial's)",
+                Mathf.IsEqualApprox(health.Current, PlayerHealth.Max) && !hud.HealthBarVisible,
+                $"{health.Current:0}, bar visible {hud.HealthBarVisible}");
+        }
+
+        // The speedometer (P-015): it draws locomotion speed, and its redline is where Flow headroom begins.
+        {
+            var dial = hud.Dial;
+            Check("the speedometer's redline starts at the base cap and its scale ends at the Flow ceiling (D-088)",
+                Mathf.IsEqualApprox(dial.RedlineFrom, _player.LocomotionCap) && dial.FullScale >= _player.FlowCap - 0.01f,
+                $"redline {dial.RedlineFrom:0.0}, full scale {dial.FullScale:0.0}, base cap {_player.LocomotionCap:0.0}, flow cap {_player.FlowCap:0.0}");
+            Check("the speedometer reads zero at rest", Mathf.Abs(dial.Shown - _player.LocomotionSpeed) < 0.5f,
+                $"dial {dial.Shown:0.0}, ball {_player.LocomotionSpeed:0.0}");
+
+            Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            foreach (var _ in Seconds(2.5f)) yield return null;
+            float driving = _player.LocomotionSpeed;
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the speedometer follows the ball up to speed",
+                driving > 20f && Mathf.Abs(dial.Shown - _player.LocomotionSpeed) < 1.0f,
+                $"dial {dial.Shown:0.0} vs ball {_player.LocomotionSpeed:0.0} m/s");
+            ReleaseAll();
+            foreach (var _ in Seconds(2.0f)) yield return null;
+        }
+
+        // Run state: the stage label and the wallet the reward burst will fill (T3).
+        {
+            _debug.Run.AddCurrency(25);
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the HUD shows the run's stage number and its wallet",
+                hud.StageShown == _debug.Run.StageIndex + 1 && hud.CurrencyShown == 25,
+                $"stage {hud.StageShown}, currency {hud.CurrencyShown} vs {_debug.Run.Currency}");
+        }
+
+        // The toggles: hidden means hidden, and the band word is off by default (P-005).
+        {
+            Check("the band word is off by default", !t.Hud.BandWord && !hud.BandWordVisible);
+            t.Hud.BandWord = true;
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the band word appears when asked for", hud.BandWordVisible);
+            t.Hud.BandWord = false;
+
+            t.Hud.Visible = false;
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the HUD hides on its toggle", !hud.Visible);
+            t.Hud.Visible = true;
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the HUD comes back", hud.Visible);
+
+            // Scale relays out without moving what the bars read.
+            float health01 = hud.HealthShown;
+            t.Hud.Scale = 1.5f;
+            foreach (var _ in Frames(3)) yield return null;
+            Check("the HUD scale relays out and the bars still read the same fractions",
+                Mathf.Abs(hud.HealthShown - health01) < 0.02f && Mathf.Abs(hud.BoostShown - _player.Boost01) < 0.02f,
+                $"health {hud.HealthShown:0.000} vs {health01:0.000}, boost {hud.BoostShown:0.000}");
+            t.Hud.Scale = 1f;
+            foreach (var _ in Frames(3)) yield return null;
+        }
+
+        // The HUD is built once and lives on the UI layer: a world rebuild never touches it (08 §10).
+        {
+            var ui = hud.GetParent();
+            uiNodes = ui.GetChildCount();
+            int before = GetTree().GetNodeCount();
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            Check("the HUD is never rebuilt with the world",
+                hud.GetParent() == ui && ui.GetChildCount() == uiNodes && GetTree().GetNodeCount() == before,
+                $"ui children {ui.GetChildCount()} vs {uiNodes}, nodes {GetTree().GetNodeCount()} vs {before}");
+        }
+
+        // Per-frame cost: what the HUD allocates on top of an idle frame, measured against itself hidden.
+        {
+            foreach (var _ in Frames(10)) yield return null;
+            t.Hud.Visible = false;
+            foreach (var _ in Frames(20)) yield return null;
+            long idleStart = GC.GetAllocatedBytesForCurrentThread();
+            foreach (var _ in Frames(120)) yield return null;
+            long idle = GC.GetAllocatedBytesForCurrentThread() - idleStart;
+            t.Hud.Visible = true;
+            foreach (var _ in Frames(20)) yield return null;
+            long shownStart = GC.GetAllocatedBytesForCurrentThread();
+            foreach (var _ in Frames(120)) yield return null;
+            long shown = GC.GetAllocatedBytesForCurrentThread() - shownStart;
+            long cost = shown - idle;
+            GD.Print($"[SELFTEST] HUD allocation over 120 frames: {shown} B visible, {idle} B hidden, {cost} B of it the HUD's");
+            Check("the HUD allocates nothing per frame worth counting (< 4 KB over 120 frames)",
+                cost < 4096, $"{cost} B over 120 frames ({shown} visible, {idle} hidden)");
+        }
+    }
+
     // ---------------- T1: stage completion, transition, run seed and stage index (02 §2, §4; 05 §7; 08 §7, §10) ----------------
 
     /// <summary>
@@ -3208,6 +3384,9 @@ public partial class MovementToySelfTest : Node
             _player.GlobalPosition.DistanceTo(world.SpawnPoint) < WorldScale.PadRadius && _player.LocomotionSpeed < 1f &&
             Forward.Dot(world.SpawnFacing) > 0.985f,
             $"{_player.GlobalPosition.DistanceTo(world.SpawnPoint):0.0} m from spawn, {_player.LocomotionSpeed:0.00} m/s, facing dot {Forward.Dot(world.SpawnFacing):0.000}");
+        Check("the HUD's stage number follows the transition (T2)",
+            _debug.Hud.StageShown == run.StageIndex + 1 && _debug.Hud.StageShown == 2,
+            $"HUD reads stage {_debug.Hud.StageShown}, director {run.StageIndex + 1}");
         Check("exit A continues the archetype just played (P-011)", world.Archetype == prevArchetype,
             $"{ArchetypeRules.Label(prevArchetype)} -> {ArchetypeRules.Label(world.Archetype)}");
         // Flow and boost carry (P-010). Neither is reset; both keep running their own rules across the

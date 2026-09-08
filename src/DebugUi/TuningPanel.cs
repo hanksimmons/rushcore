@@ -224,6 +224,8 @@ public partial class TuningPanel : Control
             ("Teleport To Start", () => { _debug.TeleportToStart(); Status("Teleported to start."); }),
             ("Teleport Near Exit", () => { _debug.TeleportNearExit(); Status("Teleported 200 m short of the exit."); }),
             ("Refill Boost", () => { _debug.RefillBoost(); Status("Boost refilled."); }),
+            ("Kill Player", () => { _debug.KillPlayer(); Status("Player down; recovering."); }),
+            ("Heal Player", () => { _debug.HealPlayer(); Status("Health full."); }),
         }));
 
         _statusLabel = new Label { Text = string.Empty };

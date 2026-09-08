@@ -6,17 +6,19 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | Task | Packet | Branch | State | Last commit | Harness (full run) | P-entries | Reconciled |
 |---|---|---|---|---|---|---|---|
 | T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | **merged** into `develop-secondary` | 4db5348 | 337/337; canyon 334/334, dunes 337/337, sky 338/338 | P-012 (P-003, P-010, P-011 implemented) | — |
-| T2 | `T2_HUD.md` | `opus/t2-hud` | not started | — | — | — | — |
+| T2 | `T2_HUD.md` | `opus/t2-hud` | **merged** into `develop-secondary` | fb326bc | 368/368 with the speedometer; the sky run's one red check is the flaky guard below | P-015 (P-004, P-005 implemented) | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | not started | — | — | — | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
-| T8b | `T8_TUBE_RUBBER_BAND.md` (Mouth entry) | `opus/t8-tube-mouth` | pushed | (first commit) | 347/347 | P-014 | — |
+| T8b | `T8_TUBE_RUBBER_BAND.md` (Mouth entry) | `opus/t8-tube-mouth` | **merged** into `develop-secondary` | 5071b29 | 347/347 | P-014 | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |
 | T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | **merged** into `develop-secondary` (play verdict given: the rubber-banding is gone) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
 
 ## Merged into `develop-secondary`
 
+- T8b (5071b29, the tube mouth) and T2 (fb326bc, the HUD with the speedometer) merged 2026-09-07, after the user's
+  playtest. Both conflicts were both-sides additions to this file and the decisions table; both sides kept.
 - T1 (4db5348) and T4 (524dc21) merged 2026-09-07. Full harness on the merged branch: 346/346 default, canyon
   343/343, dunes 346/346, sky 347/347; golden hashes unchanged. Three text conflicts (the runbook, this file's
   decisions table, the harness's tail) were both-sides additions and both sides were kept.
@@ -57,6 +59,13 @@ Open items. `T6_SAMPLE_FIXES.md` carries them into the sample playtest so they a
   vertex rather than the ground under the mouth point, leaving the tube floor 12 cm above the terrain on the tube
   sample (the validator allows up to a metre). It is the last of the entry collision the user reported; the world
   layer's share is fixed (P-014). Closing it changes tube geometry and therefore every stage hash.
+- **T2: the T8 tube-camera guard flakes across its threshold on the base branch.** "the tube camera does not snap
+  along the axis sample grid" bounds the worst change in the lens's step between ticks at 3.5 m on the sky tube
+  ride. Two runs of `develop-secondary` (004894b) with no changes at all measured 3.37 m and 3.65 m: one passes,
+  one fails. On `opus/t2-hud`, 3.63 m and 2.63 m; with the HUD node simply not added to the tree, 2.94 m. The
+  metric is sampled per rendered frame against an interpolated player transform, so it varies with how much work a
+  frame did, and no UI change can reach physics. It needs re-expressing per physics tick, or against the lens's
+  station along the tube — the quantity the snap actually moved. The tolerance has not been touched.
 
 Items the parallel track could not close inside its boundaries. Copied here from the packets' Delivery records so the
 reconciliation sees them in one place.

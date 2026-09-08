@@ -618,19 +618,24 @@ public partial class PlayerPhysics : RigidBody3D
         float dist = rel.Length();
         if (dist < 1e-3f) return false;
         Vector3 outward = rel / dist;
-        // The wall the follow holds is the collider's inscribed circle (T7): the shell is a ring of flat facets, so a
-        // ball held outside that circle sits proud of a facet's middle and the solver and the follow fight each tick (a
-        // judder while steering or boosting up the wall). Inside it the ball never fires the collider while the follow
-        // is active, and fast arrivals still land. Since the collided rings are circumscribed about the analytic circle
-        // (T8 mouth fix), that inscribed circle *is* the analytic radius, and the floor the follow models is the floor
-        // the ball rests on — which at a ground mouth is the difference between a flush entrance and a 5 cm step.
+        // Where the follow holds the ball (T7): inside the shell, far enough in that the solver never fires under it.
+        // The shell is a ring of flat facets, so a ball held out at the face sits proud of a facet's middle and the
+        // solver and the follow fight each tick (a judder while steering or boosting up the wall).
+        //
+        // Both the hold and the outward bound stay on R·cos(pi/Sides), where T7 measured them, even though the collided
+        // rings are now circumscribed about the analytic circle (T8 mouth fix) and their faces therefore sit a facet's
+        // depth further out. Moving either onto the new face costs margin the follow needs where its axis reference is
+        // worst: `Structure.Nearest` answers with a nearest vertex rather than the true axis, out by 21 cm on a steeply
+        // climbing Sky tube, and 5 cm nearer the face was enough to put 1.6 cm of penetration and grazing contacts back
+        // on Sky, from none. The cost is that the ball rides about 17 cm off the glass instead of 12; the 5 cm and the
+        // rest both come back when the structure query interpolates the axis, which is recorded for the main track.
         // How far inside the inscribed circle the ball is held: the rest band, the axis reference's own uncertainty, and a
         // centimetre. `Structure.Nearest` answers with the nearest axis *vertex* and its tangent, and the axis is sampled
         // every few metres, so on a curving tube the perpendicular distance to that vertex's tangent line differs from the
         // distance to the real axis by (Δs/2)²/2ρ: measured 1.4 cm on a Dune Sea tube, 3.5 cm on a Highlands one and 21 cm
         // on a steeply climbing Sky one (T7). The follow therefore knows where the wall is only to about that, and must
         // not aim closer than it knows; the margin comes off again once the query interpolates the axis.
-        float wall = radius - 2f * GroundFollowDeadband - TubeAxisUncertainty - 0.01f;
+        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - TubeAxisUncertainty - 0.01f;
         float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vOut = v.Dot(outward);
@@ -653,7 +658,7 @@ public partial class PlayerPhysics : RigidBody3D
         // it comes before the pre-compensation below, which stands for exactly what the step adds after this callback:
         // the outward travel is then (min(vOut, room/dt) − press·dt + press·dt)·dt ≤ room. A bound, not a target: at the
         // rest band's outer edge it still allows 2.4 m/s outward, so the wall is not sticky.
-        float room = Mathf.Max(0f, radius - m.BallRadius - dist);
+        float room = Mathf.Max(0f, radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - m.BallRadius - dist);
         vOut = Mathf.Min(vOut, room / dt);
         vOut -= press * dt;
         v = v - outward * v.Dot(outward) + outward * vOut;

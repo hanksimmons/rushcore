@@ -112,6 +112,9 @@ Gameplay reads these values; debug UI edits the same source.
 
 No duplicate magic-number copies.
 
+The `HUD` category (T2) holds `Visible`, `Scale` and `Band Word`. They are presentation handles, not feel values, and
+are not part of the frozen movement baseline.
+
 ## 8. Persistence
 
 Debug-only:
@@ -178,7 +181,8 @@ manual sample from the panel). Delivered (D-104): `World › Route Debug Lines` 
 tube axes, terminal lines in their own colour; on by default in the toy) and `World › Stage Debug Views` (corridor
 bounds, challenge zones, structure bounds, floors and drains, exit pad rings (D-105); off by default). Player contact
 and impact vectors remain in the telemetry rows; the `stage` row names the exit reached, leads with the stage index
-in the run (`3/9`) and shows `(outro)` while the completion sequence plays (T1).
+in the run (`3/9`) and shows `(outro)` while the completion sequence plays (T1). The `health` row carries the value
+the HUD draws (T2). The developer overlay keeps the numbers; the player HUD (06 §12) carries none of them.
 
 ## 12. Debug actions
 
@@ -194,6 +198,9 @@ Useful controls:
 - pause,
 
 These intentionally bypass normal game rules to accelerate iteration.
+
+Delivered (T2): **Kill Player** (`K`) takes health to zero, which recovers to the checkpoint and refills on arrival
+(P-004); **Heal Player** (`H`) returns it to full. Both are on the panel too. Nothing damages health yet.
 
 Delivered (T1): **Teleport Near Exit** (`E`, or the panel button) drops the ball on the primary 200 m short of exit
 A, facing down the route and grounded, and carries stage progress and the armed anchor with it so the tracker never

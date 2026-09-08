@@ -217,6 +217,15 @@ public sealed class VfxTuning
     public float MaxVisualRollRevPerSecond = 3.28499984741211f;
 }
 
+/// <summary>Player HUD (06 §12, T2): whether it is shown, how big, and the optional speed-band word.</summary>
+public sealed class HudTuning
+{
+    public bool Visible = true;
+    public float Scale = 1f;
+    /// <summary>The qualitative band word under the Flow meter; off by default (06 §12 "optional", P-005).</summary>
+    public bool BandWord = false;
+}
+
 /// <summary>
 /// Stage-completion sequence timings (T1, P-003). Presentation pacing, not feel values: they are
 /// not part of the frozen movement baseline and are safe to change without a promotion.
@@ -270,6 +279,7 @@ public sealed class GameplayTuning
     public readonly FlowTuning Flow = new();
     public readonly CarveTuning Carve = new();
     public readonly RunTuning Run = new();
+    public readonly HudTuning Hud = new();
 
     public const string CatMovement = "Movement";
     public const string CatJumpSlam = "Jump / Slam";
@@ -280,9 +290,10 @@ public sealed class GameplayTuning
     public const string CatFlow = "Flow";
     public const string CatCarve = "Carve";
     public const string CatRun = "Run";
+    public const string CatHud = "HUD";
 
     public static readonly string[] Categories =
-        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatRun, CatWorld };
+        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatRun, CatHud, CatWorld };
 
     public IReadOnlyList<TuningParameter> Parameters { get; }
     public IReadOnlyList<TuningToggle> Toggles { get; }
@@ -401,6 +412,11 @@ public sealed class GameplayTuning
         F(CatRun, "Outro (s)", 0f, 3f, () => rn.OutroSeconds, v => rn.OutroSeconds = v);
         F(CatRun, "Fade Out (s)", 0f, 3f, () => rn.FadeOutSeconds, v => rn.FadeOutSeconds = v);
         F(CatRun, "Fade In (s)", 0f, 3f, () => rn.FadeInSeconds, v => rn.FadeInSeconds = v);
+
+        var hd = Hud;
+        B(CatHud, "Visible", () => hd.Visible, v => hd.Visible = v);
+        F(CatHud, "Scale", 0.6f, 1.6f, () => hd.Scale, v => hd.Scale = v);
+        B(CatHud, "Band Word", () => hd.BandWord, v => hd.BandWord = v);
 
         var w = World;
         F(CatWorld, "Terrain Amplitude", 0.1f, 3f, () => w.TerrainAmplitude, v => w.TerrainAmplitude = v);

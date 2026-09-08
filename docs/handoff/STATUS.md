@@ -38,6 +38,9 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 
 ## Open for the user's read (collected)
 
+**`OPEN_DECISIONS.md` is the full ledger** of everything waiting on the user, with the options and the lever for
+each. What follows is the subset that came out of the packets' own Delivery records.
+
 Questions this track cannot answer, because they are judgements about how something looks or feels in play and no AI
 agent plays stages. Copied from the packets' Delivery records so a playtest session can pick them all up at once.
 

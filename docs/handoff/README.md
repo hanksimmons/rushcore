@@ -37,7 +37,7 @@ every push. Tell me in one line what you are about to do, then go.
 
 1. `CLAUDE.md` (operating contract), `README.md` (authority hierarchy)
 2. `docs/00_GAME_VISION.md`, `docs/01_MVP_SCOPE.md`
-3. this file, then `STATUS.md`
+3. this file, then `STATUS.md`, then `OPEN_DECISIONS.md` (what is waiting on the user, and what not to re-decide)
 4. the assigned packet, then every spec section it lists under "Owning specs"
 5. `docs/05_TECHNICAL_ARCHITECTURE.md`, `docs/08_TEST_ACCEPTANCE.md` §1, §2, §12
 6. `docs/10_MOVEMENT_TOY_RUNBOOK.md` (build, run, harness commands, controls)

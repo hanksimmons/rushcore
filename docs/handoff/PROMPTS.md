@@ -137,6 +137,50 @@ Delivery record and STATUS row current at every push. Same rules and definition 
 
 ---
 
+## Resume prompt (after a compaction, mid-programme)
+
+State at the time of writing (2026-09-07): `develop-secondary` 223b2dd is the integration branch and everything below
+forks from and merges into it; `develop` stays at a793dbe until the branching exits are settled. T7 (tube judder) and
+the tube camera fix are merged and have the user's play verdict. T1–T6 have not started. T8 is open but demoted.
+
+```text
+Resume RUSHCORE (Godot .NET 4.7.2, C#, macOS arm64, repo ~/rushcore). Do: git fetch && git checkout develop-secondary
+&& git pull. Read, in order: CLAUDE.md, docs/handoff/README.md, docs/handoff/STATUS.md, docs/handoff/PROMPTS.md, and
+docs/handoff/PROVISIONAL_DECISIONS.md. That is the whole operating contract; the packets T1..T8 in docs/handoff/ are the
+work. Then run the data-only harness (RUSHCORE_SELFTEST_DATA_ONLY=1 /Applications/Godot_mono.app/Contents/MacOS/godot
+--headless --fixed-fps 60 --path . -- --rushcore-selftest) to confirm the baseline is green before touching anything.
+
+Where we are: Phase 3 is complete and merged to develop (a793dbe). develop-secondary carries D-105 branching exits, the
+golden hashes, the handoff packets, and the two tube fixes (T7's follow on the shell's inscribed circle with a 24-facet
+shell, and the tube camera pushed along the radial keeping its station along the tube). The user has played those and
+confirmed the tube rides smooth. Harness on develop-secondary: 314 default, 311 canyon, 314 dunes, 315 sky, all passing,
+golden hashes unchanged.
+
+What remains, in the order I recommended: T1 stage lifecycle (the keystone: run seed, stage index, completion outro on
+any exit pad carrying which exit; unblocks T2), then T2 HUD and the health value, then T3 enemy and pickup visuals.
+T4 prop scatter and T5 generation measurements are isolated (world layer, and generator plus harness) and can go at any
+time. T6 sample-stage fixes is blocked on the user's playtest notes for the six samples. T8 (the tube arrest) is open
+but rare — one tick in nine hundred, none near the bottom of the tube, not felt in play.
+
+Two things gate the order, and the first is the user's to answer: (1) the user said the branching exits "need
+refinement" and has never said what is wrong; T1 builds stage completion directly on StageDefinition.Exits, so ask
+before starting T1, and if the answer is not ready do T5 then T4 instead. (2) T1, T2 and T3 all edit GameBootstrap,
+IDebugActions, TuningPanel and GameplayTuning, so they must run one at a time, never in parallel.
+
+Rules: one packet per branch named opus/t<n>-<slug> off develop-secondary; full harness green (plus
+RUSHCORE_ARCHETYPE=canyon|dunes|sky where the packet says) before every push; push and give the compare URL against
+develop-secondary; no gh CLI; the user merges or instructs. No attribution lines. Docs with code, same commit. The D-095
+movement baseline is frozen. Never change a generator rule, validator tolerance, WorldScale number, route topology or
+tests/GoldenHashes.cs — if the golden-hash check fails on your branch, generation moved: undo it and record it under
+"Needs main track". Write P-numbers only, never D-numbers, and never edit docs/09, docs/DECISIONS.md or the CLAUDE.md
+phase paragraph. Keep the packet's Delivery record and the STATUS.md row current at every commit, so an interruption
+loses nothing.
+
+Tell me in one line what you are about to do, then go.
+```
+
+---
+
 ## Reconcile prompt (the main track, on return)
 
 ```text

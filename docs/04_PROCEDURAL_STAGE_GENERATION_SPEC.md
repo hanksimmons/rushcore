@@ -753,4 +753,22 @@ terminal candidates were rejected across a batch.
 5. exact stage clear-time target,
 6. render chunking threshold if profiling requires it.
 
+Measured (T5, 2026-09-08, `RUSHCORE_MEASURE=1`; instruments only, no rule, tolerance or verdict changed):
+
+7. **the wall-clearance probe.** Over 400 batch seeds the check rejects 6 attempt-1 builds — 4 on Canyon Run, 2 on
+   Sky Terraces, none on Rolling Highlands or Dune Sea — and every one of them on a **straight**, not a tight bend.
+   Reading the terrain across the probe window separates them: Canyon's four stand in front of a real wall face
+   (the ground rises 83 m on average, 93 m at the worst), Sky's two stand on ground that rises 1 m with no optional
+   line within 337 m. The probe is sound on Canyon and is measuring something other than a wall on Sky.
+8. **where a tube's wall ride comes from.** Over 74 tubes in the four batches the maximum sits on the builder's own
+   lateral **swing**, not on the primary's bend: swing out on 45 of them, swing back on 10, the climb on 15, the
+   descent on 4. Every maximum is taken at the cap (149 m/s), and rides reach 88°.
+9. **floor-3 room on Sky Terraces.** Of 95 floor-2 sections on 100 seeds, 4 could carry a floor 3 branching off them
+   under the shipped `Floor3` numbers — the same 4 seeds that carry one today. Room is not the constraint (4248 m
+   mean against a 2000 m need); the floor-3 shape's own transitions are, blocked by a bend on 39 sections and by the
+   inside of a bend on 32.
+10. **landing run against the model.** Over 7 real flights on Highlands seed 8 and Dune Sea seed 1, the ball is back
+    within 2% of the model's speed inside **0–12 m** of touching down (mean 4 m), against the 100 m the model
+    reserves. The reservation is not challenged by speed: the model already predicts the landing loss.
+
 Route representation details (polyline/curve helper, internal data structures) are implementation decisions as long as this behavioral contract is preserved.

@@ -1909,6 +1909,11 @@ public partial class MovementToySelfTest : Node
         double msSum = 0, msMax = 0;
         string firstFailure = "";
         string tuningBefore = TuningSnapshot();
+        // T5 instruments (RUSHCORE_MEASURE=1): read-only tallies, no Check, no effect on the run's count.
+        bool measure = System.Environment.GetEnvironmentVariable("RUSHCORE_MEASURE") == "1";
+        var wall = new WallProbeTally();
+        var ride = new List<(string Seed, StageGenerator.TubeRideReading R)>();
+        var floor3Room = new Floor3RoomTally();
         var sw = System.Diagnostics.Stopwatch.StartNew();
         for (int i = 0; i < Count; i++)
         {
@@ -1980,8 +1985,11 @@ public partial class MovementToySelfTest : Node
                     fallbackReasons["attempt 1: " + f.Name] = fallbackReasons.GetValueOrDefault("attempt 1: " + f.Name) + 1;
                 }
             }
+
+            if (measure) MeasureSeed(gen, req, def, wall, ride, floor3Room, archetype);
         }
         sw.Stop();
+        if (measure) PrintMeasureTables(A, archetype, wall, ride, floor3Room, seedsWithFloor3, Count);
         GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; {crests} crests, {trains} trains of ≥ 2 ({seedsWithTrain} seeds, e.g. {exampleTrain}); regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
         GD.Print($"[SELFTEST] {A} structures over the batch: {tubes} tubes on {seedsWithTube} seeds (e.g. {exampleTube}), {tubesPassed} pass, wall ride ≤ {rideMax:0}°; {lids} lids ({lidsPassed} pass); {spirals} spiral pits; terraces: {floor2} on floor 2, {floor3} on floor 3 ({seedsWithFloor3} seeds; at stage 0: {string.Join(" ", floor3AtZero)})");
@@ -2232,6 +2240,16 @@ public partial class MovementToySelfTest : Node
         var crestLandS = new float[features.Count];
         var launchArmed = new bool[features.Count];   // the ball must be grounded inside the window first: a gap's dive is still airborne when the far-rim window opens
         var quietKm = new List<(int km, float raw)>();
+        // T5 instrument 4 (RUSHCORE_MEASURE=1): after every real flight landing, how many route metres the ball takes
+        // to come back within 2% of the model's speed there, against the model's 100 m reservation (D-094, D-100).
+        bool measure = System.Environment.GetEnvironmentVariable("RUSHCORE_MEASURE") == "1";
+        var landings = new List<(float At, float Metres, float Down, bool Slam, float Ball, float Model)>();
+        bool wasGrounded = true;
+        float airborneSince = 0f, lastVerticalSpeed = 0f;
+        bool airborneWasSlam = false;
+        float settleFrom = -1f;
+        float settleDown = 0f;
+        bool settleSlam = false;
         while (ticks < maxTicks)
         {
             ticks++;
@@ -2260,6 +2278,40 @@ public partial class MovementToySelfTest : Node
                     else if (crestLaunchS[c] > 0f && crestLandS[c] == 0f) crestLandS[c] = along;
                 }
             }
+            if (measure)
+            {
+                if (!_player.IsGrounded)
+                {
+                    if (wasGrounded) { airborneSince = along; airborneWasSlam = false; }
+                    if (_player.SlamActive) airborneWasSlam = true;
+                    lastVerticalSpeed = _player.Velocity.Y;
+                }
+                else if (!wasGrounded)
+                {
+                    // A real flight, not a facet hop: at least 30 m of route in the air.
+                    if (along - airborneSince >= 30f && settleFrom < 0f)
+                    {
+                        settleFrom = along;
+                        settleDown = -lastVerticalSpeed;
+                        settleSlam = airborneWasSlam;
+                    }
+                }
+                if (settleFrom >= 0f)
+                {
+                    float model = profile.SpeedAt(along);
+                    if (Mathf.Abs(_player.LocomotionSpeed - model) <= 0.02f * Mathf.Max(1f, model))
+                    {
+                        landings.Add((settleFrom, along - settleFrom, settleDown, settleSlam, _player.LocomotionSpeed, model));
+                        settleFrom = -1f;
+                    }
+                    else if (along - settleFrom > 900f)   // never got there: record the ceiling and move on
+                    {
+                        landings.Add((settleFrom, along - settleFrom, settleDown, settleSlam, _player.LocomotionSpeed, model));
+                        settleFrom = -1f;
+                    }
+                }
+                wasGrounded = _player.IsGrounded;
+            }
             if (System.Environment.GetEnvironmentVariable("RUSHCORE_DRIVE_TRACE") is { } tr && float.TryParse(tr, out float trAt) && Mathf.Abs(along - trAt) < 120f)
                 GD.Print($"[TRACE] {along:0} m y={p.Y:0.00} ground={world.SampleHeight(p.X, p.Z):0.00} v=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) grounded={_player.IsGrounded} raw={_player.IsRawGrounded}");
             if (along >= nextMark)
@@ -2286,6 +2338,23 @@ public partial class MovementToySelfTest : Node
         }
         int armed = world.StageCheckpointIndex;
         ReleaseAll();
+        if (measure)
+        {
+            string A2 = ArchetypeRules.Label(world.Archetype);
+            if (landings.Count == 0)
+                GD.Print($"[MEASURE] {A2} seed {world.Seed}/{world.StageIndex} landing run: no flight of 30 m or more on this route");
+            else
+            {
+                foreach (var l in landings)
+                    GD.Print($"[MEASURE] {A2} landing run   at {l.At:0} m: {l.Metres:0} m to within 2% of the model " +
+                             $"({l.Ball:0} vs {l.Model:0} m/s), landed {l.Down:0} m/s down{(l.Slam ? ", slam" : "")}" +
+                             $"{(l.Metres > 900f ? " (capped: never converged)" : "")}");
+                GD.Print($"[MEASURE] {A2} seed {world.Seed}/{world.StageIndex} landing run: {landings.Count} landings, " +
+                         $"mean {landings.Average(l => l.Metres):0} m, worst {landings.Max(l => l.Metres):0} m, " +
+                         $"against the model's {WorldScale.LandingRunAfterFlight:0} m reservation " +
+                         $"({landings.Count(l => l.Metres > WorldScale.LandingRunAfterFlight)} of {landings.Count} over it)");
+            }
+        }
         float progressed = verts[nearest].Distance;
         float groundedFrac = grounded / (float)Mathf.Max(1, ticks);
         float ballTime = exitTick > 0 ? exitTick / (float)Engine.PhysicsTicksPerSecond : float.NaN;
@@ -3190,6 +3259,155 @@ public partial class MovementToySelfTest : Node
             Check("the HUD allocates nothing per frame worth counting (< 4 KB over 120 frames)",
                 cost < 4096, $"{cost} B over 120 frames ({shown} visible, {idle} hidden)");
         }
+    }
+
+    // ---------------- T5: generation instruments (RUSHCORE_MEASURE=1, read-only) ----------------
+
+    /// <summary>
+    /// The four T5 instruments are measurements, not checks: they add no <c>Check</c>, change no verdict and print
+    /// under a <c>[MEASURE]</c> prefix so the tables can be grepped out of a run. The default harness count is
+    /// identical with and without <c>RUSHCORE_MEASURE=1</c>.
+    /// </summary>
+    private sealed class WallProbeTally
+    {
+        /// <summary>Bend-radius buckets at the failing probe: straight, r ≥ 160, 100–160, &lt; 100.</summary>
+        public readonly int[] Rejections = new int[4];
+        public readonly int[] Misreads = new int[4];
+        public readonly float[] SubWidthSum = new float[4];
+        public int AllAttemptOneRejections;
+        public int ExtraAttemptsOnWallSeeds;
+        public int WallSeeds;
+        public string Worst = "", WorstProfile = "";
+        public float WorstWeight = 1f;
+        public float RiseSum;
+
+        public static int Bucket(float radius) => radius <= 0f ? 0 : radius >= 160f ? 1 : radius >= 100f ? 2 : 3;
+        public static readonly string[] BucketName = { "straight", "r ≥ 160", "100–160", "r < 100" };
+    }
+
+    private sealed class Floor3RoomTally
+    {
+        public int Floor2Sections, CouldBranch, SeedsThatCouldGain, SeedsWithFloor2;
+        public readonly Dictionary<string, int> Blocked = new();
+        public float RoomSum;
+        public string Example = "";
+    }
+
+    /// <summary>Instruments 1–3, per seed: the wall probe on a rejected attempt 1, every tube's ride, floor-3 room.</summary>
+    private static void MeasureSeed(StageGenerator gen, StageGenerationRequest req, StageDefinition def,
+                                    WallProbeTally wall, List<(string, StageGenerator.TubeRideReading)> ride,
+                                    Floor3RoomTally room, TerrainArchetype archetype)
+    {
+        string seed = $"{req.RunSeed}/{req.StageIndex}";
+
+        // 1. Wall probe: only attempt 1 can be rejected by it (a later attempt that passes tells us nothing).
+        if (def.Report.Attempts > 1)
+        {
+            var first = gen.BuildAttempt(req, 0);
+            var failures = first.Report.Failures.ToList();
+            wall.AllAttemptOneRejections += failures.Count;
+            if (failures.Any(f => f.Name.StartsWith("wall faces stay outside")))
+            {
+                var r = StageGenerator.MeasureWallProbe(first);
+                int b = WallProbeTally.Bucket(r.BendRadius);
+                wall.Rejections[b]++;
+                wall.SubWidthSum[b] += r.SubWidthMetres;
+                wall.RiseSum += r.RiseMetres;
+                if (!r.IsIntrusion) wall.Misreads[b]++;
+                wall.WallSeeds++;
+                wall.ExtraAttemptsOnWallSeeds += def.Report.Attempts - 1;
+                if (r.CoarseWeight < wall.WorstWeight)
+                {
+                    wall.WorstWeight = r.CoarseWeight;
+                    wall.Worst = $"{seed} at vertex {r.VertexIndex} ({(r.BendRadius > 0f ? $"r{r.BendRadius:0}" : "straight")}), " +
+                                 $"coarse weight {r.CoarseWeight:0.000}, corridor interior never below {r.InnerWorst:0.000}, " +
+                                 $"{r.SubWidthMetres:0} m of the 24 m window under 0.99, ground rises {r.RiseMetres:0.0} m, " +
+                                 $"nearest optional line {(r.NearestLineMetres < 0f ? "none on this seed" : $"{r.NearestLineMetres:0} m away")} " +
+                                 $"→ {(r.IsIntrusion ? "INTRUSION" : "misread")}";
+                    wall.WorstProfile = r.Profile;
+                }
+            }
+        }
+
+        // 2. Tube ride: every tube on every seed, with where in the builder's envelope the maximum sits.
+        foreach (var t in def.Tubes) ride.Add((seed, StageGenerator.MeasureTubeRide(def, t, GravityOf())));
+
+        // 3. Floor-3 room: only meaningful where floors exist at all.
+        if (archetype != TerrainArchetype.SkyTerraces) return;
+        var floor2s = def.OptionalLines.Where(l => l.Kind == RouteLineKind.Terrace && l.Floor == 2 && !l.Terminal).ToList();
+        if (floor2s.Count == 0) return;
+        room.SeedsWithFloor2++;
+        bool gained = false;
+        foreach (var l in floor2s)
+        {
+            room.Floor2Sections++;
+            if (OptionalLineBuilder.Floor3CouldBranch(def.PrimaryRoute, l, out string why, out float roomM))
+            {
+                room.CouldBranch++;
+                room.RoomSum += roomM;
+                gained = true;
+                if (room.Example == "") room.Example = $"{seed} (floor 2 at {def.PrimaryRoute.Vertices[l.JoinStart].Distance:0} m, {roomM:0} m of room)";
+            }
+            else
+            {
+                string bucket = why.StartsWith("room ") ? "not enough room after the floor-2 transition" : why;
+                room.Blocked[bucket] = room.Blocked.GetValueOrDefault(bucket) + 1;
+            }
+        }
+        if (gained) room.SeedsThatCouldGain++;
+    }
+
+    /// <summary>The compiled gravity the tube validator measures the ride against (03 §15; never edited here).</summary>
+    private static float GravityOf() => new GameplayTuning().Movement.Gravity;
+
+    private static void PrintMeasureTables(string A, TerrainArchetype archetype, WallProbeTally wall,
+                                           List<(string Seed, StageGenerator.TubeRideReading R)> ride,
+                                           Floor3RoomTally room, int seedsWithFloor3, int count)
+    {
+        // ---- Table 1: wall probe ----
+        int rej = wall.Rejections.Sum(), mis = wall.Misreads.Sum();
+        GD.Print($"[MEASURE] {A} wall probe: {rej} attempt-1 rejections by the wall check of {wall.AllAttemptOneRejections} rejections in all " +
+                 $"({(wall.AllAttemptOneRejections == 0 ? 0f : rej / (float)wall.AllAttemptOneRejections):P0} of them), on {wall.WallSeeds} seeds " +
+                 $"costing {(wall.WallSeeds == 0 ? 0f : wall.ExtraAttemptsOnWallSeeds / (float)wall.WallSeeds):0.0} extra attempts each; " +
+                 $"{mis} classified misread, {rej - mis} intrusion");
+        for (int b = 0; b < 4; b++)
+        {
+            if (wall.Rejections[b] == 0) continue;
+            GD.Print($"[MEASURE] {A} wall probe   {WallProbeTally.BucketName[b],-8}: {wall.Rejections[b]} rejections, " +
+                     $"{wall.Misreads[b]} misread, {wall.Rejections[b] - wall.Misreads[b]} intrusion, " +
+                     $"mean {wall.SubWidthSum[b] / wall.Rejections[b]:0.0} m of the 24 m window under 0.99");
+        }
+        if (rej > 0) GD.Print($"[MEASURE] {A} wall probe   mean ground rise across the window {wall.RiseSum / rej:0.0} m (a wall face would be metres; a bank's shoulder is not)");
+        if (wall.Worst != "") GD.Print($"[MEASURE] {A} wall probe   worst: {wall.Worst}");
+        if (wall.WorstProfile != "") GD.Print($"[MEASURE] {A} wall probe   worst profile (weight/height above the route, across the route):{wall.WorstProfile}");
+
+        // ---- Table 2: tube ride ----
+        if (ride.Count > 0)
+        {
+            var bins = new int[10];
+            foreach (var (_, r) in ride) bins[Mathf.Clamp((int)(r.MaxDegrees / 10f), 0, 9)]++;
+            GD.Print($"[MEASURE] {A} tube ride: {ride.Count} tubes; histogram 0–90°+ in 10° bins " +
+                     string.Join(" ", bins.Select((n, k) => $"[{k * 10}–{k * 10 + 9}:{n}]")) +
+                     $"; {ride.Count(x => x.R.MaxDegrees > 85f)} over 85°");
+            var byPhase = ride.GroupBy(x => x.R.Phase).OrderByDescending(g => g.Count());
+            GD.Print($"[MEASURE] {A} tube ride   where the maximum sits: " +
+                     string.Join(", ", byPhase.Select(g => $"{g.Key} ×{g.Count()} (worst {g.Max(x => x.R.MaxDegrees):0}°)")));
+            foreach (var (seed, r) in ride.OrderByDescending(x => x.R.MaxDegrees).Take(3))
+                GD.Print($"[MEASURE] {A} tube ride   worst {r.MaxDegrees:0}° on {seed}: {r.Phase} at {r.AlongMetres:0} m of {r.SpanMetres:0} m, " +
+                         $"lateral offset {r.LateralOffset:0} m, speed {r.SpeedAtMax:0} m/s, tightest primary bend in the section " +
+                         $"{(r.TightestBendRadius > 0f ? $"r{r.TightestBendRadius:0} m" : "none (all straight)")}");
+        }
+
+        // ---- Table 3: floor-3 room ----
+        if (archetype != TerrainArchetype.SkyTerraces) return;
+        GD.Print($"[MEASURE] {A} floor-3 room: {room.Floor2Sections} floor-2 sections on {room.SeedsWithFloor2} seeds; " +
+                 $"{room.CouldBranch} could carry a floor 3 branching off them ({(room.Floor2Sections == 0 ? 0f : room.CouldBranch / (float)room.Floor2Sections):P0}), " +
+                 $"on {room.SeedsThatCouldGain} seeds of {count}, against {seedsWithFloor3} seeds carrying floor 3 today " +
+                 $"(floor-3 length {OptionalLineBuilder.Floor3Length:0} m" +
+                 $"{(room.CouldBranch == 0 ? "" : $", mean room {room.RoomSum / room.CouldBranch:0} m")})");
+        if (room.Blocked.Count > 0)
+            GD.Print($"[MEASURE] {A} floor-3 room   blocked by: " + string.Join(", ", room.Blocked.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
+        if (room.Example != "") GD.Print($"[MEASURE] {A} floor-3 room   example: {room.Example}");
     }
 
     // ---------------- T3: enemy and pickup visuals, the reward burst, the combat one-shots ----------------

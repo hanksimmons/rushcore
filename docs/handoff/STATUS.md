@@ -9,7 +9,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T2 | `T2_HUD.md` | `opus/t2-hud` | **merged** into `develop-secondary` | fb326bc | 368/368 with the speedometer; the sky run's one red check is the flaky guard below | P-015 (P-004, P-005 implemented) | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | **merged** into `develop-secondary` | 2eee91f | 386/386 default (112.3 s); canyon 382/382, dunes 386/386, sky 387/387 | P-017 (P-006, P-007 implemented) | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
-| T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
+| T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | **pushed** | 03e1211 | 386/386 default; data-only 44 s with and without `RUSHCORE_MEASURE` | none (instruments only) | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
 | T8b | `T8_TUBE_RUBBER_BAND.md` (Mouth entry) | `opus/t8-tube-mouth` | **merged** into `develop-secondary` | 5071b29 | 347/347 | P-014 | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |
@@ -67,6 +67,17 @@ Each is also written up where it happened, with the numbers: `T4_PROP_SCATTER.md
 Open items. `T6_SAMPLE_FIXES.md` carries them into the sample playtest so they are asked while the samples are open.
 
 ## Needs main track (collected)
+
+- **T5: `BuildLine` discards a line's own segment kinds.** Every vertex of an optional line is written
+  `Kind = Straight` and the skeleton carries no `Bends`, so D-103's actual floor-3 candidate — transitions riding the
+  floor 2 rather than the primary — cannot be evaluated: `JoinsOnStraights` and `SideValid` against a floor-2
+  skeleton are vacuously true. Mapping the primary's segment kinds onto the line's vertices is a few lines and
+  changes no geometry.
+- **T5: the wall-clearance check is measuring something other than a wall on Sky Terraces.** Over 400 batch seeds it
+  rejects 6 attempt-1 builds, all on straights. Canyon's four stand in front of a real 83–93 m wall face and are
+  correct. Sky's two stand on ground that rises 1 m with no optional line within 337 m: the primary's own stamp
+  simply does not reach the level width plus the setback there. Proposal in the packet: keep the weight test as the
+  wall test where `WallHeight > 0`, and replace or drop it on archetypes without walls.
 
 - **T8b: the tube mouth lip is the generator's.** `TubeBuilder.Make` sets the mouth axis height from the route
   vertex rather than the ground under the mouth point, leaving the tube floor 12 cm above the terrain on the tube

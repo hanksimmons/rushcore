@@ -20,6 +20,9 @@ RUSHCORE_ARCHETYPE=sky <same command>                           # the stage case
 RUSHCORE_BATCH_FAILS=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>   # tally what attempt 1 failed on across each batch, with the first seed's features and bends
 RUSHCORE_LINE_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # for a dropped optional line, the polyline heights ±40 m around its first launch
 RUSHCORE_EXIT_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # tally why terminal-line (exit) candidates were rejected per batch (D-105)
+RUSHCORE_MEASURE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>       # T5 generation instruments, tables 1-3: wall probe, tube ride, floor-3 room (grep '[MEASURE]')
+RUSHCORE_MEASURE=1 <same command> --seed 8                            # T5 table 4: metres from each landing until the ball is back on the model's speed
+RUSHCORE_MEASURE=1 RUSHCORE_ARCHETYPE=dunes <same command> --seed 1   # the same over a dune train's five crest landings
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Archetype = 1)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --dunes --seed 1    # play a Dune Sea stage (World › Archetype = 2)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 9            # a Highlands stage with a see-through tube at 1.1 km (D-101; Movement › Tube Contact)

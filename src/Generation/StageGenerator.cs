@@ -633,6 +633,139 @@ public sealed class StageGenerator
         report.Add("start and exit pads are flat", startFlat < 1.0f && exitFlat < 1.0f, $"height spread start {startFlat:0.00} m, exit {exitFlat:0.00} m");
     }
 
+    // ---------------------------------------------------------------- T5 instruments (read-only)
+
+    /// <summary>Where the wall-clearance probe was worst on a stage, and what a fine re-sample says about it (T5).</summary>
+    public readonly record struct WallProbeReading(
+        float CoarseWeight, int VertexIndex, float Side, float BendRadius,
+        float InnerWorst, float SubWidthMetres, float RiseMetres, float NearestLineMetres, string Profile)
+    {
+        /// <summary>
+        /// The discriminator is the ground, not the stamp: a wall face standing in the reach lifts the terrain well
+        /// above the route, while the falloff of a bend's own bank leaves it nearly level. Three metres is a fifth of
+        /// the shortest archetype wall and far above any bank's shoulder.
+        /// </summary>
+        public bool IsIntrusion => RiseMetres > 3f;
+    }
+
+    /// <summary>
+    /// T5 instrument, read-only: re-runs the shipped wall-clearance probe (04 §10, D-096) over a stage, finds the
+    /// worst sample, then re-samples across the route at 1 m from the corridor centre to well past the reach.
+    ///
+    /// <para>The shipped check takes one sample per five vertices at exactly the level-width reach and fails the stage
+    /// when the primary's stamp weight there is under 0.99. It is suspected of reading the falloff of a bend's own
+    /// bank as a wall. Weight alone cannot settle that — a stamp always fades outward, so sampling inward finds full
+    /// weight whatever is out there — so this reads the <em>terrain</em> across the same window: <c>RiseMetres</c> is
+    /// how far the ground climbs above the route inside it. A wall face lifts it metres; a bank's shoulder does not.
+    /// Decides nothing and changes nothing: the verdict stays with the shipped check.</para>
+    /// </summary>
+    public static WallProbeReading MeasureWallProbe(StageDefinition def)
+    {
+        var route = def.PrimaryRoute;
+        var v = route.Vertices;
+        var field = def.HeightField!;
+        var bendAt = new RouteBend?[v.Count];
+        foreach (var b in route.Bends) for (int i = b.StartIndex; i <= b.EndIndex; i++) bendAt[i] = b;
+        float reach = StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
+
+        float worst = 1f;
+        int worstIndex = 0;
+        float worstSide = 1f;
+        for (int i = 0; i < v.Count; i += 5)
+        {
+            float lx0 = -Mathf.Sin(v[i].Heading), lz0 = Mathf.Cos(v[i].Heading);
+            foreach (float side in new[] { 1f, -1f })
+            {
+                if (bendAt[i] is { } bend && side * Mathf.Sign(bend.TurnAngle) > 0f && bend.Radius < reach + 10f) continue;
+                float w = field.PrimaryWeight(v[i].Position.X + lx0 * reach * side, v[i].Position.Z + lz0 * reach * side);
+                if (w >= worst) continue;
+                worst = w; worstIndex = i; worstSide = side;
+            }
+        }
+
+        var wv = v[worstIndex];
+        float lx = -Mathf.Sin(wv.Heading) * worstSide, lz = Mathf.Cos(wv.Heading) * worstSide;
+        float innerWorst = 1f, subWidth = 0f, rise = 0f;
+        var profile = new System.Text.StringBuilder();
+        for (float s2 = 0f; s2 <= reach + 40f + 1e-3f; s2 += 1f)
+        {
+            float w = field.PrimaryWeight(wv.Position.X + lx * s2, wv.Position.Z + lz * s2);
+            float h = field.Sample(wv.Position.X + lx * s2, wv.Position.Z + lz * s2);
+            if (s2 <= reach - 12f) innerWorst = Mathf.Min(innerWorst, w);
+            if (s2 >= reach - 12f && s2 <= reach + 12f && w < 0.99f) subWidth += 1f;
+            if (s2 >= reach - 12f) rise = Mathf.Max(rise, h - wv.Position.Y);
+            if (Mathf.PosMod(s2, 20f) < 0.5f) profile.Append($" {s2:0}m:w{w:0.00}/h{h - wv.Position.Y:+0;-0;0}");
+        }
+        // What else is claiming the ground there? An optional line's own corridor blends the primary's weight down
+        // just as a wall does, and it leaves the terrain level while doing it.
+        Vector3 probe = wv.Position + new Vector3(lx, 0f, lz) * reach;
+        float nearestLine = float.MaxValue;
+        foreach (var line in def.OptionalLines)
+            foreach (var lv in line.Vertices)
+                nearestLine = Mathf.Min(nearestLine, new Vector2(lv.Position.X - probe.X, lv.Position.Z - probe.Z).Length());
+
+        return new WallProbeReading(worst, worstIndex, worstSide, bendAt[worstIndex]?.Radius ?? 0f,
+                                    innerWorst, subWidth, rise,
+                                    nearestLine == float.MaxValue ? -1f : nearestLine, profile.ToString());
+    }
+
+    /// <summary>Where a tube's worst wall ride comes from, in the builder's own terms (T5).</summary>
+    public readonly record struct TubeRideReading(
+        float MaxDegrees, string Phase, float AlongMetres, float SpanMetres,
+        float LateralOffset, float TightestBendRadius, float SpeedAtMax);
+
+    /// <summary>
+    /// T5 instrument, read-only: recomputes the wall-ride profile the tube validator reports (docs/11 §7d,
+    /// tan φ = v²κ/g over the axis's plan curvature) and says *where* the maximum sits — which term of
+    /// <see cref="TubeBuilder"/>'s envelope is running there (climb, swing out, cruise, swing back, descent), how far
+    /// out the lateral offset has swung, and the tightest primary bend the section overlaps.
+    ///
+    /// <para>T7 and T8 already settled the ride's feel and the axis-reference error; this answers only the question
+    /// they left: which part of the builder produces the angle.</para>
+    /// </summary>
+    public static TubeRideReading MeasureTubeRide(StageDefinition def, TubeDefinition t, float gravity)
+    {
+        var v = def.PrimaryRoute.Vertices;
+        float span = v[t.JoinEnd].Distance - v[t.JoinStart].Distance;
+        float ramp = TubeBuilder.RampLength(t.CruiseHeight);
+        float swing = WorldScale.TubeSwingLength;
+        var p = t.Profile!;
+
+        float best = 0f, bestAlong = 0f, bestSpeed = 0f;
+        float along = 0f;
+        for (int i = 1; i < t.Axis.Length; i++)
+        {
+            along += t.Axis[i].DistanceTo(t.Axis[i - 1]);
+            if (i < 3 || i + 3 >= t.Axis.Length) continue;
+            Vector2 a = new(t.Axis[i - 3].X, t.Axis[i - 3].Z), b = new(t.Axis[i].X, t.Axis[i].Z), c = new(t.Axis[i + 3].X, t.Axis[i + 3].Z);
+            Vector2 ab = b - a, bc = c - b;
+            if (ab.LengthSquared() < 1e-6f || bc.LengthSquared() < 1e-6f) continue;
+            float turn = Mathf.Abs(ab.AngleTo(bc)), len = 0.5f * (ab.Length() + bc.Length());
+            float speed = p.Speed[Mathf.Min(i, p.Count - 1)];
+            float deg = Mathf.RadToDeg(Mathf.Atan(speed * speed * (turn / Mathf.Max(1e-3f, len)) / gravity));
+            if (deg <= best) continue;
+            best = deg; bestAlong = along; bestSpeed = speed;
+        }
+
+        // The envelope runs in the primary's distance; the axis is a little longer, so read it by fraction.
+        float d = bestAlong / Mathf.Max(1f, t.Length) * span;
+        string phase = d < ramp ? "climb"
+                     : d < ramp + swing ? "swing out"
+                     : d < span - ramp - swing ? "cruise"
+                     : d < span - ramp ? "swing back"
+                     : "descent";
+        float offset = WorldScale.TubeMouthOffset
+                     + (WorldScale.TubeLateralOffset - WorldScale.TubeMouthOffset) * TubeBuilder.LateralEnvelope(d, span, ramp);
+
+        float tightest = 0f;
+        foreach (var bend in def.PrimaryRoute.Bends)
+        {
+            if (bend.EndIndex < t.JoinStart || bend.StartIndex > t.JoinEnd) continue;
+            if (tightest == 0f || bend.Radius < tightest) tightest = bend.Radius;
+        }
+        return new TubeRideReading(best, phase, d, span, offset, tightest, bestSpeed);
+    }
+
     private readonly float _gravity;
 
     /// <summary>

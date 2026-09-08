@@ -15,6 +15,10 @@ generator rule, a validator, a `WorldScale` number or a camera baseline value is
 
 Format: `sample # · what was seen · where (route metre or landmark) · expected`.
 
+The six samples are `World › Sample Stage` 1 tube, 2 tunnels + pit, 3 sky floor 3, 4 dune trains, 5 gap + turns,
+6 three exits (D-105, Highlands seed 4). The tube samples (1 and 4) have had their play verdict already: after T7 and
+the camera fix the ride is smooth, so notes on those two should be about how the tube *looks*, not how it feels.
+
 1.
 2.
 3.
@@ -24,7 +28,9 @@ Already known and **out of scope** here: "maps do not truly branch, every stage 
 ## Candidate issues from the code audit (unverified; confirm on the sample before touching)
 
 - Tube shell (`src/World/TubeMesh.cs`, `WorldDressing.TubeShellMaterial`): translucency against fog at distance; rib
-  band contrast; whether the ×2 mouth flare reads as an entrance from 300 m out.
+  band contrast; whether the ×2 mouth flare reads as an entrance from 300 m out. **Changed since this packet was
+  written** (T7): the shell is 24 facets a ring rather than 10, so it should read rounder, and the ball is held about
+  12 cm off the glass rather than 4 cm. Whether that float is visible is an open question the harness cannot answer.
 - Lid underside (`WorldDressing.LidMaterial`, `MovementToyWorld.BuildStructures`): dark under the roof; an unshaded
   edge band or a faint emissive underside may be needed so the tunnel reads as a tunnel, not a hole.
 - Pit rim (`SpiralPit`, the `PIT ↓` sign): readability from the approach at the cap; a ring of markers at the rim.
@@ -34,6 +40,8 @@ Already known and **out of scope** here: "maps do not truly branch, every stage 
 - Dune palette: crest contrast in the sand family; whether a train's launch crests read as launches.
 - `TUBE ✗` signs: a failed tube should not be built at all; confirm none is on the samples.
 - Sign glyph sizes at the D-091 scale (the ball is 0.66 m; signs were sized before the rescale).
+- Exit signs and forks (D-105, sample 6): whether `EXIT A/B/C` on a pad and `EXIT B ↑` at the top of a fork's S read as
+  a choice from the primary at speed, and whether the exit-pad colour reads as an ending.
 
 ## Rules for a fix
 

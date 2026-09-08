@@ -23,8 +23,11 @@ harness print, and a table in this packet's Delivery record. **No validator verd
 - Tube ride: `TubeDefinition.MaxRideDegrees`; `StageGenerator` line ~311–355 reports "wall ride ≤ N°" per tube;
   `TubeBuilder.LateralEnvelope` and the swing rule at line ~110. Over primary bends the ride reaches about 85°.
 - Floor 3: `OptionalLineBuilder` placement tries tier 3 (floor 3 stacked on a floor 2, `LineShape` Floor3: offset
-  300, transition 360, ramp 600, `Length = 2T + 2Ramp + 80`) then tier 2; floor 3 lands on about 3% of Sky seeds
-  (3 of 82 in the last batch). D-103 names "branching floor 3 from floor 2" as the candidate.
+  300, transition 360, ramp 600, `Length = 2T + 2Ramp + 80`) then tier 2. **Refreshed after D-105** (branching exits
+  claim their spans first, so the floors compete with them): floor 3 now lands on about 1% of Sky seeds (1 to 4 per
+  100, against 3 per 100 before), and tubes fell with it — Highlands 22 to 12, Dune Sea 44 to 25, Sky 63 to 36 per 100
+  seeds. Take the current numbers from a fresh batch run rather than from this packet. D-103 names "branching floor 3
+  from floor 2" as the candidate, and it matters more now that the sections are contested.
 - Landing run: the route speed model reserves a 100 m landing run after every flight (D-094, D-100 "landing speed after
   brake shed"); the real ball keeps 7–9% less through chained landings (D-094 measured on the strip); the gap between
   the 100 m reservation and the real braking distance is recorded as a known non-blocking item.
@@ -40,7 +43,10 @@ harness print, and a table in this packet's Delivery record. **No validator verd
 2. **Tube ride source.** For every tube in the four batches: `MaxRideDegrees`, the tightest primary bend radius whose
    arc the swing overlaps in plan, the lateral offset at the ride maximum, and whether the maximum occurs on the swing
    term, the climb, or the cruise. Histogram ride angle in 10° bins; count > 85°. Print the three worst seeds with the
-   numbers.
+   numbers. **Read T7 and T8 first**: the ride angle is already known to reach 179° under a sustained lean, and the
+   dominant imprecision in the tube ride is the structure query answering with the nearest axis *sample* (measured 1.4
+   cm on a Dune Sea tube, 3.5 cm on Highlands, 21 cm on a steeply climbing Sky one). Do not re-derive those; measure
+   what they leave open, which is where the ride angle *comes from* in the builder's own terms.
 3. **Floor-3 room.** On the Sky batch: for each floor-2 section, whether a floor 3 could branch from it under the
    existing `LineShape` numbers (remaining primary-straight length after the floor-2 transition ≥ the floor-3 length,
    side valid, no feature overlap) and how many seeds would gain a floor 3 that way, against the current 3%. Use
@@ -55,7 +61,8 @@ existing harness count must not change under `RUSHCORE_MEASURE=1`.
 
 ## Deliverable
 
-- The four tables in the Delivery record below, with the seeds behind the worst cases.
+- The four tables in the Delivery record below, with the seeds behind the worst cases. Every "current" figure quoted in
+  this packet predates D-105 unless it says otherwise; re-measure before comparing against it.
 - One recommendation per instrument, each phrased as a proposal for the main track (for example: "refine the wall probe
   over ±12 m at 1 m when the coarse weight < 0.99 and the bend radius < 160; would recover N% of attempt-1
   rejections"), with an estimate of what would change in which file. No code for the proposals.

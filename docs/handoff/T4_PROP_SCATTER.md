@@ -30,9 +30,11 @@ deterministic from the cosmetic seed, and is measured for cost. The scatter is s
 ## Design
 
 1. **One clear function for stages**, `StageDressing.ClearOf(stage)`, that returns false inside: every line's
-   level width plus falloff (primary and optional, all floors), every module's body and landing run, every tube's
-   mouth zone and the ground under its axis (R + 10 m plan), every lid footprint plus 20 m, the spiral disc plus 40 m,
-   and 30 m of every checkpoint anchor. Build it from `StageDefinition` data only; no field sampling except height.
+   level width plus falloff (primary and optional, all floors, **terminal lines included**), every module's body and
+   landing run, every tube's mouth zone and the ground under its axis (R + 10 m plan), every lid footprint plus 20 m,
+   the spiral disc plus 40 m, **every exit pad in `StageDefinition.Exits` plus its `WorldScale.PadRadius` and 20 m
+   more** (D-105: one to three flat 60 m pads a stage, and a prop on one would sit in the place the stage ends), and
+   30 m of every checkpoint anchor. Build it from `StageDefinition` data only; no field sampling except height.
 2. **Per-archetype prop sets** (06 §16 list: rocks, crystals, sparse vegetation, pylons/markers, abstract
    structures), each a small static description (mesh, colour family, size range, slope limit, where it likes to be):
    - Highlands: rocks and crystal clusters, densest 100–300 m off the corridor edge, fading beyond 600 m.
@@ -70,7 +72,8 @@ deterministic from the cosmetic seed, and is measured for cost. The scatter is s
 For each of the four archetype stage cases (run the default harness plus `RUSHCORE_ARCHETYPE=canyon|dunes|sky`):
 
 - Zero scatter instances inside `ClearOf(stage)` (iterate every MultiMesh instance transform; report the count and the
-  nearest offending distance if any).
+  nearest offending distance if any). Report the nearest instance to each exit pad separately: the pads are the newest
+  keep-out (D-105) and the easiest to forget.
 - Instance transforms byte-identical across two builds of the same request; stage hash identical across density 0.19
   and 1.0.
 - Instance counts within the caps; scatter time under 300 ms; total build still under the 8000 ms budget.

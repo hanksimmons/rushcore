@@ -5,14 +5,20 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 
 | Task | Packet | Branch | State | Last commit | Harness (full run) | P-entries | Reconciled |
 |---|---|---|---|---|---|---|---|
-| T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | pushed | 4db5348 | 337/337; canyon 334/334, dunes 337/337, sky 338/338 | P-012 (P-003, P-010, P-011 implemented) | — |
+| T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | **merged** into `develop-secondary` | 4db5348 | 337/337; canyon 334/334, dunes 337/337, sky 338/338 | P-012 (P-003, P-010, P-011 implemented) | — |
 | T2 | `T2_HUD.md` | `opus/t2-hud` | not started | — | — | — | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | not started | — | — | — | — |
-| T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | not started | — | — | — | — |
+| T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |
 | T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | **merged** into `develop-secondary` (play verdict given: the rubber-banding is gone) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
+
+## Merged into `develop-secondary`
+
+- T1 (4db5348) and T4 (524dc21) merged 2026-09-07. Full harness on the merged branch: 346/346 default, canyon
+  343/343, dunes 346/346, sky 347/347; golden hashes unchanged. Three text conflicts (the runbook, this file's
+  decisions table, the harness's tail) were both-sides additions and both sides were kept.
 
 ## Baseline at handoff
 
@@ -26,6 +32,23 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
   the stage (`MovementToyWorld.StageExitIndex`). T1 reads the list, not a single exit.
 - Main-track reservations: Phase 4 impact model and Flow integration; Sky Terraces second cut; Dune Sea optional line;
   spiral ramp; Phase 6 run and route generation (the route cards on the fork signs, the next-stage seed from the exit taken).
+
+## Open for the user's read (collected)
+
+Questions this track cannot answer, because they are judgements about how something looks or feels in play and no AI
+agent plays stages. Copied from the packets' Delivery records so a playtest session can pick them all up at once.
+
+- **T4, Dune Sea scatter density:** about 190 instances a stage against Highlands' 1264, because the rule puts things
+  on wave crests only. Accents on the crest lines, or a bare stage? Lever: the `DuneSea` branch of `WorldDressing.Suits`.
+- **T4, Canyon Run scatter shape:** no crystals at all, 1458 rocks, every one on a wall top, none on the slot floors.
+  Does the bare floor beside the corridor read as a canyon or as a fence? Lever: the `CanyonRun` branch of `Suits`.
+- **T4, frame time at density 0.19 and 1.0:** cannot be measured headless. `godot --path . -- --seed 8`, F2, read the
+  `frame` row at both densities; at 1.0 the stage carries 2700 instances (the caps).
+- **T1, the completion outro:** whether it reads as "done" rather than a freeze, and whether anything of the finished
+  stage shows through the fade.
+
+Each is also written up where it happened, with the numbers: `T4_PROP_SCATTER.md` and `T1_STAGE_LIFECYCLE.md`, under
+Open items. `T6_SAMPLE_FIXES.md` carries them into the sample playtest so they are asked while the samples are open.
 
 ## Needs main track (collected)
 

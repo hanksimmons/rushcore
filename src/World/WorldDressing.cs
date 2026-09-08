@@ -361,12 +361,10 @@ public partial class WorldDressing : Node3D
         }
         if (_t.World.StageDebugViews) BuildStageDebugViews(stage);
 
-        // Cosmetic scatter never enters the corridor (04 §5G): keep clear of the stamp and its falloff.
-        float clearance = StageHeightField.CorridorHalfWidth + StageHeightField.BendExtraHalfWidth + StageHeightField.FalloffWidth * 0.5f;
-        float area = (_world.HalfX * _world.HalfZ) / (MovementToyWorld.Extent * MovementToyWorld.Extent * 0.25f);
-        BuildScatteredProps(
-            (x, z) => _world.InBounds(x, z, 40f) && field.DistanceToRoute(x, z) > clearance,
-            _world.HalfX - 50f, _world.HalfZ - 50f, area, (_, _) => 1f);
+        // Cosmetic scatter (04 §5G, T4): archetype-aware, deterministic from the cosmetic seed, never inside a
+        // line, pad, anchor, lid, tube or the spiral disc.
+        BuildStageScatter(stage, field);
+        BuildEdgeMarkers(stage);
 
         // Boost rings on the line every ~1.2 km so the toy's boost loop stays exercised.
         for (float d = 900f; d < route.Length - 400f; d += 1200f)
@@ -932,6 +930,225 @@ public partial class WorldDressing : Node3D
         AddMultiMesh("Rocks", _rockMesh, rocks, rockColors);
         AddMultiMesh("Crystals", _crystalMesh, crystals, crystalColors);
         AddMultiMesh("PropPylons", _pylonMesh, pylons, pylonColors);
+    }
+
+
+    // ---------------------------------------------------------------- stage scatter (04 §5G, 06 §16; T4)
+
+    /// <summary>
+    /// Instance caps per stage: the scatter is scenery and is never allowed to become the frame budget. They are a
+    /// ceiling, not the working number — at the default density a stage lands well under them, so `Prop Density`
+    /// still does something; the caps bind only when the slider is pushed past about 0.6.
+    /// </summary>
+    public const int RockCap = 1800, CrystalCap = 900, MarkerCap = 240;
+    /// <summary>Placement attempts at density 1.0 over the lab's area; the stage's larger footprint scales it.</summary>
+    private const float ScatterAttempts = 900f;
+
+    /// <summary>Where the last stage scatter put every instance, in build order: the dressing's own record of what
+    /// it placed, which the harness measures against <see cref="StageScatter"/>.</summary>
+    private readonly List<Vector3> _scatterPositions = new();
+    private readonly List<Vector3> _markerPositions = new();
+    private readonly List<Vector3> _scatterColliderPositions = new();
+    public IReadOnlyList<Vector3> ScatterPositions => _scatterPositions;
+    public IReadOnlyList<Vector3> MarkerPositions => _markerPositions;
+    /// <summary>Only the scatter's own colliders: the scale pillars beside the start pad are the dressing's, not the scatter's.</summary>
+    public IReadOnlyList<Vector3> ScatterColliderPositions => _scatterColliderPositions;
+
+    /// <summary>Counts and cost of the last stage scatter, for the build log and the harness.</summary>
+    public int ScatterRocks { get; private set; }
+    public int ScatterCrystals { get; private set; }
+    public int ScatterMarkers { get; private set; }
+    public int ScatterColliders { get; private set; }
+    public ulong ScatterMillis { get; private set; }
+
+    /// <summary>
+    /// Archetype-aware scenery on a generated stage. Each archetype has one place it belongs (06 §16): highlands
+    /// rocks and crystal clusters off the corridor edge, canyon slabs and fins on the wall tops only, dune stones
+    /// and dry tufts on the wave's crests, sky crystals below the cloud band. Sizes grow with distance from the
+    /// route so the parallax reads as speed. The stream is <see cref="StageGenerationRequest.CosmeticSeed"/>
+    /// (P-008), so a scatter change can never move a stage hash.
+    /// </summary>
+    private void BuildStageScatter(StageDefinition stage, StageHeightField field)
+    {
+        ScatterRocks = ScatterCrystals = ScatterMarkers = ScatterColliders = 0;
+        ScatterMillis = 0;
+        _scatterPositions.Clear();
+        _markerPositions.Clear();
+        _scatterColliderPositions.Clear();
+        float density = Mathf.Clamp(_t.World.PropDensity, 0f, 3f);
+        if (density <= 0f) return;
+
+        ulong start = Time.GetTicksMsec();
+        var keep = new StageScatter(stage);
+        var rng = new RandomNumberGenerator { Seed = stage.Request.CosmeticSeed };
+        var arch = stage.Request.Archetype;
+        float cloudCeiling = stage.PrimaryRoute.Vertices.Average(v => v.Position.Y) + WorldScale.CloudBandHeight;
+
+        var rocks = new List<Transform3D>(RockCap);
+        var rockColors = new List<Color>(RockCap);
+        var crystals = new List<Transform3D>(CrystalCap);
+        var crystalColors = new List<Color>(CrystalCap);
+
+        float rangeX = _world.HalfX - 50f, rangeZ = _world.HalfZ - 50f;
+        float area = (_world.HalfX * _world.HalfZ) / (MovementToyWorld.Extent * MovementToyWorld.Extent * 0.25f);
+        int attempts = Mathf.RoundToInt(ScatterAttempts * density * area);
+
+        for (int i = 0; i < attempts; i++)
+        {
+            // Every draw is taken before any test, so the stream does not depend on which tests pass.
+            float x = rng.RandfRange(-rangeX, rangeX);
+            float z = rng.RandfRange(-rangeZ, rangeZ);
+            float roll = rng.Randf();
+            float yaw = rng.Randf() * Mathf.Tau;
+            float size = rng.RandfRange(0.7f, 1.0f);
+            float tint = rng.RandfRange(-0.06f, 0.06f);
+            float shape = rng.Randf();
+            float lottery = rng.Randf();
+
+            if (!_world.InBounds(x, z, 40f) || !keep.Clear(x, z)) continue;
+            float toLine = keep.DistanceToLine(x, z);
+            float slope = Steepness(x, z);
+            float y = _world.SampleHeight(x, z);
+            if (!Suits(arch, stage, field, x, z, y, slope, toLine, cloudCeiling, lottery, out bool crystal, out Color color)) continue;
+
+            // Farther from the line means bigger: the parallax is the speed cue (06 §16).
+            float grow = Mathf.Lerp(0.9f, 1.8f, Mathf.Clamp((toLine - StageScatter.LineClearance) / 900f, 0f, 1f));
+            bool solid = toLine > StageScatter.ColliderClearance;
+
+            if (!crystal)
+            {
+                if (rocks.Count >= RockCap) continue;
+                // A canyon's fins stand up; a dune's stones lie flat; the family's rocks are lumps.
+                float r = size * grow * rng.RandfRange(1.6f, 4.4f);
+                float sy = arch == TerrainArchetype.CanyonRun && shape > 0.8f ? rng.RandfRange(2.2f, 3.4f)
+                         : arch == TerrainArchetype.DuneSea ? rng.RandfRange(0.28f, 0.45f)
+                         : rng.RandfRange(0.5f, 0.9f);
+                float sz = arch == TerrainArchetype.CanyonRun ? rng.RandfRange(0.35f, 0.7f) : rng.RandfRange(0.8f, 1.2f);
+                var basis = new Basis(Vector3.Up, yaw).Scaled(new Vector3(r, r * sy, r * sz));
+                Vector3 pos = _world.SurfacePoint(x, z, -r * 0.25f);
+                rocks.Add(new Transform3D(basis, pos));
+                rockColors.Add(Shift(color, tint));
+                _scatterPositions.Add(pos);
+                if (solid)
+                {
+                    AddCollider(new BoxShape3D { Size = new Vector3(2f * r, 2f * r * sy, 2f * r * sz) * 0.9f }, pos, yaw);
+                    _scatterColliderPositions.Add(pos);
+                    ScatterColliders++;
+                }
+            }
+            else
+            {
+                if (crystals.Count >= CrystalCap) continue;
+                // A dune's tuft is a low fan; every other archetype's crystal is a shard.
+                bool tuft = arch == TerrainArchetype.DuneSea;
+                float h = size * grow * (tuft ? rng.RandfRange(1.4f, 2.6f) : rng.RandfRange(5f, 13f));
+                float r = h * (tuft ? rng.RandfRange(0.35f, 0.6f) : rng.RandfRange(0.14f, 0.24f));
+                var basis = new Basis(Vector3.Up, yaw).Scaled(new Vector3(r, h, r));
+                Vector3 pos = _world.SurfacePoint(x, z, h * 0.5f - h * 0.15f);
+                crystals.Add(new Transform3D(basis, pos));
+                crystalColors.Add(Shift(color, tint));
+                _scatterPositions.Add(pos);
+                if (solid && !tuft)
+                {
+                    AddCollider(new BoxShape3D { Size = new Vector3(1.2f * r, h, 1.2f * r) }, pos, yaw);
+                    _scatterColliderPositions.Add(pos);
+                    ScatterColliders++;
+                }
+            }
+        }
+
+        AddMultiMesh("Rocks", _rockMesh, rocks, rockColors);
+        AddMultiMesh("Crystals", _crystalMesh, crystals, crystalColors);
+        ScatterRocks = rocks.Count;
+        ScatterCrystals = crystals.Count;
+        ScatterMillis = Time.GetTicksMsec() - start;
+    }
+
+    /// <summary>
+    /// Where each archetype's scenery belongs, and what colour it is (06 §3, §16). Returns false where this
+    /// landscape wants nothing at all, which is how a canyon's slot floors and a dune's swales stay empty.
+    /// </summary>
+    private static bool Suits(TerrainArchetype arch, StageDefinition stage, StageHeightField field,
+                              float x, float z, float y, float slope, float toLine, float cloudCeiling,
+                              float lottery, out bool crystal, out Color color)
+    {
+        crystal = false;
+        color = default;
+        if (slope > 0.8f) return false;
+        switch (arch)
+        {
+            case TerrainArchetype.CanyonRun:
+                // Wall tops only: the side terrain a canyon raises, never the slot floor beside the corridor.
+                if (field.WallHeight <= 0f || y - field.Relief(x, z) < field.WallHeight * 0.6f) return false;
+                if (slope > 0.5f) return false;
+                crystal = false;
+                color = new Color(0.52f, 0.28f, 0.22f);   // red rock (D-098)
+                return true;
+
+            case TerrainArchetype.DuneSea:
+                // Crests of the wave only, and only where the sand lies flat enough to hold anything.
+                if (!stage.PrimaryRoute.Dunes.Exists || field.DuneHeight(x, z) < stage.PrimaryRoute.Dunes.Height * 0.6f) return false;
+                if (slope > 0.12f) return false;
+                if (lottery > 0.7f) return false;         // sparse: the crest lines must stay readable
+                crystal = lottery < 0.18f;
+                color = crystal ? new Color(0.50f, 0.45f, 0.30f)    // dry tuft
+                                : new Color(0.72f, 0.63f, 0.48f);   // ridged stone
+                return true;
+
+            case TerrainArchetype.SkyTerraces:
+                // Below the cloud band, on the outer margins around the floors; nothing on a floor surface
+                // (those are lines, and the line keep-out already holds them clear).
+                if (y > cloudCeiling) return false;
+                if (toLine > StageScatter.LineClearance + WorldScale.TerraceOuterFalloff(WorldScale.FloorStep)) return false;
+                crystal = lottery < 0.75f;
+                color = crystal ? new Color(0.62f, 0.82f, 0.92f) : new Color(0.55f, 0.58f, 0.64f);
+                return true;
+
+            default:
+                // Rolling Highlands: densest just off the corridor edge, thinning with distance (06 §16 scale cues).
+                float reach = Mathf.Clamp(1f - (toLine - 600f) / 900f, 0.25f, 1f);
+                if (lottery > reach) return false;
+                crystal = lottery > 0.62f * reach;
+                color = crystal ? new Color(0.32f, 0.55f, 0.68f) : new Color(0.46f, 0.42f, 0.38f);
+                return true;
+        }
+    }
+
+    /// <summary>
+    /// Scale cues on the corridor edge (04 §5G, 06 §16): low posts at the level width every 200 m of straight
+    /// route, both sides. None in a bend (the bank is the cue there), none across a module or under a lid.
+    /// Collider-free: they stand at the edge of the drivable width and must never be something to hit.
+    /// </summary>
+    private void BuildEdgeMarkers(StageDefinition stage)
+    {
+        var route = stage.PrimaryRoute;
+        var v = route.Vertices;
+        var bendAt = new bool[v.Count];
+        foreach (var b in route.Bends) for (int i = b.StartIndex; i <= b.EndIndex; i++) bendAt[i] = true;
+
+        var posts = new List<Transform3D>(MarkerCap);
+        var colors = new List<Color>(MarkerCap);
+        var color = new Color(0.72f, 0.70f, 0.62f);
+        for (float d = 300f; d < route.Length - 200f && posts.Count + 2 <= MarkerCap; d += 200f)
+        {
+            int i = route.IndexAtDistance(d);
+            if (bendAt[i]) continue;
+            if (route.Features.Any(f => d > f.CentreDistance - 150f && d < f.ReservedEnd + 50f)) continue;
+            var p = v[i];
+            if (stage.Lids.Any(l => l.Covers(p.Position.X, p.Position.Z))) continue;
+            foreach (float side in new[] { 1f, -1f })
+            {
+                float w = StageHeightField.CorridorHalfWidth + 4f;
+                float x = p.Position.X - Mathf.Sin(p.Heading) * w * side, z = p.Position.Z + Mathf.Cos(p.Heading) * w * side;
+                if (!_world.InBounds(x, z, 10f)) continue;
+                Vector3 at = _world.SurfacePoint(x, z, 2.0f);
+                posts.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(1.1f, 5f, 1.1f)), at));
+                colors.Add(color);
+                _markerPositions.Add(at);
+            }
+        }
+        AddMultiMesh("EdgeMarkers", _postMesh, posts, colors);
+        ScatterMarkers = posts.Count;
     }
 
     private static Color Shift(Color c, float d) => new(

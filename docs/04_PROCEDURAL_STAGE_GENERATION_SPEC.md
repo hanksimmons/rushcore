@@ -224,6 +224,15 @@ Props:
 - reinforce scale/speed,
 - do not accidentally become gameplay collision.
 
+Delivered (T4, P-008): `StageScatter` states the keep-out once, from `StageDefinition` alone, and both the dressing and
+the harness read it — outside every line's level width plus its bend extra and half its falloff (160 m, primary and
+every optional line, all floors, terminal lines included), every exit pad plus 20 m (D-105), every checkpoint anchor
+plus 30 m, every lid footprint plus 20 m, every tube axis plus its radius and 10 m, and the spiral disc plus 40 m. A
+module's body and its landing run lie on their line and are inside the line keep-out by construction. The stream is
+`StageGenerationRequest.CosmeticSeed`, so a scatter change can never move a stage hash, and no scatter collider stands
+within 200 m of a line. Scale-cue posts at the level width every 200 m of straight route are the exception that stands
+inside the corridor's edge, and they carry no collider.
+
 ### H — Validate
 
 Run lightweight deterministic checks.

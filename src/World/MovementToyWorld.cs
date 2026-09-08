@@ -140,6 +140,18 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         => Mathf.Abs(x) < HalfX - margin && Mathf.Abs(z) < HalfZ - margin;
     /// <summary>Metres between height samples for the current build (World › Cell Size).</summary>
     public float CellSize { get; private set; } = DefaultCellSize;
+    /// <summary>Cosmetic scatter of the last stage build (T4): counts, colliders and cost.</summary>
+    public int ScatterRocks { get; private set; }
+    public int ScatterCrystals { get; private set; }
+    public int ScatterMarkers { get; private set; }
+    public int ScatterColliders { get; private set; }
+    public ulong ScatterMillis { get; private set; }
+
+    /// <summary>Where the last stage build's scatter and edge markers stand (T4), for the harness.</summary>
+    public IReadOnlyList<Vector3> ScatterPositions => _dressing.ScatterPositions;
+    public IReadOnlyList<Vector3> MarkerPositions => _dressing.MarkerPositions;
+    public IReadOnlyList<Vector3> ScatterColliderPositions => _dressing.ScatterColliderPositions;
+
     /// <summary>Budget readouts for the last build (Gate M1).</summary>
     public int Triangles { get; private set; }
     public int Tiles { get; private set; }
@@ -249,6 +261,14 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         SpawnPoint = _field.SpawnXZ with { Y = SampleHeight(_field.SpawnXZ.X, _field.SpawnXZ.Z) + 4f };
 
         _dressing.Rebuild();
+        ScatterRocks = _dressing.ScatterRocks;
+        ScatterCrystals = _dressing.ScatterCrystals;
+        ScatterMarkers = _dressing.ScatterMarkers;
+        ScatterColliders = _dressing.ScatterColliders;
+        ScatterMillis = _dressing.ScatterMillis;
+        if (IsStage)
+            GD.Print($"[RUSHCORE] scatter: {ScatterRocks} rocks, {ScatterCrystals} crystals, {ScatterMarkers} markers " +
+                     $"({ScatterColliders} with colliders) in {ScatterMillis} ms at density {_t.World.PropDensity:0.00}");
         BuiltDebugViews = _t.World.StageDebugViews;
         BuildMillis = Time.GetTicksMsec() - start;
         GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +

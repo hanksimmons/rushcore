@@ -107,7 +107,7 @@ visual (06 §5), or if any part seems to need a collider to look right.
 
 ## Delivery record (filled by the implementing agent)
 
-- **Branch / commits:** `opus/t3-visuals` off `develop-secondary` (f2e0774, with T1, T2, T4 and the tube fixes merged).
+- **Branch / commits:** `opus/t3-visuals` off `develop-secondary` (f2e0774, with T1, T2, T4 and the tube fixes merged); cb3c638.
 - **Harness (full run, count and wall time):** **386/386 default (110.5 s)**, **canyon 382/382**, **dunes 386/386**,
   **sky 387/387** — all four green, including the T8 tube-camera guard that flaked on the base branch (B-1). Golden
   hashes unchanged: `[tube 7D24840659B28767] [tunnels + pit 327D9152EADB87E0] [sky floor 3 C453C38B4481CEB3]

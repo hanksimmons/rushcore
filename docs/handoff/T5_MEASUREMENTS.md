@@ -93,7 +93,7 @@ instrument shows an existing check is wrong (report; do not fix).
 
 ## Delivery record (filled by the implementing agent)
 
-- **Branch / commits:** `opus/t5-measurements` off `develop-secondary` (84d3aa2, with T1–T4 and the tube fixes merged).
+- **Branch / commits:** `opus/t5-measurements` off `develop-secondary` (84d3aa2, with T1–T4 and the tube fixes merged); 03e1211.
 - **Harness (default count; data-only time with and without `RUSHCORE_MEASURE`):** **386/386 default (110.6 s)**, golden hashes unchanged.
   Data-only **44 s with `RUSHCORE_MEASURE=1` and 44 s without** — the instruments cost nothing measurable, against the
   packet's 10 s allowance. The instruments add

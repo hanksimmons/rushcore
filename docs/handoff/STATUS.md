@@ -9,7 +9,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T2 | `T2_HUD.md` | `opus/t2-hud` | **merged** into `develop-secondary` | fb326bc | 368/368 with the speedometer; the sky run's one red check is the flaky guard below | P-015 (P-004, P-005 implemented) | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | **merged** into `develop-secondary` | 2eee91f | 386/386 default (112.3 s); canyon 382/382, dunes 386/386, sky 387/387 | P-017 (P-006, P-007 implemented) | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
-| T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | **pushed** | (see below) | 386/386 default; data-only 44 s with and without `RUSHCORE_MEASURE` | none (instruments only) | — |
+| T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | **pushed** | 03e1211 | 386/386 default; data-only 44 s with and without `RUSHCORE_MEASURE` | none (instruments only) | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
 | T8b | `T8_TUBE_RUBBER_BAND.md` (Mouth entry) | `opus/t8-tube-mouth` | **merged** into `develop-secondary` | 5071b29 | 347/347 | P-014 | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |

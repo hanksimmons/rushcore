@@ -27,7 +27,7 @@ RUSHCORE_EXIT_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # tally wh
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --sky --seed 1      # a Sky Terraces stage (World › Archetype = 3, D-103)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 4            # a Highlands stage with three exits: A on the primary, B and C on terminal lines (D-105)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 4 --stage 3 # start that run at its fourth stage (T1; the seed row reads run/stage)
-/Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user:// (the last frame is the T3 showcase row)
 ```
 
 The self-test drives the real controller with synthetic input on an isolated rig plus the
@@ -72,6 +72,17 @@ the health bar sits slim above it and appears only once health is off full), boo
 number and a progress line top-centre, the wallet top-right. `HUD › Visible`, `HUD › Scale` and `HUD › Band Word`
 (the `ROLL / RUSH / CRUSH / OVERDRIVE` word, off by default) are in the F1 panel. It carries no numbers: m/s, caps and
 takeoff stay on the F2 telemetry, which also gained a `health` row.
+
+**Enemy and pickup showcase** (`World › Enemy Showcase`, off by default; T3): a row 40 m to the left of the lab
+spawn, running back down the calibration lane, carrying one of each enemy (Pylon, Bulwark, Strider, Shooter), one
+elite Pylon, one of each pickup shape (boost ring, coin, reward tetrahedron, item cube, shortcut chevrons, exit
+pillars) and a burst pad that throws twelve coins when the ball rolls over it. Toggling it rebuilds the world, and
+it exists on the lab terrain only: with the calibration strip or a generated stage up it does nothing at all, so turn
+`World › Generated Stage` off first. Nothing in the row has a collider
+(P-006): drive through it. Panel buttons **Play Crush**, **Play Fail**, **Play Damage** and **Burst 12 Coins** fire
+the one-shots without leaving the spawn; the first two aim at the row's Pylon and Bulwark when it is up and at the
+ball when it is not. Generated stages gained one thing from this: every exit pad now carries a 14 m pillar pair
+beside its EXIT sign, so a pad reads from a long way out.
 
 **Prop scatter** (`World › Prop Density`, default 0.19; T4): scenery on a generated stage is archetype-aware —
 highlands rocks and crystals off the corridor edge, canyon slabs and fins on the wall tops, dune stones and tufts on

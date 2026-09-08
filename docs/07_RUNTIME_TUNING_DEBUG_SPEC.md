@@ -180,7 +180,10 @@ Disabled by default. `World › Sample Stage` picks a named archetype and seed f
 manual sample from the panel). Delivered (D-104): `World › Route Debug Lines` (route, optional lines by floor, checkpoints,
 tube axes, terminal lines in their own colour; on by default in the toy) and `World › Stage Debug Views` (corridor
 bounds, challenge zones, structure bounds, floors and drains, exit pad rings (D-105); off by default). Player contact
-and impact vectors remain in the telemetry rows; the `stage` row names the exit reached, leads with the stage index
+and impact vectors remain in the telemetry rows. `World › Enemy Showcase` (T3, off by default) stands a lab row 40 m
+beside the calibration lane carrying one of each enemy, one elite, one of each pickup shape and a reward-burst pad, so
+the silhouettes can be judged at the cap; it is lab terrain only, never the strip and never a generated stage, and
+toggling it rebuilds the world. The `stage` row names the exit reached, leads with the stage index
 in the run (`3/9`) and shows `(outro)` while the completion sequence plays (T1). The `health` row carries the value
 the HUD draws (T2). The developer overlay keeps the numbers; the player HUD (06 §12) carries none of them.
 
@@ -198,6 +201,12 @@ Useful controls:
 - pause,
 
 These intentionally bypass normal game rules to accelerate iteration.
+
+Delivered (T3): **Play Crush**, **Play Fail**, **Play Damage** and **Burst 12 Coins**, on the panel. The first two
+fire on the showcase row's Pylon and Bulwark when it is up and at the ball when it is not; the third is the player's
+own damage pulse; the fourth throws twelve coins at the ball and lets it magnetise them into the run's wallet, which
+is also what the row's burst pad does when the ball rolls over it. None of them has a hotkey: the panel is enough for
+a cue that is judged by looking at it.
 
 Delivered (T2): **Kill Player** (`K`) takes health to zero, which recovers to the checkpoint and refills on arrival
 (P-004); **Heal Player** (`H`) returns it to full. Both are on the panel too. Nothing damages health yet.

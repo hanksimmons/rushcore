@@ -78,6 +78,46 @@ is a judgement.
 - **Lever:** `GroundFollowDeadband` and `TubeAxisUncertainty` in `PlayerPhysics`, which now stand at 3 cm and 1 cm.
 - **To judge:** `World › Sample Stage` = 1, boost through and watch the contact point.
 
+### A-7. The enemy silhouettes have never been seen at the cap — **DECIDED (2026-09-08)**
+
+**The user's verdict, from the first pass at the cap: "all the enemies should be like 3-4x current size."** Delivered
+at **3.5×** through one constant, `EnemyVisual.SizeScale`; the four builders keep their nominal proportions, so that
+constant is the only thing to move if a second pass wants them bigger or smaller again. As built: Pylon 1.8 m across
+and 9.1 m tall, Bulwark 11.2 × 6.3 × 5.6 m, Strider an 8.4 m body 5.6 m up, Shooter a 4.2 m core 8.4 m overall,
+elite the same at 1.3× again. The showcase row's spacing went 14 m → 26 m with them so a Bulwark no longer touches
+its neighbours, which makes the row 286 m long.
+
+Left open underneath the size: whether each silhouette now says what 02 §7 wants — Bulwark "not at this speed",
+Pylon "ram it", the Strider's crossing axis obvious, the elite unmistakable — is still a read only you can make, and
+it is worth making again now that they are big enough to see.
+
+- **Lever:** `EnemyVisual.SizeScale`, and the nominal numbers in its four builders.
+- **To judge:** `World › Generated Stage` off, `World › Enemy Showcase` on, then run the lab lane past the row.
+
+### A-8. A reward burst cannot catch a ball above about 60 m/s — anywhere, including on its own line
+
+Measured: twelve coins thrown 30 m to the side of a ball travelling at 73 m/s collected **0 of 12** and the burst
+freed itself at its 6 s limit. Parked, the same burst collects all twelve in well under a second.
+
+The geometry is worse than "do not throw it beside the ball", which is what this entry first said. A coin is given no
+share of the ball's velocity at spawn, and the magnet's ceiling is P-007's 60 m/s, so a coin closes on a receding
+ball at `60 − v`. **Above 60 m/s it never closes, whatever direction the burst was thrown in.** A burst thrown exactly
+where the ball is — which is where a crush puts it — spends its 0.4 s free flight while the ball travels 59 m at the
+base cap, and then falls further behind every tick. So as it stands, a reward burst only pays out below 60 m/s: below
+the Rush band, and well under the 148.5 m/s cap, never mind D-088's 255 m/s ceiling.
+
+- **Why this matters now:** Phase 4's impact model is what will spawn these, and crushing happens at speed. As built,
+  the reward for a crush at the cap is nothing.
+- **Options:** (a) give each coin the ball's velocity at spawn, so the burst travels with the player and the magnet
+  only has to close a small relative gap — this is the usual fix and keeps the 0.4 s arc readable; (b) raise
+  `RewardBurst.MagnetSpeed` above the Flow ceiling (255 m/s), which collects everything but makes the arc a snap;
+  (c) magnetise toward where the ball *will be* rather than where it is; (d) accept it, and let Phase 4 decide that
+  rewards are collected on the slow-down rather than in the rush.
+- **Recommendation:** (a). It is the one that keeps P-007's presentation — a real arc, then a magnet — intact.
+- **Lever:** `RewardBurst.Spawn` (the initial `_velocity`) and `RewardBurst.MagnetSpeed`, currently 60 m/s (P-007).
+- **To judge:** drive the showcase row's line at speed and cross the burst pad at the end of it (the wallet is top
+  right on the HUD, and should not move), then roll over the same pad at walking pace and watch all twelve come in.
+
 ---
 
 ## B. Needs your call on approach
@@ -130,8 +170,8 @@ you reported: rolling in at the cap now costs 2% of the entry speed, down from 1
 
 ### D-1. What the parallel track takes next
 
-- **T3** (enemy and pickup visuals) is ready and is the last of the three packets that share `GameBootstrap`,
-  `IDebugActions`, `TuningPanel` and `GameplayTuning`, so it runs alone.
-- **T5** (generation measurements) is isolated and can go at any time.
+- **T3** (enemy and pickup visuals) is **delivered** on `opus/t3-visuals` (2026-09-08). It left A-7 and A-8 above.
+- **T5** (generation measurements) is isolated and can go at any time, and is now the only packet left that is not
+  waiting on you.
 - **T6** (sample-stage presentation fixes) opens as soon as playtest notes exist. Two have landed and are done: the
   tube entry collision and the speedometer.

@@ -2,6 +2,7 @@ using Godot;
 using Rushcore.Camera;
 using Rushcore.DebugUi;
 using Rushcore.Generation;
+using Rushcore.Pickups;
 using Rushcore.Player;
 using Rushcore.Run;
 using Rushcore.Testing;
@@ -26,6 +27,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private TuningPanel _tuningPanel = null!;
     private TelemetryOverlay _telemetry = null!;
     private ColorRect _fade = null!;
+    private PlayerVfx _playerVfx = null!;
+    private readonly RandomNumberGenerator _burstRng = new();
     private PlayerHud _hud = null!;
     private readonly PlayerHealth _health = new();
     private readonly RunDirector _director = new(DefaultSeed);
@@ -85,13 +88,16 @@ public partial class GameBootstrap : Node3D, IDebugActions
         AddChild(_world);
         _world.BoostPickupCollected += amount => _player.RefillBoost(amount);
         _world.StageCompleted += OnStageCompleted;
+        // The showcase row's pad throws the coins; the wallet they land in is the run's (T2, T3).
+        _world.RewardPadTriggered += at => SpawnRewardBurst(at, 12);
 
         _player = new PlayerPhysics(_tuning);
         AddChild(_player);
         _player.GlobalPosition = _world.SpawnPoint;
         _player.SetCheckpoint(_world.SpawnPoint);
         _player.AddChild(new PlayerVisual(_tuning, _player));
-        _player.AddChild(new PlayerVfx(_tuning, _player));
+        _playerVfx = new PlayerVfx(_tuning, _player);
+        _player.AddChild(_playerVfx);
         // Health has no damage source yet (T2, P-004): reaching zero recovers to the checkpoint, and the value
         // comes back when the ball arrives rather than in the same instant.
         _health.Died += () => GD.Print("[RUSHCORE] Player down; recovering to the checkpoint.");
@@ -255,8 +261,36 @@ public partial class GameBootstrap : Node3D, IDebugActions
             case 312: Capture("rushcore_06_release.png"); break;
             case 330: Input.ActionPress(InputBootstrap.Jump, 1f); break;
             case 336: Capture("rushcore_07_slam.png"); Input.ActionRelease(InputBootstrap.Jump); break;
-            case 380: Capture("rushcore_08_after.png"); GetTree().Quit(); break;
+            case 380:
+                Capture("rushcore_08_after.png");
+                // One frame of the T3 showcase row (06 §8, §9), so the silhouettes can be reviewed from
+                // another device. The row is lab-only, so the lab is what gets built whatever the saved
+                // override says; the toggle rebuilds the world and the teleport waits for that to land.
+                _tuning.World.GeneratedStage = false;
+                _tuning.World.CalibrationStrip = false;
+                _tuning.World.SampleStage = 0f;
+                _tuning.World.EnemyShowcase = true;
+                break;
+            case 420: TeleportToShowcase(); break;
+            case 445: Capture("rushcore_09_showcase.png", checkGroundVisible: true); GetTree().Quit(); break;
         }
+    }
+
+    /// <summary>
+    /// Parks the ball on the lane opposite the middle of the showcase row and turns it to face across at the row,
+    /// which is the angle the row is meant to be read from while driving past it. The telemetry plate stands down
+    /// for the frame so it does not cover a third of what the capture exists to show.
+    /// </summary>
+    private void TeleportToShowcase()
+    {
+        float midX = WorldDressing.ShowcaseStartX - WorldDressing.ShowcaseSpacing * 5.5f;
+        // Far enough back that most of a 286 m row is in frame; the lane itself is only 40 m off the row.
+        Vector3 p = _world.SurfacePoint(midX, TerrainHeightField.LaneZ - 70f, _tuning.Movement.BallRadius + 0.4f);
+        _player.SetCheckpoint(p);
+        _camera.SnapYawToward(Vector3.Back);        // +Z: the row stands 40 m that way
+        _player.TeleportTo(p);
+        _camera.SnapToPlayer();
+        _telemetry.Visible = false;
     }
 
     private void Capture(string fileName, bool checkGroundVisible = false)
@@ -438,6 +472,36 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public void KillPlayer() => _health.Kill();
 
     public void HealPlayer() => _health.Refill();
+
+    // ---------------- T3: the combat one-shots and the reward burst ----------------
+
+    public void PlayCrush()
+    {
+        if (_world.Showcase is { } row) row.Pylon.PlayCrush();
+        else _world.Vfx.Play(Rushcore.Vfx.WorldVfxKind.Crush, _player.GlobalPosition);
+    }
+
+    public void PlayFailedImpact()
+    {
+        if (_world.Showcase is { } row) row.Bulwark.PlayFail();
+        else _world.Vfx.Play(Rushcore.Vfx.WorldVfxKind.FailedImpact, _player.GlobalPosition);
+    }
+
+    public void PlayDamage() => _playerVfx.PlayDamage();
+
+    public void BurstCoins() => SpawnRewardBurst(_player.GlobalPosition + Vector3.Up * 2f, 12);
+
+    /// <summary>
+    /// Throws a reward burst and points its collected coins at the run's wallet (P-007). The burst is kinematic
+    /// and frees itself; nothing here can touch the ball's velocity, which is the whole reason auto-collect
+    /// exists (02 §12).
+    /// </summary>
+    private void SpawnRewardBurst(Vector3 origin, int coins)
+    {
+        var burst = RewardBurst.Spawn(_world, origin, PickupKind.Currency, coins, _burstRng,
+                                      () => _player.GlobalPosition, _world.Vfx);
+        burst.Collected += (_, amount) => _director.AddCurrency(amount);
+    }
 
     public void CopySeedToClipboard() => DisplayServer.ClipboardSet(_director.RunSeed.ToString());
 }

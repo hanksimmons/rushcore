@@ -43,6 +43,16 @@ public partial class PlayerVfx : Node3D
     private float _burstAge = -1f;
     private Vector3 _burstOrigin;
     private const float BurstEffectSeconds = 0.42f;
+
+    // Damage (06 §10): a red-edged pulse on the ball itself. There is no damage source yet (T2's health is a
+    // value); this is the cue the impact model will fire, built now so the main track only has to call it.
+    private GpuParticles3D _damage = null!;
+    private ParticleProcessMaterial _damagePm = null!;
+    private MeshInstance3D _damageFlash = null!;
+    private StandardMaterial3D _damageMat = null!;
+    private float _damageAge = -1f;
+    private const float DamageEffectSeconds = 0.30f;
+    private static readonly Color DamageColor = new(1.00f, 0.24f, 0.20f);
     private static readonly Color SparkColor = new(0.40f, 0.78f, 1.00f);
     private static readonly Color BoomColor = new(0.72f, 0.90f, 1.00f);
 
@@ -50,7 +60,7 @@ public partial class PlayerVfx : Node3D
     private Vector3 _travelDir = Vector3.Forward;
 
     // Pending one-shots: set in physics-step handlers, fired in _Process.
-    private bool _pendingJump, _pendingLand, _pendingBurst;
+    private bool _pendingJump, _pendingLand, _pendingBurst, _pendingDamage;
     private float _pendingJumpCharge;
     private float _pendingLandImpact;
     private bool _pendingLandSlam;
@@ -84,6 +94,7 @@ public partial class PlayerVfx : Node3D
         BuildJumpBurst(softMix);
         BuildLandBurst(softMix);
         BuildBurst(chunkAdd);
+        BuildDamage(softAdd);
         BuildCarve(chunkMix, softMix);
 
         ApplyRadius(Mathf.Max(0.05f, _t.Movement.BallRadius));
@@ -116,6 +127,16 @@ public partial class PlayerVfx : Node3D
     }
 
     private void OnLandingBurst(float speed) => _pendingBurst = true;
+
+    /// <summary>
+    /// The player took damage (06 §10, T3): a short red flash around the ball and a spray of red motes off it.
+    /// Player-local and 0.3 s long, so it never sits over the surface the ball is about to land on (08 §9).
+    /// Fired by the debug action today and by the impact model when it lands.
+    /// </summary>
+    public void PlayDamage() => _pendingDamage = true;
+
+    /// <summary>True while the damage pulse is drawing (the harness reads it).</summary>
+    public bool DamagePulseActive => _damageAge >= 0f;
 
     // ---------------- per-frame drive ----------------
 
@@ -170,6 +191,7 @@ public partial class PlayerVfx : Node3D
 
         FirePendingBursts(r);
         AnimateBurst(dt, r);
+        AnimateDamage(dt, r);
     }
 
     /// <summary>
@@ -248,6 +270,14 @@ public partial class PlayerVfx : Node3D
             }
         }
 
+        if (_pendingDamage)
+        {
+            _pendingDamage = false;
+            _damage.Restart();
+            _damageAge = 0f;
+            _damageFlash.Visible = true;
+        }
+
         if (_pendingBurst)
         {
             _pendingBurst = false;
@@ -296,6 +326,23 @@ public partial class PlayerVfx : Node3D
         _bowRing.Basis = face * Basis.Identity.Scaled(new Vector3(bowScale, r * 0.5f, bowScale));
         _bowRing.Position = fwd * r * (1.3f + 2.2f * ease);
         _bowMat.AlbedoColor = new Color(BoomColor, 0.7f * fade);
+    }
+
+    /// <summary>The damage flash: a shell around the ball that swells a little and fades out fast.</summary>
+    private void AnimateDamage(float dt, float r)
+    {
+        if (_damageAge < 0f) return;
+        _damageAge += dt;
+        float t01 = _damageAge / DamageEffectSeconds;
+        if (t01 >= 1f)
+        {
+            _damageAge = -1f;
+            _damageFlash.Visible = false;
+            return;
+        }
+        float fade = Mathf.Pow(1f - t01, 1.4f);
+        _damageFlash.Scale = Vector3.One * r * (2.1f + 1.6f * t01);
+        _damageMat.AlbedoColor = new Color(DamageColor, 0.55f * fade);
     }
 
     private Vector3 _boomOriginAbove(float r) => _burstOrigin + Vector3.Up * (r * 0.12f);
@@ -355,6 +402,13 @@ public partial class PlayerVfx : Node3D
         _carveSprayPm.EmissionSphereRadius = r * 0.6f;
         _carveSprayPm.ScaleMin = 0.30f * r;
         _carveSprayPm.ScaleMax = 0.80f * r;
+
+        _damage.Position = Vector3.Zero;
+        _damagePm.EmissionSphereRadius = r * 1.0f;
+        _damagePm.InitialVelocityMin = 5f * r;
+        _damagePm.InitialVelocityMax = 12f * r;
+        _damagePm.ScaleMin = 0.10f * r;
+        _damagePm.ScaleMax = 0.24f * r;
 
         _sparks.Position = contact;
         _sparksPm.EmissionRingRadius = r * 0.8f;
@@ -470,6 +524,33 @@ public partial class PlayerVfx : Node3D
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         AddChild(_bowRing);
+    }
+
+    /// <summary>Damage (06 §10): red motes off the whole ball plus a shell flash, both player-local.</summary>
+    private void BuildDamage(Material draw)
+    {
+        _damagePm = Sphere(new Vector3(0f, 1f, 0f), 180f, 5f, 12f, new Vector3(0f, -12f, 0f), Ramp(DamageColor, 1.0f));
+        _damagePm.DampingMin = 3f;
+        _damagePm.DampingMax = 7f;
+        _damage = Emitter("DamagePulse", 64, 0.30f, true, _damagePm, _quad, draw);
+
+        _damageMat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            CullMode = BaseMaterial3D.CullModeEnum.Back,
+            AlbedoColor = new Color(DamageColor, 0f),
+        };
+        _damageFlash = new MeshInstance3D
+        {
+            Name = "DamageFlash",
+            Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 12, Rings = 7 },
+            MaterialOverride = _damageMat,
+            Visible = false,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_damageFlash);
     }
 
     private GpuParticles3D Emitter(string name, int amount, float lifetime, bool oneShot,

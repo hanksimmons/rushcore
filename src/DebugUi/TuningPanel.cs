@@ -226,6 +226,10 @@ public partial class TuningPanel : Control
             ("Refill Boost", () => { _debug.RefillBoost(); Status("Boost refilled."); }),
             ("Kill Player", () => { _debug.KillPlayer(); Status("Player down; recovering."); }),
             ("Heal Player", () => { _debug.HealPlayer(); Status("Health full."); }),
+            ("Play Crush", () => { _debug.PlayCrush(); Status("Crush one-shot."); }),
+            ("Play Fail", () => { _debug.PlayFailedImpact(); Status("Failed-impact one-shot."); }),
+            ("Play Damage", () => { _debug.PlayDamage(); Status("Damage pulse."); }),
+            ("Burst 12 Coins", () => { _debug.BurstCoins(); Status("Twelve coins thrown."); }),
         }));
 
         _statusLabel = new Label { Text = string.Empty };

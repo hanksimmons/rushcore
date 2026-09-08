@@ -26,6 +26,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     private IHeightSource _field = null!;
     private int _nx = Samples, _nz = Samples;
     private WorldDressing _dressing = null!;
+    private Rushcore.Vfx.WorldVfx _vfx = null!;
     private Node3D _terrainRoot = null!;
     private Node3D _structureRoot = null!;
     private StaticBody3D _terrainBody = null!;
@@ -129,10 +130,16 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     {
         bool wantStage = _t.World.GeneratedStage;
         bool wantStrip = !wantStage && _t.World.CalibrationStrip;
-        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype) && _t.World.StageDebugViews == BuiltDebugViews;
+        // The showcase row is lab-only (P-006), so the toggle is compared only where it can be honoured. Comparing
+        // it everywhere would leave a stage permanently mismatched while the toggle is on and rebuild the world every frame.
+        bool showcaseOk = wantStage || wantStrip || _t.World.EnemyShowcase == BuiltShowcase;
+        return wantStage == IsStage && wantStrip == IsStrip && (!IsStage || Archetype == WantedArchetype)
+               && _t.World.StageDebugViews == BuiltDebugViews && showcaseOk;
     }
     /// <summary>Whether the last dressing build drew the stage debug views (the toggle rebuilds the world).</summary>
     public bool BuiltDebugViews { get; private set; }
+    /// <summary>Whether the last dressing build stood the T3 showcase row up (the toggle rebuilds the world).</summary>
+    public bool BuiltShowcase { get; private set; }
     /// <summary>Half extents of the active terrain in metres.</summary>
     public float HalfX { get; private set; } = Extent * 0.5f;
     public float HalfZ { get; private set; } = Extent * 0.5f;
@@ -164,8 +171,17 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     /// <summary>Raised once per build when the ball first reaches an exit pad; carries the exit index (T1).</summary>
     public event Action<int>? StageCompleted;
 
+    /// <summary>The showcase row's burst pad was driven over (T3): the composition root throws the coins.</summary>
+    public event Action<Vector3>? RewardPadTriggered;
+
     /// <summary>Dressing of the built world; the completion outro pulses the exit through it.</summary>
     public WorldDressing Dressing => _dressing;
+
+    /// <summary>The world's one-shot effects (T3, 06 §10): crush, failed impact, pickup, exit.</summary>
+    public Rushcore.Vfx.WorldVfx Vfx => _vfx;
+
+    /// <summary>The T3 lab showcase row, or null when <c>World › Enemy Showcase</c> is off (P-006).</summary>
+    public WorldDressing.ShowcaseRow? Showcase => _dressing.Showcase;
 
     public override void _Ready()
     {
@@ -187,9 +203,15 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         _structureRoot = new Node3D { Name = "Structures" };
         AddChild(_structureRoot);
 
+        // World one-shot VFX (T3, 06 §10): built once with a fixed pool, so a rebuild never disturbs it and
+        // nothing is allocated when an effect fires.
+        _vfx = new Rushcore.Vfx.WorldVfx();
+        AddChild(_vfx);
+
         _dressing = new WorldDressing(_t, this);
         AddChild(_dressing);
         _dressing.BoostPickupCollected += amount => BoostPickupCollected?.Invoke(amount);
+        _dressing.RewardPadTriggered += at => RewardPadTriggered?.Invoke(at);
 
         Build();
     }
@@ -270,6 +292,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
             GD.Print($"[RUSHCORE] scatter: {ScatterRocks} rocks, {ScatterCrystals} crystals, {ScatterMarkers} markers " +
                      $"({ScatterColliders} with colliders) in {ScatterMillis} ms at density {_t.World.PropDensity:0.00}");
         BuiltDebugViews = _t.World.StageDebugViews;
+        BuiltShowcase = _dressing.Showcase is not null;
         BuildMillis = Time.GetTicksMsec() - start;
         GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
                  $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +

@@ -127,7 +127,7 @@ outside this packet fails.
 
 ## Delivery record (filled by the implementing agent)
 
-- **Branch / commits:** `opus/t1-stage-lifecycle` off `develop-secondary` (5d940c3).
+- **Branch / commits:** `opus/t1-stage-lifecycle` off `develop-secondary` (5d940c3); 4db5348.
 - **Harness (full run, count and wall time):** 337/337 in 107 s (default, Rolling Highlands); canyon 334/334,
   dunes 337/337, sky 338/338 (`RUSHCORE_ARCHETYPE`, run because the packet touches stage dressing). Golden hashes unchanged: tube 7D24840659B28767, tunnels + pit 327D9152EADB87E0, sky floor 3
   C453C38B4481CEB3, dune trains 1903C69DC8E57D46, gap + turns 3CA4CC5E70D0F945, three exits DE6A618E62DEB3EE.

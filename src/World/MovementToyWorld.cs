@@ -41,6 +41,8 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     }
 
     public int Seed { get; private set; }
+    /// <summary>Which stage of the run this build is (T1); the seed chain has always taken it (05 §9).</summary>
+    public int StageIndex { get; private set; }
     public Vector3 SpawnPoint { get; private set; }
     /// <summary>Flat direction the player faces at spawn (down the calibration lane).</summary>
     public Vector3 SpawnFacing => _field.SpawnFacing;
@@ -109,6 +111,8 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
                     StageExitTime = StageClock;
                     StageExitIndex = e.Index;
                     GD.Print($"[RUSHCORE] Stage exit {e.Label} reached in {StageExitTime:0.0} s (route speed model: {Stage.SpeedProfile.TotalTime:0.0} s base kit to exit A)");
+                    _dressing.PulseExit(e.Index);
+                    StageCompleted?.Invoke(e.Index);
                     break;
                 }
 
@@ -144,6 +148,12 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
 
     /// <summary>Raised when the player collects a boost pickup; carries the refill amount.</summary>
     public event Action<float>? BoostPickupCollected;
+
+    /// <summary>Raised once per build when the ball first reaches an exit pad; carries the exit index (T1).</summary>
+    public event Action<int>? StageCompleted;
+
+    /// <summary>Dressing of the built world; the completion outro pulses the exit through it.</summary>
+    public WorldDressing Dressing => _dressing;
 
     public override void _Ready()
     {
@@ -189,7 +199,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         {
             var generator = new StageGenerator(_t.Movement, _t.Flow, _t.JumpSlam);
             Archetype = WantedArchetype;
-            Stage = generator.Generate(new StageGenerationRequest(Seed, 0, Archetype));
+            Stage = generator.Generate(new StageGenerationRequest(Seed, StageIndex, Archetype));
             _field = Stage.HeightField!;
             var r = Stage.Report;
             StageSummary = $"{ArchetypeRules.Label(Archetype)} {(r.Passed ? "valid" : "INVALID")}{(r.UsedFallback ? " FALLBACK" : "")} " +
@@ -197,7 +207,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +
                            $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Tubes.Count} tubes, {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Exits.Count} exits, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
-            GD.Print($"[RUSHCORE] Stage generated seed={Seed}/0 attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
+            GD.Print($"[RUSHCORE] Stage generated seed={Seed}/{StageIndex} attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
             foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
         }
         else
@@ -246,10 +256,36 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
                  $"{Triangles / 1000f:0} k tris in {Tiles} tiles, heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");
     }
 
+    /// <summary>Rebuilds on a new seed, keeping the stage index (the lab, the strip and "restart same seed").</summary>
     public void Regenerate(int seed)
     {
         Seed = seed;
         Build();
+    }
+
+    /// <summary>
+    /// Rebuilds as the requested stage of a run (T1). The archetype still comes from the world toggle the
+    /// request was made with, so the panel, <see cref="MatchesTuning"/> and the built stage never disagree.
+    /// </summary>
+    public void Regenerate(StageGenerationRequest request)
+    {
+        Seed = request.RunSeed;
+        StageIndex = request.StageIndex;
+        Build();
+    }
+
+    /// <summary>
+    /// Debug teleports that skip forward along the primary (07 §12) move progress with them, so the tracker
+    /// and the armed anchor stay honest instead of trailing at the start pad. The clock is untouched.
+    /// </summary>
+    public void SkipStageProgressTo(int vertexIndex)
+    {
+        if (Stage is null) return;
+        StageProgressIndex = Mathf.Clamp(vertexIndex, 0, Stage.PrimaryRoute.Vertices.Count - 1);
+        var cps = Stage.Checkpoints;
+        int next = -1;
+        while (next + 1 < cps.Count && cps[next + 1].PrimaryIndex <= StageProgressIndex) next++;
+        StageCheckpointIndex = next;
     }
 
     /// <summary>Authoritative height source. Bilinear over the same grid the collider uses.</summary>

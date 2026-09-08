@@ -13,12 +13,20 @@ public interface IDebugActions
     GameplayTuning Tuning { get; }
     PlayerPhysics Player { get; }
     MovementToyWorld World { get; }
+    /// <summary>The run's seed and stage index (T1); the HUD and the panel read it, nobody else advances it.</summary>
+    Rushcore.Run.RunDirector Run { get; }
     string SeedText { get; }
+    /// <summary>True while the stage-completion outro is playing (controls locked, fade running).</summary>
+    bool StageOutroActive { get; }
 
     void RestartSameSeed();
     void RestartNewSeed();
     void RecoverPlayer();
     void TeleportToStart();
+    /// <summary>Drops the ball on the primary 200 m short of the exit pad (07 §12).</summary>
+    void TeleportNearExit();
+    /// <summary>Starts a run at a stage index and rebuilds; the `--stage N` flag takes this path.</summary>
+    void StartRun(int runSeed, int stageIndex);
     void RefillBoost();
     void CopySeedToClipboard();
 }

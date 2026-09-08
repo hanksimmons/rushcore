@@ -122,7 +122,8 @@ Compiled defaults remain clean-build authority.
 
 ## 9. Seed/debug tools
 
-Required eventually:
+Required eventually (the seed row reads `run/stage` since T1: the run seed and the stage index inside it; **Copy
+Seed** copies the run seed alone, which is what `-- --seed N` takes):
 
 - show run/stage seed,
 - restart same stage seed,
@@ -172,7 +173,8 @@ Disabled by default. `World › Sample Stage` picks a named archetype and seed f
 manual sample from the panel). Delivered (D-104): `World › Route Debug Lines` (route, optional lines by floor, checkpoints,
 tube axes, terminal lines in their own colour; on by default in the toy) and `World › Stage Debug Views` (corridor
 bounds, challenge zones, structure bounds, floors and drains, exit pad rings (D-105); off by default). Player contact
-and impact vectors remain in the telemetry rows; the `stage` row names the exit reached.
+and impact vectors remain in the telemetry rows; the `stage` row names the exit reached, leads with the stage index
+in the run (`3/9`) and shows `(outro)` while the completion sequence plays (T1).
 
 ## 12. Debug actions
 
@@ -188,6 +190,11 @@ Useful controls:
 - pause,
 
 These intentionally bypass normal game rules to accelerate iteration.
+
+Delivered (T1): **Teleport Near Exit** (`E`, or the panel button) drops the ball on the primary 200 m short of exit
+A, facing down the route and grounded, and carries stage progress and the armed anchor with it so the tracker never
+trails at the start pad. It reaches the completion sequence without driving the whole stage. `Restart Same Seed`
+rebuilds the current stage index; `New Seed` starts a new run at index 0.
 
 ## 13. Shipping behavior
 

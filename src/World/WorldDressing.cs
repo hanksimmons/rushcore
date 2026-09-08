@@ -41,6 +41,11 @@ public partial class WorldDressing : Node3D
     private StandardMaterial3D _matPickup = null!;
 
     private readonly List<BoostRing> _pickups = new();
+    /// <summary>The EXIT pad signs in exit order, and the hidden flash ring standing on each pad (T1).</summary>
+    private readonly List<Label3D> _exitSigns = new();
+    private readonly List<MeshInstance3D> _exitFlashes = new();
+    private int _pulseExit = -1;
+    private float _pulseLeft;
     /// <summary>One static body holds every prop/marker collider; rebuilt with the content.</summary>
     private StaticBody3D _colliders = null!;
     private float _clock;
@@ -233,6 +238,9 @@ public partial class WorldDressing : Node3D
             child.QueueFree();
         }
         _pickups.Clear();
+        _exitSigns.Clear();
+        _exitFlashes.Clear();
+        _pulseExit = -1;
 
         _colliders = new StaticBody3D
         {
@@ -271,7 +279,22 @@ public partial class WorldDressing : Node3D
 
         AddSign(_world.SurfacePoint(route.Start.X, route.Start.Z, 26f), "START", 10f);
         // Exits (02 §4, D-105): every pad is named, and a terminal line's fork carries the name at the top of its S.
-        foreach (var e in stage.Exits) AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, 26f), $"EXIT {e.Label}", 10f);
+        // The sign and one hidden ring per pad are what the completion pulse animates (T1, 06 §10 "exit").
+        foreach (var e in stage.Exits)
+        {
+            _exitSigns.Add(AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, 26f), $"EXIT {e.Label}", 10f));
+            var flash = new MeshInstance3D
+            {
+                Mesh = _ringMesh,
+                MaterialOverride = _matPickup,
+                Position = _world.SurfacePoint(e.Position.X, e.Position.Z, 3f),
+                Scale = Vector3.One * WorldScale.PadRadius,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                Visible = false,
+            };
+            _content.AddChild(flash);
+            _exitFlashes.Add(flash);
+        }
         foreach (var e in stage.Exits)
         {
             if (e.IsPrimary) continue;
@@ -642,9 +665,9 @@ public partial class WorldDressing : Node3D
         => AddSign(_world.SurfacePoint(ScaleStripHeightField.X(sd), 0f, 24f), text, 8f);
 
     /// <summary>Billboarded world text, sized in metres of glyph height.</summary>
-    private void AddSign(Vector3 position, string text, float glyphMetres)
+    private Label3D AddSign(Vector3 position, string text, float glyphMetres)
     {
-        _content.AddChild(new Label3D
+        var label = new Label3D
         {
             Text = text,
             FontSize = 64,
@@ -654,7 +677,39 @@ public partial class WorldDressing : Node3D
             OutlineModulate = new Color(0.05f, 0.05f, 0.07f),
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             Position = position,
-        });
+        };
+        _content.AddChild(label);
+        return label;
+    }
+
+    /// <summary>
+    /// Stage completion (T1, 06 §10 "exit"): the pad's sign swells and a ring flashes outward from the pad
+    /// over the outro. Presentation only, on nodes built with the stage, so the node count never moves.
+    /// </summary>
+    public void PulseExit(int exitIndex)
+    {
+        if (exitIndex < 0 || exitIndex >= _exitFlashes.Count) return;
+        _pulseExit = exitIndex;
+        _pulseLeft = Mathf.Max(0.05f, _t.Run.OutroSeconds);
+        _exitFlashes[exitIndex].Visible = true;
+    }
+
+    private void StepExitPulse(float dt)
+    {
+        if (_pulseExit < 0) return;
+        float total = Mathf.Max(0.05f, _t.Run.OutroSeconds);
+        _pulseLeft -= dt;
+        float done = Mathf.Clamp(1f - _pulseLeft / total, 0f, 1f);
+        var sign = _exitSigns[_pulseExit];
+        var flash = _exitFlashes[_pulseExit];
+        sign.Scale = Vector3.One * (1f + 0.6f * Mathf.Sin(done * Mathf.Pi));
+        flash.Scale = Vector3.One * WorldScale.PadRadius * (1f + 2.5f * done);
+        flash.Transparency = done;
+        if (_pulseLeft > 0f) return;
+        sign.Scale = Vector3.One;
+        flash.Visible = false;
+        flash.Transparency = 0f;
+        _pulseExit = -1;
     }
 
     /// <summary>Distance markers along the flat calibration lane: 50 m posts, 100 m gantries.</summary>
@@ -1054,6 +1109,7 @@ public partial class WorldDressing : Node3D
         float dt = (float)delta;
         _clock += dt;
         ApplyFog();
+        StepExitPulse(dt);
 
         for (int i = 0; i < _pickups.Count; i++)
         {

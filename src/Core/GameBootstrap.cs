@@ -1,7 +1,9 @@
 using Godot;
 using Rushcore.Camera;
 using Rushcore.DebugUi;
+using Rushcore.Generation;
 using Rushcore.Player;
+using Rushcore.Run;
 using Rushcore.Testing;
 using Rushcore.Tuning;
 using Rushcore.World;
@@ -22,14 +24,24 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private CameraRig _camera = null!;
     private TuningPanel _tuningPanel = null!;
     private TelemetryOverlay _telemetry = null!;
-    private int _seed = DefaultSeed;
+    private ColorRect _fade = null!;
+    private readonly RunDirector _director = new(DefaultSeed);
     private int _sampleSeen;
     private float _cellSizeSeen, _cellSizeDwell;
+
+    /// <summary>The completion sequence (T1): exit feedback, fade out, rebuild, fade in.</summary>
+    private enum OutroPhase { None, Feedback, FadeOut, FadeIn }
+    private OutroPhase _outro;
+    private float _outroT;
+    private int _outroExit = -1;
 
     public GameplayTuning Tuning => _tuning;
     public PlayerPhysics Player => _player;
     public MovementToyWorld World => _world;
-    public string SeedText => _seed.ToString();
+    public RunDirector Run => _director;
+    public bool StageOutroActive => _outro != OutroPhase.None;
+    /// <summary>Run seed and stage index (T1). The clipboard copies the run seed alone, for `--seed N`.</summary>
+    public string SeedText => $"{_director.RunSeed}/{_director.StageIndex}";
 
     public override void _Ready()
     {
@@ -38,7 +50,13 @@ public partial class GameBootstrap : Node3D, IDebugActions
         // the panel toggle must keep working in that state.
         ProcessMode = ProcessModeEnum.Always;
         GD.Print("[RUSHCORE] Bootstrapping Movement Toy on Godot ", Engine.GetVersionInfo()["string"]);
-        if (SeedFromArgs() is { } seed) { _seed = seed; GD.Print("[RUSHCORE] Seed from command line ", _seed); }
+        if (SeedFromArgs() is { } seed) { _director.StartRun(seed); GD.Print("[RUSHCORE] Seed from command line ", seed); }
+        // `-- --stage N` launches on stage N of that run (T1): the same seed chain, a later stage.
+        if (IntFromArgs("--stage") is { } stageIndex)
+        {
+            _director.StartRun(_director.RunSeed, stageIndex);
+            GD.Print($"[RUSHCORE] Stage index from command line {_director.StageIndex}");
+        }
 
         InputBootstrap.Register();
 
@@ -58,9 +76,10 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (HasFlag("--dunes")) { _tuning.World.GeneratedStage = true; _tuning.World.Archetype = (int)Rushcore.Generation.TerrainArchetype.DuneSea; GD.Print("[RUSHCORE] Dune Sea from command line"); }
         if (HasFlag("--sky")) { _tuning.World.GeneratedStage = true; _tuning.World.Archetype = (int)Rushcore.Generation.TerrainArchetype.SkyTerraces; GD.Print("[RUSHCORE] Sky Terraces from command line"); }
 
-        _world = new MovementToyWorld(_tuning, _seed);
+        _world = new MovementToyWorld(_tuning, _director.RunSeed);
         AddChild(_world);
         _world.BoostPickupCollected += amount => _player.RefillBoost(amount);
+        _world.StageCompleted += OnStageCompleted;
 
         _player = new PlayerPhysics(_tuning);
         AddChild(_player);
@@ -84,6 +103,10 @@ public partial class GameBootstrap : Node3D, IDebugActions
         AddChild(ui);
         _telemetry = new TelemetryOverlay(this);
         ui.AddChild(_telemetry);
+        // Stage transition fade (T1): under the tuning panel, over everything else, never eats a click.
+        _fade = new ColorRect { Name = "StageFade", Color = new Color(0f, 0f, 0f, 0f), MouseFilter = Control.MouseFilterEnum.Ignore };
+        _fade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        ui.AddChild(_fade);
         _tuningPanel = new TuningPanel(this) { Visible = false };
         ui.AddChild(_tuningPanel);
 
@@ -108,11 +131,13 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private int _screenshotFrame;
 
     /// <summary>`-- --seed N` launches on a named world seed (regression seeds, the G0 manual sample).</summary>
-    private static int? SeedFromArgs()
+    private static int? SeedFromArgs() => IntFromArgs("--seed");
+
+    private static int? IntFromArgs(string flag)
     {
         string[] args = OS.GetCmdlineUserArgs();
         for (int i = 0; i + 1 < args.Length; i++)
-            if (args[i] == "--seed" && int.TryParse(args[i + 1], out int seed)) return seed;
+            if (args[i] == flag && int.TryParse(args[i + 1], out int value)) return value;
         return null;
     }
 
@@ -129,6 +154,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
         if (_screenshotFrame > 0) StepScreenshotCapture();
 
+        if (_outro != OutroPhase.None) StepStageOutro((float)delta);
+
         // World › Sample Stage picks a named archetype and seed (docs/10) and rebuilds; the seed row shows the seed.
         int sample = Mathf.RoundToInt(_tuning.World.SampleStage);
         if (sample != _sampleSeen)
@@ -136,17 +163,18 @@ public partial class GameBootstrap : Node3D, IDebugActions
             _sampleSeen = sample;
             if (Rushcore.Generation.SampleStages.At(sample) is { } e)
             {
-                _seed = e.Seed;
                 _tuning.World.GeneratedStage = true;
                 _tuning.World.Archetype = (int)e.Archetype;
                 GD.Print($"[RUSHCORE] Sample stage {sample}: {e.Name} ({e.What}), seed {e.Seed}");
-                RestartSameSeed();
+                StartRun(e.Seed, 0);
             }
         }
 
         // World › Calibration Strip and Cell Size rebuild the whole terrain (Gate M1). The
-        // toggle applies at once; the slider waits until it has stopped moving.
-        if (!_world.MatchesTuning()) RestartSameSeed();
+        // toggle applies at once; the slider waits until it has stopped moving. A transition
+        // sets the archetype and rebuilds in one step, so the watchdog stands down while it runs.
+        if (_outro != OutroPhase.None) { }
+        else if (!_world.MatchesTuning()) RestartSameSeed();
         else if (!Mathf.IsEqualApprox(_tuning.World.CellSize, _world.CellSize))
         {
             if (!Mathf.IsEqualApprox(_tuning.World.CellSize, _cellSizeSeen)) { _cellSizeSeen = _tuning.World.CellSize; _cellSizeDwell = 0f; }
@@ -171,6 +199,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (Input.IsActionJustPressed(InputBootstrap.DebugRefillBoost)) RefillBoost();
         if (Input.IsActionJustPressed(InputBootstrap.DebugRegenerateWorld)) RestartNewSeed();
         if (Input.IsActionJustPressed(InputBootstrap.DebugTeleportStart)) TeleportToStart();
+        if (Input.IsActionJustPressed(InputBootstrap.DebugTeleportNearExit)) TeleportNearExit();
         if (Input.IsActionJustPressed(InputBootstrap.DebugTogglePhysicsHz))
         {
             // V-007: 60 Hz is the baseline; 120 is only to be tried if high-speed
@@ -251,32 +280,144 @@ public partial class GameBootstrap : Node3D, IDebugActions
         GD.Print($"[RUSHCORE] render check: ground-under-player luminance std={std:0.0000} -> {(ok ? "PASS" : "FAIL (uniform: terrain not rendered?)")}");
     }
 
+    // ---------------- stage completion (T1) ----------------
+
+    /// <summary>
+    /// The ball reached an exit pad (02 §4, D-105). Controls lock at once and the outro runs: exit
+    /// feedback while the ball rolls free, a fade, the next stage of the same run, a fade back in.
+    /// With <see cref="RunDirector.AutoAdvance"/> off the completion is still raised and printed but
+    /// nothing is built, so one stage can be driven again and again.
+    /// </summary>
+    private void OnStageCompleted(int exitIndex)
+    {
+        if (!_director.AutoAdvance || _outro != OutroPhase.None) return;
+        _outroExit = exitIndex;
+        _outro = OutroPhase.Feedback;
+        _outroT = 0f;
+        _player.ControlsLocked = true;
+    }
+
+    private void StepStageOutro(float dt)
+    {
+        var r = _tuning.Run;
+        _outroT += dt;
+        switch (_outro)
+        {
+            case OutroPhase.Feedback:
+                if (_outroT < r.OutroSeconds) break;
+                _outro = OutroPhase.FadeOut;
+                _outroT = 0f;
+                break;
+
+            case OutroPhase.FadeOut:
+                SetFade(r.FadeOutSeconds <= 0f ? 1f : _outroT / r.FadeOutSeconds);
+                if (_outroT < r.FadeOutSeconds) break;
+                SetFade(1f);
+                BuildNextStage();
+                _outro = OutroPhase.FadeIn;
+                _outroT = 0f;
+                break;
+
+            case OutroPhase.FadeIn:
+                SetFade(r.FadeInSeconds <= 0f ? 0f : 1f - _outroT / r.FadeInSeconds);
+                if (_outroT < r.FadeInSeconds) break;
+                SetFade(0f);
+                _outro = OutroPhase.None;
+                _player.ControlsLocked = false;
+                break;
+        }
+    }
+
+    private void SetFade(float alpha) => _fade.Color = _fade.Color with { A = Mathf.Clamp(alpha, 0f, 1f) };
+
+    /// <summary>
+    /// The next stage of the same run: same run seed, index + 1, and the archetype the exit taken picks
+    /// (P-011). Flow and boost carry (P-010): the transition teleport keeps the chain. Synchronous, as the
+    /// rebuild has always been; the wall time is printed so the budget stays visible (08 §10).
+    /// </summary>
+    private void BuildNextStage()
+    {
+        ulong stageSeed = _world.Stage?.Request.StageSeed ?? SeedChain.Derive(_director.RunSeed, "stage", _director.StageIndex);
+        var next = RunDirector.NextArchetype(stageSeed, _world.Archetype, _outroExit);
+        string label = _world.StageExitLabel;
+        float clock = _world.StageExitTime, model = _world.Stage?.SpeedProfile.TotalTime ?? 0f;
+        int from = _director.StageIndex;
+
+        ulong start = Time.GetTicksMsec();
+        bool wrapped = _director.Advance(_outroExit);
+        _tuning.World.Archetype = (int)next;
+        _world.Regenerate(_director.Request(next));
+        TeleportToStart(keepChain: true);
+        ulong millis = Time.GetTicksMsec() - start;
+
+        GD.Print($"[RUSHCORE] Stage {_director.RunSeed}/{from} complete by exit {label} in {clock:0.0} s (model {model:0.0} s); " +
+                 $"stage {_director.RunSeed}/{_director.StageIndex} {ArchetypeRules.Label(next)}, next build {millis} ms");
+        if (wrapped) GD.Print("[RUSHCORE] run complete (placeholder)");
+    }
+
     // ---------------- IDebugActions ----------------
     public void RestartSameSeed()
     {
-        _world.Regenerate(_seed);
+        _world.Regenerate(_director.Request(_world.WantedArchetype));
         TeleportToStart();
     }
 
     public void RestartNewSeed()
     {
-        _seed = (int)(Time.GetTicksUsec() & 0x7FFFFFFF);
-        _world.Regenerate(_seed);
+        StartRun((int)(Time.GetTicksUsec() & 0x7FFFFFFF), 0);
+        GD.Print("[RUSHCORE] New world seed ", _director.RunSeed);
+    }
+
+    public void StartRun(int runSeed, int stageIndex)
+    {
+        CancelOutro();
+        _director.StartRun(runSeed, stageIndex);
+        _world.Regenerate(_director.Request(_world.WantedArchetype));
         TeleportToStart();
-        GD.Print("[RUSHCORE] New world seed ", _seed);
+    }
+
+    /// <summary>A manual restart never leaves a half-played outro behind: the fade clears and controls return.</summary>
+    private void CancelOutro()
+    {
+        if (_outro == OutroPhase.None) return;
+        _outro = OutroPhase.None;
+        _outroT = 0f;
+        SetFade(0f);
+        _player.ControlsLocked = false;
     }
 
     public void RecoverPlayer() => _player.RequestRecovery();
 
-    public void TeleportToStart()
+    public void TeleportToStart() => TeleportToStart(keepChain: false);
+
+    private void TeleportToStart(bool keepChain)
     {
         _world.ResetStageProgress();
         _player.SetCheckpoint(_world.SpawnPoint);
         _camera.SnapYawToward(_world.SpawnFacing);   // face down the lane, not the old heading
-        _player.TeleportTo(_world.SpawnPoint);
+        _player.TeleportTo(_world.SpawnPoint, keepChain);
+    }
+
+    /// <summary>
+    /// Debug (07 §12): drops the ball on the primary 200 m short of the exit pad, facing down the route,
+    /// so the completion sequence can be reached without driving the whole stage. Progress and the armed
+    /// anchor move with it; the stage clock is left alone.
+    /// </summary>
+    public void TeleportNearExit()
+    {
+        if (_world.Stage is not { } stage) { TeleportToStart(); return; }
+        var route = stage.PrimaryRoute;
+        int i = route.IndexAtDistance(Mathf.Max(0f, route.Length - 200f));
+        var v = route.Vertices[Mathf.Clamp(i, 0, route.Vertices.Count - 1)];
+        Vector3 p = _world.SurfacePoint(v.Position.X, v.Position.Z, _tuning.Movement.BallRadius + 0.6f);
+        _world.SkipStageProgressTo(i);
+        _player.SetCheckpoint(p);
+        _camera.SnapYawToward(new Vector3(Mathf.Cos(v.Heading), 0f, Mathf.Sin(v.Heading)));
+        _player.TeleportTo(p);
+        GD.Print($"[RUSHCORE] Teleported to {v.Distance:0} m of {route.Length:0} m on the primary ({route.Length - v.Distance:0} m short of exit A)");
     }
 
     public void RefillBoost() => _player.RefillBoost(_tuning.Boost.BoostCapacity);
 
-    public void CopySeedToClipboard() => DisplayServer.ClipboardSet(SeedText);
+    public void CopySeedToClipboard() => DisplayServer.ClipboardSet(_director.RunSeed.ToString());
 }

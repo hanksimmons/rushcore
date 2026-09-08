@@ -172,8 +172,8 @@ public partial class TelemetryOverlay : Control
         Set(Row.Seed, _debug.World.IsStage ? $"{_debug.SeedText}   {_debug.World.StageSummary}" : _debug.SeedText);
         var w = _debug.World;
         Set(Row.Stage, w.IsStage && w.Stage is { } st
-            ? $"clock {w.StageClock,6:0.0} s   progress {st.PrimaryRoute.Vertices[w.StageProgressIndex].Distance,5:0} / {st.PrimaryRoute.Length:0} m   anchor {w.StageCheckpointIndex + 1}/{st.Checkpoints.Count}" +
-              (w.StageExitTime > 0f ? $"   EXIT {w.StageExitLabel} {w.StageExitTime:0.0} s" : $"   {st.Exits.Count} exits") +
+            ? $"{_debug.Run.StageIndex + 1}/{Rushcore.Run.RunDirector.StageCount}   clock {w.StageClock,6:0.0} s   progress {st.PrimaryRoute.Vertices[w.StageProgressIndex].Distance,5:0} / {st.PrimaryRoute.Length:0} m   anchor {w.StageCheckpointIndex + 1}/{st.Checkpoints.Count}" +
+              (w.StageExitTime > 0f ? $"   EXIT {w.StageExitLabel} {w.StageExitTime:0.0} s{(_debug.StageOutroActive ? " (outro)" : "")}" : $"   {st.Exits.Count} exits") +
               (st.Report.Passed ? "" : "   INVALID: " + string.Join("; ", st.Report.Failures.Select(f => f.Name)))
             : "-");
         int overrides = _debug.Tuning.OverrideCount;

@@ -217,6 +217,18 @@ public sealed class VfxTuning
     public float MaxVisualRollRevPerSecond = 3.28499984741211f;
 }
 
+/// <summary>
+/// Stage-completion sequence timings (T1, P-003). Presentation pacing, not feel values: they are
+/// not part of the frozen movement baseline and are safe to change without a promotion.
+/// </summary>
+public sealed class RunTuning
+{
+    /// <summary>Exit feedback before the fade begins; controls are locked and the ball rolls free.</summary>
+    public float OutroSeconds = 0.7f;
+    public float FadeOutSeconds = 0.5f;
+    public float FadeInSeconds = 0.4f;
+}
+
 /// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>
 public sealed class WorldTuning
 {
@@ -257,6 +269,7 @@ public sealed class GameplayTuning
     public readonly WorldTuning World = new();
     public readonly FlowTuning Flow = new();
     public readonly CarveTuning Carve = new();
+    public readonly RunTuning Run = new();
 
     public const string CatMovement = "Movement";
     public const string CatJumpSlam = "Jump / Slam";
@@ -266,9 +279,10 @@ public sealed class GameplayTuning
     public const string CatWorld = "World";
     public const string CatFlow = "Flow";
     public const string CatCarve = "Carve";
+    public const string CatRun = "Run";
 
     public static readonly string[] Categories =
-        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatWorld };
+        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatRun, CatWorld };
 
     public IReadOnlyList<TuningParameter> Parameters { get; }
     public IReadOnlyList<TuningToggle> Toggles { get; }
@@ -382,6 +396,11 @@ public sealed class GameplayTuning
         F(CatVfx, "Carve Effect", 0f, 3f, () => x.CarveEffectStrength, v => x.CarveEffectStrength = v);
         F(CatVfx, "Squash / Stretch", 0f, 3f, () => x.SquashStretchStrength, v => x.SquashStretchStrength = v);
         F(CatVfx, "Max Visual Roll (rev/s)", 0.5f, 12f, () => x.MaxVisualRollRevPerSecond, v => x.MaxVisualRollRevPerSecond = v);
+
+        var rn = Run;
+        F(CatRun, "Outro (s)", 0f, 3f, () => rn.OutroSeconds, v => rn.OutroSeconds = v);
+        F(CatRun, "Fade Out (s)", 0f, 3f, () => rn.FadeOutSeconds, v => rn.FadeOutSeconds = v);
+        F(CatRun, "Fade In (s)", 0f, 3f, () => rn.FadeInSeconds, v => rn.FadeInSeconds = v);
 
         var w = World;
         F(CatWorld, "Terrain Amplitude", 0.1f, 3f, () => w.TerrainAmplitude, v => w.TerrainAmplitude = v);

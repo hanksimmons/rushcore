@@ -161,6 +161,15 @@ Avoid both extremes:
 
 Generator creates data; runtime consumes data.
 
+Delivered (T1, P-010..P-012): `src/Run/RunDirector.cs` is a plain class the composition root owns, holding the run
+seed, the stage index (0..8, wrapping with a placeholder line until the run summary exists), the exit the current
+stage was entered by, and `Request(archetype)`, which is the only place a `StageGenerationRequest` for a stage is
+made. `MovementToyWorld` plays the `StageHost` part rather than a second class: `Regenerate(request)` builds one
+stage and the previous one is unloaded by the same terrain and dressing rebuild that has always run, and it raises
+`StageCompleted(exitIndex)` once per build when the ball first reaches any exit pad (D-105). Run currency,
+progression state and death arrive with their own phases; nothing stands in for them now. The composition root runs
+the completion sequence: controls locked, exit feedback, fade, `RunDirector.Advance`, rebuild, teleport, fade in.
+
 ## 8. Data model
 
 Prefer simple C# classes/records/structs for:

@@ -127,13 +127,55 @@ outside this packet fails.
 
 ## Delivery record (filled by the implementing agent)
 
-- Branch / commits:
-- Harness (full run, count and wall time):
-- Files changed:
-- What was built (three to eight lines, concrete):
-- Deviations from the packet and why:
-- Measurements (transition ms, node counts before/after, outro speeds):
-- P-entries written:
-- Spec sections edited:
-- Open items:
-- Needs main track:
+- **Branch / commits:** `opus/t1-stage-lifecycle` off `develop-secondary` (5d940c3).
+- **Harness (full run, count and wall time):** 337/337 in 107 s (default, Rolling Highlands); canyon 334/334,
+  dunes 337/337, sky 338/338 (`RUSHCORE_ARCHETYPE`, run because the packet touches stage dressing). Golden hashes unchanged: tube 7D24840659B28767, tunnels + pit 327D9152EADB87E0, sky floor 3
+  C453C38B4481CEB3, dune trains 1903C69DC8E57D46, gap + turns 3CA4CC5E70D0F945, three exits DE6A618E62DEB3EE.
+- **Files changed:** `src/Run/RunDirector.cs` (new), `src/Core/GameBootstrap.cs`, `src/Core/IDebugActions.cs`,
+  `src/Core/InputBootstrap.cs`, `src/World/MovementToyWorld.cs`, `src/World/WorldDressing.cs`,
+  `src/Player/PlayerPhysics.cs`, `src/Tuning/GameplayTuning.cs`, `src/DebugUi/TuningPanel.cs`,
+  `src/DebugUi/TelemetryOverlay.cs`, `tests/MovementToySelfTest.cs`, docs 05 §7, 07 §9/§10/§12, 08 §7, 10, this
+  packet, `STATUS.md`, `PROVISIONAL_DECISIONS.md`.
+- **What was built:**
+  - `RunDirector`: run seed, stage index (0..8, wrapping with the placeholder line), the exit the stage was entered
+    by, `Request(archetype)`, `Advance(exitIndex)`, and the static `NextArchetype` that P-011 describes.
+  - The world takes a request: `Regenerate(StageGenerationRequest)` sets the seed and the stage index, `Build()`
+    generates `new StageGenerationRequest(Seed, StageIndex, Archetype)` instead of always index 0, and the log and
+    the seed row read `run/stage`. `StageCompleted(exitIndex)` is raised once per build at the first exit pad.
+  - The outro in the composition root: controls locked at the pad, 0.7 s of exit feedback (the pad's sign swells and
+    a ring flashes outward), 0.5 s fade, the rebuild, the teleport, 0.4 s fade back in, controls returned. Timings
+    are `Run › Outro / Fade Out / Fade In` (P-003).
+  - `PlayerPhysics.ControlsLocked` drops steering, jump, boost and carve at the one place input is read and cancels
+    a charge in progress; gravity, drag and the ground follow are untouched, so the ball rolls free.
+  - Flow and boost carry (P-010): the transition teleport asks to keep the chain; recovery still ends it (02 §8).
+  - The exit taken picks the next archetype (P-011): exit A continues, B and C land elsewhere, from the seed chain.
+  - `TeleportNearExit` (`E`, panel button, `IDebugActions`) and `--stage N`, which takes the same path as `StartRun`.
+- **Deviations from the packet and why:**
+  - The archetype the transition picks is written to `World › Archetype` before the rebuild rather than passed around
+    it, so the panel, `MatchesTuning()` and the built stage cannot disagree (the world toggle stays the one authority
+    for which archetype is built). The request still carries it.
+  - The exit pulse is fired by the world beside the completion event rather than by the bootstrap: it is presentation
+    on nodes the dressing owns, and putting it there keeps the bootstrap free of dressing internals.
+  - The packet asked for the node count after a transition to equal the count after the first build. It cannot: a
+    different stage has different dressing, so the count legitimately differs. The leak test instead is that
+    rebuilding the stage the case started on, after three transitions, returns the tree to exactly its first count
+    (3240 → 3240, orphans 0 → 0), plus the existing flat-count check over three regenerations.
+  - Two additions the packet did not anticipate, both written up as P-012: `RunDirector.AutoAdvance` and the
+    `keepChain` argument on `TeleportTo`.
+  - The Flow/boost carry is measured on the tick before the rebuild and six ticks after it, not at the pad and after
+    the outro: the ball rolls free for 0.7 s after the pad and whatever it meets there is a movement rule, not the
+    transition. What is asserted is that the transition itself resets neither.
+- **Measurements:** transition rebuild 2.9–3.1 s wall (2882 / 3088 / 3079 ms; budget 8000). Exit A reached at
+  123 m/s with Flow 0.250 and boost 54.9 of 100; across the rebuild Flow and boost both came out unchanged.
+  Ball travel through the 0.7 s of exit feedback with Space, W and Shift held: no charge, no jump, no drive, no
+  boost, and it rolled on rather than freezing. Node count 3240 before and after three transitions, orphans 0 → 0.
+  `NextArchetype` on the "three exits" sample: exit B takes highlands → sky, the same on both passes.
+- **P-entries written:** P-012 (new). P-003, P-010 and P-011 are implemented as written; P-001 and P-002 stay
+  superseded.
+- **Spec sections edited:** 05 §7 (what `RunDirector` owns now and that the world plays `StageHost`), 07 §9 (the
+  seed row reads `run/stage`, Copy Seed copies the run seed), 07 §10 (the stage row), 07 §12 (Teleport Near Exit),
+  08 §7 (the harness list for S0's lifecycle lines), 10 (the `E` hotkey, `--stage N`, the completion sequence).
+- **Open items:** the outro is the placeholder sequence 06 §13 allows for now: no completion card, no route cards,
+  no shop, no score. The run wrap prints and starts again at stage 0. The manual read of the outro ("done", not a
+  freeze) is the user's.
+- **Needs main track:** nothing new. T7's axis-reference item stands unchanged.

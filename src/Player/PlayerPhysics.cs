@@ -61,6 +61,7 @@ public partial class PlayerPhysics : RigidBody3D
     private Vector3 _checkpoint;
     private float _checkpointTimer;
     private bool _pendingTeleport;
+    private bool _keepChain;
     private Vector3 _teleportPos;
     private bool _needsInterpolationReset;
 
@@ -206,6 +207,23 @@ public partial class PlayerPhysics : RigidBody3D
         if (Input.IsActionJustPressed(InputBootstrap.Jump)) _jumpPressedEdge = true;
         if (Input.IsActionJustReleased(InputBootstrap.Jump)) _jumpReleasedEdge = true;
 
+        // Stage outro (T1): input is dropped at the one place it is read, so no rule below can see a
+        // press. The ball keeps its velocity and rolls free; a charge in progress is cancelled here so
+        // the zeroed hold cannot read as a release and fire a jump.
+        if (ControlsLocked)
+        {
+            _moveInput = Vector2.Zero;
+            _boostHeld = _carveHeld = _jumpHeld = false;
+            _jumpPressedEdge = _jumpReleasedEdge = false;
+            if (_isCharging)
+            {
+                _isCharging = false;
+                _chargeSeconds = 0f;
+                _chargeGrace = 0f;
+                JumpChargeCanceled?.Invoke();
+            }
+        }
+
         // Live tunables that live on engine objects rather than in our integration math.
         GravityScale = _t.Movement.Gravity / Mathf.Max(0.001f, _defaultGravity);
         if (!Mathf.IsEqualApprox(_shape.Radius, _t.Movement.BallRadius))
@@ -226,6 +244,13 @@ public partial class PlayerPhysics : RigidBody3D
     public void RefillBoost(float amount) =>
         _boost = Mathf.Clamp(_boost + amount, 0f, _t.Boost.BoostCapacity);
 
+    /// <summary>
+    /// Stage outro (T1): steering, jump, boost and carve input is ignored while this is set, and a charge
+    /// in progress is cancelled. Nothing else changes: gravity, drag and the ground follow keep running and
+    /// the ball rolls to a stop on its own.
+    /// </summary>
+    public bool ControlsLocked { get; set; }
+
     public void SetCheckpoint(Vector3 position) => _checkpoint = position;
     /// <summary>Toy behaviour: re-anchor to the ball every 0.75 s of ground contact. A generated
     /// stage turns this off and supplies its own progression anchors (04 §13).</summary>
@@ -233,10 +258,16 @@ public partial class PlayerPhysics : RigidBody3D
 
     public void RequestRecovery() => TeleportTo(_checkpoint);
 
-    public void TeleportTo(Vector3 position)
+    /// <summary>
+    /// Moves the ball and clears the movement state. <paramref name="keepChain"/> keeps Flow and its chain
+    /// clock across the move: the stage transition passes it (P-010, a run is one chain across all nine
+    /// stages), recovery never does (02 §8: falling ends the chain).
+    /// </summary>
+    public void TeleportTo(Vector3 position, bool keepChain = false)
     {
         _teleportPos = position;
         _pendingTeleport = true;
+        _keepChain = keepChain;
     }
 
     // ---------------- physics ----------------
@@ -456,8 +487,12 @@ public partial class PlayerPhysics : RigidBody3D
         IsCarving = false;
         _carveTurned = 0f;
         CarveAngleDegrees = 0f;
-        Flow = 0f;                                   // recovery / teleport ends the chain (02 §8)
-        _sinceFlowGain = float.PositiveInfinity;
+        if (!_keepChain)
+        {
+            Flow = 0f;                               // recovery / teleport ends the chain (02 §8)
+            _sinceFlowGain = float.PositiveInfinity;
+        }
+        _keepChain = false;
         _prevLocSpeed = 0f;
         _rawGrounded = false;
         _followActive = false;

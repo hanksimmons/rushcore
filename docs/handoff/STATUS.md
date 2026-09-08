@@ -5,7 +5,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 
 | Task | Packet | Branch | State | Last commit | Harness (full run) | P-entries | Reconciled |
 |---|---|---|---|---|---|---|---|
-| T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | not started | — | — | — | — |
+| T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | pushed | (first commit) | 337/337; canyon 334/334, dunes 337/337, sky 338/338 | P-012 (P-003, P-010, P-011 implemented) | — |
 | T2 | `T2_HUD.md` | `opus/t2-hud` | not started | — | — | — | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | not started | — | — | — | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | not started | — | — | — | — |

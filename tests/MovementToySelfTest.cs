@@ -49,6 +49,7 @@ public partial class MovementToySelfTest : Node
     /// <summary>When set, WASD is re-derived every tick so a rotating camera cannot bend the drive line.</summary>
     private Vector3? _worldDrive;
     private bool _visCheck;
+    private int _completedCount, _lastExitIndex = -1;
     private int _visFrames, _visBlocked;
     private int _groundViolations;
     private Vector3 _laneFwd = Vector3.Forward;
@@ -79,6 +80,7 @@ public partial class MovementToySelfTest : Node
         _player.Landed += (_, _) => _landedCount++;
         _player.LandingBurst += _ => _burstCount++;
         _debug.World.BoostPickupCollected += _ => _pickupCount++;
+        _debug.World.StageCompleted += i => { _completedCount++; _lastExitIndex = i; };
 
         // Wall-clock budget: every check counts physics ticks, so the run is launched with
         // `--fixed-fps 60` (runbook): one 1/60 s tick per frame with no real-time sync, so a headless
@@ -1204,6 +1206,9 @@ public partial class MovementToySelfTest : Node
         // ---- Phase 2: a generated stage builds, spawns the player and is driveable along its route ----
         foreach (var e in RunGeneratedStageCase()) yield return e;
 
+        // ---- T1: stage completion, the transition, and the run seed / stage index ----
+        foreach (var e in RunStageLifecycleCase()) yield return e;
+
         // ---- Phase 2 dependency (04 §9): NaN vertices in HeightMapShape3D are holes under Jolt ----
         {
             var body = new StaticBody3D { Name = "NaNHoleTest", Position = new Vector3(0f, PlatformY, -2200f) };
@@ -2074,6 +2079,9 @@ public partial class MovementToySelfTest : Node
         t.World.Archetype = (int)(envArchetype == "canyon" ? TerrainArchetype.CanyonRun : envArchetype == "dunes" ? TerrainArchetype.DuneSea : envArchetype == "sky" ? TerrainArchetype.SkyTerraces : TerrainArchetype.RollingHighlands);
         // The stage debug views (D-104) build with the stage: a smoke test that every view draws and the tree stays flat.
         t.World.StageDebugViews = true;
+        // Completion still fires and still prints here (T1); only the automatic rebuild is held off, so the
+        // drive, the tube ride and the branch ride all stay on the stage this case set up.
+        _debug.Run.AutoAdvance = false;
         string tuningStage = TuningSnapshot();
         _debug.RestartSameSeed();
         foreach (var _ in Frames(3)) yield return null;
@@ -2888,5 +2896,297 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Frames(3)) yield return null;
         Check("lab restored after the generated stage", !_debug.World.IsStage && !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f));
         Check("lab node count returns to its pre-stage value", GetTree().GetNodeCount() == nodesLab, $"{nodesLab} -> {GetTree().GetNodeCount()}");
+    }
+
+    // ---------------- T1: stage completion, transition, run seed and stage index (02 §2, §4; 05 §7; 08 §7, §10) ----------------
+
+    /// <summary>
+    /// The run lifecycle end to end on the "three exits" sample (Highlands seed 4, D-105): the stage index is
+    /// real, the exit pad ends the stage once, the outro locks the controls without freezing the ball, and the
+    /// next stage of the same run is built with Flow and boost carried (P-010) and the archetype the exit taken
+    /// picked (P-011). One seed, driven by the follower over the last stretch: a lifecycle check, not a feel one.
+    /// </summary>
+    private IEnumerable RunStageLifecycleCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        var run = _debug.Run;
+        var world = _debug.World;
+        int nodesLab = GetTree().GetNodeCount();
+        int labSeed = run.RunSeed;   // the lab's prop scatter is seeded: restore it on the same seed
+        var sample = Rushcore.Generation.SampleStages.At(6)!.Value;   // "three exits"
+        int seed = sample.Seed;
+
+        t.World.GeneratedStage = true;
+        t.World.Archetype = (int)sample.Archetype;
+        run.AutoAdvance = false;
+        _debug.StartRun(seed, 0);
+        foreach (var _ in Frames(3)) yield return null;
+        var stage = world.Stage;
+        Check("a run starts at stage 0 of its run seed, and the world builds that request",
+            stage is not null && run.StageIndex == 0 && world.StageIndex == 0 && stage!.Request.RunSeed == seed && stage.Request.StageIndex == 0,
+            $"run {run.RunSeed}/{run.StageIndex} world {world.Seed}/{world.StageIndex}");
+        if (stage is null || !stage.OptionalLines.Any(l => l.Terminal))
+        {
+            Check("the lifecycle sample carries a terminal line to exit by", false, "sample 6 (Highlands seed 4) has no terminal line");
+            t.World.GeneratedStage = false;
+            t.World.Archetype = 0f;
+            run.AutoAdvance = true;
+            _debug.StartRun(labSeed, 0);
+            yield break;
+        }
+        ulong hash0 = stage.Hash();
+
+        // `--stage N` is the same code path the launch flag takes: the seed chain's stage index, nothing else.
+        {
+            _debug.StartRun(seed, 3);
+            foreach (var _ in Frames(3)) yield return null;
+            var direct = new StageGenerator(t.Movement, t.Flow, t.JumpSlam)
+                .Generate(new StageGenerationRequest(seed, 3, sample.Archetype));
+            Check("--stage 3 builds stage index 3, hash-identical to a direct request for it",
+                run.StageIndex == 3 && world.StageIndex == 3 && world.Stage!.Hash() == direct.Hash(),
+                $"world {world.Seed}/{world.StageIndex} hash {world.Stage!.Hash():X} vs {direct.Hash():X}");
+            Check("a later stage of the same run is a different stage", world.Stage!.Hash() != hash0,
+                $"stage 0 {hash0:X}, stage 3 {world.Stage!.Hash():X}");
+        }
+
+        _debug.StartRun(seed, 0);
+        foreach (var _ in Frames(3)) yield return null;
+        stage = world.Stage!;
+        int nodesStage = GetTree().GetNodeCount();
+        double orphansStage = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
+        var verts = stage.PrimaryRoute.Vertices;
+
+        // Debug teleport (07 §12): 200 m short of exit A, in the corridor, grounded, progress moved with it.
+        _debug.TeleportNearExit();
+        foreach (var _ in Seconds(1.2f)) yield return null;
+        {
+            int n = NearestIndex(verts, _player.GlobalPosition, 0, verts.Count);
+            float remaining = stage.PrimaryRoute.Length - verts[n].Distance;
+            float offLine = new Vector2(verts[n].Position.X - _player.GlobalPosition.X, verts[n].Position.Z - _player.GlobalPosition.Z).Length();
+            Check("TeleportNearExit drops the ball 150-250 m short of the exit, inside the corridor and grounded",
+                remaining > 150f && remaining < 250f && offLine < StageHeightField.CorridorHalfWidth && _player.IsGrounded,
+                $"{remaining:0} m short, {offLine:0.0} m off the line, grounded={_player.IsGrounded}, progress index {world.StageProgressIndex}");
+            int wantAnchor = -1;
+            while (wantAnchor + 1 < stage.Checkpoints.Count && stage.Checkpoints[wantAnchor + 1].PrimaryIndex <= world.StageProgressIndex) wantAnchor++;
+            Check("the teleport carried stage progress and the armed anchor with it",
+                world.StageProgressIndex > verts.Count / 2 && world.StageCheckpointIndex == wantAnchor && wantAnchor >= 0,
+                $"progress {world.StageProgressIndex}/{verts.Count}, anchor {world.StageCheckpointIndex + 1}/{stage.Checkpoints.Count} (wanted {wantAnchor + 1})");
+        }
+
+        // A live chain and a part-spent meter to carry across the transition: a charged jump, then a slam
+        // landing (02 §8 gains). Built here, 200 m out, and then the ball is sent down the route at speed so
+        // the pad is reached about 3 s later, inside the 6 s chain window.
+        Vector3 routeHeading = Vector3.Right;
+        {
+            var av = verts[Mathf.Clamp(world.StageProgressIndex, 0, verts.Count - 1)];
+            routeHeading = new Vector3(Mathf.Cos(av.Heading), 0f, Mathf.Sin(av.Heading)).Normalized();
+            // Boost is spent to something between empty and full, so "carried" is a real claim either way.
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            foreach (var _ in Seconds(0.8f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Boost);
+            float boostSpent = _player.BoostAmount;
+
+            int landedBefore = _landedCount, guard = 0;
+            Input.ActionPress(InputBootstrap.Jump, 1f);
+            foreach (var _ in Seconds(t.JumpSlam.MaxJumpChargeSeconds + 0.08f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            foreach (var _ in Frames(20)) yield return null;
+            Input.ActionPress(InputBootstrap.Jump, 1f);
+            foreach (var _ in Act()) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            while (_landedCount == landedBefore && guard++ < 400) yield return null;
+            foreach (var _ in Frames(10)) yield return null;
+            ReleaseAll();
+            Check("the lifecycle case has a live chain and a part-spent boost meter to carry",
+                _player.Flow > 0.05f && boostSpent > 1f && boostSpent < t.Boost.BoostCapacity - 1f,
+                $"flow {_player.Flow:0.00}, boost {boostSpent:0.0} of {t.Boost.BoostCapacity:0}");
+
+            // A slam landing can leave the ball at rest facing anywhere; the follower steers camera-relative,
+            // so the view is snapped down the route and the ball is given the rolling start it would have had.
+            if (_player.CameraBasis is Rushcore.Camera.CameraRig rig) rig.SnapYawToward(routeHeading);
+            _player.LinearVelocity = routeHeading * 80f;
+            foreach (var _ in Frames(4)) yield return null;
+        }
+
+        // ---- exit A: drive the last stretch onto the primary's pad and let the transition run ----
+        run.AutoAdvance = true;
+        int completedBefore = _completedCount;
+        var prevArchetype = world.Archetype;
+        ulong stageSeedA = stage.Request.StageSeed;
+        float flowAtExit = 0f, boostAtExit = 0f, speedAtExit = 0f;
+        {
+            int nearest = NearestIndex(verts, _player.GlobalPosition, 0, verts.Count), ticks = 0;
+            while (ticks++ < Engine.PhysicsTicksPerSecond * 30 && world.StageExitIndex < 0)
+            {
+                Vector3 p = _player.GlobalPosition;
+                nearest = NearestIndex(verts, p, nearest - 5, nearest + 60);
+                var target = verts[Mathf.Min(verts.Count - 1, nearest + 15)].Position;
+                _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
+                yield return null;
+            }
+            _worldDrive = null;
+            flowAtExit = _player.Flow;
+            boostAtExit = _player.BoostAmount;
+            speedAtExit = _player.LocomotionSpeed;
+            GD.Print($"[SELFTEST] stage lifecycle: exit A {(world.StageExitIndex == 0 ? "reached" : "NOT reached")} in {ticks / (float)Engine.PhysicsTicksPerSecond:0.0} s at {speedAtExit:0} m/s " +
+                     $"(progress {world.StageProgressIndex}/{verts.Count}, {stage.PrimaryRoute.Length - verts[Mathf.Min(verts.Count - 1, world.StageProgressIndex)].Distance:0} m short, camera dot {Forward.Dot(routeHeading):0.00}), " +
+                     $"flow {flowAtExit:0.000} (chain {(float.IsPositiveInfinity(_player.SinceFlowGain) ? "—" : $"{_player.SinceFlowGain:0.0} s")}), boost {boostAtExit:0.0}");
+            Check("the follower reaches exit A and the stage completes exactly once, carrying the exit index",
+                world.StageExitIndex == 0 && _completedCount == completedBefore + 1 && _lastExitIndex == 0,
+                $"exit {world.StageExitIndex}, completions {_completedCount - completedBefore}, last {_lastExitIndex}");
+            Check("the completion outro starts on the same tick the pad is reached", _debug.StageOutroActive,
+                $"outro active={_debug.StageOutroActive}");
+        }
+
+        // Controls are locked while the outro plays: injected Space and W do nothing and the ball rolls free.
+        int jumpedBefore = _jumpedCount, chargeCanceledBefore = _chargeCanceledCount;
+        float rolled = 0f, maxInput = 0f;
+        bool chargedDuringOutro = false, outroBoost = false;
+        // Flow and boost are read on the tick before the rebuild and a few ticks after it, so the claim is
+        // about the transition itself and not about whatever the free-rolling ball meets on the way out.
+        float flowPreBuild = _player.Flow, boostPreBuild = _player.BoostAmount, flowPostBuild = 0f, boostPostBuild = 0f;
+        {
+            Vector3 last = _player.GlobalPosition;
+            int feedbackTicks = Mathf.Max(4, (int)(t.Run.OutroSeconds * Engine.PhysicsTicksPerSecond) - 4);
+            Input.ActionPress(InputBootstrap.Jump, 1f);
+            Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            for (int i = 0; i < feedbackTicks; i++)
+            {
+                yield return null;
+                Vector3 p = _player.GlobalPosition;
+                rolled += new Vector2(p.X - last.X, p.Z - last.Z).Length();
+                last = p;
+                maxInput = Mathf.Max(maxInput, _player.InputVector.Length());
+                chargedDuringOutro |= _player.IsCharging;
+                outroBoost |= _player.BoostActive;
+                if (world.StageIndex == 0) { flowPreBuild = _player.Flow; boostPreBuild = _player.BoostAmount; }
+            }
+            // The rest of the outro: the fade, the rebuild and the fade back in.
+            int guard = 0, sinceBuild = -1;
+            while (_debug.StageOutroActive && guard++ < Engine.PhysicsTicksPerSecond * 10)
+            {
+                maxInput = Mathf.Max(maxInput, _player.InputVector.Length());
+                chargedDuringOutro |= _player.IsCharging;
+                if (world.StageIndex == 0) { flowPreBuild = _player.Flow; boostPreBuild = _player.BoostAmount; }
+                else if (sinceBuild < 0) sinceBuild = 0;
+                else if (++sinceBuild == 6) { flowPostBuild = _player.Flow; boostPostBuild = _player.BoostAmount; }
+                yield return null;
+            }
+            ReleaseAll();
+            foreach (var _ in Frames(6)) yield return null;
+        }
+        Check("the outro ignores steering, jump and boost input (no charge, no jump, no drive, no boost)",
+            !chargedDuringOutro && _jumpedCount == jumpedBefore && maxInput < 0.001f && !outroBoost,
+            $"charging={chargedDuringOutro} jumps {_jumpedCount - jumpedBefore} max input {maxInput:0.000} boost={outroBoost} (charge cancels {_chargeCanceledCount - chargeCanceledBefore})");
+        Check("the ball rolls free through the exit feedback rather than freezing",
+            rolled > 1f, $"rolled {rolled:0.0} m in {t.Run.OutroSeconds:0.00} s from {speedAtExit:0.0} m/s at the pad");
+
+        // ---- the next stage of the same run ----
+        var newStage = world.Stage!;
+        Check("the transition builds the next stage of the same run",
+            run.StageIndex == 1 && world.StageIndex == 1 && newStage.Request.RunSeed == seed && newStage.Hash() != hash0,
+            $"run {run.RunSeed}/{run.StageIndex}, hash {newStage.Hash():X} vs {hash0:X}");
+        Check("nothing of the finished stage leaks into the next one (clock, exit, anchor, progress)",
+            world.StageClock < 2f && world.StageExitTime == 0f && world.StageExitIndex == -1 &&
+            world.StageCheckpointIndex == -1 && world.StageProgressIndex == 0,
+            $"clock {world.StageClock:0.0} s, exit {world.StageExitIndex}, anchor {world.StageCheckpointIndex}, progress {world.StageProgressIndex}");
+        Check("the ball starts the next stage on its spawn pad, at rest, with the camera down the route",
+            _player.GlobalPosition.DistanceTo(world.SpawnPoint) < WorldScale.PadRadius && _player.LocomotionSpeed < 1f &&
+            Forward.Dot(world.SpawnFacing) > 0.985f,
+            $"{_player.GlobalPosition.DistanceTo(world.SpawnPoint):0.0} m from spawn, {_player.LocomotionSpeed:0.00} m/s, facing dot {Forward.Dot(world.SpawnFacing):0.000}");
+        Check("exit A continues the archetype just played (P-011)", world.Archetype == prevArchetype,
+            $"{ArchetypeRules.Label(prevArchetype)} -> {ArchetypeRules.Label(world.Archetype)}");
+        // Flow and boost carry (P-010). Neither is reset; both keep running their own rules across the
+        // transition, so the check is that nothing was zeroed: Flow may only have idled down over the
+        // ~1.2 s outro (0.05/s) and boost may only have regenerated (4/s).
+        Check("Flow and boost both carry across the transition, neither is reset (P-010)",
+            flowPreBuild > 0f && flowPostBuild >= flowPreBuild - 0.01f && boostPostBuild >= boostPreBuild - 0.5f,
+            $"flow {flowAtExit:0.000} at the pad, {flowPreBuild:0.000} into the rebuild, {flowPostBuild:0.000} out of it; " +
+            $"boost {boostAtExit:0.0} / {boostPreBuild:0.0} / {boostPostBuild:0.0}");
+        Check("the transition rebuild stays inside the build budget (08 §10)", world.BuildMillis < 8000,
+            $"{world.BuildMillis} ms");
+        Check("the finished stage's pad cannot complete the new stage as well", _completedCount == completedBefore + 1,
+            $"completions {_completedCount - completedBefore}");
+
+        // ---- exits B and C: a fork changes the landscape, and the same fork always changes it the same way ----
+        var pickedByExit = new List<(int exit, TerrainArchetype from, TerrainArchetype to)>();
+        for (int pass = 0; pass < 2; pass++)
+        {
+            t.World.Archetype = (int)sample.Archetype;
+            _debug.StartRun(seed, 0);
+            foreach (var _ in Frames(3)) yield return null;
+            stage = world.Stage!;
+            var branch = stage.OptionalLines.First(l => l.Terminal);
+            int exitIndex = stage.Exits.First(e => e.LineIndex == stage.OptionalLines.IndexOf(branch)).Index;
+            var lv = branch.Vertices;
+            // Ride only the plateau end of the terminal line: the ramp and the fork are the D-105 case's job.
+            int from = branch.IndexAtDistance(Mathf.Max(0f, branch.Length - (pass == 0 ? 150f : 50f)));
+            foreach (var _ in Settle(world.SurfacePoint(lv[from].Position.X, lv[from].Position.Z, m.BallRadius + 0.6f), 0.6f)) yield return null;
+            var before = world.Archetype;
+            ulong stageSeed = stage.Request.StageSeed;
+            int ln = from, ticks = 0;
+            while (ticks++ < Engine.PhysicsTicksPerSecond * 25 && world.StageExitIndex < 0)
+            {
+                Vector3 p = _player.GlobalPosition;
+                ln = NearestIndex(lv, p, ln - 5, ln + 60);
+                var target = lv[Mathf.Min(lv.Count - 1, ln + 12)].Position;
+                _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
+                yield return null;
+            }
+            _worldDrive = null;
+            int reached = _lastExitIndex;
+            int guard = 0;
+            while (_debug.StageOutroActive && guard++ < Engine.PhysicsTicksPerSecond * 10) yield return null;
+            ReleaseAll();
+            foreach (var _ in Frames(6)) yield return null;
+            GD.Print($"[SELFTEST] stage lifecycle: exit {reached} on pass {pass + 1} took {ArchetypeRules.Label(before)} -> {ArchetypeRules.Label(world.Archetype)} " +
+                     $"(stage {world.Seed}/{world.StageIndex}, expected {ArchetypeRules.Label(Rushcore.Run.RunDirector.NextArchetype(stageSeed, before, reached))})");
+            if (pass == 0)
+            {
+                Check("a terminal exit ends the stage by its own pad and the run advances",
+                    reached == exitIndex && reached > 0 && run.StageIndex == 1,
+                    $"exit {reached} wanted {exitIndex}, stage index {run.StageIndex}");
+                Check("the exit taken picks the next stage's archetype, and a fork always changes the landscape (P-011)",
+                    world.Archetype != before && world.Archetype == Rushcore.Run.RunDirector.NextArchetype(stageSeed, before, reached),
+                    $"{ArchetypeRules.Label(before)} -> {ArchetypeRules.Label(world.Archetype)}");
+            }
+            pickedByExit.Add((reached, before, world.Archetype));
+        }
+        Check("the same run seed and the same exit give the same next stage twice running",
+            pickedByExit.Count == 2 && pickedByExit[0].exit == pickedByExit[1].exit && pickedByExit[0].to == pickedByExit[1].to,
+            string.Join("; ", pickedByExit.Select(x => $"exit {x.exit}: {ArchetypeRules.Label(x.from)} -> {ArchetypeRules.Label(x.to)}")));
+
+        // No growth across the transitions: rebuilding the stage this case started on returns the tree to its size.
+        t.World.Archetype = (int)sample.Archetype;
+        _debug.StartRun(seed, 0);
+        foreach (var _ in Frames(3)) yield return null;
+        double orphansAfter = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
+        GD.Print($"[SELFTEST] stage lifecycle: nodes {nodesStage} at the first build, {GetTree().GetNodeCount()} after three transitions; orphans {orphansStage} -> {orphansAfter}");
+        Check("three stage transitions leave the node count where the first build left it (08 §10)",
+            GetTree().GetNodeCount() == nodesStage, $"{nodesStage} -> {GetTree().GetNodeCount()}");
+        Check("no orphan nodes accumulate across stage transitions", orphansAfter <= orphansStage,
+            $"{orphansStage} -> {orphansAfter}");
+
+        t.World.GeneratedStage = false;
+        t.World.Archetype = 0f;
+        _debug.StartRun(labSeed, 0);
+        foreach (var _ in Frames(3)) yield return null;
+        Check("lab restored after the stage lifecycle case", !_debug.World.IsStage && GetTree().GetNodeCount() == nodesLab,
+            $"{nodesLab} -> {GetTree().GetNodeCount()}");
+    }
+
+    /// <summary>Nearest polyline vertex to a point in plan, searched inside a window (the follower's own rule).</summary>
+    private static int NearestIndex(IReadOnlyList<RouteVertex> v, Vector3 p, int lo, int hi)
+    {
+        int best = Mathf.Clamp(lo, 0, v.Count - 1);
+        float bestD = float.MaxValue;
+        for (int i = Mathf.Max(0, lo); i < Mathf.Min(v.Count, hi); i++)
+        {
+            float d = new Vector2(v[i].Position.X - p.X, v[i].Position.Z - p.Z).LengthSquared();
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
     }
 }

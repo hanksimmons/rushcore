@@ -222,6 +222,7 @@ public partial class TuningPanel : Control
             ("Copy Seed", () => { _debug.CopySeedToClipboard(); Status("Seed copied."); }),
             ("Recover Player", () => { _debug.RecoverPlayer(); Status("Recovered to checkpoint."); }),
             ("Teleport To Start", () => { _debug.TeleportToStart(); Status("Teleported to start."); }),
+            ("Teleport Near Exit", () => { _debug.TeleportNearExit(); Status("Teleported 200 m short of the exit."); }),
             ("Refill Boost", () => { _debug.RefillBoost(); Status("Boost refilled."); }),
         }));
 

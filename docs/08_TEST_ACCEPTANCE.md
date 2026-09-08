@@ -272,6 +272,14 @@ A complete stage:
 - does not require boost on mandatory primary route,
 - exits cleanly without previous-stage leakage.
 
+Harness (T1, the stage-lifecycle case on the "three exits" sample, Highlands seed 4): a run starts at stage 0 of its
+run seed and `--stage 3` builds a stage hash-identical to a direct request for it; reaching a pad raises completion
+exactly once carrying the exit index, and the finished pad cannot complete the stage that follows; the outro ignores
+steering, jump and boost input while the ball keeps rolling; after the transition the clock, exit, anchor and progress
+are clean, the ball is on the new spawn pad at rest with the camera down the route, Flow and boost both carry
+(P-010), the exit taken picked the archetype (P-011) and the same seed and exit pick it again; three transitions
+leave the node count and the orphan count where the first build left them.
+
 Measure clear time; use results to validate stage/run pacing rather than forcing the previous paper target.
 
 ## 8. Run — Gate R0

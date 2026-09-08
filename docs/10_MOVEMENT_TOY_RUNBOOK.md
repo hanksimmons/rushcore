@@ -26,6 +26,7 @@ RUSHCORE_EXIT_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # tally wh
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 2   # a Canyon Run with two wall tunnels and the spiral pit finale (D-102)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --sky --seed 1      # a Sky Terraces stage (World › Archetype = 3, D-103)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 4            # a Highlands stage with three exits: A on the primary, B and C on terminal lines (D-105)
+/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 4 --stage 3 # start that run at its fourth stage (T1; the seed row reads run/stage)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . --resolution 1280x720 -- --rushcore-screenshot  # PNGs to user://
 ```
 
@@ -52,9 +53,17 @@ which is how the slam-dive framing lag was found (D-090 amendment).
 | F5 | new world seed (instruments are seed-invariant; only scenery hills change) |
 | R | recover to last checkpoint |
 | T | teleport to spawn |
+| E | teleport 200 m short of exit A, on the primary (T1; the panel's "Teleport Near Exit") |
 | B | refill boost |
 
 Falling below the kill plane recovers automatically. Recovery resets physics interpolation.
+
+**Stage completion** (T1): reaching any exit pad (D-105) locks the controls and plays the outro — the pad's sign and
+ring flash while the ball rolls free (`Run › Outro`, 0.7 s), a fade (`Run › Fade Out`, 0.5 s), then the next stage of
+the same run is built and the ball spawns on its start pad and the fade lifts (`Run › Fade In`, 0.4 s). Flow and
+boost both carry across it (P-010); the exit taken picks the next stage's archetype, exit A continuing the one just
+played and B or C landing in a different landscape (P-011). Nine stages, then it wraps to stage 0 with a log line.
+`E` teleports 200 m short of exit A to reach it quickly.
 
 **Ground follow** (`Movement › Ground Follow`, snap 0.5 m; D-092): the controller reads the terrain
 grid under the ball each tick and keeps it on the surface wherever the surface could physically carry

@@ -1274,8 +1274,8 @@ public partial class WorldDressing : Node3D
 
     /// <summary>Metres between the lane's centre line and the row: outside the corridor, inside easy sight of it.</summary>
     public const float ShowcaseOffset = 40f;
-    /// <summary>Metres between neighbours in the row.</summary>
-    public const float ShowcaseSpacing = 14f;
+    /// <summary>Metres between neighbours in the row. Wide enough that a 3.5× Bulwark does not touch its neighbours.</summary>
+    public const float ShowcaseSpacing = 26f;
     /// <summary>Where the first of the twelve stands, in lab X. The row runs back down the lane from here.</summary>
     public const float ShowcaseStartX = TerrainHeightField.LaneStartX - 20f;
 

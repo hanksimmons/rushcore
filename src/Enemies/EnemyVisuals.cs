@@ -30,6 +30,14 @@ public partial class EnemyVisual : Node3D
     /// <summary>How long a crushed body stays hidden before the lab row can be used again.</summary>
     private const float CrushHiddenSeconds = 1.5f;
 
+    /// <summary>
+    /// Every silhouette is built at its nominal size and then scaled by this once (the user's playtest verdict,
+    /// 2026-09-08: "all the enemies should be like 3-4x current size"). The builders keep the nominal numbers so the
+    /// proportions stay readable in the source; this is the one place the family's size lives, so it is also the one
+    /// number to move if the next pass at the cap wants them bigger or smaller again.
+    /// </summary>
+    public const float SizeScale = 3.5f;
+
     private readonly WorldVfx? _vfx;
     private Node3D _body = null!;
     private Node3D? _halo;
@@ -58,6 +66,7 @@ public partial class EnemyVisual : Node3D
     public static EnemyVisual Create(EnemyKind kind, WorldVfx? vfx = null)
     {
         var e = new EnemyVisual(kind, vfx);
+        e.Scale = Vector3.One * SizeScale;
         e._body = new Node3D { Name = "Body" };
         e.AddChild(e._body);
         switch (kind)
@@ -87,15 +96,18 @@ public partial class EnemyVisual : Node3D
             return;
         }
 
-        float top = Height * 1.3f;
-        _halo = new Node3D { Name = "Elite", Position = Vector3.Up * (top + 0.9f) };
+        // Local space: the root already carries SizeScale, so the halo is placed in nominal metres.
+        _halo = new Node3D { Name = "Elite", Position = Vector3.Up * (NominalHeight * 1.3f + 0.9f) };
         AddChild(_halo);
         _halo.AddChild(Piece(PlaceholderPalette.Halo, PlaceholderPalette.Elite, Vector3.Zero, new Vector3(3.0f, 0.5f, 3.0f)));
         _halo.AddChild(Piece(PlaceholderPalette.Prism, PlaceholderPalette.Elite, Vector3.Up * 0.7f, new Vector3(0.8f, 1.1f, 0.8f)));
     }
 
-    /// <summary>Nominal standing height, before the elite scale: what the caller hangs signs and haloes off.</summary>
-    public float Height => Kind switch
+    /// <summary>Standing height as built, in world metres and before the elite scale.</summary>
+    public float Height => NominalHeight * SizeScale;
+
+    /// <summary>Standing height in the builders' own units, i.e. the local space the root scales.</summary>
+    private float NominalHeight => Kind switch
     {
         EnemyKind.Pylon => 2.6f,
         EnemyKind.Bulwark => 1.8f,
@@ -138,7 +150,7 @@ public partial class EnemyVisual : Node3D
         if (_halo is { } halo)
         {
             halo.Rotate(Vector3.Up, dt * 1.4f);
-            halo.Position = halo.Position with { Y = Height * 1.3f + 0.9f + Mathf.Sin(_clock * 2.2f) * 0.12f };
+            halo.Position = halo.Position with { Y = NominalHeight * 1.3f + 0.9f + Mathf.Sin(_clock * 2.2f) * 0.12f };
         }
     }
 

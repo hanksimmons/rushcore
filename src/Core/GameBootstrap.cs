@@ -284,7 +284,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private void TeleportToShowcase()
     {
         float midX = WorldDressing.ShowcaseStartX - WorldDressing.ShowcaseSpacing * 5.5f;
-        Vector3 p = _world.SurfacePoint(midX, TerrainHeightField.LaneZ, _tuning.Movement.BallRadius + 0.4f);
+        // Far enough back that most of a 286 m row is in frame; the lane itself is only 40 m off the row.
+        Vector3 p = _world.SurfacePoint(midX, TerrainHeightField.LaneZ - 70f, _tuning.Movement.BallRadius + 0.4f);
         _player.SetCheckpoint(p);
         _camera.SnapYawToward(Vector3.Back);        // +Z: the row stands 40 m that way
         _player.TeleportTo(p);

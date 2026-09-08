@@ -78,20 +78,21 @@ is a judgement.
 - **Lever:** `GroundFollowDeadband` and `TubeAxisUncertainty` in `PlayerPhysics`, which now stand at 3 cm and 1 cm.
 - **To judge:** `World › Sample Stage` = 1, boost through and watch the contact point.
 
-### A-7. The enemy silhouettes have never been seen at the cap
+### A-7. The enemy silhouettes have never been seen at the cap — **DECIDED (2026-09-08)**
 
-T3's packet asked the implementing agent to tune the enemy sizes on the runway at the cap and record what it settled
-on. That could not be done: the harness is headless and no AI agent plays stages, so the sizes shipped are the
-packet's own starting points, unjudged. What the harness can say is that they exist, carry no collider, stand clear
-of the lane and draw off twelve shared materials.
+**The user's verdict, from the first pass at the cap: "all the enemies should be like 3-4x current size."** Delivered
+at **3.5×** through one constant, `EnemyVisual.SizeScale`; the four builders keep their nominal proportions, so that
+constant is the only thing to move if a second pass wants them bigger or smaller again. As built: Pylon 1.8 m across
+and 9.1 m tall, Bulwark 11.2 × 6.3 × 5.6 m, Strider an 8.4 m body 5.6 m up, Shooter a 4.2 m core 8.4 m overall,
+elite the same at 1.3× again. The showcase row's spacing went 14 m → 26 m with them so a Bulwark no longer touches
+its neighbours, which makes the row 286 m long.
 
-- **Delivered sizes (P-017):** Pylon 0.5 m across × 2.6 m tall; Bulwark 3.2 × 1.8 × 1.6 m, leaning 8°; Strider a
-  2.4 m body 1.6 m up on blade legs; Shooter a 1.2 m core with a barrel and a ring, 2.4 m overall; elite = the same
-  silhouette at 1.3× under a halo.
-- **The read to make:** does the Bulwark say "not at this speed" and the Pylon say "ram it" *before* you are on
-  them (02 §7)? Is the Strider's crossing axis obvious? Is the elite unmistakable at a glance?
-- **Lever:** the size constants in `EnemyVisual.Create`'s four builders, and `Height`.
-- **To judge:** `World › Enemy Showcase` on, then drive the lab lane past the row at the cap.
+Left open underneath the size: whether each silhouette now says what 02 §7 wants — Bulwark "not at this speed",
+Pylon "ram it", the Strider's crossing axis obvious, the elite unmistakable — is still a read only you can make, and
+it is worth making again now that they are big enough to see.
+
+- **Lever:** `EnemyVisual.SizeScale`, and the nominal numbers in its four builders.
+- **To judge:** `World › Generated Stage` off, `World › Enemy Showcase` on, then run the lab lane past the row.
 
 ### A-8. A reward burst cannot catch a ball above about 60 m/s — anywhere, including on its own line
 

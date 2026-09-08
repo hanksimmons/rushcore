@@ -153,16 +153,17 @@ The game should communicate crushability primarily through:
 Avoid persistent giant text labels.
 
 Delivered as placeholders (T3, P-017), presentation only: no collider, no behaviour, no placement in a generated
-stage. Sizes are metres against the 0.66 m ball (D-091). **Pylon** — a 0.5 m triangular prism standing 2.6 m in pale
-cool plastic under one lit cap; nothing about it is heavy, which is the message. **Bulwark** — a 3.2 × 1.8 × 1.6 m
-dark block on planted feet, leaning 8° into the oncoming line, with one hazard chevron band proud of its face.
-**Strider** — a 2.4 m body on two blade legs 1.6 m up, its long axis lying across the travel line, bobbing on a code
-timer rather than an animation player, so the crossing direction reads before it has moved. **Shooter** — a 1.2 m
-core on a short pillar with a barrel cone and an orientation ring in the aim colour, and the projectile shape it
-never fires. **Elite** — the same silhouette at 1.3× under a rotating halo and crown in the one elite colour, so an
-elite is recognised before its role is; the treatment is identical for all four (02 §7's "one constrained modifier").
-The whole language draws from twelve shared materials (`src/Vfx/PlaceholderPalette.cs`): a row of a dozen bodies
-creates no resources at all.
+stage. Sizes are metres against the 0.66 m ball (D-091), as built after the first playtest at the cap sent them up
+3.5× (`EnemyVisual.SizeScale`, the one number the family's size lives in). **Pylon** — a 1.8 m triangular prism
+standing 9.1 m in pale cool plastic under one lit cap; nothing about it is heavy, which is the message.
+**Bulwark** — an 11.2 × 6.3 × 5.6 m dark block on planted feet, leaning 8° into the oncoming line, with one hazard
+chevron band proud of its face. **Strider** — an 8.4 m body on two blade legs 5.6 m up, its long axis lying across
+the travel line, bobbing on a code timer rather than an animation player, so the crossing direction reads before it
+has moved. **Shooter** — a 4.2 m core on a pillar 8.4 m overall, with a barrel cone and an orientation ring in the
+aim colour, and the projectile shape it never fires. **Elite** — the same silhouette at 1.3× under a rotating halo
+and crown in the one elite colour, so an elite is recognised before its role is; the treatment is identical for all
+four (02 §7's "one constrained modifier"). The whole language draws from twelve shared materials
+(`src/Vfx/PlaceholderPalette.cs`): a row of a dozen bodies creates no resources at all.
 
 ## 9. Pickups and affordances
 

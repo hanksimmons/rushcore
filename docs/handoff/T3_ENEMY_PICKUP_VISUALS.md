@@ -108,7 +108,7 @@ visual (06 §5), or if any part seems to need a collider to look right.
 ## Delivery record (filled by the implementing agent)
 
 - **Branch / commits:** `opus/t3-visuals` off `develop-secondary` (f2e0774, with T1, T2, T4 and the tube fixes merged); cb3c638.
-- **Harness (full run, count and wall time):** **386/386 default (110.5 s)**, **canyon 382/382**, **dunes 386/386**,
+- **Harness (full run, count and wall time):** **386/386 default (112.3 s)**, **canyon 382/382**, **dunes 386/386**,
   **sky 387/387** — all four green, including the T8 tube-camera guard that flaked on the base branch (B-1). Golden
   hashes unchanged: `[tube 7D24840659B28767] [tunnels + pit 327D9152EADB87E0] [sky floor 3 C453C38B4481CEB3]
   [dune trains 1903C69DC8E57D46] [gap + turns 3CA4CC5E70D0F945] [three exits DE6A618E62DEB3EE]`. The archetype runs
@@ -124,12 +124,13 @@ visual (06 §5), or if any part seems to need a collider to look right.
   - **`PlaceholderPalette`** — twelve shared materials and the unit meshes the whole placeholder language draws
     from, including a real tetrahedron built from the alternating corners of a cube. Nothing here is per instance:
     the showcase row measured **45 draws off 12 materials**.
-  - **Enemies** (`EnemyVisual`, metres against the 0.66 m ball): **Pylon** 0.5 m prism, 2.6 m tall, pale cool body
-    under one lit cap. **Bulwark** 3.2 × 1.8 × 1.6 m dark block on planted feet, leaning 8° into the line, one
-    hazard chevron band proud of the face. **Strider** a 2.4 m body 1.6 m up on two blade legs with a small head at
-    one end, its long axis across the travel line, bobbing on a code timer. **Shooter** a 1.2 m core on a 1.1 m
-    pillar with a barrel cone along its facing, an orientation ring in the aim colour, and the projectile shape it
-    never fires. **Elite** the same silhouette at 1.3× under a rotating halo and crown.
+  - **Enemies** (`EnemyVisual`, metres against the 0.66 m ball, as built after the user's first pass at the cap sent
+    them up 3.5× — see below): **Pylon** a 1.8 m prism, 9.1 m tall, pale cool body under one lit cap. **Bulwark**
+    11.2 × 6.3 × 5.6 m dark block on planted feet, leaning 8° into the line, one hazard chevron band proud of the
+    face. **Strider** an 8.4 m body 5.6 m up on two blade legs with a small head at one end, its long axis across
+    the travel line, bobbing on a code timer. **Shooter** a 4.2 m core on a pillar, 8.4 m overall, with a barrel
+    cone along its facing, an orientation ring in the aim colour, and the projectile shape it never fires.
+    **Elite** the same silhouette at 1.3× under a rotating halo and crown.
   - **Pickups** (`PickupVisual`): boost ring (unchanged shape, 3.1 m outer), currency a 1.2 m hexagonal coin, reward
     a 1.6 m spinning tetrahedron, item a 1 m cube inside a thin twelve-bar frame, exit a 14 m pillar pair 18 m
     across with a lintel, shortcut a 5 m post carrying two hazard chevrons.
@@ -167,8 +168,12 @@ visual (06 §5), or if any part seems to need a collider to look right.
   - **The Strider is turned 90° in the row** so its long axis lies across the lane's travel line rather than facing
     the runway with the others. That is the whole point of the silhouette (02 §7), and facing only matters for the
     Shooter's barrel.
-  - **Sizes were not tuned at the cap.** The packet asked the agent to settle them on the runway; the harness is
-    headless and no agent plays stages, so the packet's own starting points shipped unjudged. Recorded as A-7.
+  - **Sizes could not be tuned at the cap by this track.** The packet asked the agent to settle them on the runway;
+    the harness is headless and no agent plays stages, so the packet's own starting points shipped unjudged and the
+    read went to the user as A-7. **The user's verdict came back the same day — "all the enemies should be like 3-4x
+    current size" — and is delivered at 3.5×** through the single constant `EnemyVisual.SizeScale`, with the four
+    builders keeping their nominal proportions so one number moves the family. The showcase row's spacing went
+    14 m → 26 m with them, making the row 286 m long, and the screenshot's stand-off moved back to suit.
 - **Measurements (material counts, node counts, burst timings):**
   - Showcase row: 45 mesh draws off **12** unique materials; nearest part of the row **40 m** from the lane centre
     against a 24 m corridor half width; **0** `CollisionShape3D` and **0** `PhysicsBody3D` under any enemy or
@@ -187,8 +192,8 @@ visual (06 §5), or if any part seems to need a collider to look right.
 - **Spec sections edited:** 06 §8 (the delivered silhouettes and sizes), 06 §9 (the delivered pickup shapes and the
   burst), 06 §10 (the delivered one-shots and where each lives), 07 §11 (`World › Enemy Showcase`), 07 §12 (the four
   panel actions), 10 (the showcase row, the panel buttons, the exit marker, the screenshot's last frame).
-- **Open items:** both are the user's read and both are in `OPEN_DECISIONS.md`. **A-7** — the four silhouettes have
-  never been seen at the cap, so the packet's sizes are unjudged. **A-8** — a burst cannot catch a ball above
+- **Open items:** in `OPEN_DECISIONS.md`. **A-7 is closed** — the user judged the sizes at the cap and they are up
+  3.5×; whether each silhouette now says what 02 §7 wants is a read still worth making at the new size. **A-8** — a burst cannot catch a ball above
   about 60 m/s **in any direction**, on its own line included: a coin gets no share of the ball's velocity and the
   magnet closes at `60 − v` against P-007's 60 m/s. As built, a crush at the cap pays nothing. Giving each coin the
   ball's velocity at spawn is the recommended fix and is one line, but it moves P-007, so it is the user's. The screenshot's showcase frame is delivered and its

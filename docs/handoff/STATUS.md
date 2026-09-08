@@ -7,7 +7,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 |---|---|---|---|---|---|---|---|
 | T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | **merged** into `develop-secondary` | 4db5348 | 337/337; canyon 334/334, dunes 337/337, sky 338/338 | P-012 (P-003, P-010, P-011 implemented) | — |
 | T2 | `T2_HUD.md` | `opus/t2-hud` | **merged** into `develop-secondary` | fb326bc | 368/368 with the speedometer; the sky run's one red check is the flaky guard below | P-015 (P-004, P-005 implemented) | — |
-| T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | **pushed** | cb3c638 | 386/386 default (110.5 s); canyon 382/382, dunes 386/386, sky 387/387 | P-017 (P-006, P-007 implemented) | — |
+| T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | **pushed** | cb3c638 | 386/386 default (112.3 s); canyon 382/382, dunes 386/386, sky 387/387 | P-017 (P-006, P-007 implemented) | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
@@ -50,12 +50,14 @@ agent plays stages. Copied from the packets' Delivery records so a playtest sess
   Does the bare floor beside the corridor read as a canyon or as a fence? Lever: the `CanyonRun` branch of `Suits`.
 - **T4, frame time at density 0.19 and 1.0:** cannot be measured headless. `godot --path . -- --seed 8`, F2, read the
   `frame` row at both densities; at 1.0 the stage carries 2700 instances (the caps).
-- **T3, the enemy silhouettes at the cap:** the packet asked the agent to tune the sizes on the runway; headless, it
-  could not. The shipped sizes are the packet's starting points, unjudged. Lever: the four builders in
-  `EnemyVisual.Create`. `World › Enemy Showcase` on, then drive the lab lane past the row.
+- **T3, the enemy silhouettes at the cap — CLOSED (2026-09-08):** the packet asked the agent to tune the sizes on the
+  runway and, headless, it could not. The user judged them in play and called for 3–4×; delivered at 3.5× through
+  `EnemyVisual.SizeScale`. Whether each silhouette now says what 02 §7 wants is still a read worth making.
 - **T3, the reward magnet:** twelve coins thrown 30 m beside a ball at 73 m/s collected 0 of 12 and the burst freed
-  itself at 6 s; parked, all twelve land inside a second. P-007's 60 m/s magnet cannot catch a ball near the
-  148.5 m/s cap, so a burst has to be thrown on the ball's line. Lever: `RewardBurst.MagnetSpeed`.
+  itself at 6 s; parked, all twelve land inside a second. A coin gets no share of the ball's velocity and P-007's
+  magnet closes at `60 − v`, so above 60 m/s it never closes **in any direction**, a burst on the ball's own line
+  included: as built, a crush at the cap pays nothing. Lever: `RewardBurst.Spawn`'s initial velocity, and
+  `MagnetSpeed`.
 - **T1, the completion outro:** whether it reads as "done" rather than a freeze, and whether anything of the finished
   stage shows through the fade.
 

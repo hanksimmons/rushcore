@@ -239,7 +239,13 @@ Normal HUD does **not** need exact m/s.
 
 Speed state is communicated primarily through player/camera/VFX; a small qualitative indicator is optional if playtests need it.
 
-Delivered (T2, `src/UI/PlayerHud.cs`): health bottom-left, boost bottom-centre (brightening while it fires), Flow
+The playtest asked for one (2026-09-07, P-015): a small racecar speedometer in the corner where the health bar was.
+It is a dial, not a readout — a 240° sweep, ticks every 50 m/s, a needle, the number in the middle — and the stretch
+above the base cap is drawn as a redline, so the dial says what Flow headroom is (D-088): everything past the red is
+speed that was earned and can be lost. The qualitative band word (P-005) stays as the optional extra it was.
+
+Delivered (T2, `src/UI/PlayerHud.cs`): the speedometer bottom-left with the health bar slim above it — shown only
+once something has taken health off full, since nothing damages it yet — boost bottom-centre (brightening while it fires), Flow
 bottom-right (a bar with a 0.3 s pulse on a gain, dim at zero, never a number), the stage number and a thin primary
 progress line top-centre, the run's wallet top-right. Flat unshaded colours, one monospaced font at 14 px at scale 1
 (never below 12 px), an outline for contrast rather than a plate behind the text, and no raw m/s — those stay in the

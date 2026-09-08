@@ -112,6 +112,12 @@ if the palette in 06 §3 has to change to make the HUD readable.
   - `HUD › Visible / Scale / Band Word`; `K` kills and `H` heals, on the panel too; the telemetry gained a `health`
     row (07 §10 lists health).
   - `RunDirector.Currency` with `AddCurrency`: the wallet the HUD reads and T3's reward burst will fill.
+  - **The speedometer (P-015, the user's Session B verdict):** `SpeedDial`, a drawn racecar dial in the lower left
+    where the health bar was — 240° of sweep to the Flow ceiling, ticks every 50 m/s, a needle and the number in
+    the middle, with a redline from the base cap up so the dial draws D-088's headroom as the earned part of the
+    scale. It redraws only when the needle would visibly move and takes its numbers from a prebuilt table, so a
+    dial at the cap allocates nothing. The health bar keeps the corner above it and appears only when health is
+    off full — never, until a damage source exists.
 - **Deviations from the packet and why:**
   - Health lives on the composition root rather than on `PlayerPhysics`. The packet allowed either; this way the
     player class gains nothing at all, which suits a value with no damage source yet.
@@ -129,8 +135,10 @@ if the palette in 06 §3 has to change to make the HUD readable.
   share is not distinguishable from the harness's own noise (the difference measured −9 600 B), so it is well under
   the 4 KB the packet allows. Font 14 px at scale 1, floored at 12 px so scale 0.6 stays legible. Bars 220 px wide
   (Flow 200) at scale 1.
-- **P-entries written:** none new. P-004 is implemented with the refinement noted in its row; P-005 as written.
-- **Spec sections edited:** 06 §12 (what the HUD shows and what it never shows), 07 §7 (the `HUD` category), 07 §10
+- **P-entries written:** P-015 (the speedometer, the user's playtest verdict). P-004 is implemented with the
+  refinement noted in its row; P-005 as written.
+- **Spec sections edited:** 06 §12 (what the HUD shows and what it never shows, and the speedometer the playtest
+  asked for), 07 §7 (the `HUD` category), 07 §10
   (the `health` row; the developer overlay keeps the numbers), 07 §12 (kill and heal), 10 (hotkeys, the HUD line).
 - **Open items:** contrast at speed on the four archetypes is the user's read (06 §17, and the packet's manual
   line) — sand, canyon rock and cloud white are the three grounds to check the ink against. The wallet reads 0

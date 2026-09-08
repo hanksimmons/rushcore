@@ -38,6 +38,8 @@ public partial class PlayerHud : Control
     private readonly IDebugActions _debug;
     private readonly PlayerHealth _health;
 
+    private SpeedDial _dial = null!;
+    private Label _dialCaption = null!;
     private ColorRect _healthBack = null!, _healthFill = null!;
     private ColorRect _boostBack = null!, _boostFill = null!;
     private ColorRect _flowBack = null!, _flowFill = null!;
@@ -68,6 +70,12 @@ public partial class PlayerHud : Control
     public float BoostShown => Drawn(_boostFill, _boostBack);
     public float FlowShown => Drawn(_flowFill, _flowBack);
     public float ProgressShown => Drawn(_progressFill, _progressBack);
+    /// <summary>The speedometer, for the harness: what it draws and where its redline starts.</summary>
+    public SpeedDial Dial => _dial;
+    /// <summary>The health bar shows itself only when health is not full: nothing damages it yet (T2), and the
+    /// speedometer has the corner the user asked for it in (P-015).</summary>
+    public bool HealthBarVisible => _healthBack.Visible;
+
     /// <summary>The stage number the label reads (1-based), and the currency it shows.</summary>
     public int StageShown => _shownStage;
     public int CurrencyShown => _shownCurrency;
@@ -84,11 +92,14 @@ public partial class PlayerHud : Control
 
         _font = new SystemFont { FontNames = new[] { "Menlo", "Monaco", "SF Mono", "Consolas", "DejaVu Sans Mono", "monospace" } };
 
+        _dial = new SpeedDial { MouseFilter = MouseFilterEnum.Ignore };
+        AddChild(_dial);
         (_healthBack, _healthFill) = AddBar(HealthFill);
         (_boostBack, _boostFill) = AddBar(BoostFill);
         (_flowBack, _flowFill) = AddBar(FlowFill);
         (_progressBack, _progressFill) = AddBar(ProgressFill);
 
+        _dialCaption = AddLabel("m/s", HorizontalAlignment.Center);
         _healthCaption = AddLabel("HEALTH", HorizontalAlignment.Left);
         _boostCaption = AddLabel("BOOST", HorizontalAlignment.Center);
         _flowCaption = AddLabel("FLOW", HorizontalAlignment.Right);
@@ -136,10 +147,17 @@ public partial class PlayerHud : Control
             l.AddThemeFontSizeOverride("font_size", fs);
         float lineHeight = fs * 1.4f;
 
-        // Health, bottom-left.
-        Place(_healthBack, new Vector2(m, screen.Y - m - bh), new Vector2(bw, bh));
-        Place(_healthFill, _healthBack.Position, new Vector2(bw, bh));
-        Place(_healthCaption, new Vector2(m, screen.Y - m - bh - lineHeight - gap), new Vector2(bw, lineHeight));
+        // The speedometer, bottom-left (P-015): the corner the health bar used to have.
+        float dial = 108f * scale;
+        Place(_dial, new Vector2(m, screen.Y - m - dial), new Vector2(dial, dial));
+        _dial.SetFont(_font, Mathf.Max(14, Mathf.RoundToInt(20f * scale)));
+        Place(_dialCaption, new Vector2(m, screen.Y - m - dial * 0.22f), new Vector2(dial, lineHeight));
+
+        // Health, a slim bar over the dial, shown only once something has taken it off full.
+        float hh = Mathf.Max(3f, bh * 0.4f);
+        Place(_healthBack, new Vector2(m, screen.Y - m - dial - hh - gap), new Vector2(dial, hh));
+        Place(_healthFill, _healthBack.Position, new Vector2(dial, hh));
+        Place(_healthCaption, new Vector2(m, screen.Y - m - dial - hh - gap - lineHeight), new Vector2(dial, lineHeight));
 
         // Boost, bottom-centre.
         float cx = (screen.X - bw) * 0.5f;
@@ -185,7 +203,18 @@ public partial class PlayerHud : Control
         var p = _debug.Player;
         _pulse = Mathf.Max(0f, _pulse - (float)delta);
 
+        // The dial reads locomotion speed against the base cap and the Flow ceiling, so the redline is the
+        // headroom Flow buys (D-088) rather than an arbitrary mark.
+        _dial.Show(p.LocomotionSpeed, p.LocomotionCap, p.FlowCap);
+
         SetFill(_healthFill, _healthBack, _health.Fraction, ref _shownHealth);
+        bool hurt = _health.Fraction < 0.999f;
+        if (hurt != _healthBack.Visible)
+        {
+            _healthBack.Visible = hurt;
+            _healthFill.Visible = hurt;
+            _healthCaption.Visible = hurt;
+        }
 
         SetFill(_boostFill, _boostBack, p.Boost01, ref _shownBoost);
         if (p.BoostActive != _shownBoosting)

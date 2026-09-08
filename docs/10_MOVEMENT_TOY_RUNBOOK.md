@@ -67,7 +67,8 @@ boost both carry across it (P-010); the exit taken picks the next stage's archet
 played and B or C landing in a different landscape (P-011). Nine stages, then it wraps to stage 0 with a log line.
 `E` teleports 200 m short of exit A to reach it quickly.
 
-**Player HUD** (T2): health bottom-left, boost bottom-centre, Flow bottom-right (it pulses on a gain), the stage
+**Player HUD** (T2): the speedometer bottom-left (a dial, redlined above the base cap so the red is Flow headroom;
+the health bar sits slim above it and appears only once health is off full), boost bottom-centre, Flow bottom-right (it pulses on a gain), the stage
 number and a progress line top-centre, the wallet top-right. `HUD › Visible`, `HUD › Scale` and `HUD › Band Word`
 (the `ROLL / RUSH / CRUSH / OVERDRIVE` word, off by default) are in the F1 panel. It carries no numbers: m/s, caps and
 takeoff stay on the F2 telemetry, which also gained a `health` row.

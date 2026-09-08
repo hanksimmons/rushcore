@@ -3035,9 +3035,10 @@ public partial class MovementToySelfTest : Node
             Check("health starts full", Mathf.IsEqualApprox(health.Current, PlayerHealth.Max), $"{health.Current:0}");
             health.Damage(30f);
             foreach (var _ in Frames(2)) yield return null;
-            Check("the health bar tracks the value after damage",
-                Mathf.Abs(health.Fraction - 0.7f) < 0.001f && Mathf.Abs(hud.HealthShown - health.Fraction) < 0.01f,
-                $"health {health.Current:0}, bar {hud.HealthShown:0.000}");
+            Check("the health bar appears once something has taken health off full, and tracks the value",
+                Mathf.Abs(health.Fraction - 0.7f) < 0.001f && Mathf.Abs(hud.HealthShown - health.Fraction) < 0.01f &&
+                hud.HealthBarVisible,
+                $"health {health.Current:0}, bar {hud.HealthShown:0.000}, visible {hud.HealthBarVisible}");
 
             int recoveredBefore = _recoveredCount;
             _debug.KillPlayer();
@@ -3054,7 +3055,29 @@ public partial class MovementToySelfTest : Node
             health.Damage(45f);
             _debug.HealPlayer();
             foreach (var _ in Frames(2)) yield return null;
-            Check("heal returns the value to full", Mathf.IsEqualApprox(health.Current, PlayerHealth.Max), $"{health.Current:0}");
+            Check("heal returns the value to full and the bar stands down again (P-015: the corner is the dial's)",
+                Mathf.IsEqualApprox(health.Current, PlayerHealth.Max) && !hud.HealthBarVisible,
+                $"{health.Current:0}, bar visible {hud.HealthBarVisible}");
+        }
+
+        // The speedometer (P-015): it draws locomotion speed, and its redline is where Flow headroom begins.
+        {
+            var dial = hud.Dial;
+            Check("the speedometer's redline starts at the base cap and its scale ends at the Flow ceiling (D-088)",
+                Mathf.IsEqualApprox(dial.RedlineFrom, _player.LocomotionCap) && dial.FullScale >= _player.FlowCap - 0.01f,
+                $"redline {dial.RedlineFrom:0.0}, full scale {dial.FullScale:0.0}, base cap {_player.LocomotionCap:0.0}, flow cap {_player.FlowCap:0.0}");
+            Check("the speedometer reads zero at rest", Mathf.Abs(dial.Shown - _player.LocomotionSpeed) < 0.5f,
+                $"dial {dial.Shown:0.0}, ball {_player.LocomotionSpeed:0.0}");
+
+            Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            foreach (var _ in Seconds(2.5f)) yield return null;
+            float driving = _player.LocomotionSpeed;
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the speedometer follows the ball up to speed",
+                driving > 20f && Mathf.Abs(dial.Shown - _player.LocomotionSpeed) < 1.0f,
+                $"dial {dial.Shown:0.0} vs ball {_player.LocomotionSpeed:0.0} m/s");
+            ReleaseAll();
+            foreach (var _ in Seconds(2.0f)) yield return null;
         }
 
         // Run state: the stage label and the wallet the reward burst will fill (T3).

@@ -36,5 +36,13 @@ public interface IDebugActions
     void KillPlayer();
     /// <summary>Debug (07 §12): back to full health.</summary>
     void HealPlayer();
+    /// <summary>Debug (07 §12, T3): the crush one-shot on the showcase Pylon, or at the ball if the row is off.</summary>
+    void PlayCrush();
+    /// <summary>Debug (07 §12, T3): the failed-impact one-shot on the showcase Bulwark, or at the ball.</summary>
+    void PlayFailedImpact();
+    /// <summary>Debug (07 §12, T3): the damage pulse on the ball.</summary>
+    void PlayDamage();
+    /// <summary>Debug (07 §12, T3): throw a burst of twelve coins at the ball and let it magnetise them in (P-007).</summary>
+    void BurstCoins();
     void CopySeedToClipboard();
 }

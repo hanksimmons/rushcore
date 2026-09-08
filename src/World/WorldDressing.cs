@@ -1,7 +1,10 @@
 using Godot;
+using Rushcore.Enemies;
 using Rushcore.Generation;
+using Rushcore.Pickups;
 using Rushcore.Player;
 using Rushcore.Tuning;
+using Rushcore.Vfx;
 
 namespace Rushcore.World;
 
@@ -57,6 +60,11 @@ public partial class WorldDressing : Node3D
     }
 
     public event Action<float>? BoostPickupCollected;
+    /// <summary>The showcase row's burst pad was driven over (T3); the composition root throws the coins.</summary>
+    public event Action<Vector3>? RewardPadTriggered;
+
+    /// <summary>The T3 lab row, or null while <c>World › Enemy Showcase</c> is off (P-006).</summary>
+    public ShowcaseRow? Showcase { get; private set; }
 
     public StandardMaterial3D TubeShellMaterial { get; private set; } = null!;
     public StandardMaterial3D TubeRibMaterial { get; private set; } = null!;
@@ -241,6 +249,7 @@ public partial class WorldDressing : Node3D
         _exitSigns.Clear();
         _exitFlashes.Clear();
         _pulseExit = -1;
+        Showcase = null;
 
         _colliders = new StaticBody3D
         {
@@ -265,6 +274,7 @@ public partial class WorldDressing : Node3D
         BuildFeaturePylons();
         BuildScatteredProps(IsClearOfInstruments, 500f, 500f, 1f, PlacementChance);
         BuildBoostPickups();
+        if (_t.World.EnemyShowcase) BuildEnemyShowcase();
     }
 
     // ---------------------------------------------------------------- generated stage (Phase 2)
@@ -283,6 +293,12 @@ public partial class WorldDressing : Node3D
         foreach (var e in stage.Exits)
         {
             _exitSigns.Add(AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, 26f), $"EXIT {e.Label}", 10f));
+            // The exit's shape, not just its word (06 §9, T3): a pillar pair standing on the pad, square to the
+            // line coming in, so the pad is recognisable long before the sign is readable.
+            var marker = PickupVisual.Create(PickupKind.Exit);
+            marker.Position = _world.SurfacePoint(e.Position.X, e.Position.Z);
+            marker.Rotation = new Vector3(0f, e.Heading + Mathf.Pi * 0.5f, 0f);   // pillars square to the line coming in
+            _content.AddChild(marker);
             var flash = new MeshInstance3D
             {
                 Mesh = _ringMesh,
@@ -690,6 +706,7 @@ public partial class WorldDressing : Node3D
         _pulseExit = exitIndex;
         _pulseLeft = Mathf.Max(0.05f, _t.Run.OutroSeconds);
         _exitFlashes[exitIndex].Visible = true;
+        _world.Vfx.Play(WorldVfxKind.Exit, _exitFlashes[exitIndex].Position);
     }
 
     private void StepExitPulse(float dt)
@@ -1237,6 +1254,103 @@ public partial class WorldDressing : Node3D
             Position = position,
             Rotation = new Vector3(0f, yaw, 0f),
         });
+    }
+
+    // ---------------------------------------------------------------- T3 showcase row (lab only)
+
+    /// <summary>
+    /// The <c>World › Enemy Showcase</c> row (P-006): one of each enemy, one elite, one of each pickup shape and
+    /// a burst pad, standing beside the lab's calibration lane so the silhouettes can be judged at the cap. This
+    /// is the only place a placeholder enemy exists — generated stages get none, and none of it has a collider.
+    /// </summary>
+    public sealed class ShowcaseRow
+    {
+        public Node3D Root = null!;
+        public EnemyVisual Pylon = null!, Bulwark = null!, Strider = null!, Shooter = null!, Elite = null!;
+        public Node3D BurstPad = null!;
+        public EnemyVisual[] Enemies = System.Array.Empty<EnemyVisual>();
+        public PickupVisual[] Pickups = System.Array.Empty<PickupVisual>();
+    }
+
+    /// <summary>Metres between the lane's centre line and the row: outside the corridor, inside easy sight of it.</summary>
+    public const float ShowcaseOffset = 40f;
+    /// <summary>Metres between neighbours in the row.</summary>
+    public const float ShowcaseSpacing = 14f;
+    /// <summary>Where the first of the twelve stands, in lab X. The row runs back down the lane from here.</summary>
+    public const float ShowcaseStartX = TerrainHeightField.LaneStartX - 20f;
+
+    /// <summary>
+    /// Stands the row up 40 m to the left of the lab spawn, facing the runway, running back down the lane so a
+    /// single pass at the cap goes by every shape in turn. Nothing here collides: they are silhouettes until the
+    /// main track brings the impact model (P-006).
+    /// </summary>
+    private void BuildEnemyShowcase()
+    {
+        var row = new ShowcaseRow { Root = new Node3D { Name = "EnemyShowcase" } };
+        _content.AddChild(row.Root);
+
+        float z = TerrainHeightField.LaneZ + ShowcaseOffset;
+        float x = ShowcaseStartX;
+        int slot = 0;
+        Vector3 Next() => _world.SurfacePoint(x - ShowcaseSpacing * slot++, z);
+
+        var vfx = _world.Vfx;
+        row.Pylon = Enemy(row, EnemyKind.Pylon, Next(), vfx);
+        row.Bulwark = Enemy(row, EnemyKind.Bulwark, Next(), vfx);
+        row.Strider = Enemy(row, EnemyKind.Strider, Next(), vfx);
+        // The Strider's long axis lies across the lane's travel line, which is the whole point of the shape
+        // (02 §7): its crossing direction has to be obvious before it has moved.
+        row.Strider.Rotation = new Vector3(0f, Mathf.Pi * 0.5f, 0f);
+        row.Shooter = Enemy(row, EnemyKind.Shooter, Next(), vfx);
+        row.Elite = Enemy(row, EnemyKind.Pylon, Next(), vfx);
+        row.Elite.Name = "ElitePylon";
+        row.Elite.SetElite(true);
+        row.Enemies = new[] { row.Pylon, row.Bulwark, row.Strider, row.Shooter, row.Elite };
+
+        var pickups = new List<PickupVisual>();
+        foreach (var kind in new[] { PickupKind.Boost, PickupKind.Currency, PickupKind.Reward, PickupKind.Item, PickupKind.Shortcut, PickupKind.Exit })
+        {
+            var pickup = PickupVisual.Create(kind, pickups.Count * 0.6f);
+            pickup.Position = Next();
+            row.Root.AddChild(pickup);
+            pickups.Add(pickup);
+        }
+        row.Pickups = pickups.ToArray();
+
+        row.BurstPad = BuildBurstPad(row.Root, Next());
+        Showcase = row;
+    }
+
+    private EnemyVisual Enemy(ShowcaseRow row, EnemyKind kind, Vector3 at, WorldVfx vfx)
+    {
+        var e = EnemyVisual.Create(kind, vfx);
+        e.Position = at;
+        row.Root.AddChild(e);
+        return e;
+    }
+
+    /// <summary>
+    /// A pad that throws a reward burst when the ball rolls over it. The trigger is an <see cref="Area3D"/>, the
+    /// same affordance the boost rings use; the coins themselves are the composition root's, since only it knows
+    /// where the ball is and which wallet the burst fills.
+    /// </summary>
+    private Node3D BuildBurstPad(Node3D parent, Vector3 at)
+    {
+        var pad = new Node3D { Name = "BurstPad", Position = at };
+        parent.AddChild(pad);
+        pad.AddChild(new MeshInstance3D
+        {
+            Mesh = PlaceholderPalette.Cylinder,
+            MaterialOverride = PlaceholderPalette.Currency,
+            Position = Vector3.Up * 0.15f,
+            Scale = new Vector3(9f, 0.3f, 9f),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        });
+        var area = new Area3D { Name = "Trigger", Monitoring = true, Monitorable = false };
+        area.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 5f } });
+        pad.AddChild(area);
+        area.BodyEntered += body => { if (body is PlayerPhysics) RewardPadTriggered?.Invoke(pad.GlobalPosition + Vector3.Up * 1.5f); };
+        return pad;
     }
 
     private sealed class BoostRing

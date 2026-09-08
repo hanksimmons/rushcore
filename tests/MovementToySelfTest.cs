@@ -1,9 +1,12 @@
 using System.Collections;
 using Godot;
 using Rushcore.Core;
+using Rushcore.Enemies;
 using Rushcore.Generation;
+using Rushcore.Pickups;
 using Rushcore.Player;
 using Rushcore.Tuning;
+using Rushcore.Vfx;
 using Rushcore.World;
 
 namespace Rushcore.Testing;
@@ -1289,6 +1292,9 @@ public partial class MovementToySelfTest : Node
         // meets the tube, and the T8 camera guard is measured on that ride. The HUD case has nothing to do with
         // the drive, so it stands after it rather than shifting it.
         foreach (var e in RunHudCase()) yield return e;
+
+        // ---- T3: the enemy and pickup silhouettes, the reward burst and the combat one-shots ----
+        foreach (var e in RunShowcaseCase()) yield return e;
 
         // ---- fall recovery ----
         foreach (var _ in Seconds(0.5f)) yield return null;
@@ -3183,6 +3189,209 @@ public partial class MovementToySelfTest : Node
             GD.Print($"[SELFTEST] HUD allocation over 120 frames: {shown} B visible, {idle} B hidden, {cost} B of it the HUD's");
             Check("the HUD allocates nothing per frame worth counting (< 4 KB over 120 frames)",
                 cost < 4096, $"{cost} B over 120 frames ({shown} visible, {idle} hidden)");
+        }
+    }
+
+    // ---------------- T3: enemy and pickup visuals, the reward burst, the combat one-shots ----------------
+
+    /// <summary>
+    /// Everything T3 builds is presentation, so what the harness can assert is that it is presentation: the row
+    /// exists, carries no collider and no gameplay, stands clear of the lane, draws from the shared palette and
+    /// leaves the node count exactly where it found it. The reward burst is the one thing here with a rule —
+    /// coins reach the ball and the burst cleans itself up — so that is measured on a parked ball and on a
+    /// moving one. Whether a Bulwark reads as heavy at the cap is the user's; no agent plays stages.
+    /// </summary>
+    private IEnumerable RunShowcaseCase()
+    {
+        var t = _debug.Tuning;
+        var world = _debug.World;
+
+        // The exit's shape on a real stage (06 §9): one pillar pair per pad, on the "three exits" sample.
+        {
+            t.World.SampleStage = 6f;
+            foreach (var _ in Frames(6)) yield return null;
+            int exits = world.Stage?.Exits.Count ?? 0;
+            int markers = CountKind(world.Dressing, PickupKind.Exit);
+            Check("every exit pad carries the exit marker, not just the sign (06 §9)",
+                exits >= 2 && markers == exits, $"{markers} markers for {exits} pads");
+
+            // The row is lab-only, so asking for it on a stage must be a no-op — not a world that can never
+            // match its tuning and therefore rebuilds itself every frame (caught in play at 1 fps, 2026-09-08).
+            var stage = world.Stage;
+            t.World.EnemyShowcase = true;
+            foreach (var _ in Frames(12)) yield return null;
+            Check("asking for the showcase row on a generated stage rebuilds nothing (it is lab terrain only)",
+                ReferenceEquals(world.Stage, stage) && world.MatchesTuning() && world.Showcase is null,
+                $"same stage {ReferenceEquals(world.Stage, stage)}, matches {world.MatchesTuning()}");
+            t.World.EnemyShowcase = false;
+
+            t.World.SampleStage = 0f;
+            t.World.GeneratedStage = false;
+            t.World.Archetype = 0f;
+            foreach (var _ in Frames(6)) yield return null;
+        }
+
+        foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        int baseline = GetTree().GetNodeCount();
+
+        t.World.EnemyShowcase = true;
+        foreach (var _ in Frames(6)) yield return null;
+        var row = world.Showcase;
+        Check("World › Enemy Showcase stands the lab row up", row is not null && world.BuiltShowcase && !world.IsStage,
+            $"row={(row is null ? "none" : "built")} stage={world.IsStage}");
+        if (row is null)
+        {
+            t.World.EnemyShowcase = false;
+            foreach (var _ in Frames(6)) yield return null;
+            yield break;
+        }
+
+        // No colliders anywhere on an enemy or a pickup (P-006): they are silhouettes until the impact model.
+        {
+            int shapes = 0, bodies = 0;
+            foreach (var e in row.Enemies) shapes += CountDescendants<CollisionShape3D>(e);
+            foreach (var p in row.Pickups) shapes += CountDescendants<CollisionShape3D>(p);
+            foreach (var e in row.Enemies) bodies += CountDescendants<PhysicsBody3D>(e);
+            Check("no placeholder enemy or pickup has a collider or a body (P-006)", shapes == 0 && bodies == 0,
+                $"{shapes} collision shapes, {bodies} bodies");
+            Check("the burst pad is a trigger area and nothing solid",
+                CountDescendants<Area3D>(row.BurstPad) == 1 && CountDescendants<PhysicsBody3D>(row.BurstPad) == 0,
+                $"areas {CountDescendants<Area3D>(row.BurstPad)}, bodies {CountDescendants<PhysicsBody3D>(row.BurstPad)}");
+        }
+
+        // Clear of the lane the ball actually drives (04 §5G's rule, applied to the lab's runway).
+        {
+            float nearest = float.MaxValue;
+            foreach (var m in Descendants<MeshInstance3D>(row.Root))
+            {
+                Vector3 p = m.GlobalPosition;
+                if (p.X < TerrainHeightField.LaneEndX || p.X > TerrainHeightField.LaneStartX) continue;
+                nearest = Mathf.Min(nearest, Mathf.Abs(p.Z - TerrainHeightField.LaneZ));
+            }
+            Check("no part of the row stands inside the runway's corridor",
+                nearest > TerrainHeightField.LaneHalfWidth, $"nearest {nearest:0.0} m from the lane centre, half width {TerrainHeightField.LaneHalfWidth:0}");
+        }
+
+        // The palette is shared: a row of a dozen bodies must not create a dozen materials (05 §15, 06 §17).
+        {
+            var mats = new HashSet<ulong>();
+            foreach (var m in Descendants<MeshInstance3D>(row.Root))
+                if (m.MaterialOverride is { } mat) mats.Add(mat.GetRid().Id);
+            GD.Print($"[SELFTEST] showcase row: {CountDescendants<MeshInstance3D>(row.Root)} draws off {mats.Count} materials");
+            Check("the showcase row draws off at most twelve shared materials", mats.Count <= 12, $"{mats.Count} materials");
+        }
+
+        Check("the elite treatment is one silhouette scaled with a halo, not a second body",
+            row.Elite.IsElite && row.Elite.Kind == EnemyKind.Pylon && !row.Pylon.IsElite,
+            $"elite={row.Elite.IsElite} kind={row.Elite.Kind}");
+        Check("the Shooter carries a projectile shape it never fires (02 §7)", row.Shooter.Projectile is not null);
+
+        // Crush: the one-shot fires, the body goes, and nothing is left behind two seconds later.
+        {
+            int played = world.Vfx.PlayedCount;
+            _debug.PlayCrush();
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the crush one-shot fires and takes the body with it",
+                world.Vfx.ActiveCount >= 1 && world.Vfx.PlayedCount == played + 1 && row.Pylon.BodyHidden,
+                $"active {world.Vfx.ActiveCount}, hidden {row.Pylon.BodyHidden}");
+            foreach (var _ in Seconds(2.0f)) yield return null;
+            Check("two seconds later the crush has cleared and the body is back",
+                world.Vfx.ActiveCount == 0 && !row.Pylon.BodyHidden && GetTree().GetNodeCount() == baseline + RowNodes(row),
+                $"active {world.Vfx.ActiveCount}, hidden {row.Pylon.BodyHidden}");
+        }
+
+        // Failed impact and damage: both fire, neither leaves a node behind.
+        {
+            int nodes = GetTree().GetNodeCount();
+            int played = world.Vfx.PlayedCount;
+            _debug.PlayFailedImpact();
+            _debug.PlayDamage();
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the failed-impact and damage cues fire from the pool, allocating no node",
+                world.Vfx.PlayedCount == played + 1 && GetTree().GetNodeCount() == nodes,
+                $"played {world.Vfx.PlayedCount - played}, nodes {GetTree().GetNodeCount()} vs {nodes}");
+            foreach (var _ in Seconds(1.0f)) yield return null;
+        }
+
+        // The reward burst, parked: twelve coins off a point 5 m away all reach the ball, and the burst goes.
+        {
+            int nodes = GetTree().GetNodeCount();
+            int wallet = _debug.Run.Currency;
+            int collected = 0;
+            var rng = new RandomNumberGenerator();
+            rng.Seed = 7;
+            var burst = RewardBurst.Spawn(world, _player.GlobalPosition + new Vector3(5f, 2f, 0f), PickupKind.Currency, 12,
+                                          rng, () => _player.GlobalPosition, world.Vfx);
+            burst.Collected += (_, amount) => { collected += amount; _debug.Run.AddCurrency(amount); };
+            float elapsed = 0f;
+            while (collected < 12 && elapsed < 3f) { elapsed += 1f / 60f; yield return null; }
+            Check("a parked ball magnetises every coin of a twelve-coin burst inside three seconds (P-007)",
+                collected == 12, $"{collected} of 12 in {elapsed:0.00} s");
+            Check("the coins land in the run's wallet, which the HUD already reads (T2)",
+                _debug.Run.Currency == wallet + collected && _debug.Hud.CurrencyShown == _debug.Run.Currency,
+                $"wallet {_debug.Run.Currency} vs {wallet} + {collected}, HUD {_debug.Hud.CurrencyShown}");
+            float freed = 0f;
+            while (IsInstanceValid(burst) && freed < 6.5f) { freed += 1f / 60f; yield return null; }
+            foreach (var _ in Frames(3)) yield return null;
+            Check("the burst frees itself and the node count comes back",
+                !IsInstanceValid(burst) && GetTree().GetNodeCount() == nodes, $"nodes {GetTree().GetNodeCount()} vs {nodes}");
+        }
+
+        // The reward burst, moving: thrown 30 m to the side of a ball at speed, it either catches up or it goes.
+        {
+            int nodes = GetTree().GetNodeCount();
+            int collected = 0;
+            Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            foreach (var _ in Seconds(3.0f)) yield return null;
+            float speed = _player.LocomotionSpeed;
+            var rng = new RandomNumberGenerator();
+            rng.Seed = 11;
+            Vector3 side = Vector3.Up.Cross(_laneFwd).Normalized();
+            var burst = RewardBurst.Spawn(world, _player.GlobalPosition + side * 30f + Vector3.Up * 2f, PickupKind.Currency, 12,
+                                          rng, () => _player.GlobalPosition, world.Vfx);
+            burst.Collected += (_, amount) => collected += amount;
+            float elapsed = 0f;
+            while (IsInstanceValid(burst) && elapsed < 7f) { elapsed += 1f / 60f; yield return null; }
+            ReleaseAll();
+            foreach (var _ in Frames(3)) yield return null;
+            GD.Print($"[SELFTEST] burst thrown 30 m beside a ball at {speed:0} m/s: {collected} of 12 collected, gone in {elapsed:0.0} s");
+            Check("a burst thrown beside a moving ball leaks nothing either way (P-007)",
+                !IsInstanceValid(burst) && elapsed <= RewardBurst.MaxSeconds + 0.4f && GetTree().GetNodeCount() == nodes,
+                $"{collected} of 12 in {elapsed:0.00} s, nodes {GetTree().GetNodeCount()} vs {nodes}");
+        }
+
+        // Off again: the row is a world toggle, so the world it leaves behind is the world it found.
+        {
+            t.World.EnemyShowcase = false;
+            foreach (var _ in Frames(6)) yield return null;
+            Check("toggling the row off leaves the node count where it started",
+                world.Showcase is null && !world.BuiltShowcase && GetTree().GetNodeCount() == baseline,
+                $"nodes {GetTree().GetNodeCount()} vs {baseline}, row {(world.Showcase is null ? "gone" : "still up")}");
+        }
+    }
+
+    private static int RowNodes(WorldDressing.ShowcaseRow row) => CountDescendants<Node>(row.Root) + 1;
+
+    private static int CountKind(WorldDressing dressing, PickupKind kind)
+    {
+        int n = 0;
+        foreach (var p in Descendants<PickupVisual>(dressing)) if (p.Kind == kind) n++;
+        return n;
+    }
+
+    private static int CountDescendants<T>(Node root) where T : Node
+    {
+        int n = 0;
+        foreach (var _ in Descendants<T>(root)) n++;
+        return n;
+    }
+
+    private static IEnumerable<T> Descendants<T>(Node root) where T : Node
+    {
+        foreach (Node child in root.GetChildren())
+        {
+            if (child is T hit) yield return hit;
+            foreach (var deeper in Descendants<T>(child)) yield return deeper;
         }
     }
 

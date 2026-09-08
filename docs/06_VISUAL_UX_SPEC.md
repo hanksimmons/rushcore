@@ -152,6 +152,18 @@ The game should communicate crushability primarily through:
 
 Avoid persistent giant text labels.
 
+Delivered as placeholders (T3, P-017), presentation only: no collider, no behaviour, no placement in a generated
+stage. Sizes are metres against the 0.66 m ball (D-091). **Pylon** — a 0.5 m triangular prism standing 2.6 m in pale
+cool plastic under one lit cap; nothing about it is heavy, which is the message. **Bulwark** — a 3.2 × 1.8 × 1.6 m
+dark block on planted feet, leaning 8° into the oncoming line, with one hazard chevron band proud of its face.
+**Strider** — a 2.4 m body on two blade legs 1.6 m up, its long axis lying across the travel line, bobbing on a code
+timer rather than an animation player, so the crossing direction reads before it has moved. **Shooter** — a 1.2 m
+core on a short pillar with a barrel cone and an orientation ring in the aim colour, and the projectile shape it
+never fires. **Elite** — the same silhouette at 1.3× under a rotating halo and crown in the one elite colour, so an
+elite is recognised before its role is; the treatment is identical for all four (02 §7's "one constrained modifier").
+The whole language draws from twelve shared materials (`src/Vfx/PlaceholderPalette.cs`): a row of a dozen bodies
+creates no resources at all.
+
 ## 9. Pickups and affordances
 
 Consistent shape language for:
@@ -164,6 +176,16 @@ Consistent shape language for:
 - high-risk shortcut markers.
 
 Currency may burst physically, then magnetize/auto-collect to preserve momentum.
+
+Delivered (T3, P-017), one shape and one material each: **boost** keeps the ring the player drives through;
+**currency** is a flat hexagonal coin; **XP / reward** is a spinning tetrahedron, which nothing else in the world is;
+**item** is a cube inside a thin frame; **stage exit** is a pillar pair 14 m tall standing on the pad, square to the
+line coming in, so a pad is recognisable long before its EXIT sign is readable; **high-risk shortcut** is a twin
+chevron post. That post and the Bulwark's band are the only things in the language wearing hazard ink — rewards are
+warm or cool and never red, so a reward line can never be read as a threat (08 §9). The burst-and-magnetise is
+delivered as P-007 describes: kinematic coins, a 0.4 s ballistic arc, then a magnet easing to 60 m/s that collects
+inside 1.2 m, one event per coin, and no force on the ball at any point — auto-collect exists precisely so momentum
+is never the price of a reward (02 §12).
 
 ## 10. VFX priorities
 
@@ -184,6 +206,14 @@ VFX explains physics:
 - exit.
 
 Prefer particles/shared simple meshes/shaders over temporary heavy node hierarchies.
+
+Delivered (T3): the world one-shots live in `src/Vfx/WorldVfx.cs` on a fixed pool of eight reusable slots — **crush**
+(bright shards thrown out under a flat expanding ring, 0.55 s), **failed impact** (a dull dark puff that hangs and
+sinks, deliberately unrewarding to look at, 0.5 s), **pickup** (a few motes rising off the spot, 0.45 s) and **exit**
+(a tall ring climbing off the pad through the completion outro, 1 s). **Damage** is player-local instead:
+`PlayerVfx.PlayDamage()` throws red motes off the ball under a shell flash for 0.3 s. Every emitter, mesh and material
+is built once, so firing an effect allocates nothing and adds no node, and all of them are short and thrown outward so
+none sits over the surface the ball is about to land on (08 §9).
 
 ## 11. Camera presentation
 

@@ -78,6 +78,35 @@ is a judgement.
 - **Lever:** `GroundFollowDeadband` and `TubeAxisUncertainty` in `PlayerPhysics`, which now stand at 3 cm and 1 cm.
 - **To judge:** `World › Sample Stage` = 1, boost through and watch the contact point.
 
+### A-7. The enemy silhouettes have never been seen at the cap
+
+T3's packet asked the implementing agent to tune the enemy sizes on the runway at the cap and record what it settled
+on. That could not be done: the harness is headless and no AI agent plays stages, so the sizes shipped are the
+packet's own starting points, unjudged. What the harness can say is that they exist, carry no collider, stand clear
+of the lane and draw off twelve shared materials.
+
+- **Delivered sizes (P-017):** Pylon 0.5 m across × 2.6 m tall; Bulwark 3.2 × 1.8 × 1.6 m, leaning 8°; Strider a
+  2.4 m body 1.6 m up on blade legs; Shooter a 1.2 m core with a barrel and a ring, 2.4 m overall; elite = the same
+  silhouette at 1.3× under a halo.
+- **The read to make:** does the Bulwark say "not at this speed" and the Pylon say "ram it" *before* you are on
+  them (02 §7)? Is the Strider's crossing axis obvious? Is the elite unmistakable at a glance?
+- **Lever:** the size constants in `EnemyVisual.Create`'s four builders, and `Height`.
+- **To judge:** `World › Enemy Showcase` on, then drive the lab lane past the row at the cap.
+
+### A-8. A reward burst can never catch a ball at speed — is 60 m/s the right magnet?
+
+Measured: twelve coins thrown 30 m to the side of a ball travelling at 73 m/s collected **0 of 12** and the burst
+freed itself at its 6 s limit. The magnet's ceiling is P-007's 60 m/s and the ball's cap is 148.5 m/s, so a coin
+that is not already on the ball's line is simply lost. Parked, the same burst collects all twelve in well under a
+second.
+
+- **What this means:** a burst has to be thrown *on* the ball's line, which is exactly where a crush puts it. It is
+  not a bug so much as a constraint on where Phase 4 is allowed to spawn one.
+- **Options:** leave it (crushes spawn on the line anyway); raise `RewardBurst.MagnetSpeed` above the cap so a coin
+  can always catch up; or give the magnet a lead on the ball's velocity rather than its position.
+- **Lever:** `RewardBurst.MagnetSpeed`, currently 60 m/s (P-007).
+- **To judge:** `Burst 12 Coins` from the panel while boosting, and the showcase row's burst pad at speed.
+
 ---
 
 ## B. Needs your call on approach
@@ -130,8 +159,8 @@ you reported: rolling in at the cap now costs 2% of the entry speed, down from 1
 
 ### D-1. What the parallel track takes next
 
-- **T3** (enemy and pickup visuals) is ready and is the last of the three packets that share `GameBootstrap`,
-  `IDebugActions`, `TuningPanel` and `GameplayTuning`, so it runs alone.
-- **T5** (generation measurements) is isolated and can go at any time.
+- **T3** (enemy and pickup visuals) is **delivered** on `opus/t3-visuals` (2026-09-08). It left A-7 and A-8 above.
+- **T5** (generation measurements) is isolated and can go at any time, and is now the only packet left that is not
+  waiting on you.
 - **T6** (sample-stage presentation fixes) opens as soon as playtest notes exist. Two have landed and are done: the
   tube entry collision and the speedometer.

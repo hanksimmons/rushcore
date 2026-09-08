@@ -296,6 +296,14 @@ Procedural props:
 
 Props reinforce scale/speed and do not accidentally obstruct mandatory lines.
 
+Delivered per archetype (T4): Rolling Highlands scatters rocks and crystal clusters, densest just off the corridor edge
+and thinning beyond 600 m; Canyon Run puts red slabs and standing fins on the wall tops only (above 60% of the wall
+height), never on a slot floor; Dune Sea puts ridged stones and dry tufts on the wave's crests only, sparse, so the
+crest lines stay readable; Sky Terraces puts pale crystals on the margins around the floors, below the cloud band, and
+nothing on a floor surface. Instances grow with distance from the route, so the parallax is the speed cue. Low posts
+mark the corridor's level width every 200 m of straight route, never in a bend (the bank is the cue there), across a
+module, or under a lid.
+
 Lighting baseline:
 
 - one dominant directional light,

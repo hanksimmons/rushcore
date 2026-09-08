@@ -77,6 +77,10 @@ Expose only macro handles initially:
 
 Do not expose every internal constant.
 
+`World › Prop Density` (default 0.19) scales the placement attempts on a generated stage; the instance caps (1800
+rocks, 900 crystals, 240 markers) are a ceiling the default sits well under, so the slider keeps working, and they
+bind only past about 0.6. Density changes scenery only: it never moves a stage hash (T4, P-008).
+
 ## 6. VFX tuning
 
 - player charge effect strength,

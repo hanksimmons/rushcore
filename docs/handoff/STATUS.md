@@ -8,7 +8,7 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T1 | `T1_STAGE_LIFECYCLE.md` | `opus/t1-stage-lifecycle` | not started | — | — | — | — |
 | T2 | `T2_HUD.md` | `opus/t2-hud` | not started | — | — | — | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | not started | — | — | — | — |
-| T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | not started | — | — | — | — |
+| T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | pushed | (first commit) | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
 | T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | not started | — | — | — | — |
 | T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |

@@ -97,13 +97,58 @@ fields to generation data; report which), or if any check reveals a line, module
 
 ## Delivery record (filled by the implementing agent)
 
-- Branch / commits:
-- Harness (full run and the three archetype runs, counts and wall times):
-- Files changed:
-- What was built (per-archetype sets and caps):
-- Deviations from the packet and why:
-- Measurements (instance counts, scatter ms, frame time at density 0.19 and 1.0):
-- P-entries written:
-- Spec sections edited:
-- Open items:
-- Needs main track:
+- **Branch / commits:** `opus/t4-prop-scatter` off `develop-secondary` (5d940c3).
+- **Harness (full run and the three archetype runs):** 323/323 default (82 s), canyon 320/320, dunes 323/323,
+  sky 324/324. Golden hashes unchanged (the scatter reads the cosmetic stream and never touches generation data).
+- **Files changed:** `src/World/StageScatter.cs` (new), `src/World/WorldDressing.cs`, `src/World/MovementToyWorld.cs`
+  (scatter counters and the build log line), `tests/MovementToySelfTest.cs`, docs 04 §5G, 06 §16, 07 §5, 10, this
+  packet, `STATUS.md`, `PROVISIONAL_DECISIONS.md`.
+- **What was built:**
+  - `StageScatter`: the keep-out stated once from `StageDefinition` alone — every line's level width plus its bend
+    extra and half its falloff (160 m; primary and every optional line, all floors, terminal lines included), every
+    exit pad plus 20 m, every checkpoint anchor plus 30 m, every lid footprint plus 20 m, every tube axis plus its
+    radius and 10 m (behind a plan bounding circle), the spiral disc plus 40 m. `Why(x, z)` names the rule that
+    rejects a point, so a violation reports its own cause. The dressing asks it before placing and the harness asks
+    it about everything placed.
+  - Per-archetype sets (06 §16): highlands rocks and crystal clusters, densest just off the corridor edge and
+    thinning past 600 m; canyon red slabs and standing fins on the wall tops only (above 60% of the wall height),
+    never on a slot floor; dune ridged stones and dry tufts on the wave's crests only, sparse; sky pale crystals on
+    the margins around the floors, below the cloud band. Instances grow with distance from the route (0.9 → 1.8),
+    so the parallax reads as speed.
+  - Scale cues: collider-free posts at the corridor's level width every 200 m of straight route, both sides, none in
+    a bend, across a module, or under a lid.
+  - Determinism: the stream is `Request.CosmeticSeed` (P-008), and every draw is taken before any test, so the
+    stream does not depend on which tests pass. No scatter collider stands within 200 m of a line.
+- **Deviations from the packet and why:**
+  - Caps are a ceiling, not the working number (P-013): the first cut at 900/500 was saturated at the shipped
+    density, which killed the `Prop Density` slider. 1800 rocks / 900 crystals / 240 markers, with the default
+    landing well under them.
+  - The harness measures the positions the dressing recorded rather than reading them back out of the `MultiMesh`.
+    Reading `MultiMesh.GetInstanceTransform` back returned the origin for every instance, which made the first
+    version of the check pass nothing; a separate check asserts the drawn instance count equals the placed count.
+  - Modules and their landing runs get no separate keep-out test: they lie on their line and are inside the line
+    keep-out by construction. Stated in 04 §5G rather than coded twice.
+  - The 300 ms scatter budget is asserted at the shipped density. At density 1.0 (over five times it) the scatter
+    takes about 680 ms, which the harness bounds at 1000 ms; the build budget (8000 ms) is untouched either way.
+  - Frame time at density 0.19 and 1.0 could not be measured: the harness is headless, so there is no renderer to
+    time, and no AI agent plays stages. The instance counts and the scatter cost are reported instead, and the
+    frame-rate read is the user's.
+- **Measurements:** see the table below.
+- **P-entries written:** P-013 (new); P-008 implemented as written.
+- **Spec sections edited:** 04 §5G (the keep-out, delivered), 06 §16 (what each archetype scatters), 07 §5 (the
+  density slider and the caps), 10 (the runbook line and the build-log format).
+- **Open items:** Dune Sea is the sparse one by design and lands at about 190 instances a stage; whether that reads
+  as scenery or as emptiness at speed is the user's call. Canyon puts everything on the wall tops and carries no
+  crystals at all, which is the packet's rule — worth a look in play. No LOD (the packet's instruction); the caps
+  are never reached at the shipped density, so nothing pops.
+- **Needs main track:** nothing new.
+
+### Measured (density 0.19 unless stated)
+
+| Stage | Rocks | Crystals | Markers | Colliders | Scatter ms |
+|---|---|---|---|---|---|
+| Rolling Highlands (default seed) | 819 | 445 | 46 | 1172 | 155 |
+| Canyon Run | 1458 | 0 | 36 | 1357 | 209 |
+| Dune Sea | 133 | 54 | 30 | 130 | 7 |
+| Sky Terraces | 220 | 634 | 46 | 774 | 68 |
+| Rolling Highlands at density 1.0 | 1800 (cap) | 900 (cap) | 46 | 2473 | 681 |

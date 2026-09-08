@@ -56,6 +56,13 @@ which is how the slam-dive framing lag was found (D-090 amendment).
 
 Falling below the kill plane recovers automatically. Recovery resets physics interpolation.
 
+**Prop scatter** (`World › Prop Density`, default 0.19; T4): scenery on a generated stage is archetype-aware —
+highlands rocks and crystals off the corridor edge, canyon slabs and fins on the wall tops, dune stones and tufts on
+the wave's crests, sky crystals on the margins below the cloud band — and low posts mark the corridor's level width
+every 200 m of straight route. It is drawn from the cosmetic seed, so the density slider never changes the stage
+itself, and nothing stands in a line, an exit pad, an anchor, a lid, a tube or the spiral disc. The build log prints
+`scatter: N rocks, M crystals, K markers (C with colliders) in T ms`.
+
 **Ground follow** (`Movement › Ground Follow`, snap 0.5 m; D-092): the controller reads the terrain
 grid under the ball each tick and keeps it on the surface wherever the surface could physically carry
 it (v²κ below gravity), so the collider's flat facets never hop it and a charge held over a rolling

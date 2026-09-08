@@ -2104,6 +2104,81 @@ public partial class MovementToySelfTest : Node
             Check("no solid prop stands inside a route corridor", solids > 0 && inside == 0, $"{inside} of {solids} colliders inside; closest {closest:0} m from a line");
         }
 
+        // Cosmetic scatter (04 §5G, 06 §16; T4): nothing stands in a line, a pad, an anchor, a lid, a tube or the
+        // spiral disc; the edge markers deliberately do stand at the level width, and carry no collider.
+        {
+            var keep = new StageScatter(stage);
+            int instances = 0, inside = 0, markers = world.MarkerPositions.Count;
+            float worstLine = float.MaxValue, nearestPad = float.MaxValue;
+            string why = "";
+            foreach (var p in world.ScatterPositions)
+            {
+                instances++;
+                if (!keep.Clear(p.X, p.Z)) { inside++; if (why.Length == 0) why = $"first at ({p.X:0}, {p.Z:0}): {keep.Why(p.X, p.Z)}"; worstLine = Mathf.Min(worstLine, keep.DistanceToLine(p.X, p.Z)); }
+                nearestPad = Mathf.Min(nearestPad, keep.DistanceToExitPad(p.X, p.Z));
+            }
+            // The rendered instance count must match what was placed, and the marker mesh carries no collider.
+            int drawn = 0;
+            foreach (var node in world.FindChildren("*", "MultiMeshInstance3D", recursive: true, owned: false))
+            {
+                if (node is not MultiMeshInstance3D mmi || mmi.Multimesh is not { } mm) continue;
+                string which = mmi.Name;
+                if (which == "EdgeMarkers")
+                    Check("edge markers carry no collider (they stand at the level width)", mmi.GetChildCount() == 0, $"{mmi.GetChildCount()} children");
+                if (which == "Rocks" || which == "Crystals") drawn += mm.InstanceCount;
+            }
+            Check("every placed scatter instance is drawn", drawn == instances, $"{drawn} drawn, {instances} placed");
+            GD.Print($"[SELFTEST] scatter: {world.ScatterRocks} rocks, {world.ScatterCrystals} crystals, {markers} markers, " +
+                     $"{world.ScatterColliders} colliders in {world.ScatterMillis} ms; nearest instance to an exit pad {nearestPad:0} m");
+            Check("no cosmetic scatter stands inside a line, exit pad, anchor, lid, tube or the spiral disc (04 §5G)",
+                instances > 0 && inside == 0,
+                $"{inside} of {instances} inside the keep-out{(inside > 0 ? $"; {why}" : "")}");
+            Check("the nearest scatter instance stands clear of every exit pad (D-105)",
+                nearestPad > WorldScale.PadRadius + StageScatter.ExitPadClearance,
+                $"nearest {nearestPad:0} m, pad {WorldScale.PadRadius:0} m + {StageScatter.ExitPadClearance:0} m");
+            Check("scatter stays inside its instance caps and its time budget",
+                world.ScatterRocks <= WorldDressing.RockCap && world.ScatterCrystals <= WorldDressing.CrystalCap &&
+                markers <= WorldDressing.MarkerCap && world.ScatterMillis < 300,
+                $"{world.ScatterRocks}/{WorldDressing.RockCap} rocks, {world.ScatterCrystals}/{WorldDressing.CrystalCap} crystals, {markers}/{WorldDressing.MarkerCap} markers, {world.ScatterMillis} ms");
+            float closestCollider = float.MaxValue;
+            int colliders = world.ScatterColliderPositions.Count;
+            foreach (var c in world.ScatterColliderPositions)
+                closestCollider = Mathf.Min(closestCollider, keep.DistanceToLine(c.X, c.Z));
+            Check("every scatter collider stands at least 200 m from every line (the corridor is never something to hit)",
+                colliders > 0 && closestCollider > StageScatter.ColliderClearance,
+                $"{colliders} colliders, closest {closestCollider:0} m from a line (rule {StageScatter.ColliderClearance:0} m)");
+        }
+
+        // The scatter is deterministic from the cosmetic seed (P-008) and the density slider never moves a hash.
+        {
+            float density0 = t.World.PropDensity;
+            var first = ScatterSnapshot(world);
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            var again = ScatterSnapshot(world);
+            Check("two builds of the same request scatter identically (cosmetic seed, P-008)",
+                first.Count > 0 && first.SequenceEqual(again), $"{first.Count} vs {again.Count} instances");
+
+            ulong hashBefore = world.Stage!.Hash();
+            int rocksBefore = world.ScatterRocks;
+            t.World.PropDensity = 1.0f;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            GD.Print($"[SELFTEST] scatter at density 1.00: {world.ScatterRocks} rocks, {world.ScatterCrystals} crystals in {world.ScatterMillis} ms (0.19 gave {rocksBefore} rocks)");
+            Check("the stage hash does not move with Prop Density (cosmetic stream, 05 §9)",
+                world.Stage!.Hash() == hashBefore, $"{hashBefore:X} vs {world.Stage!.Hash():X}");
+            // Density 1.0 is over five times the shipped default: the caps hold and the build budget still does.
+            Check("density raises the instance count up to the caps, inside the build budget",
+                world.ScatterRocks > rocksBefore && world.ScatterRocks <= WorldDressing.RockCap &&
+                world.ScatterCrystals <= WorldDressing.CrystalCap && world.ScatterMillis < 1000,
+                $"{rocksBefore} -> {world.ScatterRocks} rocks, {world.ScatterCrystals} crystals, {world.ScatterMillis} ms");
+
+            t.World.PropDensity = density0;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            stage = world.Stage!;
+        }
+
         foreach (var _ in Seconds(1.0f)) yield return null;
         Check("player spawns grounded on the start pad facing the route",
             _player.IsGrounded && Forward.Dot(stage.StartFacing) > 0.98f && _player.GlobalPosition.DistanceTo(stage.StartPosition) < 12f,
@@ -2888,5 +2963,14 @@ public partial class MovementToySelfTest : Node
         foreach (var _ in Frames(3)) yield return null;
         Check("lab restored after the generated stage", !_debug.World.IsStage && !_debug.World.IsStrip && Mathf.IsEqualApprox(_debug.World.HalfX, MovementToyWorld.Extent * 0.5f));
         Check("lab node count returns to its pre-stage value", GetTree().GetNodeCount() == nodesLab, $"{nodesLab} -> {GetTree().GetNodeCount()}");
+    }
+
+    /// <summary>Every scatter and marker position in build order: two builds of one request must match exactly.</summary>
+    private static List<string> ScatterSnapshot(MovementToyWorld world)
+    {
+        var list = new List<string>();
+        foreach (var p in world.ScatterPositions) list.Add($"s:{p.X:R},{p.Y:R},{p.Z:R}");
+        foreach (var p in world.MarkerPositions) list.Add($"m:{p.X:R},{p.Y:R},{p.Z:R}");
+        return list;
     }
 }

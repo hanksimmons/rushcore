@@ -262,6 +262,40 @@ public static class OptionalLineBuilder
         return true;
     }
 
+    // ---------------------------------------------------------------- T5 measurement (read-only)
+
+    /// <summary>
+    /// T5 instrument, read-only: could a floor 3 branch off this floor-2 section under the shipped
+    /// <see cref="Floor3"/> numbers, taking off after the floor 2's leaving transition rather than sharing its span?
+    /// That is D-103's named candidate, and it matters more since D-105 made the sections contested.
+    ///
+    /// <para>Asks exactly the three questions the placement loop asks: is there room on the primary after the floor-2
+    /// transition for a floor-3 length, do both of its own transitions lie on straights, is the side valid, and does
+    /// it clear every feature. Builds nothing and decides nothing — <paramref name="why"/> names the first question
+    /// that said no.</para>
+    /// </summary>
+    internal static bool Floor3CouldBranch(RouteSkeleton primary, RouteSkeleton floor2, out string why, out float roomMetres)
+    {
+        why = "";
+        var v = primary.Vertices;
+        float stop = primary.Spiral is { } pit ? pit.ApproachDistance - 100f : primary.Length - 400f;
+        float d = v[floor2.JoinStart].Distance + floor2.Transition;
+        float L = Floor3.Length;
+        roomMetres = stop - d;
+        if (roomMetres < L) { why = $"room {roomMetres:0} m < floor-3 length {L:0} m"; return false; }
+
+        int a = primary.IndexAtDistance(d), b = primary.IndexAtDistance(d + L);
+        if (b >= v.Count - 1) { why = "runs past the last vertex"; return false; }
+        float Offset(int i) => Floor3.Offset * Bump(v[i].Distance - v[a].Distance, v[b].Distance - v[a].Distance, Floor3.Transition);
+        if (!JoinsOnStraights(primary, a, b, Floor3.Transition)) { why = "a transition crosses a bend"; return false; }
+        if (!SideValid(primary, TurnSigns(primary), a, b, floor2.Side, Offset)) { why = "inside of a bend on the floor 2's side"; return false; }
+        if (OverlapsFeature(primary, d, d + L)) { why = "overlaps a feature"; return false; }
+        return true;
+    }
+
+    /// <summary>T5 instrument, read-only: the shipped floor-3 shape's length, for the room table.</summary>
+    internal static float Floor3Length => Floor3.Length;
+
     /// <summary>Lateral offset envelope along a line of the given length: 0 at both joins, 1 between the transitions.</summary>
     public static float Bump(float d, float length) => Bump(d, length, WorldScale.RidgeTransition);
     public static float Bump(float d, float length, float transition) =>

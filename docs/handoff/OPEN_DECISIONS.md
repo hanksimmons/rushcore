@@ -93,19 +93,29 @@ of the lane and draw off twelve shared materials.
 - **Lever:** the size constants in `EnemyVisual.Create`'s four builders, and `Height`.
 - **To judge:** `World › Enemy Showcase` on, then drive the lab lane past the row at the cap.
 
-### A-8. A reward burst can never catch a ball at speed — is 60 m/s the right magnet?
+### A-8. A reward burst cannot catch a ball above about 60 m/s — anywhere, including on its own line
 
 Measured: twelve coins thrown 30 m to the side of a ball travelling at 73 m/s collected **0 of 12** and the burst
-freed itself at its 6 s limit. The magnet's ceiling is P-007's 60 m/s and the ball's cap is 148.5 m/s, so a coin
-that is not already on the ball's line is simply lost. Parked, the same burst collects all twelve in well under a
-second.
+freed itself at its 6 s limit. Parked, the same burst collects all twelve in well under a second.
 
-- **What this means:** a burst has to be thrown *on* the ball's line, which is exactly where a crush puts it. It is
-  not a bug so much as a constraint on where Phase 4 is allowed to spawn one.
-- **Options:** leave it (crushes spawn on the line anyway); raise `RewardBurst.MagnetSpeed` above the cap so a coin
-  can always catch up; or give the magnet a lead on the ball's velocity rather than its position.
-- **Lever:** `RewardBurst.MagnetSpeed`, currently 60 m/s (P-007).
-- **To judge:** `Burst 12 Coins` from the panel while boosting, and the showcase row's burst pad at speed.
+The geometry is worse than "do not throw it beside the ball", which is what this entry first said. A coin is given no
+share of the ball's velocity at spawn, and the magnet's ceiling is P-007's 60 m/s, so a coin closes on a receding
+ball at `60 − v`. **Above 60 m/s it never closes, whatever direction the burst was thrown in.** A burst thrown exactly
+where the ball is — which is where a crush puts it — spends its 0.4 s free flight while the ball travels 59 m at the
+base cap, and then falls further behind every tick. So as it stands, a reward burst only pays out below 60 m/s: below
+the Rush band, and well under the 148.5 m/s cap, never mind D-088's 255 m/s ceiling.
+
+- **Why this matters now:** Phase 4's impact model is what will spawn these, and crushing happens at speed. As built,
+  the reward for a crush at the cap is nothing.
+- **Options:** (a) give each coin the ball's velocity at spawn, so the burst travels with the player and the magnet
+  only has to close a small relative gap — this is the usual fix and keeps the 0.4 s arc readable; (b) raise
+  `RewardBurst.MagnetSpeed` above the Flow ceiling (255 m/s), which collects everything but makes the arc a snap;
+  (c) magnetise toward where the ball *will be* rather than where it is; (d) accept it, and let Phase 4 decide that
+  rewards are collected on the slow-down rather than in the rush.
+- **Recommendation:** (a). It is the one that keeps P-007's presentation — a real arc, then a magnet — intact.
+- **Lever:** `RewardBurst.Spawn` (the initial `_velocity`) and `RewardBurst.MagnetSpeed`, currently 60 m/s (P-007).
+- **To judge:** drive the showcase row's line at speed and cross the burst pad at the end of it (the wallet is top
+  right on the HUD, and should not move), then roll over the same pad at walking pace and watch all twelve come in.
 
 ---
 

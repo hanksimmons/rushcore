@@ -178,7 +178,8 @@ visual (06 §5), or if any part seems to need a collider to look right.
   - Reward burst, ball parked 5 m away: **12 of 12** collected inside 3 s, all twelve in the run's wallet and on the
     HUD, the burst freed and the node count back.
   - Reward burst, thrown 30 m beside a ball at **73 m/s**: **0 of 12** collected, freed at its 6 s limit, no leak.
-    The magnet's 60 m/s ceiling cannot catch a ball near the 148.5 m/s cap — see A-8.
+    The magnet's 60 m/s ceiling cannot catch a ball near the 148.5 m/s cap, and the same arithmetic holds for a burst
+    thrown on the ball's own line — see A-8.
   - Toggling the row off returns the node count to the pre-row baseline exactly.
   - `--rushcore-screenshot` end to end: **7 s wall, 2 world builds** (see the bug below for what that was before).
 - **P-entries written:** P-017 (the delivered visual language, its sizes and the twelve-material palette). P-006 and
@@ -187,9 +188,10 @@ visual (06 §5), or if any part seems to need a collider to look right.
   burst), 06 §10 (the delivered one-shots and where each lives), 07 §11 (`World › Enemy Showcase`), 07 §12 (the four
   panel actions), 10 (the showcase row, the panel buttons, the exit marker, the screenshot's last frame).
 - **Open items:** both are the user's read and both are in `OPEN_DECISIONS.md`. **A-7** — the four silhouettes have
-  never been seen at the cap, so the packet's sizes are unjudged. **A-8** — a burst thrown beside a ball at speed
-  collects nothing, because P-007's magnet is 60 m/s against a 148.5 m/s cap; the constraint that follows is that
-  Phase 4 must spawn a burst on the ball's line. The screenshot's showcase frame is delivered and its
+  never been seen at the cap, so the packet's sizes are unjudged. **A-8** — a burst cannot catch a ball above
+  about 60 m/s **in any direction**, on its own line included: a coin gets no share of the ball's velocity and the
+  magnet closes at `60 − v` against P-007's 60 m/s. As built, a crush at the cap pays nothing. Giving each coin the
+  ball's velocity at spawn is the recommended fix and is one line, but it moves P-007, so it is the user's. The screenshot's showcase frame is delivered and its
   ground-visibility guard passes (luminance std 0.146), but composing a static frame of a twelve-figure row from a
   chase camera 18.8 m off the ground is a compromise: the row reads across the frame at about 60 m, which is small.
   It is a review aid, not an acceptance gate.

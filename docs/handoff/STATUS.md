@@ -9,14 +9,16 @@ reconciliation (`docs/handoff/README.md` §8). States: `not started` · `in prog
 | T2 | `T2_HUD.md` | `opus/t2-hud` | **merged** into `develop-secondary` | fb326bc | 368/368 with the speedometer; the sky run's one red check is the flaky guard below | P-015 (P-004, P-005 implemented) | — |
 | T3 | `T3_ENEMY_PICKUP_VISUALS.md` | `opus/t3-visuals` | **merged** into `develop-secondary` | 2eee91f | 386/386 default (112.3 s); canyon 382/382, dunes 386/386, sky 387/387 | P-017 (P-006, P-007 implemented) | — |
 | T4 | `T4_PROP_SCATTER.md` | `opus/t4-prop-scatter` | **merged** into `develop-secondary` | 524dc21 | 323/323; canyon 320/320, dunes 323/323, sky 324/324 | P-013 (P-008 implemented) | — |
-| T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | **pushed** | 03e1211 | 386/386 default; data-only 44 s with and without `RUSHCORE_MEASURE` | none (instruments only) | — |
-| T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | blocked on the user's notes | — | — | — | — |
+| T5 | `T5_MEASUREMENTS.md` | `opus/t5-measurements` | **merged** into `develop-secondary` | 03e1211 | 386/386 default; data-only 44 s with and without `RUSHCORE_MEASURE` | none (instruments only) | — |
+| T6 | `T6_SAMPLE_FIXES.md` | `opus/t6-sample-fixes` | **blocked on the user** — every other packet is delivered | — | — | — | — |
 | T8b | `T8_TUBE_RUBBER_BAND.md` (Mouth entry) | `opus/t8-tube-mouth` | **merged** into `develop-secondary` | 5071b29 | 347/347 | P-014 | — |
 | T8 | `T8_TUBE_RUBBER_BAND.md` | `opus/t8-tube-arrest` | camera half **merged**; the arrest is open but rare (1 of 915 ticks, none near the bottom) and no longer felt in play | — | — | — | — |
 | T7 | `T7_TUBE_JUDDER.md` | `opus/t7-tube-judder` | **merged** into `develop-secondary` (play verdict given: the rubber-banding is gone) | (final commit) | 313/313; canyon 311/311, dunes 313/313, sky 314/314 | P-009 | — |
 
 ## Merged into `develop-secondary`
 
+- T5 (03e1211) merged 2026-09-08, on the user's instruction. Full harness on the merged head: **386/386 default
+  (109.6 s)**; golden hashes unchanged. No conflicts.
 - T3 (2eee91f) merged 2026-09-08, on the user's instruction, after the size verdict landed. Full harness on the merged
   head: **386/386 default (109.4 s)**; golden hashes unchanged. No conflicts: T3 was the only branch open.
 - T8b (5071b29, the tube mouth) and T2 (fb326bc, the HUD with the speedometer) merged 2026-09-07, after the user's

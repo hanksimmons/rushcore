@@ -182,7 +182,7 @@ public sealed class RouteSpeedModel
     /// <param name="chainFromBaseCap">Ceiling safety case (04 §12): once the base kit could have reached
     /// the base cap, assume a full chain and hold the ceiling wherever the bends allow; bends still
     /// clamp to their corner limits and the ceiling returns right after them.</param>
-    /// <param name="carried">A tube (04 §5I, D-101): the walls carry the ball, so no corner limit and no launch; grade, drag and the cap only.</param>
+    /// <param name="carried">A carried segment (walls carry the ball, none today since D-112): so no corner limit and no launch; grade, drag and the cap only.</param>
     public RouteSpeedProfile Integrate(IReadOnlyList<Vector3> polyline, float entrySpeed = 0f, bool driveHeld = true, bool chainFromBaseCap = false, bool carried = false)
     {
         int n = polyline.Count;

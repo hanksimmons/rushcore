@@ -66,8 +66,6 @@ public partial class WorldDressing : Node3D
     /// <summary>The T3 lab row, or null while <c>World › Enemy Showcase</c> is off (P-006).</summary>
     public ShowcaseRow? Showcase { get; private set; }
 
-    public StandardMaterial3D TubeShellMaterial { get; private set; } = null!;
-    public StandardMaterial3D TubeRibMaterial { get; private set; } = null!;
     public StandardMaterial3D LidMaterial { get; private set; } = null!;
 
     protected void RaiseBoostPickup(float amount) => BoostPickupCollected?.Invoke(amount);
@@ -200,20 +198,6 @@ public partial class WorldDressing : Node3D
         _matInstanced = Flat(Colors.White);
         _matInstanced.VertexColorUseAsAlbedo = true;
 
-        // Tube shell (06 §3, D-096): a translucent skin seen from outside, opaque ribs as the motion cue at speed.
-        TubeShellMaterial = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(0.55f, 0.85f, 1.0f, 0.22f),
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            CullMode = BaseMaterial3D.CullModeEnum.Back,
-            DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Lambert,
-            SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
-            Roughness = 0.4f,
-            EmissionEnabled = true,
-            Emission = new Color(0.25f, 0.5f, 0.7f),
-            EmissionEnergyMultiplier = 0.25f,
-        };
-        TubeRibMaterial = Glow(new Color(0.85f, 0.95f, 1.0f), 0.5f);
         LidMaterial = Flat(new Color(0.48f, 0.30f, 0.22f));
     }
 
@@ -332,8 +316,6 @@ public partial class WorldDressing : Node3D
         // Scale pillars are solid: they stand just outside the corridor, never inside it (04 §5G).
         BuildPillars(route.Start.X + 30f, route.Start.Z + StageHeightField.CorridorHalfWidth + 12f);
 
-        foreach (var tube in stage.Tubes)
-            AddSign(tube.Axis[0] + Vector3.Up * (tube.Radius * 2f + 8f), tube.Passed ? "TUBE" : "TUBE ✗", 7f);
         foreach (var lid in stage.Lids)
         {
             var e = route.Vertices[lid.StartIndex];
@@ -373,12 +355,11 @@ public partial class WorldDressing : Node3D
             BuildRouteLines(route);
             foreach (var line in stage.OptionalLines) BuildRouteLines(line, line.Terminal ? ExitLineColor : line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : RouteOptionalColor);
             foreach (var cp in stage.Checkpoints) AddCheckpointPost(cp.Position);
-            foreach (var tube in stage.Tubes) BuildPolyline(tube.Axis, RouteTubeColor, 0f);
         }
         if (_t.World.StageDebugViews) BuildStageDebugViews(stage);
 
         // Cosmetic scatter (04 §5G, T4): archetype-aware, deterministic from the cosmetic seed, never inside a
-        // line, pad, anchor, lid, tube or the spiral disc.
+        // line, pad, anchor, lid or the spiral disc.
         BuildStageScatter(stage, field);
         BuildEdgeMarkers(stage);
 
@@ -396,7 +377,6 @@ public partial class WorldDressing : Node3D
     private static readonly Color RouteBendColor = new(1.0f, 0.62f, 0.2f);
     private static readonly Color RouteCrestColor = new(1.0f, 0.3f, 0.85f);
     private static readonly Color RouteOptionalColor = new(0.45f, 1.0f, 0.4f);
-    private static readonly Color RouteTubeColor = new(0.85f, 0.45f, 1.0f);
     private static readonly Color FloorTwoColor = new(0.55f, 1.0f, 0.75f);
     private static readonly Color FloorThreeColor = new(1.0f, 0.85f, 0.35f);
     private static readonly Color CorridorColor = new(0.35f, 0.65f, 0.75f);
@@ -415,7 +395,7 @@ public partial class WorldDressing : Node3D
     /// <summary>
     /// Stage debug views (04 §16, 07 §11; D-104): corridor bounds on every line (its level width, wider on bends),
     /// challenge zones (a yellow line over each module's straight from its entrance to the end of its landing zone,
-    /// posts at both ends), structure bounds (lid box outlines, tube mouth rings), floors (terrace bounds in the
+    /// posts at both ends), structure bounds (lid box outlines), floors (terrace bounds in the
     /// floor's colour) and drains (a red line along a terrace's cliff foot on the floor below). Off by default.
     /// </summary>
     private void BuildStageDebugViews(StageDefinition stage)
@@ -503,20 +483,6 @@ public partial class WorldDressing : Node3D
             {
                 Vector3 up = Vector3.Up * y;
                 BuildPolyline(new[] { c + a * hl + s * hw + up, c - a * hl + s * hw + up, c - a * hl - s * hw + up, c + a * hl - s * hw + up, c + a * hl + s * hw + up }, StructureColor, 0f);
-            }
-        }
-        foreach (var tube in stage.Tubes)
-        {
-            foreach (int end in new[] { 0, tube.Axis.Length - 1 })
-            {
-                Vector3 t = tube.TangentAt(end);
-                Vector3 n = Mathf.Abs(t.Y) < 0.9f ? Vector3.Up - t * t.Y : Vector3.Right;
-                n = n.Normalized();
-                Vector3 bnorm = t.Cross(n).Normalized();
-                float r = tube.Radius * WorldScale.TubeMouthFlare;
-                var ring = new Vector3[25];
-                for (int i = 0; i < 25; i++) ring[i] = tube.Axis[end] + (n * Mathf.Cos(Mathf.Tau * i / 24f) + bnorm * Mathf.Sin(Mathf.Tau * i / 24f)) * r;
-                BuildPolyline(ring, StructureColor, 0f);
             }
         }
         if (route.Spiral is { } pit)

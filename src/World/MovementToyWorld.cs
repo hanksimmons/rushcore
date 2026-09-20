@@ -12,7 +12,7 @@ namespace Rushcore.World;
 /// active <see cref="IHeightSource"/> (<see cref="TerrainHeightField"/> lab, or the
 /// <see cref="ScaleStripHeightField"/> for Gate M1) and <see cref="WorldDressing"/>.
 /// </summary>
-public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, Rushcore.Player.IStructureSurface
+public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
 {
     /// <summary>Lab default: metres between height samples, also the size of one rendered facet.</summary>
     public const float DefaultCellSize = 4f;
@@ -240,7 +240,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
                            $"{Stage.PrimaryRoute.Length:0} m, base-kit {Stage.SpeedProfile.TotalTime:0.0} s ({Stage.SpeedProfile.SecondsBelow(_t.Movement.HardMaxLocomotionSpeed * 0.98f):0.0} s below cap), " +
                            $"ceiling {Stage.CeilingProfile?.TotalTime ?? 0f:0.0} s / {Stage.CeilingProfile?.Flights.Count ?? 0} flights, " +
                            $"{Stage.PrimaryRoute.Bends.Count} bends, {Stage.PrimaryRoute.Features.Count} features, {Stage.Modules.Count} modules, " +
-                           $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Tubes.Count} tubes, {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Exits.Count} exits, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
+                           $"{Stage.OptionalLines.Count} lines ({Stage.OptionalLines.Count(l => l.Floor >= 2)} terraces), {Stage.Lids.Count} lids{(Stage.PrimaryRoute.Spiral is not null ? ", spiral pit" : "")}, {Stage.Exits.Count} exits, {Stage.Checkpoints.Count} anchors, gen {r.TotalMillis:0.0} ms";
             GD.Print($"[RUSHCORE] Stage generated seed={Seed}/{StageIndex} attempts={r.Attempts} {StageSummary} hash={Stage.Hash():X}");
             foreach (var c in r.Checks) GD.Print($"[RUSHCORE]   {(c.Passed ? "ok  " : "FAIL")} {c.Name} {c.Detail}");
         }
@@ -365,31 +365,13 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
         return false;
     }
 
-    /// <summary>Physics layer of structures (lids, tubes): the ball collides with it, the camera's occlusion probe does not (04 §9).</summary>
+    /// <summary>Physics layer of structures (lids, wall shells): the ball collides with it, the camera's occlusion probe does not (04 §9).</summary>
     public const uint StructureLayer = 2;
     /// <summary>Collision triangles in the wall shells of the current stage (D-111); 0 on an unwalled archetype.</summary>
     public int WallShellTriangles { get; private set; }
     /// <summary>The wall shells' collision triangles per strip (harness instruments only).</summary>
     public List<Vector3[]> WallShellData { get; } = new();
-    /// <summary>The built stage's tubes, for the camera push-out and the harness; empty outside a stage.</summary>
-    public IReadOnlyList<TubeDefinition> Tubes => Stage?.Tubes ?? (IReadOnlyList<TubeDefinition>)System.Array.Empty<TubeDefinition>();
-
-    // IStructureSurface (D-101): the tube follow reads the analytic shell.
-    public bool Nearest(Vector3 p, out Vector3 axisPoint, out Vector3 tangent, out float radius, out float distance)
-    {
-        axisPoint = Vector3.Zero; tangent = Vector3.Forward; radius = 0f; distance = float.MaxValue;
-        foreach (var tube in Tubes)
-        {
-            if (!tube.Bounds.HasPoint(p)) continue;
-            tube.NearestOnAxis(p, out Vector3 q, out Vector3 t, out float d);
-            if (d >= distance) continue;
-            distance = d; axisPoint = q; tangent = t; radius = tube.Radius;
-        }
-        return distance < float.MaxValue;
-    }
-
-    /// <summary>Structures (04 §5I, §9): each tube is a swept see-through shell with opaque ribs and an inward-facing
-    /// concave collider with backface collision, on the structure layer. Rebuilt with the terrain.</summary>
+    /// <summary>Structures (04 §5I, §9): wall shells and lids, on the structure layer. Rebuilt with the terrain.</summary>
     private void BuildStructures()
     {
         foreach (Node child in _structureRoot.GetChildren())
@@ -398,25 +380,6 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
             child.QueueFree();
         }
         if (Stage is null) return;
-        int k = 0;
-        foreach (var tube in Stage.Tubes)
-        {
-            var built = TubeMesh.Build(tube);
-            var shell = new MeshInstance3D { Name = $"Tube{k}Shell", Mesh = built.Shell, MaterialOverride = _dressing.TubeShellMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-            var ribs = new MeshInstance3D { Name = $"Tube{k}Ribs", Mesh = built.Ribs, MaterialOverride = _dressing.TubeRibMaterial };
-            var body = new StaticBody3D
-            {
-                Name = $"Tube{k}Body",
-                CollisionLayer = StructureLayer,
-                CollisionMask = 0,
-                PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
-            };
-            body.AddChild(new CollisionShape3D { Shape = new ConcavePolygonShape3D { Data = built.CollisionTriangles, BackfaceCollision = true } });
-            _structureRoot.AddChild(shell);
-            _structureRoot.AddChild(ribs);
-            _structureRoot.AddChild(body);
-            k++;
-        }
         // Wall shells (D-111): the wall band of every profiled line as a swept surface of the stamp, collided as an
         // outward-facing concave shape on the structure layer and drawn with the terrain material. The heightfield under
         // it is sunk, so the shell is the wall the ball meets and the follow's analytic profile is exactly its surface.

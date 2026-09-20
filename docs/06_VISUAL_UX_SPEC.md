@@ -50,10 +50,8 @@ valley floor with blue shadow faces on the rails, scree +150 to +350, rock and m
 headwalls at every height, a crest line on every rail, and a longer fog end so the valley reads from the summit.
 
 Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
-above which the fog thickens into a layer the top floor sits in and a fall drops through; a see-through
-tube is a translucent shell with opaque ribs every 25 m, the ribs being the motion cue (§2) at speed. Delivered
-(D-101): a pale blue skin at 22% alpha with a faint emission, back faces culled (the camera is always outside),
-ribs as glowing bands 0.6 m wide standing 0.25 m off the shell. The cloud band (D-103) is two unshaded
+above which the fog thickens into a layer the top floor sits in and a fall drops through. (The see-through
+tube's glass shell and ribs were removed 2026-09-19, D-112; tunnels are rock, `docs/13`.) The cloud band (D-103) is two unshaded
 translucent sheets at 55% and 35% alpha, 130 and 160 m above the primary's mean height, on Sky Terraces only.
 
 ## 4. Terrain shading
@@ -243,10 +241,8 @@ No extreme FOV distortion.
 
 ### Structures (D-096)
 
-- Tubes: the camera stays outside the shell and sees the player through it. The tube's collider is invisible
-  to the occlusion probe; after the chase placement the lens is pushed radially out of the shell to at least
-  the occlusion margin; ribs are thin (≤ 0.5 m) and spaced so any occlusion is momentary. The camera never
-  enters a tube and is never pulled in by its walls.
+- Tunnels (`docs/13`, planned): the camera flies through with the ball, under the confined framing the lids
+  use, for the tunnel's whole length.
 - Wall tunnels (lids): confined framing, distance and pitch bounded to the declared clearance (`docs/11 §7`) — delivered D-102 as a lens ceiling: under a roof the lens stays 1.5 m below its underside, lifted when the ball is on top of the roof,
   still never clipping.
 - Floors: a fall keeps the yaw and the framing bands hold the ball; no cut, no fade.

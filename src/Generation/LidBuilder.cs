@@ -5,11 +5,11 @@ namespace Rushcore.Generation;
 /// <summary>
 /// Lids (04 §5I, D-102): a wall tunnel is a box roof over a slot straight of the primary, spanning the corridor
 /// wall to wall, its underside the family's clearance above the highest corridor point under it. Placed on plain
-/// straights clear of features, tube mouths and the pit approach; the module declares its ceiling (§10 headroom).
+/// straights clear of features, line joins and the pit approach; the module declares its ceiling (§10 headroom).
 /// </summary>
 public static class LidBuilder
 {
-    public static List<LidDefinition> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules rules, IReadOnlyList<TubeDefinition> tubes, IReadOnlyList<RouteSkeleton>? lines = null)
+    public static List<LidDefinition> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules rules, IReadOnlyList<RouteSkeleton>? lines = null)
     {
         var lids = new List<LidDefinition>();
         if (rules.LidChance <= 0f) return lids;
@@ -32,7 +32,7 @@ public static class LidBuilder
             if (from < lastEnd + WorldScale.OptionalLineSpacing * 0.5f) continue;
             if (to > primary.Length - 400f) break;
             if (primary.Spiral is { } pit && to > pit.ApproachDistance - 100f) break;
-            if (FeatureBetween(primary, from - 50f, to + 50f) || TubeMouthBetween(primary, tubes, from - 50f, to + 50f) || LineJoinBetween(primary, lines, from - 50f, to + 50f)) continue;
+            if (FeatureBetween(primary, from - 50f, to + 50f) || LineJoinBetween(primary, lines, from - 50f, to + 50f)) continue;
             if (!rng.Chance(rules.LidChance)) continue;
             int a = primary.IndexAtDistance(from), b = primary.IndexAtDistance(to);
             float top = float.MinValue;
@@ -75,18 +75,6 @@ public static class LidBuilder
             float ds = v[l.JoinStart].Distance, de = v[l.JoinEnd].Distance;
             if (from < ds + l.Transition && to > ds) return true;
             if (!l.Terminal && from < de && to > de - l.Transition) return true;
-        }
-        return false;
-    }
-
-    private static bool TubeMouthBetween(RouteSkeleton primary, IReadOnlyList<TubeDefinition> tubes, float from, float to)
-    {
-        var v = primary.Vertices;
-        foreach (var t in tubes)
-        {
-            float ds = v[t.JoinStart].Distance, de = v[t.JoinEnd].Distance;
-            if (from < ds + WorldScale.TubeMouthStraight * 2f && to > ds - WorldScale.TubeMouthStraight) return true;
-            if (from < de + WorldScale.LandingZoneLength && to > de - WorldScale.TubeMouthStraight * 2f) return true;
         }
         return false;
     }

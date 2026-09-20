@@ -129,15 +129,7 @@ public sealed class StageGenerator
         }
         def.DroppedLines = dropped.Count;
         def.DroppedDetail = string.Join("; ", dropped);
-        // Tubes (04 §5I, D-101) branch off the lifted primary; their carried profiles start at the join's arrival speed.
-        if (!straight)
-            foreach (var tube in TubeBuilder.Build(route, field, request.StageSeed, rules, optional))
-            {
-                tube.Profile = _speed.Integrate(tube.Axis, profile.Speed[tube.JoinStart], carried: true);
-                tube.CeilingProfile = _ceiling.Integrate(tube.Axis, ceiling.Speed[tube.JoinStart], chainFromBaseCap: true, carried: true);
-                def.Tubes.Add(tube);
-            }
-        if (!straight) def.Lids.AddRange(LidBuilder.Build(route, request.StageSeed, rules, def.Tubes, optional));
+        if (!straight) def.Lids.AddRange(LidBuilder.Build(route, request.StageSeed, rules, optional));
         // Exits (02 §4, D-105): the primary's pad is A; each terminal line's pad follows in route order of its fork.
         def.Exits.Add(new StageExit(0, "A", route.Exit, route.Vertices[^1].Heading, -1));
         foreach (int k in Enumerable.Range(0, optional.Count).Where(k => optional[k].Terminal).OrderBy(k => optional[k].JoinStart))
@@ -154,7 +146,7 @@ public sealed class StageGenerator
         def.WidestFlowGap = ValidateTwoSpeeds(route, profile, ceiling, report);
         ValidateModules(def, report);
         ValidateOptionalLines(def, report);
-        ValidateTubes(def, report);
+        ValidateLineGraph(def, report);
         ValidateStructuresAndHeadroom(def, report);
         ValidateCheckpoints(def, report);
         ValidateExits(def, report);
@@ -318,64 +310,15 @@ public sealed class StageGenerator
         return (ok, $"floor {line.Floor} at {primary[line.JoinStart].Distance:0} m, {line.RidgeHeight:0} m up: cliff foot at most {worstFoot:0.0} m above the floor below, step up {riseIn:0.0} m on the way down, outer grade ≤ {worstOut:0.00}{(ok ? "" : " FAIL")}");
     }
 
-    /// <summary>
-    /// Tubes (04 §5I, §10, §12; D-101): the axis keeps the camera clearance above the ground along the cruise and never
-    /// dips below its own radius over the ground; a ground mouth sits inside the line's level width and the exit lands
-    /// on a straight (by construction, reported); the carried profile never stalls; the graph stays acyclic (every tube
-    /// rejoins further along its line). The steepest wall ride the base kit asks of the tube is reported (V-015).
-    /// </summary>
-    private void ValidateTubes(StageDefinition def, ValidationReport report)
+    /// <summary>The line graph stays acyclic in route distance: every optional line rejoins (or ends) further along.</summary>
+    private static void ValidateLineGraph(StageDefinition def, ValidationReport report)
     {
-        var field = def.HeightField!;
-        var v = def.PrimaryRoute.Vertices;
-        bool allOk = true, acyclic = true;
-        string detail = "";
-        foreach (var t in def.Tubes)
-        {
-            float worstCruise = float.MaxValue, worstAny = float.MaxValue;
-            float span = v[t.JoinEnd].Distance - v[t.JoinStart].Distance, ramp = TubeBuilder.RampLength(t.CruiseHeight);
-            float along = 0f;
-            for (int i = 0; i < t.Axis.Length; i++)
-            {
-                if (i > 0) along += t.Axis[i].DistanceTo(t.Axis[i - 1]);
-                float clearance = t.Axis[i].Y - field.Sample(t.Axis[i].X, t.Axis[i].Z);
-                worstAny = Mathf.Min(worstAny, clearance);
-                // The envelope runs in the primary's distance; the axis is a little longer, so read it by fraction.
-                if (TubeBuilder.HeightEnvelope(along / Mathf.Max(1f, t.Length) * span, span, ramp) > 0.9f) worstCruise = Mathf.Min(worstCruise, clearance);
-            }
-            // Wall ride (docs/11 §7d): tan φ = v² κ / g with the axis's plan curvature over ±3 points.
-            float ride = 0f;
-            var p = t.Profile!;
-            for (int i = 3; i + 3 < t.Axis.Length; i++)
-            {
-                Vector2 a = new(t.Axis[i - 3].X, t.Axis[i - 3].Z), b = new(t.Axis[i].X, t.Axis[i].Z), c = new(t.Axis[i + 3].X, t.Axis[i + 3].Z);
-                Vector2 ab = b - a, bc = c - b;
-                if (ab.LengthSquared() < 1e-6f || bc.LengthSquared() < 1e-6f) continue;
-                float turn = Mathf.Abs(ab.AngleTo(bc)), len = 0.5f * (ab.Length() + bc.Length());
-                float kappa = turn / Mathf.Max(1e-3f, len);
-                float speed = p.Speed[Mathf.Min(i, p.Count - 1)];
-                ride = Mathf.Max(ride, Mathf.RadToDeg(Mathf.Atan(speed * speed * kappa / _gravity)));
-            }
-            t.MaxRideDegrees = ride;
-            float mouthEdge = WorldScale.TubeMouthOffset + t.Radius * WorldScale.TubeMouthFlare;
-            bool mouthsOk = mouthEdge <= StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
-            // The builder guaranteed the clearance on its own samples; the resampled axis reads it within a few metres.
-            bool clearOk = worstCruise >= t.Radius + WorldScale.TubeClearance - 5f && worstAny >= t.Radius - 3f;
-            bool profileOk = !p.Stalled;
-            if (t.JoinEnd <= t.JoinStart) acyclic = false;
-            t.Passed = mouthsOk && clearOk && profileOk;
-            allOk &= t.Passed;
-            t.Detail = $"{t.Length:0} m from {v[t.JoinStart].Distance:0} m, cruise {t.CruiseHeight:0} m up, clearance ≥ {worstCruise:0} m (min {worstAny:0.0}), " +
-                       $"entry {p.Speed[0]:0} → exit {p.Speed[^1]:0} m/s (ceiling {t.CeilingProfile!.Speed[^1]:0}), wall ride ≤ {ride:0}°";
-            detail += $" [{t.Detail}{(t.Passed ? "" : clearOk ? mouthsOk ? " STALLS" : " MOUTH OUTSIDE THE LEVEL WIDTH" : " AXIS TOO LOW")}]";
-        }
-        report.Add("tube axes keep the camera clearance above the ground and their mouths sit on the line (04 §10)", allOk, $"{def.Tubes.Count} tubes{detail}");
-        report.Add("the line graph is acyclic in route distance (every tube and line rejoins further along)", acyclic && def.OptionalLines.All(l => l.JoinEnd > l.JoinStart));
+        report.Add("the line graph is acyclic in route distance (every line rejoins further along)", def.OptionalLines.All(l => l.JoinEnd > l.JoinStart));
     }
 
     /// <summary>
     /// Lids and headroom (04 §10, D-102): every lid keeps the family's clearance over the corridor under it and spans the
-    /// slot; nothing else stands within the full-charge apex above the primary's centreline (a tube axis near the
+    /// slot; nothing else stands within the full-charge apex above the primary's centreline (a structure near the
     /// centreline below the apex would be an undeclared ceiling), so only lids declare a ceiling.
     /// </summary>
     private void ValidateStructuresAndHeadroom(StageDefinition def, ValidationReport report)
@@ -396,19 +339,6 @@ public sealed class StageGenerator
 
         float apex = _fullTakeoff * _fullTakeoff / (2f * _gravity) + 2f * _ballRadius;
         float worst = float.MaxValue; string where = "";
-        foreach (var t in def.Tubes)
-            foreach (var a in t.Axis)
-            {
-                int i = def.PrimaryRoute.IndexAtDistance(0f);   // nearest by plan distance over the tube's join span
-                float best = float.MaxValue; int bi = t.JoinStart;
-                for (int k = t.JoinStart; k <= t.JoinEnd; k += 2)
-                {
-                    float d = new Vector2(v[k].Position.X - a.X, v[k].Position.Z - a.Z).LengthSquared();
-                    if (d < best) { best = d; bi = k; }
-                }
-                float lateral = Mathf.Sqrt(best), above = a.Y - t.Radius - v[bi].Position.Y;
-                if (lateral < 20f + t.Radius && above < apex && above < worst) { worst = above; where = $"tube (joins {v[t.JoinStart].Distance:0}–{v[t.JoinEnd].Distance:0} m, side {t.Side:+0;-0}, cruise {t.CruiseHeight:0}) axis {above:0} m above the centreline, {lateral:0.0} m off it in plan, at {v[bi].Distance:0} m; axis ({a.X:0},{a.Y:0},{a.Z:0}) vertex ({v[bi].Position.X:0},{v[bi].Position.Y:0},{v[bi].Position.Z:0}) heading {Mathf.RadToDeg(v[bi].Heading):0}°"; }
-            }
         report.Add("headroom: nothing but a declared lid stands within the jump apex above the primary's centreline (04 §10)", worst == float.MaxValue,
             worst == float.MaxValue ? $"apex {apex:0} m clear; {def.Lids.Count} declared ceilings" : where);
     }
@@ -710,63 +640,6 @@ public sealed class StageGenerator
         return new WallProbeReading(worst, worstIndex, worstSide, bendAt[worstIndex]?.Radius ?? 0f,
                                     innerWorst, subWidth, rise,
                                     nearestLine == float.MaxValue ? -1f : nearestLine, profile.ToString());
-    }
-
-    /// <summary>Where a tube's worst wall ride comes from, in the builder's own terms (T5).</summary>
-    public readonly record struct TubeRideReading(
-        float MaxDegrees, string Phase, float AlongMetres, float SpanMetres,
-        float LateralOffset, float TightestBendRadius, float SpeedAtMax);
-
-    /// <summary>
-    /// T5 instrument, read-only: recomputes the wall-ride profile the tube validator reports (docs/11 §7d,
-    /// tan φ = v²κ/g over the axis's plan curvature) and says *where* the maximum sits — which term of
-    /// <see cref="TubeBuilder"/>'s envelope is running there (climb, swing out, cruise, swing back, descent), how far
-    /// out the lateral offset has swung, and the tightest primary bend the section overlaps.
-    ///
-    /// <para>T7 and T8 already settled the ride's feel and the axis-reference error; this answers only the question
-    /// they left: which part of the builder produces the angle.</para>
-    /// </summary>
-    public static TubeRideReading MeasureTubeRide(StageDefinition def, TubeDefinition t, float gravity)
-    {
-        var v = def.PrimaryRoute.Vertices;
-        float span = v[t.JoinEnd].Distance - v[t.JoinStart].Distance;
-        float ramp = TubeBuilder.RampLength(t.CruiseHeight);
-        float swing = WorldScale.TubeSwingLength;
-        var p = t.Profile!;
-
-        float best = 0f, bestAlong = 0f, bestSpeed = 0f;
-        float along = 0f;
-        for (int i = 1; i < t.Axis.Length; i++)
-        {
-            along += t.Axis[i].DistanceTo(t.Axis[i - 1]);
-            if (i < 3 || i + 3 >= t.Axis.Length) continue;
-            Vector2 a = new(t.Axis[i - 3].X, t.Axis[i - 3].Z), b = new(t.Axis[i].X, t.Axis[i].Z), c = new(t.Axis[i + 3].X, t.Axis[i + 3].Z);
-            Vector2 ab = b - a, bc = c - b;
-            if (ab.LengthSquared() < 1e-6f || bc.LengthSquared() < 1e-6f) continue;
-            float turn = Mathf.Abs(ab.AngleTo(bc)), len = 0.5f * (ab.Length() + bc.Length());
-            float speed = p.Speed[Mathf.Min(i, p.Count - 1)];
-            float deg = Mathf.RadToDeg(Mathf.Atan(speed * speed * (turn / Mathf.Max(1e-3f, len)) / gravity));
-            if (deg <= best) continue;
-            best = deg; bestAlong = along; bestSpeed = speed;
-        }
-
-        // The envelope runs in the primary's distance; the axis is a little longer, so read it by fraction.
-        float d = bestAlong / Mathf.Max(1f, t.Length) * span;
-        string phase = d < ramp ? "climb"
-                     : d < ramp + swing ? "swing out"
-                     : d < span - ramp - swing ? "cruise"
-                     : d < span - ramp ? "swing back"
-                     : "descent";
-        float offset = WorldScale.TubeMouthOffset
-                     + (WorldScale.TubeLateralOffset - WorldScale.TubeMouthOffset) * TubeBuilder.LateralEnvelope(d, span, ramp);
-
-        float tightest = 0f;
-        foreach (var bend in def.PrimaryRoute.Bends)
-        {
-            if (bend.EndIndex < t.JoinStart || bend.StartIndex > t.JoinEnd) continue;
-            if (tightest == 0f || bend.Radius < tightest) tightest = bend.Radius;
-        }
-        return new TubeRideReading(best, phase, d, span, offset, tightest, bestSpeed);
     }
 
     private readonly float _gravity;

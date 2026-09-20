@@ -10,10 +10,9 @@ public static class SampleStages
 
     public static readonly Entry[] All =
     {
-        new("tube", TerrainArchetype.RollingHighlands, 9, "a see-through tube at 1.1 km (D-101)"),
         new("tunnels + pit", TerrainArchetype.CanyonRun, 2, "two wall tunnels and the spiral pit finale (D-102)"),
         new("sky floor 3", TerrainArchetype.SkyTerraces, 30, "a floor-2 and floor-3 terrace stack (D-103)"),
-        new("dune trains", TerrainArchetype.DuneSea, 1, "a three-crest dune train and a tube (D-099)"),
+        new("dune trains", TerrainArchetype.DuneSea, 1, "a three-crest dune train (D-099)"),
         new("gap + turns", TerrainArchetype.RollingHighlands, 8, "a mandatory gap and four committed banked turns (D-097)"),
         new("three exits", TerrainArchetype.RollingHighlands, 4, "two terminal lines forking to exits B and C beside exit A (D-105)"),
     };

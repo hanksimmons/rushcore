@@ -280,7 +280,7 @@ the 100-seed batch the two-speed figures (100 seeds: 100 valid, 0 fallbacks; sec
 ## 7. Vertical ladder at the D-091 baseline (D-096)
 
 Written 2026-09-06 for the vertical grammar (04 §5I). The family above is unchanged; this section adds
-the sizes that walls, floors, tubes and lids need, derived from the same frozen inputs (g 39.39, full
+the sizes that walls, floors and lids need, derived from the same frozen inputs (g 39.39, full
 charge 84.63 m/s, half charge 43.3 m/s, base cap 148.5, ceiling 254.7, ball 0.66 m, rig 18.8 m at
 −20.6°). Every size is provisional until measured (V-016). The reach rows follow the controller's
 takeoff rule (03 §6, D-012): the release sets the vertical speed to max(current vertical, charge
@@ -303,10 +303,8 @@ at 69 m/s: a slam keeps Flow); the jump step onto a terrace is not yet built.
 **Jump step band 60–90 m.** A full charge lifts the ball 91 m above the lip at any speed, so a floor
 step taken by a jump is 60–90 m (plus the lip); a mandatory step is at most 20 m (half charge, 04
 §11), which is a lip rather than a floor. Larger lifts are not jumps: a driven ball climbs any grade up
-to 0.71 (35°, §2) without losing speed, so spiral ramps and tubes (whose walls carry the ball at any
-pitch) link floors of any spacing, and three floors put the top 120–270 m up. A midair tube mouth is
-placed inside the reachable set from its runway at the arrival speed, with the mouth radius as the aim
-tolerance; the hang time at 84.6 m/s of vertical is 4.3 s, so the horizontal reach at the lip's height
+to 0.71 (35°, §2) without losing speed, so spiral ramps link floors of any spacing, and three floors put
+the top 120–270 m up. The hang time at 84.6 m/s of vertical is 4.3 s, so the horizontal reach at the lip's height
 is 640 m at the base cap and never binds.
 
 ### 7b. Falls
@@ -342,42 +340,10 @@ minimum minus 120 m, so a fall is never a restore.
 
 ### 7d. Tubes
 
-| Quantity | Provisional value |
-|---|---:|
-| Tube radius | 4–8 m |
-| Mouth flare | ×2 over one tube diameter |
-| Rib spacing / thickness | 25 m / ≤ 0.5 m |
-| Shell facets per ring | 24 (even, so the bottom of the tube is a corner and the cruise rests on the circle exactly) |
-| Follow's hold radius | inscribed circle − rest band − axis-reference uncertainty (≈ 12 cm inside the shell; T7 / P-009) |
-| Path radius | ≥ 3 × tube radius (the sweep never self-intersects) |
-| Tube length | 150–800 m |
-| Axis clearance above ground and from walls | ≥ 30 m except at the mouths |
-
-Wall ride: inside a bend of path radius R the ball rides to tan φ = v² / (g·R).
-
-| Path radius at the base cap | 100 m | 300 m | 600 m |
-|---|---:|---:|---:|
-| Ride angle | 80° | 62° | 43° |
-
-The ground-normal limit (0.498, about 60°) is crossed below a path radius of about 320 m at the base
-cap (and about 900 m at the ceiling), so the ball inside a tight tube bend reads airborne to the
-controller (V-015). A tube bend loses no speed in the route speed model (carried segment); the exit
-velocity runs along the axis into the landing zone. *Delivered (D-101):* the tube follow makes the wall ground
-at any angle (03 §3), so the limit no longer applies inside tubes; the swing is an S of 200 m over 500 m
-(r ≈ 270, a 64° ride at the base cap), the primary's own bends under the section push the worst ride to about
-80°, and the ride is reported per tube. Radius 6 m, mouth offset 45 m, climb pitch ≤ 14°, cruise clearance 30 m,
-section 1 800 m at the lowest cruise.
+Removed 2026-09-19 (D-112). The tunnel that replaces the tube is sized in `docs/13`.
 
 ### 7e. Camera clearance
 
-*Delivered (D-101):* the lens is pushed radially to R + 1.5 m from the nearest axis point after the chase
-placement (×2 at the flared mouths), the shell is on a physics layer the occlusion probe ignores, and the harness
-holds the lens outside with a clear line of sight for a whole ride. The original derivation follows.
-
-The rig sits 17.6 m behind and 6.7 m above the ball. Inside a tube of radius R with the ball on the
-floor, the lens must clear the top of the shell by the occlusion margin, 2R + 0.6 m above the floor:
-at R 6 that is a radial push of about 5 m. The push is applied after the chase placement along the
-radial from the tube axis through the lens, so when the ball rides a wall or the ceiling the lens
-follows around the outside. A tube axis therefore needs 2R + 7 m plus margin of clear space on every
-side; 30 m covers R 8. Lid tunnels use the confined framing instead: clearance ≥ 15 m above the ball,
-width ≥ 75 m (the minimum corridor), length ≤ 300 m provisional.
+The tube camera rule (the lens pushed outside the shell) went with the tubes (D-112). Lid tunnels use the confined
+framing: clearance ≥ 15 m above the ball, width ≥ 75 m (the minimum corridor), length ≤ 300 m provisional; the
+tunnel shell (`docs/13`) extends that framing to its whole length, with the camera inside.

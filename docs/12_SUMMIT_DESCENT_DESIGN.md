@@ -265,7 +265,7 @@ Structure before noise, as everywhere:
    12 m guide banks.
 3. **Archetype rules** (`ArchetypeRules.SummitDescent`): walls 0 (the rails and headwalls are their own stamps,
    not the canyon's side terrain), bank scale 1.5, swells 0 on the switchbacks / 0.10 on the run, no launch crests
-   on the switchbacks, one allowed on the run, `TubeChance` 0, `SpiralChance` 0, `LidChance` 0, `Floors` 1,
+   on the switchbacks, one allowed on the run, `SpiralChance` 0, `LidChance` 0, `Floors` 1,
    `ExitSpread` 300; new fields `FaceSlopeMin/Max`, `LegAngleMin/Max`, `HairpinRadiusMin/Max`, `FanWidth`,
    `DescentTarget`, `RailHeight`, `HeadwallHeight`, `ChuteChance`. Constants in `WorldScale` under a `// Summit`
    block, pinned by the golden hashes.
@@ -341,7 +341,7 @@ Gate: **G0 (Summit Descent)** per `08 §5`, plus the lines added there for this 
 
 ## 12. Not in this design
 
-No climbs on the primary (the summit start settles it); no mandatory chute; no tubes, lids or spiral pit in the
+No climbs on the primary (the summit start settles it); no mandatory chute; no lids or spiral pit in the
 first cut (they are compatible and can come later as optional lines); no new movement verb, threshold or camera
 rule; no difficulty escalation (parked until after Phase 4); no enemies (Phase 4 places them on every archetype at
 once); no second primary floor; no retrofit of rails onto the other four archetypes until this one has its verdict.

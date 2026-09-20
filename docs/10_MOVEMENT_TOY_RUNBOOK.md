@@ -20,12 +20,11 @@ RUSHCORE_ARCHETYPE=sky <same command>                           # the stage case
 RUSHCORE_BATCH_FAILS=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>   # tally what attempt 1 failed on across each batch, with the first seed's features and bends
 RUSHCORE_LINE_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # for a dropped optional line, the polyline heights ±40 m around its first launch
 RUSHCORE_EXIT_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # tally why terminal-line (exit) candidates were rejected per batch (D-105)
-RUSHCORE_MEASURE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>       # T5 generation instruments, tables 1-3: wall probe, tube ride, floor-3 room (grep '[MEASURE]')
+RUSHCORE_MEASURE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>       # T5 generation instruments, tables 1 and 3: wall probe, floor-3 room (grep '[MEASURE]')
 RUSHCORE_MEASURE=1 <same command> --seed 8                            # T5 table 4: metres from each landing until the ball is back on the model's speed
 RUSHCORE_MEASURE=1 RUSHCORE_ARCHETYPE=dunes <same command> --seed 1   # the same over a dune train's five crest landings
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Archetype = 1)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --dunes --seed 1    # play a Dune Sea stage (World › Archetype = 2)
-/Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 9            # a Highlands stage with a see-through tube at 1.1 km (D-101; Movement › Tube Contact)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 2   # a Canyon Run with two wall tunnels and the spiral pit finale (D-102)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --sky --seed 1      # a Sky Terraces stage (World › Archetype = 3, D-103)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 4            # a Highlands stage with three exits: A on the primary, B and C on terminal lines (D-105)
@@ -92,7 +91,7 @@ beside its EXIT sign, so a pad reads from a long way out.
 highlands rocks and crystals off the corridor edge, canyon slabs and fins on the wall tops, dune stones and tufts on
 the wave's crests, sky crystals on the margins below the cloud band — and low posts mark the corridor's level width
 every 200 m of straight route. It is drawn from the cosmetic seed, so the density slider never changes the stage
-itself, and nothing stands in a line, an exit pad, an anchor, a lid, a tube or the spiral disc. The build log prints
+itself, and nothing stands in a line, an exit pad, an anchor, a lid or the spiral disc. The build log prints
 `scatter: N rocks, M crystals, K markers (C with colliders) in T ms`.
 
 **Ground follow** (`Movement › Ground Follow`, snap 0.5 m; D-092): the controller reads the terrain
@@ -359,10 +358,10 @@ launch-crest straights; boost rings on the primary every `Boost › Pickup Spaci
 
 | # | Name | Command | What to look at |
 |---|---|---|---|
-| 1 | tube | `-- --seed 9` | a see-through tube leaving the corridor at 1.1 km (D-101) |
+| 1 | *(tube)* | — | removed 2026-09-19 (D-112); the slot is free for the first tunnel sample (`docs/13`) |
 | 2 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102); walls are the authored profile since D-109 (hash re-recorded) |
 | 3 | sky floor 3 | `-- --sky --seed 30` | a floor-2 and floor-3 terrace stack (D-103) |
-| 4 | dune trains | `-- --dunes --seed 1` | a three-crest dune train and a tube (D-099) |
+| 4 | dune trains | `-- --dunes --seed 1` | a three-crest dune train (D-099) |
 | 5 | gap + turns | `-- --seed 8` | a mandatory gap and four committed banked turns (D-097) |
 | 6 | three exits | `-- --seed 4` | two terminal lines forking to exits B and C beside exit A (D-105) |
 | 7 | summit | `-- --summit --seed N` | *not yet built* (D-107, `docs/12`): five switchback tiers and a chute; the seed is pinned when S1 lands |
@@ -371,8 +370,8 @@ Setting the selector picks the archetype and seed and rebuilds; the `seed` row s
 before F5 (a new random seed) or the archetype slider, or the sample re-applies when the selector changes again.
 
 `World › Route Debug Lines` (04 §16) draws the primary route 3 m up: cyan straights, orange bends,
-magenta feature zones, optional lines by floor, checkpoint posts and tube axes; `World › Stage Debug Views`
-(D-104, off by default, rebuilds the world) adds corridor bounds, challenge zones, lid and tube-mouth outlines,
+magenta feature zones, optional lines by floor and checkpoint posts; `World › Stage Debug Views`
+(D-104, off by default, rebuilds the world) adds corridor bounds, challenge zones, lid outlines,
 the pit rim, floor bounds and terrace drains. The telemetry `seed` row shows the generation summary (valid / fallback,
 length, base-kit time, bends, crests, generation ms) and the log prints every validation check.
 Build: ≈ 3.6 s headless for 752 k samples / 1.5 M triangles / 48 tiles (world sampling dominates;

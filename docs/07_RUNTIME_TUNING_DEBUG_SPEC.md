@@ -174,14 +174,14 @@ Toggles:
 - challenge zones,
 - spawn anchors,
 - invalid slopes/regions,
-- structures (lid and tube bounds, tube paths and mouths),
+- structures (lid bounds, wall shells, tunnels),
 - floors and drains,
 - player ground normal/contact (contact, raw, ground follow),
 - impact vector.
 
 Disabled by default. `World › Sample Stage` picks a named archetype and seed from the runbook's sample list (the G0
 manual sample from the panel). Delivered (D-104): `World › Route Debug Lines` (route, optional lines by floor, checkpoints,
-tube axes, terminal lines in their own colour; on by default in the toy) and `World › Stage Debug Views` (corridor
+terminal lines in their own colour; on by default in the toy) and `World › Stage Debug Views` (corridor
 bounds, challenge zones, structure bounds, floors and drains, exit pad rings (D-105); off by default). Player contact
 and impact vectors remain in the telemetry rows. `World › Enemy Showcase` (T3, off by default) stands a lab row 40 m
 beside the calibration lane carrying one of each enemy, one elite, one of each pickup shape and a reward-burst pad, so

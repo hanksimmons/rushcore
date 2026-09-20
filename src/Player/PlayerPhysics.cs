@@ -73,11 +73,6 @@ public partial class PlayerPhysics : RigidBody3D
     /// <summary>Ground follow (03 §3, D-092): gaps inside the deadband are left to the solver; larger
     /// gaps close over this horizon as a velocity, never as a transform write.</summary>
     private const float GroundFollowDeadband = 0.03f;
-    /// <summary>How far the axis reference can be from the real tube axis; the tube follow keeps this much clear of the
-    /// shell on top of its rest band. It was 5 cm while the structure query answered with the nearest axis *sample*
-    /// (21 cm out on a steeply climbing Sky tube); the query now returns the nearest point on the axis polyline (T8),
-    /// so what is left is the polyline's own departure from the true curve, a few millimetres at this sampling.</summary>
-    private const float TubeAxisUncertainty = 0.01f;
     private const float GroundFollowCloseSeconds = 0.05f;
     private const float JumpLockoutSeconds = 0.08f;
     private const float CheckpointIntervalSeconds = 0.75f;
@@ -94,16 +89,10 @@ public partial class PlayerPhysics : RigidBody3D
     public bool IsRawGrounded => _rawGrounded;
     /// <summary>True while the analytic ground follow is carrying the ball this tick (03 §3, D-092).</summary>
     public bool GroundFollowActive => _followActive;
-    /// <summary>True while grounded on a surface steeper than the ordinary ground limit outside a tube (D-108).</summary>
+    /// <summary>True while grounded on a surface steeper than the ordinary ground limit (D-108).</summary>
     public bool IsWallRiding { get; private set; }
     /// <summary>The terrain grid the ground follow reads; null (the default) disables the follow.</summary>
     public IGroundSurface? Ground { get; set; }
-    /// <summary>Structures whose walls carry the ball (tubes, D-101): the analytic shell the tube follow reads; null = none.</summary>
-    public IStructureSurface? Structure { get; set; }
-    /// <summary>True while the ball is inside a tube this tick (telemetry).</summary>
-    public bool InTube { get; private set; }
-    /// <summary>True while the tube follow is carrying the ball on the shell this tick.</summary>
-    public bool TubeFollowActive { get; private set; }
     public Vector3 GroundNormal => _groundNormal;
     public Vector3 Velocity { get; private set; }
     /// <summary>Grounded: ground-tangent speed. Airborne: world-XZ speed (03 §5).</summary>
@@ -182,7 +171,7 @@ public partial class PlayerPhysics : RigidBody3D
         AddChild(new CollisionShape3D { Shape = _shape, Name = "Collider" });
 
         Mass = 1.0f;
-        CollisionMask = 1 | Rushcore.World.MovementToyWorld.StructureLayer;   // terrain and props, plus lids and tubes (04 §9, D-101)
+        CollisionMask = 1 | Rushcore.World.MovementToyWorld.StructureLayer;   // terrain and props, plus lids and wall shells (04 §9, D-111)
         ContinuousCd = true;                 // D-066: tunneling is a first-order risk
         CanSleep = false;                    // D-071
         ContactMonitor = true;               // D-067: grounded state reads direct contacts
@@ -324,7 +313,7 @@ public partial class PlayerPhysics : RigidBody3D
         var m = _t.Movement;
         // Wall ride (D-108): grounded on a surface the ordinary limit would call airborne. The plane, and so the
         // cap, the steer and the drive, is the wall's; only the drive is scaled and the stick re-framed below.
-        IsWallRiding = m.WallRide && IsGrounded && !InTube && planeNormal.Y < m.MinGroundNormalDot;
+        IsWallRiding = m.WallRide && IsGrounded && planeNormal.Y < m.MinGroundNormalDot;
         var f = _t.Flow;
         float cap = Mathf.Max(0.001f, m.HardMaxLocomotionSpeed);
         // Steering authority saturates at the base cap: the frozen curve (03 §4) is untouched by headroom.
@@ -539,13 +528,10 @@ public partial class PlayerPhysics : RigidBody3D
         Vector3 sum = Vector3.Zero;
         int hits = 0;
         int contacts = state.GetContactCount();
-        // Tube contact (V-015 → D-101): inside a tube the walls carry the ball, so any contact is ground; the
-        // normal it reports is the wall's, and drive and charge read from it.
-        InTube = Structure is not null && Structure.Nearest(state.Transform.Origin, out _, out _, out float tubeRadius, out float tubeDist) && tubeDist <= tubeRadius * 2f;
         // Wall ride (D-108): above the ride speed every wall a heightfield can make is ground too; below it a wall
         // is what it was, so a slow ball slides off and falls back.
         bool wallRide = _t.Movement.WallRide && v.Length() >= _t.Movement.WallRideMinSpeed;
-        float minDot = InTube && _t.Movement.TubeContact ? -1f : wallRide ? _t.Movement.WallRideMinNormalDot : _t.Movement.MinGroundNormalDot;
+        float minDot = wallRide ? _t.Movement.WallRideMinNormalDot : _t.Movement.MinGroundNormalDot;
         for (int i = 0; i < contacts; i++)
         {
             Vector3 n = state.GetContactLocalNormal(i);
@@ -559,12 +545,10 @@ public partial class PlayerPhysics : RigidBody3D
         // The analytic follow reads the same terrain grid the collider is built from, so a facet
         // edge that would hop the ball for a few ticks reads as continuous ground instead (D-092).
         _followActive = TryGroundFollow(state, dt, ref v, minDot, wasGrounded, out Vector3 followNormal);
-        Vector3 tubeNormal = Vector3.Up;
-        TubeFollowActive = !_followActive && TryTubeFollow(state, dt, ref v, out tubeNormal);
-        _rawGrounded = (hits > 0 || _followActive || TubeFollowActive) && _jumpLockout <= 0f;
+        _rawGrounded = (hits > 0 || _followActive) && _jumpLockout <= 0f;
         if (_rawGrounded)
         {
-            _groundNormal = _followActive ? followNormal : TubeFollowActive ? tubeNormal : sum.Normalized();     // stable representative normal (03 §3)
+            _groundNormal = _followActive ? followNormal : sum.Normalized();     // stable representative normal (03 §3)
             _groundStick = GroundStickSeconds;
         }
         else
@@ -632,7 +616,7 @@ public partial class PlayerPhysics : RigidBody3D
         }
         Vector3 vT = v - n * vN;
         // Wall carry (D-108): in the wall band, where the baseline follow never ran, a ball grounded last tick is held
-        // to the wall the way the tube follow holds the shell: its normal motion is the closing rate, its speed is
+        // to the wall: its normal motion is the closing rate, its speed is
         // conserved (the wall does no work), and the coming step's dip into a concave wall is cancelled in advance.
         // Below the band the follow is the D-092 rule byte for byte, so ordinary ground is untouched.
         bool carry = m.WallRide && wasGrounded && (analytic || n.Y < m.MinGroundNormalDot) && kappa >= 0f;
@@ -640,7 +624,7 @@ public partial class PlayerPhysics : RigidBody3D
         if (kappa < 0f && vT.LengthSquared() * -kappa >= m.Gravity * n.Y) return false;
 
         // On a concave wall the collider's flat facets are chords on the ball's side of the smooth surface, so the rest
-        // height sits the chord's sagitta off it, as the tube follow holds the inscribed circle. On the authored wall the
+        // height sits the chord's sagitta off it. On the authored wall the
         // collider is the shell (D-111), whose chords are the shell's stations, so the rest is the shell's; on a grid wall
         // the chord is a cell's diagonal (κ·cell²/8), since the wall runs at any angle to the grid.
         float rest = analytic ? Rushcore.Generation.WallProfile.ShellRest
@@ -652,7 +636,7 @@ public partial class PlayerPhysics : RigidBody3D
         if (carry)
         {
             // The wall does no work: what the removed normal component took comes back along the tangent, and the
-            // coming straight step's dip into a concave wall (½·v²κ·dt, the tube follow's term) is cancelled in advance.
+            // coming straight step's dip into a concave wall (½·v²κ·dt) is cancelled in advance.
             float total = v.Length();
             float tLen = vT.Length();
             if (tLen > 1e-3f) vT *= Mathf.Sqrt(Mathf.Max(0f, total * total - vN * vN)) / tLen;
@@ -681,7 +665,7 @@ public partial class PlayerPhysics : RigidBody3D
             if (kappa > 0f)
             {
                 // The curvature is across the profile, so only the motion up or down the wall dips into the curve
-                // (the tube follow's "around" term): the motion along the wall sees a straight surface. Counting the
+                // the motion along the wall sees a straight surface. Counting the
                 // whole tangent speed here pushed a lengthwise ride 4 m/s off the wall every tick, and the close pulled
                 // it back into the facets, which bled the ride's speed.
                 vN += 0.5f * across * across * kappa * dt;
@@ -689,74 +673,6 @@ public partial class PlayerPhysics : RigidBody3D
         }
         v = vT + n * vN;
         normal = n;
-        return true;
-    }
-
-    /// <summary>
-    /// Tube follow (D-101, the tube twin of the ground follow): the shell's collider is a ring of flat facets and
-    /// a ball at speed hops every facet edge, so inside a tube the controller reads the analytic shell (axis and
-    /// radius) instead: within the snap distance of the wall the outward-moving component away from the wall is
-    /// removed, the gap closes as a bounded velocity, and the ball counts as grounded with the wall's normal. A
-    /// concave wall can always carry the ball, so there is no curvature test. Never during jump lockout or a slam,
-    /// never against a ball arriving at the wall faster than one snap per tick (the solver lands that).
-    /// </summary>
-    private bool TryTubeFollow(PhysicsDirectBodyState3D state, float dt, ref Vector3 v, out Vector3 normal)
-    {
-        normal = Vector3.Up;
-        var m = _t.Movement;
-        if (Structure is null || !m.TubeContact || _jumpLockout > 0f || _slamActive) return false;
-        Vector3 c = state.Transform.Origin;
-        if (!Structure.Nearest(c, out Vector3 axisPoint, out Vector3 tangent, out float radius, out _)) return false;
-        Vector3 rel = c - axisPoint;
-        rel -= tangent * rel.Dot(tangent);
-        float dist = rel.Length();
-        if (dist < 1e-3f) return false;
-        Vector3 outward = rel / dist;
-        // Where the follow holds the ball (T7): inside the shell, far enough in that the solver never fires under it.
-        // The shell is a ring of flat facets, so a ball held out at the face sits proud of a facet's middle and the
-        // solver and the follow fight each tick (a judder while steering or boosting up the wall).
-        //
-        // Both the hold and the outward bound stay on R·cos(pi/Sides), where T7 measured them, even though the collided
-        // rings are now circumscribed about the analytic circle (T8 mouth fix) and their faces therefore sit a facet's
-        // depth further out. Moving either onto the new face costs margin the follow needs where its axis reference is
-        // worst: `Structure.Nearest` answers with a nearest vertex rather than the true axis, out by 21 cm on a steeply
-        // climbing Sky tube, and 5 cm nearer the face was enough to put 1.6 cm of penetration and grazing contacts back
-        // on Sky, from none. The cost is that the ball rides about 17 cm off the glass instead of 12; the 5 cm and the
-        // rest both come back when the structure query interpolates the axis, which is recorded for the main track.
-        // How far inside the inscribed circle the ball is held: the rest band, the axis reference's own uncertainty, and a
-        // centimetre. `Structure.Nearest` answers with the nearest axis *vertex* and its tangent, and the axis is sampled
-        // every few metres, so on a curving tube the perpendicular distance to that vertex's tangent line differs from the
-        // distance to the real axis by (Δs/2)²/2ρ: measured 1.4 cm on a Dune Sea tube, 3.5 cm on a Highlands one and 21 cm
-        // on a steeply climbing Sky one (T7). The follow therefore knows where the wall is only to about that, and must
-        // not aim closer than it knows; the margin comes off again once the query interpolates the axis.
-        float wall = radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - 2f * GroundFollowDeadband - TubeAxisUncertainty - 0.01f;
-        float gap = wall - m.BallRadius - dist;                     // > 0: inside, off the wall; < 0: pressed into it
-        if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
-        float vOut = v.Dot(outward);
-        if (vOut > m.GroundFollowSnapDistance / dt) return false;   // flying into the wall: a landing
-        float excess = Mathf.Max(0f, Mathf.Abs(gap) - GroundFollowDeadband) * Mathf.Sign(gap);
-        float target = excess / GroundFollowCloseSeconds;           // toward the wall (outward) when off it
-        vOut = gap >= 0f ? Mathf.Max(vOut, target) : Mathf.Min(vOut, target);
-        // The wall's normal force (T7): the server integrates gravity after this callback, so a ball held on the wall
-        // creeps into it by g·dt² a tick until the closing velocity balances it a few centimetres inside the collider,
-        // and the solver fights the follow there. Cancel in advance what the coming step pushes into the wall: gravity's
-        // outward component and the centripetal demand of the ball's motion around the ring.
-        // Gravity is exact (the server adds g·dt at the same instant); the ring's centripetal term is half, because a
-        // straight step of the motion around the ring leaves the circle by u²dt²/2r, not u²dt²/r.
-        float press = Mathf.Max(0f, -outward.Y * m.Gravity);
-        Vector3 around = v - tangent * v.Dot(tangent) - outward * vOut;
-        press += 0.5f * around.LengthSquared() / Mathf.Max(0.5f, dist);
-        // Never step outside the shell (T7): the collider is a ring of flat facets whose nearest point to the axis is the
-        // inscribed circle, so a ball kept inside that circle cannot reach a face while the follow holds it, whatever the
-        // drive, the boost or the ring motion does. The bound is applied to the velocity the step will actually carry, so
-        // it comes before the pre-compensation below, which stands for exactly what the step adds after this callback:
-        // the outward travel is then (min(vOut, room/dt) − press·dt + press·dt)·dt ≤ room. A bound, not a target: at the
-        // rest band's outer edge it still allows 2.4 m/s outward, so the wall is not sticky.
-        float room = Mathf.Max(0f, radius * Mathf.Cos(Mathf.Pi / Rushcore.World.TubeMesh.Sides) - m.BallRadius - dist);
-        vOut = Mathf.Min(vOut, room / dt);
-        vOut -= press * dt;
-        v = v - outward * v.Dot(outward) + outward * vOut;
-        normal = -outward;
         return true;
     }
 
@@ -1051,13 +967,6 @@ public interface ICameraBasis
 
 /// <summary>The terrain grid the analytic ground follow reads (03 §3, D-092): the same samples the
 /// collider and the render mesh are built from, so the one height source stays one.</summary>
-/// <summary>A structure whose walls carry the ball (a tube): the nearest shell axis point to a position, its tangent and radius.</summary>
-public interface IStructureSurface
-{
-    /// <summary>False when the position is outside every structure's bounds.</summary>
-    bool Nearest(Vector3 position, out Vector3 axisPoint, out Vector3 tangent, out float radius, out float distance);
-}
-
 public interface IGroundSurface
 {
     float CellSize { get; }

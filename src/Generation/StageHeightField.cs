@@ -566,7 +566,7 @@ public sealed class StageHeightField : IHeightSource
     }
 
     /// <summary>
-    /// The analytic wall under a point (D-109, the wall twin of a tube's <c>Nearest</c>): on a walled archetype, the
+    /// The analytic wall under a point (D-109): on a walled archetype, the
     /// nearest stamped wall's surface normal (pointing off the wall, toward the corridor and up), the perpendicular gap
     /// from the ball's rest height on it, and the profile's curvature across (the fillet's, or 0 on the face). False
     /// inside a corridor, on a bend's inside, at the rounded lip (real physics launches the ball there), where the side

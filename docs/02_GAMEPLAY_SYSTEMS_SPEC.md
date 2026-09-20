@@ -76,8 +76,8 @@ A stage is a **broad directional traversal landscape**:
 It is neither a narrow race corridor nor an unstructured open sandbox.
 
 A stage may be vertical (D-096): floors are terraces, and the guaranteed primary route stays on the lowest
-one. Upper floors, tubes and wall tunnels are optional lines that rejoin the primary or reach the exit; a
-tube's exit may open onto a different area, so tubes are where the line graph branches. Falling from a
+one. Upper floors and tunnels are optional lines that rejoin the primary or reach the exit; a tunnel may
+open onto a pocket area no surface route reaches, so tunnels are where the line graph branches (`docs/13`). Falling from a
 floor lands on ground that drains back to the primary: it costs time and Flow, never a restore.
 
 The mandatory primary route must remain viable without requiring a stocked boost meter. Boost creates better/faster/riskier optional opportunities.

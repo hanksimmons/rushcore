@@ -107,3 +107,5 @@ reconciliation sees them in one place.
   the nearest point along the two adjoining segments would remove it, let `PlayerPhysics.TubeAxisUncertainty` go to
   zero and tighten every tube ride; the camera's `PushOutOfTubes` reads the same query and would gain the same accuracy.
   Outside T7's boundary (the packet allows `TryTubeFollow` and `TubeMesh` only).
+
+- **2026-09-19 (main track, D-112):** the see-through tubes were removed by the user's call. T7 (tube judder) and T8/T8b (tube mouth, tube camera) are superseded history; their packets stay as records. Tunnels replace tubes per `docs/13`.

@@ -171,7 +171,7 @@ Current accepted direction:
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
 - the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
 - `HeightMapShape3D` main terrain,
-- structures (D-096, D-111): lids as `BoxShape3D`, tubes and wall shells as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk a metre beneath it, and the world's height query answers with the stamp there; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); inside a tube the tube follow (D-101, `Movement › Tube Contact`) holds the ball to the analytic shell and counts any contact as ground, a rule scoped to tubes.
+- structures (D-096, D-111, D-112): lids as `BoxShape3D`, wall shells (and the planned tunnel shells, `docs/13`) as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk a metre beneath it, and the world's height query answers with the stamp there; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); the see-through tubes and the tube follow (D-101) were removed on 2026-09-19 (D-112).
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
 
@@ -188,7 +188,7 @@ Start at 60 physics Hz. Only test/raise to 120 if measured high-speed behavior r
 - 1–3 meaningful optional lines,
 - mandatory traversal cannot require a stocked boost meter,
 - one logical height source for render/collision,
-- the ground is one single-valued heightfield; walls, terraces, slots and spirals are stamps in it; lids, tubes and wall shells are the only structures (04 §5I, D-096, D-111: a wall shell is the stamp's own wall band sampled finely and swept as a collider, with the heightfield sunk a metre beneath it); never a second height layer,
+- the ground is one single-valued heightfield; walls, terraces, slots and spirals are stamps in it; lids, wall shells and tunnel shells are the only structures (04 §5I, D-096, D-111, D-112: a wall shell is the stamp's own wall band sampled finely and swept as a collider, with the heightfield sunk a metre beneath it); never a second height layer,
 - bounded validators/regeneration,
 - regression seeds for fixed failures.
 
@@ -256,12 +256,12 @@ Until the implementation plan advances:
 > 84.63, slam 90 + 250, carve 84°/s, camera), the analytic ground follow is in (D-092) and the ceiling addendum
 > (D-094: two-speed generation, the model's airborne phase, `docs/11 §6`) is delivered. Phase 3 opens at
 > Gate F0 with the G0 manual sample played with Flow on, and carries the vertical grammar (D-096: walls,
-> terraces, spiral pits, lids, see-through tubes, Sky Terraces; `docs/04 §5I`, `docs/11 §7`). Phase 3's
+> terraces, spiral pits, lids, Sky Terraces; `docs/04 §5I`, `docs/11 §7`). Phase 3's
 > first slice, the challenge-module grammar with the mandatory gap, the launch ramp and the banked turn
 > under the two-price rule (D-097), is delivered, and so are Canyon Run (D-098: slot walls, banked lines,
 > `ArchetypeRules`) and Dune Sea (D-099: the seeded dune wave and the trains of launch crests riding it), with the
 > D-100 gap closure (crest paid path, optional lines checked at both speeds, the ridge redesign, one archetype selector),
-> and see-through tubes (D-101: swept shell, carried segments, the tube follow, the camera push-out, the harness ride),
+> and see-through tubes (D-101; removed 2026-09-19 by D-112, replaced by the tunnel plan in `docs/13`),
 > wall tunnels and the spiral pit (D-102: lids with the confined camera, the unbounded-heading finale, the headroom validator),
 > the first cut of Sky Terraces (D-103: terrace floors with cliff edges onto the floor below, drains, the cloud band),
 > the stage debug views (D-104), and branching exits (D-105: terminal lines ending on their own pads; one to three exits
@@ -271,7 +271,9 @@ Until the implementation plan advances:
 > the inside line, 600 m of descent); slices S1–S3 in `docs/09`; the user playtests S1 + S2. The boost economy
 > changed by the user's call on the same day (D-106: start at 30%, no passive regen, rings as the refill). Before S1 the
 > walls themselves were made rideable on Canyon Run (D-108 wall ride, D-109 the authored profile, D-110 the climb scrub,
-> D-111 the wall shell over the sunk grid); the Summit's rails and headwalls use that shell.
+> D-111 the wall shell over the sunk grid); the Summit's rails and headwalls use that shell. **D-112 (2026-09-19):** the
+> see-through tubes are removed; `docs/13` plans their replacement (tunnels through walls and beneath the landscape, the
+> camera inside), courses three times longer, and the far-horizon skybox. Nothing of `docs/13` is built yet.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

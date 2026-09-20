@@ -54,10 +54,6 @@ public partial class CameraRig : Node3D, ICameraBasis
     /// <summary>World height source used for the focus/camera floors. Terrain only;
     /// props are handled by the sphere casts.</summary>
     public Func<float, float, float>? GroundHeight { get; set; }
-    /// <summary>The stage's tubes (D-101): the lens is pushed radially out of any shell it would sit inside.</summary>
-    public Func<IReadOnlyList<Rushcore.Generation.TubeDefinition>>? Tubes { get; set; }
-    /// <summary>True on frames where the tube push-out moved the lens.</summary>
-    public bool TubePushedThisFrame { get; private set; }
     /// <summary>The lid over a plan position, for the confined framing (D-102); null = none.</summary>
     public Func<float, float, Rushcore.Generation.LidDefinition?>? LidOver { get; set; }
     /// <summary>True on frames where the lid confinement lowered the lens.</summary>
@@ -125,7 +121,7 @@ public partial class CameraRig : Node3D, ICameraBasis
         _probe.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
         _probe.CollideWithAreas = false;
         _probe.CollideWithBodies = true;
-        _probe.CollisionMask = 1;            // terrain and props only: a tube's shell is see-through (04 §9, D-101)
+        _probe.CollisionMask = 1;            // terrain and props only (04 §9)
 
         _yaw = 0f;                       // the bootstrap snaps it to the spawn facing
         UpdateOrientation();
@@ -402,7 +398,6 @@ public partial class CameraRig : Node3D, ICameraBasis
 
         // Last resort: never let the lens go below the heightfield.
         FlooredThisFrame = false;
-        PushOutOfTubes();
         ConfineUnderLids();
         if (GroundHeight is null) return;
         Vector3 gp = _camera.GlobalPosition;
@@ -430,46 +425,6 @@ public partial class CameraRig : Node3D, ICameraBasis
         lens.Y = maxY;
         _camera.GlobalPosition = lens;
         LidConfinedThisFrame = true;
-    }
-
-    /// <summary>Tube camera rule (docs/11 §7e, D-101): the lens never sits inside a tube's shell. After the chase
-    /// placement it is pushed along the radial from the nearest axis point through the lens until it clears the
-    /// radius by the margin, so when the ball rides a wall or the ceiling the lens follows around the outside and
-    /// sees it through the see-through shell. The shell is invisible to the occlusion probe, so nothing pulls in.</summary>
-    private void PushOutOfTubes()
-    {
-        TubePushedThisFrame = false;
-        if (Tubes?.Invoke() is not { Count: > 0 } tubes) return;
-        Vector3 lens = _camera.GlobalPosition;
-        foreach (var tube in tubes)
-        {
-            if (!tube.Bounds.HasPoint(lens)) continue;
-            int i = tube.Nearest(lens, out _);
-            Vector3 axisPoint = tube.Axis[i];
-            Vector3 t = tube.TangentAt(i);
-            // Radial only. The lens keeps its station along the tube: rebuilding it from the axis point alone threw that
-            // away and dropped the camera onto the nearest axis sample's cross-section, so on every frame the push fired
-            // the lens jumped up to half a sample spacing (± 2 m) backwards or forwards along the tube and back again the
-            // next frame. That was the strobing camera and the ball's apparent rubber-banding inside a tube.
-            Vector3 rel = lens - axisPoint;
-            float along = rel.Dot(t);
-            Vector3 radial = rel - t * along;
-            float r = radial.Length();
-            // The test is the radial distance too: `Nearest` answers with the distance to the axis *sample*, which also
-            // counts the lens's travel along the tube, so the push fired and stopped by a quantity it was not correcting.
-            float keep = tube.Radius * (i < 3 || i >= tube.Axis.Length - 3 ? WorldScale.TubeMouthFlare : 1f) + WorldScale.TubeCameraMargin;
-            if (r >= keep) continue;
-            Vector3 outward;
-            if (r > 1e-3f) outward = radial / r;
-            else
-            {
-                Vector3 any = Mathf.Abs(t.Y) < 0.9f ? Vector3.Up : Vector3.Right;   // lens on the axis: any perpendicular
-                outward = (any - t * any.Dot(t)).Normalized();
-            }
-            lens = axisPoint + t * along + outward * keep;
-            _camera.GlobalPosition = lens;
-            TubePushedThisFrame = true;
-        }
     }
 
     private void SetZoom(float value) => _zoom = Mathf.Clamp(value, _t.Camera.ZoomMin, _t.Camera.ZoomMax);

@@ -228,7 +228,7 @@ public static class OptionalLineBuilder
     /// A side is valid when the offset line never crosses a bend's centre: on the outside of a bend
     /// anything goes; on the inside the offset at that point must leave the inside margin of radius.
     /// </summary>
-    /// <summary>The same for any offset envelope (a tube's, D-101), given the offset at each primary vertex.</summary>
+    /// <summary>The same for any offset envelope, given the offset at each primary vertex.</summary>
     internal static bool SideValid(RouteSkeleton primary, float[] turnSign, int a, int b, float side, Func<int, float> offsetAt)
     {
         var v = primary.Vertices;

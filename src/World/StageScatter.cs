@@ -18,8 +18,6 @@ public sealed class StageScatter
     /// <summary>Beyond the pad's own radius (D-105: one to three flat 60 m pads, the places a stage ends).</summary>
     public const float ExitPadClearance = 20f;
     public const float LidClearance = 20f;
-    /// <summary>Plan clearance from a tube's axis, on top of its radius: the ground a tube flies over stays bare.</summary>
-    public const float TubeClearance = 10f;
     public const float SpiralClearance = 40f;
     public const float AnchorClearance = 30f;
     /// <summary>No scatter collider stands nearer a line than this; farther props keep the toy's hard edges.</summary>
@@ -27,25 +25,11 @@ public sealed class StageScatter
 
     private readonly StageDefinition _stage;
     private readonly StageHeightField _field;
-    /// <summary>Plan bounding circle of each tube's axis, grown by its radius and clearance: the axis walk only
-    /// runs for the few points that could be near a tube at all.</summary>
-    private readonly (Vector2 Centre, float Radius)[] _tubeCircles;
 
     public StageScatter(StageDefinition stage)
     {
         _stage = stage;
         _field = stage.HeightField!;
-        _tubeCircles = new (Vector2, float)[stage.Tubes.Count];
-        for (int t = 0; t < stage.Tubes.Count; t++)
-        {
-            var tube = stage.Tubes[t];
-            var centre = Vector2.Zero;
-            foreach (var a in tube.Axis) centre += new Vector2(a.X, a.Z);
-            centre /= Mathf.Max(1, tube.Axis.Length);
-            float reach = 0f;
-            foreach (var a in tube.Axis) reach = Mathf.Max(reach, centre.DistanceTo(new Vector2(a.X, a.Z)));
-            _tubeCircles[t] = (centre, reach + tube.Radius + TubeClearance);
-        }
     }
 
     /// <summary>Plan distance to the nearest line's centreline (primary or optional, every floor).</summary>
@@ -60,7 +44,7 @@ public sealed class StageScatter
     }
 
     /// <summary>
-    /// True where a prop may stand: outside every line, exit pad, checkpoint anchor, lid, tube and the spiral
+    /// True where a prop may stand: outside every line, exit pad, checkpoint anchor, lid and the spiral
     /// disc. A module's body and its landing run lie on their line and are inside the line keep-out already.
     /// </summary>
     public bool Clear(float x, float z)
@@ -71,7 +55,6 @@ public sealed class StageScatter
             if (Plan(cp.Position, x, z) <= AnchorClearance) return false;
         foreach (var lid in _stage.Lids)
             if (DistanceToLid(lid, x, z) <= LidClearance) return false;
-        if (NearATube(x, z)) return false;
         if (_stage.PrimaryRoute.Spiral is { } pit && Plan(pit.Centre, x, z) <= pit.OuterRadius + SpiralClearance) return false;
         return true;
     }
@@ -94,33 +77,12 @@ public sealed class StageScatter
             float l = DistanceToLid(lid, x, z);
             if (l <= LidClearance) return $"lid at {l:0} m";
         }
-        if (NearATube(x, z)) return "tube axis";
         if (_stage.PrimaryRoute.Spiral is { } pit)
         {
             float sp = Plan(pit.Centre, x, z);
             if (sp <= pit.OuterRadius + SpiralClearance) return $"spiral disc at {sp:0} m";
         }
         return "";
-    }
-
-    /// <summary>True within a tube's radius and clearance of its axis, in plan. The bounding circle short-circuits
-    /// the walk: most of a stage is nowhere near a tube.</summary>
-    private bool NearATube(float x, float z)
-    {
-        for (int t = 0; t < _tubeCircles.Length; t++)
-        {
-            var (centre, radius) = _tubeCircles[t];
-            float dx = centre.X - x, dz = centre.Y - z;
-            if (dx * dx + dz * dz > radius * radius) continue;
-            var tube = _stage.Tubes[t];
-            float keep = tube.Radius + TubeClearance;
-            foreach (var a in tube.Axis)
-            {
-                float ax = a.X - x, az = a.Z - z;
-                if (ax * ax + az * az <= keep * keep) return true;
-            }
-        }
-        return false;
     }
 
     /// <summary>Plan distance to a lid's footprint (0 under the roof).</summary>

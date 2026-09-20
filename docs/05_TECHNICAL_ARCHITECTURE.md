@@ -200,8 +200,8 @@ Accepted baseline:
 - sphere collision,
 - control in `_IntegrateForces()`,
 - `HeightMapShape3D` static main terrain,
-- structure colliders (D-096, D-111): `BoxShape3D` lids, `ConcavePolygonShape3D` tubes and wall shells with backface collision, on a structure physics layer; the ground follow reads the world's height query, which is the terrain heightfield except under a wall shell, where it is the stamp the shell was sampled from,
-- physics layers: terrain, structures, player, props; the camera occlusion probe masks terrain and lids and never tubes,
+- structure colliders (D-096, D-111): `BoxShape3D` lids, `ConcavePolygonShape3D` wall shells (and the planned tunnel shells, `docs/13`) with backface collision, on a structure physics layer; the ground follow reads the world's height query, which is the terrain heightfield except under a wall shell, where it is the stamp the shell was sampled from,
+- physics layers: terrain, structures, player, props; the camera occlusion probe masks terrain and lids,
 - physics interpolation,
 - start at 60 physics ticks/sec.
 
@@ -246,7 +246,6 @@ Applies:
 - bounded zoom,
 - speed-responsive FOV/distance,
 - short shake impulses,
-- tube framing (D-096): with the ball inside a tube the chase placement is followed by a radial push of the lens out of the shell to at least the occlusion margin, and the shell is excluded from the occlusion probe; the framing bands (D-090) keep the ball in frame,
 - confined framing inside a wall tunnel: distance and pitch bounded to the tunnel's declared clearance.
 
 No manual camera rotation in MVP; yaw follows the trajectory (D-072).
@@ -262,7 +261,7 @@ Preferred tools:
 - shared `ShaderMaterial`/materials,
 - `GPUParticles3D` for transient repeated effects,
 - `MultiMeshInstance3D` for high-count repeated static/cosmetic geometry when justified,
-- tube shells (D-096): one shared translucent shell material and one rib material; ring meshes built per tube; the shell casts no shadow.
+- wall shells (D-111): the terrain material, one indexed mesh per strip.
 
 Reuse Mesh/Material resources.
 

@@ -176,7 +176,7 @@ follow, the camera and the dressing all see the surface the ball rides; `GridHei
 measurement. On the inside of a bend a vertex's ray stops a metre short of the centre of curvature, where the
 rays would cross; stations past a vertex's lip fold onto its last point and make no face. Two lines' bands may
 overlap (a ledge beside the primary): both shells sample the same stamp there and coincide. The ground stays
-one single-valued heightfield; the shell is a structure like a lid or a tube, of the stamp's own surface.
+one single-valued heightfield; the shell is a structure like a lid, of the stamp's own surface.
 
 Two rules the shell forced on the stamp. **The wall's position is interpolated along the route** (the floor's D-093
 rule applied to the wall): the profile reads a bend's extra width, berm fade and height and inside ease
@@ -249,9 +249,9 @@ model and its uncharged lip flight lands within 9% of the model's.
 Vertical grammar modules (D-096, §5I), each with the same seven fields:
 
 7. WallTunnel — a slot through a wall closed by a lid; the camera confines (06 §11); the roof refuses a charged jump, so the module declares its ceiling (§10 headroom).
-8. Tube — a see-through swept cylinder with flared mouths; entry from a ramp lip, an edge or midair, exit onto a landing zone of any line or floor; a branch point of the line graph.
+8. Tunnel — a slot cut into the ground or through a wall, roofed by a shell of rock, on an optional line; a portal through a wall or a dive beneath the landscape, sometimes the only way into a pocket area (D-112, `docs/13`). Replaces the see-through tube, removed 2026-09-19.
 9. SpiralPit / SpiralRamp — a conical helix of banked bends, each turn at a different radius, descending into a pit or climbing a mesa; falling off the inner edge lands on the turn below.
-10. TerraceStep — a floor step of 60–90 m reached by a ramp lip and a full charge (at most 20 m when mandatory), with a landing zone on the upper floor and a drain below its edge; larger lifts are spiral ramps and tubes.
+10. TerraceStep — a floor step of 60–90 m reached by a ramp lip and a full charge (at most 20 m when mandatory), with a landing zone on the upper floor and a drain below its edge; larger lifts are spiral ramps.
 11. Bridge — a lid used as a floor across a valley or a gap; falling off it lands on the drain.
 
 ### F — Gameplay object placement
@@ -279,7 +279,7 @@ Props:
 Delivered (T4, P-008): `StageScatter` states the keep-out once, from `StageDefinition` alone, and both the dressing and
 the harness read it — outside every line's level width plus its bend extra and half its falloff (160 m, primary and
 every optional line, all floors, terminal lines included), every exit pad plus 20 m (D-105), every checkpoint anchor
-plus 30 m, every lid footprint plus 20 m, every tube axis plus its radius and 10 m, and the spiral disc plus 40 m. A
+plus 30 m, every lid footprint plus 20 m, and the spiral disc plus 40 m. A
 module's body and its landing run lie on their line and are inside the line keep-out by construction. The stream is
 `StageGenerationRequest.CosmeticSeed`, so a scatter change can never move a stage hash, and no scatter collider stands
 within 200 m of a line. Scale-cue posts at the level width every 200 m of straight route are the exception that stands
@@ -300,15 +300,17 @@ Three kinds of thing, and the ball drives on all of them:
 - **Ground**: the one single-valued heightfield (§9). Walls (a step of any height across one or two cells),
   terraces (floor steps), slots (walls both sides of a corridor), cliff edges and spiral pits are all stamps
   in it, because a heightfield is happy with a near-vertical face. Nothing here needs a second representation.
-- **Structures**: a separate generated mesh plus collider, as §9 allows for bridges and overhangs. Exactly
-  two: the **lid** (a box roof over a slot: a wall tunnel, or a bridge when used as a floor) and the
-  **tube** (a circle of radius 4–8 m swept along a 3D path of straights and arcs of any pitch, rendered as a
-  see-through shell with opaque ribs, inward-facing triangles for the collider). Structures are never a
-  second height layer: the ground follow, the route speed model's touchdown and the validators keep reading
-  the one heightfield, and the contact baseline carries the ball on a structure (03 §3).
+- **Structures**: a separate generated mesh plus collider, as §9 allows for bridges and overhangs. Three:
+  the **lid** (a box roof over a slot: a wall tunnel, or a bridge when used as a floor), the **wall shell**
+  (D-111: the stamp's wall band swept finely over the sunk grid) and, planned, the **tunnel shell** (D-112,
+  `docs/13`: walls and an arched roof over a slot cut into the ground or through a wall). The see-through
+  tube (D-101) was removed on 2026-09-19: a glass pipe in the air was the wrong idea for a landscape the
+  player descends into and pierces through. Structures are never a second height layer: the ground follow,
+  the route speed model's touchdown and the validators keep reading the one heightfield, and the contact
+  baseline carries the ball on a structure (03 §3).
 - **Floors**: terraces, not stacked layers. A jump step is 60–90 m (the full-charge apex is 91 m above
   the lip at any speed, because the takeoff sets the vertical and a ramp does not add to it, `docs/11
-  §7`); larger lifts are spiral ramps and tubes, which a driven ball climbs at up to 35° without losing
+  §7`); larger lifts are spiral ramps, which a driven ball climbs at up to 35° without losing
   speed; three floors put the top 120–270 m up. The guaranteed primary route stays on the lowest floor (the free path of the two-price
   rule), upper floors are paid lines, and under every edge of an upper floor the ground **drains**: every
   cell below the edge has a descending drivable path back to the primary. The top floor may sit in the cloud
@@ -316,44 +318,10 @@ Three kinds of thing, and the ball drives on all of them:
   the design ever needs them they are the same height-source abstraction instantiated per floor with a NaN
   mask and a floor-aware follow, tracker and touchdown, and that is a separate decision.
 
-Tubes carry the line graph's branches. A tube leaves through a mouth on a ground line, at an edge or in
-midair (reachable from the take-off runway at the arrival speed with at most half a charge on a mandatory
-tube, a full charge or the ceiling on an optional one, the mouth radius as the aim tolerance) and exits
-through a flared mouth onto a 200 m landing zone of any line or floor; two tubes from one platform, or a
-tube exit onto a floor with its own lines, are the branches. Every line still rejoins the primary or
-reaches the exit and the graph is acyclic in route distance. Inside a tube the walls carry the ball (it
-rides up to tan φ = v²/(g·R)), so a tube path may bend tighter than the bend ladder: the route speed model
-treats tube segments as **carried** (no bend loss; grade, drag and cap only) and the exit velocity runs
-along the axis. A tube never passes through terrain mass and keeps its axis clear of the ground and of
-walls by the camera clearance (§10), so the camera stays outside it; a tube through a wall is a wall tunnel
-(lid) instead. Forks inside a tube are not built.
-
-**Headroom as delivered (D-102):** the validator scans every tube axis point against the primary's
-centreline; nothing but a declared lid may stand within the full-charge apex (plus a ball) above the
-centreline within 20 m plus the tube radius in plan, and a tube whose path would cross another part of the
-primary is rejected by its builder. The check found the first tubes swinging back across their own corridor
-(a sign applied to half the offset) before any ball did.
-
-**Tubes as delivered (D-101, 2026-09-07):** a tube is an optional line through the air. It leaves the primary
-through a ground mouth 45 m to one side of the centreline (inside the level width, so the free path never
-enters it), climbs over that offset at a pitch under 14° to a cruise the camera clearance (30 m) above the
-highest ground under its path, swings out 200 m over a 500 m S (about r 270), cruises, swings back, descends
-and exits through a flared mouth 45 m off the centreline onto a 200 m straight landing zone; both mouth zones
-are primary straights clear of features, and the swing takes the outside of every bend in the section. The
-axis follows the primary's own geometry under a lateral and a height envelope, so both mouths land exactly on
-the line, and the builder rejects any tube whose floor would sink into the ground. The route speed model
-integrates the axis as carried (no corner limit, no launch); the controller adds the **tube follow**, the
-shell twin of the ground follow (03 §3): inside a tube any contact is ground, the ball is held to the shell
-within the snap distance, and the wall's normal is its ground normal, so drive and charge work on the
-wall. The shell is a ring of 24 flat facets and the follow holds the ball clear inside their inscribed circle
-(T7, P-009): on the analytic circle the ball sat 29 cm inside every facet's middle at ten sides, and the solver pushed
-it out while the follow pulled it in on every tick whenever steering or boost held the ball off the bottom corner, a
-judder for as long as boost was held. The follow also supplies the wall's normal force in advance and never lets a step
-cross the inscribed circle, and it aims a margin inside that circle because the structure query answers with the nearest
-axis *sample* rather than the nearest point on the axis, which on a 4 m-sampled curving tube is up to 3.5 cm out. Measured on the first tube (Highlands seed 9/0, 2 040 m): entered at the cap, carried 100% grounded, exit
-at the model's speed and 0° off the axis, the lens outside the shell on every frame with a clear line of sight
-to the ball against the terrain. Tubes appear on about 15% of Highlands, 7% of Canyon and 41% of Dune Sea
-seeds; edge and midair mouths, and exits onto other lines or floors, arrive with Sky Terraces.
+**Headroom as delivered (D-102):** nothing but a declared lid may stand within the full-charge apex (plus a
+ball) above the primary's centreline; the validator reads every structure against it. (It caught the first
+see-through tubes swinging back across their own corridor before any ball did; tubes are gone, the check stays
+for tunnels and lids.)
 
 ### J — Exits and branching (D-105)
 
@@ -486,9 +454,9 @@ bump. Palette: sand from the troughs to pale crests, lee faces darker. Selected 
 Geometry:
 
 - three floors of terraces, the primary on the lowest, the top 120–270 m up,
-- 60–90 m jump steps, spiral ramps and tube lifts and midair tube mouths up; cliff edges and drains down,
+- 60–90 m jump steps and spiral ramps up; cliff edges and drains down,
 - the top floor in the cloud band,
-- tubes and bridges linking floors and branching lines,
+- tunnels and bridges linking floors and branching lines (tunnels per `docs/13`),
 - every fall lands on ground that drains back to the primary.
 
 **Delivered 2026-09-07 (D-103), the first cut:** the Highlands family with 500–900 m straights and its
@@ -504,11 +472,11 @@ edge, where no floor stands beyond it, descends into the relief at the route gra
 height plus half a swell over the grade limit, times the smoothstep's 1.5). The drain validator reads lateral
 cuts every 100 m of plateau: the cliff foot within 15 m of the floor below, no step up over relief noise on
 the way down, the outer slope inside the grade; a terrace that fails is dropped with its section (like a line
-whose flight cannot hold a corner). Tubes appear as on the other archetypes, cruising above the terraces.
+whose flight cannot hold a corner).
 The cloud band is two translucent sheets 130 and 160 m above the primary's mean height, so floor 3 sits in
 it. Measured: 100 seeds valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped.
 Floor 3 is rare because its section needs about 2 km bounded by straights; branching floor 3 from floor 2,
-the jump step (a lip and a full charge onto a landing zone rather than a ramp), edge and midair tube mouths,
+the jump step (a lip and a full charge onto a landing zone rather than a ramp),
 bridges between floors and a second primary floor are the open work of this archetype.
 
 Archetype rules (D-098, extended D-099): an `ArchetypeRules` record per archetype carries the wall height,
@@ -610,15 +578,10 @@ Verified 2026-09-05: the Godot 4.7 `HeightMapShape3D` class reference states "Ho
 
 Special non-heightfield structures such as bridges/ramps/overhangs can use separate generated meshes/colliders.
 
-Delivered forms (D-096): the lid is a `BoxShape3D` and a box mesh; the tube is a swept ring mesh (8–12
-sides) whose triangles face inward, with a `ConcavePolygonShape3D` built from the same triangles and
-backface collision on so the ball never leaves through a face at the cap. Both sit on a structure physics
-layer; the tube's collider is additionally invisible to the camera's occlusion probe (06 §11). The harness
-verifies a tube carries the ball at the cap with CCD the way D-079 verified NaN holes. Delivered D-101: the tube is a
-10-sided ring swept with a parallel-transported frame, flared ×2 over one diameter at each mouth, an indexed
-translucent shell with outward normals, opaque rib bands every 25 m, and a `ConcavePolygonShape3D` of the same
-triangles with backface collision on physics layer 2; the player's mask includes layer 2, the camera probe's
-does not.
+Delivered forms (D-096, D-111): the lid is a `BoxShape3D` and a box mesh; the wall shell is a `ConcavePolygonShape3D`
+of the stamp's wall band with backface collision. Both sit on a structure physics layer the ball collides with;
+the camera's occlusion probe reads terrain and lids. The see-through tube's swept ring (D-101) was removed
+2026-09-19 (D-112); the tunnel shell that replaces it is specified in `docs/13`.
 
 Do not default the entire terrain to one giant concave triangle collider.
 
@@ -640,14 +603,12 @@ Primary route segments expose tunable constraints:
   and a bend starting inside the 100 m landing run must hold the landing speed after what the brake
   sheds over that run; feature straights are sized for the ceiling flight over falling ground,
 - **headroom** (D-096): nothing within the declared jump apex above any corridor (the full-charge apex from
-  the local arrival speed and grade by default) unless the module declares a ceiling (lid, tube),
+  the local arrival speed and grade by default) unless the module declares a ceiling (lid, tunnel),
 - **wall clearance**: a wall face stands at least two cells outside the corridor's level width, so the ground
   follow's lateral samples never read it (delivered D-098 as "the primary's stamp weight is still 1 at the
   level width plus the 8 m setback on both sides", the inside of a bend tighter than that reach excepted),
 - **drains**: below every edge of an upper floor the ground descends drivably to the primary: no wall foot,
   no NaN, grade within the route limit,
-- **tube clearance**: a tube axis stays at least the camera clearance (`docs/11 §7`) above the ground and
-  clear of walls except at its mouths,
 - **blind corners**: a wall on the inside of a bend hides the read horizon; until difficulty is reassessed
   after Phase 4, walls sit on the outside of bends.
 
@@ -679,8 +640,8 @@ first-class speed source for optional lines: module preconditions that assume an
 stage clear-time targets, must account for a player who can reach 80% of the cap from any slam
 landing (D-077).
 
-A mandatory tube mouth or terrace step is a mandatory jump and obeys this section. Paid floors and midair
-mouths may demand the full charge or the ceiling (D-096).
+A mandatory terrace step is a mandatory jump and obeys this section. Paid floors may demand the full charge or
+the ceiling (D-096).
 
 ## 12. Validation
 
@@ -694,7 +655,7 @@ mouths may demand the full charge or the ceiling (D-096).
 - mandatory jumps fit base capability envelope (delivered D-097: every mandatory gap is crossable half-charged at the model's arrival speed, with the far rim's real height, plus the ball's diameter and 10 m),
 - spawn/exit/checkpoints have clearance,
 - no required route crosses unrecoverable invalid terrain,
-- vertical grammar (D-096): headroom, wall clearance, drains and tube clearance hold; every tube mouth is reachable per §5I and every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches an exit,
+- vertical grammar (D-096): headroom, wall clearance and drains hold; every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches an exit,
 - exits (D-105): at least the primary's; every pad inside the footprint, level, and any two 250 m apart; a terminal line's pad is level over the pad radius and its profile never stalls.
 
 ### Secondary
@@ -806,20 +767,20 @@ Expose:
 - checkpoints,
 - spawn anchors,
 - slope/invalid-region visualization,
-- structure bounds (lids, tubes, tube paths and mouths),
+- structure bounds (lids, wall shells, tunnels),
 - floor ids and drains,
 - validation report,
 - generation phase timing.
 
 Delivered (D-104): `World › Route Debug Lines` draws the primary (cyan straights, orange bends, magenta feature
-zones), optional lines by floor (green ridges and floor 2, gold floor 3), checkpoint posts and tube axes;
+zones), optional lines by floor (green ridges and floor 2, gold floor 3) and checkpoint posts;
 `World › Stage Debug Views` (off by default, 07 §11) adds corridor bounds on every line, challenge zones (a yellow
 line from a module's entrance to the end of its landing zone with posts at both ends, and over every committed
-bend), structure bounds (lid box outlines, tube mouth rings, the spiral pit's rim), floor bounds in the floor's
+bend), structure bounds (lid box outlines, the spiral pit's rim), floor bounds in the floor's
 colour and each terrace's drain (a red line along its cliff foot), and a ring at the pad radius around every exit
 (D-105). Terminal lines draw in their own colour. The telemetry `seed` row carries the counts (lines, terraces,
-tubes, lids, the pit, exits) and the validation status; the `stage` row names the exit reached; the log prints
-every check and the phase timings; signs mark gaps, ramps, crests, tubes, tunnels, floors, the pit, every exit pad
+lids, the pit, exits) and the validation status; the `stage` row names the exit reached; the log prints
+every check and the phase timings; signs mark gaps, ramps, crests, tunnels, floors, the pit, every exit pad
 (`EXIT A`, `EXIT B`, ...) and every fork (`EXIT B ↑` at the top of its S). `RUSHCORE_EXIT_TRACE=1` tallies why
 terminal candidates were rejected across a batch.
 
@@ -839,9 +800,7 @@ Measured (T5, 2026-09-08, `RUSHCORE_MEASURE=1`; instruments only, no rule, toler
    Reading the terrain across the probe window separates them: Canyon's four stand in front of a real wall face
    (the ground rises 83 m on average, 93 m at the worst), Sky's two stand on ground that rises 1 m with no optional
    line within 337 m. The probe is sound on Canyon and is measuring something other than a wall on Sky.
-8. **where a tube's wall ride comes from.** Over 74 tubes in the four batches the maximum sits on the builder's own
-   lateral **swing**, not on the primary's bend: swing out on 45 of them, swing back on 10, the climb on 15, the
-   descent on 4. Every maximum is taken at the cap (149 m/s), and rides reach 88°.
+8. *(the tube ride table; removed with the tubes, D-112.)*
 9. **floor-3 room on Sky Terraces.** Of 95 floor-2 sections on 100 seeds, 4 could carry a floor 3 branching off them
    under the shipped `Floor3` numbers — the same 4 seeds that carry one today. Room is not the constraint (4248 m
    mean against a 2000 m need); the floor-3 shape's own transitions are, blocked by a bend on 39 sections and by the

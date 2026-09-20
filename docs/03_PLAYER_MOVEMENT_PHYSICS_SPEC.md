@@ -82,23 +82,13 @@ than the ground-normal limit, never on a ball arriving faster than one snap dist
 a landing, resolved by the solver), and never writes a transform. `Ground Follow` off reproduces the
 contact-only controller exactly, so the frozen baseline is unchanged by it.
 
-**Structures (D-096).** Lids, bridges and tubes (04 §5I) are separate colliders, not part of the height
-source, so on or under them the follow finds no carrying surface within the snap distance and returns
-false: the contact-only baseline runs there, on flat or cylindrical geometry that needs no follow. Inside a
-tube the ball rides the wall up to the angle where tan φ = v²/(g·R); above the ground-normal limit (about
-60°, bends under about 320 m at the base cap) that ride reads as airborne to the controller: no charge, air
-control instead of drive. Whether that is acceptable or a tube-contact rule is needed is V-015; any such
-rule is an addition scoped to tubes, never a change to the baseline.
-
-*Resolved (D-101):* inside a tube the contact-only reading left the ball airborne 15% of the ride (the shell's
-facets hop it, as terrain facets did before D-092) and it exited 11% slower than the carried model. The **tube
-follow** is the scoped rule: while the ball is inside a tube's shell every contact counts as ground whatever its
-normal, and within the snap distance of the analytic shell the component moving away from the wall is removed,
-the gap closes as a bounded velocity, and the ball is grounded with the wall's normal (drive and charge on the
-wall; a concave wall always carries, so no curvature test). Never during jump lockout or a slam, never against a
-ball flying into the wall faster than one snap per tick. `Movement › Tube Contact` off restores the contact-only
-reading; outside tubes nothing changes. Measured: 100% grounded through a 2 km tube, exit speed equal to the
-model's.
+**Structures (D-096, D-111, D-112).** Lids, bridges and shells (04 §5I) are separate colliders, not part of the
+height source. On a lid the follow finds no carrying surface within the snap distance and returns false: the
+contact-only baseline runs there, on flat geometry that needs no follow. A wall shell is the stamp's own surface,
+so the follow reads the analytic wall (D-109) and holds the ball a hair off the shell. The tunnel shell (`docs/13`)
+is a slot with a roof: floor and walls are ground under the wall-ride rule below, the roof is a ceiling. The
+see-through tube and its tube follow (D-101, V-015) were removed on 2026-09-19; the wall ride carries what was
+learnt there (contacts in the band count as ground; the carry conserves speed and cancels the coming dip).
 
 ### Wall ride (D-108)
 
@@ -107,10 +97,10 @@ into the air. It is the ground rule extended, not a verb: no input starts or end
 
 ```text
 wall band  = WallRideMinNormalDot (−0.2) ≤ n·up < MinGroundNormalDot, with |v| ≥ WallRideMinSpeed (30 m/s)
-contacts   in the band count as ground (the tube rule, D-101, applied everywhere)
+contacts   in the band count as ground
 follow     runs in the band too; on a concave stretch (κ ≥ 0) a ball that was grounded last tick is carried
            round it however fast it arrives, its speed conserved (the fillet does no work) and the coming
-           step's dip into the curve cancelled in advance (½·v²·κ·dt, the tube follow's term); the rest height
+           step's dip into the curve cancelled in advance (½·v²·κ·dt); the rest height
            on a concave stretch sits the facets' chord sagitta (κ·cell²/8) off the smooth surface
 steering   on a wall the stick is read in the wall's frame: forward along travel, lateral turns the travel
            direction about the wall's normal (clockwise for right, the ground rule's own convention), so

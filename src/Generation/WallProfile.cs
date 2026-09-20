@@ -86,7 +86,7 @@ public static class WallProfile
     /// the 30 m arc puts each flat facet's middle this far inside the true surface.</summary>
     public static readonly float ShellSagitta = FootRadius * (1f - Mathf.Cos(Mathf.DegToRad(WorldScale.WallShellStepDegrees) * 0.5f));
     /// <summary>Where the analytic wall follow holds the ball above the true surface: twice the shell's sagitta, so the
-    /// facets never touch it (the tube follow's margin, T7).</summary>
+    /// facets never touch it.</summary>
     public static readonly float ShellRest = ShellSagitta * 2f;
 
     /// <summary>The shell's canonical lateral stations (D-111): the level foot inside the edge, the fillet by angle, then

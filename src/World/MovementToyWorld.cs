@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Rushcore.Generation;
 using Rushcore.Player;
@@ -164,8 +166,9 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public IReadOnlyList<Vector3> MarkerPositions => _dressing.MarkerPositions;
     public IReadOnlyList<Vector3> ScatterColliderPositions => _dressing.ScatterColliderPositions;
 
-    /// <summary>Budget readouts for the last build (Gate M1).</summary>
-    public int Triangles { get; private set; }
+    /// <summary>Budget readouts (Gate M1): triangles resident in the terrain mesh right now (the coarse mesh plus the fine
+    /// window, docs/13 §3.3), and the tile count.</summary>
+    public int Triangles => CoarseTriangles + FineTriangles;
     public int Tiles { get; private set; }
     public int SampleCount => _heights.Length;
     public ulong BuildMillis { get; private set; }
@@ -255,36 +258,46 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         {
             _field = IsStrip ? new ScaleStripHeightField(_t.World) : new TerrainHeightField(Seed, _t.World);
         }
+        ulong tGenerate = Time.GetTicksMsec() - start;
         HalfX = _field.SizeX * 0.5f;
         HalfZ = _field.SizeZ * 0.5f;
         _nx = Mathf.RoundToInt(_field.SizeX / CellSize) + 1;
         _nz = Mathf.RoundToInt(_field.SizeZ / CellSize) + 1;
 
         int nx = _nx, nz = _nz;
-        if (_heights.Length != nx * nz) _heights = new float[nx * nz];
-        _minHeight = float.MaxValue;
-        _maxHeight = float.MinValue;
-
-        for (int z = 0; z < nz; z++)
+        // Always a fresh array: a tile worker still reading the previous build's heights (docs/13 §3.3) keeps its own.
+        _heights = new float[nx * nz];
+        // Sampled a row per task (docs/13 §3.3: the height source is pure once generated, and the 752 k samples of a stage
+        // took 2.3 s on one core, 0.2 s here); each row keeps its own extremes, reduced afterwards.
+        var heights = _heights; var field = _field; float cell = CellSize, halfX = HalfX, halfZ = HalfZ;
+        var rowMin = new float[nz]; var rowMax = new float[nz];
+        System.Threading.Tasks.Parallel.For(0, nz, z =>
         {
-            float wz = z * CellSize - HalfZ;
+            float lo = float.MaxValue, hi = float.MinValue;
+            float wz = z * cell - halfZ;
             for (int x = 0; x < nx; x++)
             {
-                float wx = x * CellSize - HalfX;
-                float h = _field.Sample(wx, wz) - _field.Sink(wx, wz);   // under a wall shell the grid is sunk (D-111)
-                _heights[z * nx + x] = h / CellSize;   // shape space
-                if (h < _minHeight) _minHeight = h;
-                if (h > _maxHeight) _maxHeight = h;
+                float wx = x * cell - halfX;
+                float h = field.Sample(wx, wz) - field.Sink(wx, wz);   // under a wall shell the grid is sunk (D-111)
+                heights[z * nx + x] = h / cell;   // shape space
+                if (h < lo) lo = h;
+                if (h > hi) hi = h;
             }
-        }
+            rowMin[z] = lo; rowMax[z] = hi;
+        });
+        _minHeight = rowMin.Min();
+        _maxHeight = rowMax.Max();
 
         _terrainShape.MapWidth = nx;
         _terrainShape.MapDepth = nz;
         _terrainShape.MapData = _heights;
+        ulong tHeights = Time.GetTicksMsec() - start;
 
         BuildTerrainTiles(_dressing.CreateTerrainMaterial());
+        ulong tTiles = Time.GetTicksMsec() - start - tHeights;
         BuildStructures();
         BuildHorizon();
+        ulong tStructures = Time.GetTicksMsec() - start - tHeights - tTiles;
 
         Bounds = new Aabb(new Vector3(-HalfX, _minHeight, -HalfZ), new Vector3(_field.SizeX, _maxHeight - _minHeight, _field.SizeZ));
         KillPlaneY = _minHeight - 120f;
@@ -302,9 +315,11 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         BuiltDebugViews = _t.World.StageDebugViews;
         BuiltShowcase = _dressing.Showcase is not null;
         BuildMillis = Time.GetTicksMsec() - start;
-        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms: " +
+        GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms " +
+                 $"(generate {tGenerate}, heights {tHeights - tGenerate}, mesh {tTiles}, structures {tStructures}, dressing {BuildMillis - tHeights - tTiles - tStructures}): " +
                  $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +
-                 $"{Triangles / 1000f:0} k tris in {Tiles} tiles, heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");
+                 $"coarse {CoarseTriangles / 1000f:0} k tris at {CellSize * _stride:0} m, fine window {FineTiles} of {Tiles} tiles = {FineTriangles / 1000f:0} k tris, " +
+                 $"heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");
     }
 
     /// <summary>Rebuilds on a new seed, keeping the stage index (the lab, the strip and "restart same seed").</summary>
@@ -401,8 +416,9 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         WallShellData.Clear();
         if (Stage.HeightField is { } hf)
         {
+            var shells = hf.ShellStrips();
             int w = 0;
-            foreach (var strip in hf.ShellStrips()) WallShellTriangles += AddShell(strip, $"Wall{w++}");
+            foreach (var strip in shells) WallShellTriangles += AddShell(strip, $"Wall{w++}");
             // Tunnel roofs (docs/13 §2.1, D-113): the arch, the cap, the portal faces and rims, built and collided as the shells are.
             int r = 0;
             foreach (var strip in hf.RoofStrips()) TunnelRoofTriangles += AddShell(strip, $"Roof{r++}");
@@ -488,8 +504,59 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         return null;
     }
 
-    /// <summary>One ArrayMesh per tile: each allocation is bounded (~4 MB at 128 cells) and the
-    /// renderer culls tiles the camera cannot see. Collision stays a single heightfield.</summary>
+    // ---------------------------------------------------------------- the resident mesh (docs/13 §3.3, D-115)
+    // The whole stage is drawn once, coarsely, and finely only around the ball: every tile (128 fine cells square,
+    // 512 m at 4 m) has two mesh instances, a coarse one at CoarseCellSize built with the stage from every stride-th
+    // height, and a fine one at CellSize that holds a mesh only while the tile's centre lies inside the window round
+    // the ball. Both are the same flat-shaded builder over the same heights; the collider is never windowed. The
+    // window is re-evaluated after FineWindowStep of travel: tiles within FineWindowRadius are built on the thread
+    // pool (plain arrays over the heights and the field's colours) nearest first and committed here, one
+    // AddSurfaceFromArrays each; tiles beyond FineWindowKeep drop their mesh. A coarse tile is hidden while the fine
+    // tile over it is resident, and that is the whole level of detail. Every tile hangs a skirt along its edges so
+    // a fine/coarse seam never shows a crack. Nodes are never added or removed by the window, so the tree stays flat.
+    /// <summary>Cell size of the coarse mesh, resident over the whole stage.</summary>
+    public const float CoarseCellSize = 16f;
+    /// <summary>A tile whose centre lies within this plan distance of the ball gets its fine mesh...</summary>
+    public const float FineWindowRadius = 1200f;
+    /// <summary>...and keeps it until the centre lies beyond this (300 m of hysteresis).</summary>
+    public const float FineWindowKeep = 1500f;
+    /// <summary>Travel between two evaluations of the window.</summary>
+    public const float FineWindowStep = 100f;
+    /// <summary>Depth of the skirt every tile hangs along its edges.</summary>
+    public const float SkirtDepth = 6f;
+
+    private sealed class TerrainTile
+    {
+        public int Tx, Tz, Cx, Cz;               // fine-sample origin and size in fine cells
+        public Vector2 Centre;
+        public MeshInstance3D Coarse = null!, Fine = null!;
+        public int CoarseTriangles, FineTriangles;
+        public bool Pending;                     // a worker is building its fine mesh
+        public bool Resident => Fine.Mesh is not null;
+    }
+    private readonly List<TerrainTile> _tiles = new();
+    /// <summary>Fine cells per coarse cell; 1 means the coarse mesh is the fine mesh and there is no window.</summary>
+    private int _stride = 1;
+    /// <summary>Bumped by every build; a worker's result from an older build is dropped.</summary>
+    private int _generation;
+    private Vector2 _windowAt = new(float.NaN, float.NaN);
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(int Generation, int Tile, TileArrays Arrays)> _finished = new();
+    private readonly record struct TileJob(float[] Heights, int Nx, float Cell, float HalfX, float HalfZ, IHeightSource Field, int Tx, int Tz, int Cx, int Cz, int Stride);
+    private readonly record struct TileArrays(Vector3[] Verts, Vector3[] Norms, Color[] Cols, int Triangles);
+
+    /// <summary>Triangles of the coarse mesh (all of it, hidden tiles included) and of the fine tiles resident now.</summary>
+    public int CoarseTriangles { get; private set; }
+    public int FineTriangles { get; private set; }
+    /// <summary>Fine tiles resident, and fine tiles a worker is still building.</summary>
+    public int FineTiles => _tiles.Count(t => t.Resident);
+    public int PendingTiles => _tiles.Count(t => t.Pending);
+    /// <summary>Cell size of the coarse mesh as built (the stage's cell size times the stride).</summary>
+    public float CoarseCell => CellSize * _stride;
+    /// <summary>Every tile's plan centre and whether its fine mesh is resident or being built (the harness's window checks).</summary>
+    public IEnumerable<(Vector2 Centre, bool Fine, bool Pending)> TerrainTileStates => _tiles.Select(t => (t.Centre, t.Resident, t.Pending));
+
+    /// <summary>Builds the coarse mesh over the whole terrain and the fine window round the spawn point, complete before the
+    /// run starts (docs/13 §3.3). Both in parallel over the heights; the nodes and meshes are made here.</summary>
     private void BuildTerrainTiles(Material material)
     {
         foreach (Node child in _terrainRoot.GetChildren())
@@ -497,77 +564,210 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
             _terrainRoot.RemoveChild(child);
             child.QueueFree();
         }
-        Triangles = 0;
+        _tiles.Clear();
+        _generation++;
+        while (_finished.TryDequeue(out _)) { }
+        CoarseTriangles = 0;
+        FineTriangles = 0;
         Tiles = 0;
+        _stride = Mathf.Max(1, Mathf.RoundToInt(CoarseCellSize / CellSize));
         for (int tz = 0; tz < _nz - 1; tz += TileCells)
-        {
             for (int tx = 0; tx < _nx - 1; tx += TileCells)
             {
-                int cx = Mathf.Min(TileCells, _nx - 1 - tx);
-                int cz = Mathf.Min(TileCells, _nz - 1 - tz);
-                _terrainRoot.AddChild(new MeshInstance3D
+                int cx = Mathf.Min(TileCells, _nx - 1 - tx), cz = Mathf.Min(TileCells, _nz - 1 - tz);
+                _tiles.Add(new TerrainTile
                 {
-                    Name = $"Tile_{tx}_{tz}",
-                    Mesh = BuildTile(tx, tz, cx, cz),
-                    MaterialOverride = material,
-                    CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+                    Tx = tx, Tz = tz, Cx = cx, Cz = cz,
+                    Centre = new Vector2((tx + cx * 0.5f) * CellSize - HalfX, (tz + cz * 0.5f) * CellSize - HalfZ),
+                    Coarse = new MeshInstance3D { Name = $"Coarse_{tx}_{tz}", MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.On },
+                    Fine = new MeshInstance3D { Name = $"Fine_{tx}_{tz}", MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.On },
                 });
-                Triangles += cx * cz * 2;
-                Tiles++;
             }
+        Tiles = _tiles.Count;
+        var coarse = new TileArrays[_tiles.Count];
+        System.Threading.Tasks.Parallel.For(0, _tiles.Count, i => coarse[i] = BuildTileArrays(Job(_tiles[i], _stride)));
+        for (int i = 0; i < _tiles.Count; i++)
+        {
+            var tile = _tiles[i];
+            tile.Coarse.Mesh = ToMesh(coarse[i]);
+            tile.CoarseTriangles = coarse[i].Triangles;
+            CoarseTriangles += tile.CoarseTriangles;
+            _terrainRoot.AddChild(tile.Coarse);
+            _terrainRoot.AddChild(tile.Fine);
+        }
+        // The window round the start pad, complete before the run starts.
+        _windowAt = new Vector2(_field.SpawnXZ.X, _field.SpawnXZ.Z);
+        if (_stride <= 1) return;
+        var wanted = _tiles.Where(t => t.Centre.DistanceTo(_windowAt) <= FineWindowRadius).ToList();
+        var fine = new TileArrays[wanted.Count];
+        System.Threading.Tasks.Parallel.For(0, wanted.Count, i => fine[i] = BuildTileArrays(Job(wanted[i], 1)));
+        for (int i = 0; i < wanted.Count; i++) CommitFine(wanted[i], fine[i]);
+    }
+
+    private TileJob Job(TerrainTile t, int stride) => new(_heights, _nx, CellSize, HalfX, HalfZ, _field, t.Tx, t.Tz, t.Cx, t.Cz, stride);
+
+    /// <summary>Slides the fine window after the ball (docs/13 §3.3): commits the tiles the workers have finished, and after
+    /// <see cref="FineWindowStep"/> of travel frees the tiles that fell beyond the keep radius and sends the tiles that came
+    /// inside the window to the thread pool, nearest first. Called every frame by the composition root.</summary>
+    public void UpdateTerrainWindow(Vector3 focus)
+    {
+        CommitFinishedTiles();
+        if (_stride <= 1) return;
+        var f = new Vector2(focus.X, focus.Z);
+        if (f.DistanceTo(_windowAt) < FineWindowStep) return;
+        _windowAt = f;
+        var requests = new List<TerrainTile>();
+        foreach (var tile in _tiles)
+        {
+            float d = tile.Centre.DistanceTo(f);
+            if (d > FineWindowKeep) { if (tile.Resident) FreeFine(tile); }
+            else if (d <= FineWindowRadius && !tile.Resident && !tile.Pending) requests.Add(tile);
+        }
+        requests.Sort((a, b) => a.Centre.DistanceSquaredTo(f).CompareTo(b.Centre.DistanceSquaredTo(f)));
+        foreach (var tile in requests)
+        {
+            tile.Pending = true;
+            var job = Job(tile, 1);
+            int generation = _generation, index = _tiles.IndexOf(tile);
+            System.Threading.Tasks.Task.Run(() => _finished.Enqueue((generation, index, BuildTileArrays(job))));
         }
     }
 
-    private ArrayMesh BuildTile(int tx, int tz, int cx, int cz)
+    private void CommitFinishedTiles()
     {
-        int nx = _nx;
-        int vertCount = cx * cz * 6;                  // non-indexed: flat/faceted normals (06 §4)
-        var verts = new Vector3[vertCount];
-        var norms = new Vector3[vertCount];
-        var colors = new Color[vertCount];
-        int w = 0;
-
-        for (int z = tz; z < tz + cz; z++)
+        while (_finished.TryDequeue(out var r))
         {
-            for (int x = tx; x < tx + cx; x++)
-            {
-                float x0 = x * CellSize - HalfX, x1 = x0 + CellSize;
-                float z0 = z * CellSize - HalfZ, z1 = z0 + CellSize;
-                Vector3 a = new(x0, _heights[z * nx + x] * CellSize, z0);
-                Vector3 b = new(x1, _heights[z * nx + x + 1] * CellSize, z0);
-                Vector3 c = new(x0, _heights[(z + 1) * nx + x] * CellSize, z1);
-                Vector3 d = new(x1, _heights[(z + 1) * nx + x + 1] * CellSize, z1);
-
-                // Godot front faces are CLOCKWISE (unlike OpenGL). Seen from above,
-                // a->b->c and b->d->c are clockwise, so the surface faces the sky
-                // and survives back-face culling.
-                w = EmitTriangle(verts, norms, colors, w, a, b, c);
-                w = EmitTriangle(verts, norms, colors, w, b, d, c);
-            }
+            if (r.Generation != _generation) continue;
+            var tile = _tiles[r.Tile];
+            tile.Pending = false;
+            if (tile.Resident || tile.Centre.DistanceTo(_windowAt) > FineWindowKeep) continue;   // fell out of the window while building
+            CommitFine(tile, r.Arrays);
         }
+    }
 
+    private void CommitFine(TerrainTile tile, TileArrays arrays)
+    {
+        tile.Fine.Mesh = ToMesh(arrays);
+        tile.FineTriangles = arrays.Triangles;
+        FineTriangles += tile.FineTriangles;
+        tile.Coarse.Visible = false;
+    }
+
+    private void FreeFine(TerrainTile tile)
+    {
+        FineTriangles -= tile.FineTriangles;
+        tile.FineTriangles = 0;
+        tile.Fine.Mesh = null;
+        tile.Coarse.Visible = true;
+    }
+
+    private static ArrayMesh ToMesh(TileArrays a)
+    {
         var arrays = new Godot.Collections.Array();
         arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = verts;
-        arrays[(int)Mesh.ArrayType.Normal] = norms;
-        arrays[(int)Mesh.ArrayType.Color] = colors;
-
+        arrays[(int)Mesh.ArrayType.Vertex] = a.Verts;
+        arrays[(int)Mesh.ArrayType.Normal] = a.Norms;
+        arrays[(int)Mesh.ArrayType.Color] = a.Cols;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
         return mesh;
     }
 
-    private int EmitTriangle(Vector3[] verts, Vector3[] norms, Color[] colors, int w, Vector3 a, Vector3 b, Vector3 c)
+    /// <summary>The coarse mesh's own height at a plan point (bilinear over the coarse grid) and the height span of the coarse
+    /// cell's four corners, for the harness's chord check against the collider (docs/13 §3.4).</summary>
+    public float CoarseHeight(float x, float z, out float span)
+    {
+        float cell = CoarseCell;
+        int cx = (_nx - 1) / _stride, cz = (_nz - 1) / _stride;   // whole coarse cells
+        float fx = Mathf.Clamp((x + HalfX) / cell, 0f, cx - 0.001f), fz = Mathf.Clamp((z + HalfZ) / cell, 0f, cz - 0.001f);
+        int x0 = (int)fx * _stride, z0 = (int)fz * _stride;
+        int x1 = Mathf.Min(x0 + _stride, _nx - 1), z1 = Mathf.Min(z0 + _stride, _nz - 1);
+        float tx = fx - (int)fx, tz = fz - (int)fz;
+        float h00 = _heights[z0 * _nx + x0] * CellSize, h10 = _heights[z0 * _nx + x1] * CellSize;
+        float h01 = _heights[z1 * _nx + x0] * CellSize, h11 = _heights[z1 * _nx + x1] * CellSize;
+        span = Mathf.Max(Mathf.Max(h00, h10), Mathf.Max(h01, h11)) - Mathf.Min(Mathf.Min(h00, h10), Mathf.Min(h01, h11));
+        return Mathf.Lerp(Mathf.Lerp(h00, h10, tx), Mathf.Lerp(h01, h11, tx), tz);
+    }
+
+    /// <summary>One tile's arrays at a stride (1 = fine, the coarse stride otherwise): non-indexed, flat/faceted normals
+    /// (06 §4), the field's colour per facet, and the skirt along its four edges. Pure arrays over the job's own
+    /// references, so it runs on any thread.</summary>
+    private static TileArrays BuildTileArrays(TileJob j)
+    {
+        int cellsX = (j.Cx + j.Stride - 1) / j.Stride, cellsZ = (j.Cz + j.Stride - 1) / j.Stride;   // the last cell may be narrower
+        int ground = cellsX * cellsZ * 2, skirt = (cellsX + cellsZ) * 4;
+        int vertCount = (ground + skirt) * 3;
+        var verts = new Vector3[vertCount];
+        var norms = new Vector3[vertCount];
+        var cols = new Color[vertCount];
+        float H(int x, int z) => j.Heights[z * j.Nx + x] * j.Cell;
+        Vector3 P(int x, int z) => new(x * j.Cell - j.HalfX, H(x, z), z * j.Cell - j.HalfZ);
+        int xEnd = j.Tx + j.Cx, zEnd = j.Tz + j.Cz;
+
+        // A row of cells per task, each cell's six vertices at a fixed offset (a fine tile is ready in tens of milliseconds
+        // rather than 150, which is what keeps the window ahead of a ball at the cap).
+        System.Threading.Tasks.Parallel.For(0, cellsZ, row =>
+        {
+            int z = j.Tz + row * j.Stride, z1 = Mathf.Min(z + j.Stride, zEnd);
+            int w = row * cellsX * 6;
+            for (int x = j.Tx; x < xEnd; x += j.Stride)
+            {
+                int x1 = Mathf.Min(x + j.Stride, xEnd);
+                Vector3 a = P(x, z), b = P(x1, z), c = P(x, z1), d = P(x1, z1);
+                // Godot front faces are CLOCKWISE (unlike OpenGL). Seen from above, a->b->c and b->d->c are
+                // clockwise, so the surface faces the sky and survives back-face culling.
+                w = EmitTriangle(j.Field, verts, norms, cols, w, a, b, c);
+                w = EmitTriangle(j.Field, verts, norms, cols, w, b, d, c);
+            }
+        });
+        int w = ground * 3;
+        // Skirts (docs/13 §3.3): a band SkirtDepth deep hanging from each edge, facing outward, coloured and lit like the
+        // ground beside it, so where a fine tile's edge and its coarse neighbour's disagree the gap shows ground, not sky.
+        for (int x = j.Tx; x < xEnd; x += j.Stride)
+        {
+            int x1 = Mathf.Min(x + j.Stride, xEnd);
+            w = EmitSkirt(j.Field, verts, norms, cols, w, P(x, j.Tz), P(x1, j.Tz), new Vector3(0f, 0f, -1f));
+            w = EmitSkirt(j.Field, verts, norms, cols, w, P(x, zEnd), P(x1, zEnd), new Vector3(0f, 0f, 1f));
+        }
+        for (int z = j.Tz; z < zEnd; z += j.Stride)
+        {
+            int z1 = Mathf.Min(z + j.Stride, zEnd);
+            w = EmitSkirt(j.Field, verts, norms, cols, w, P(j.Tx, z), P(j.Tx, z1), new Vector3(-1f, 0f, 0f));
+            w = EmitSkirt(j.Field, verts, norms, cols, w, P(xEnd, z), P(xEnd, z1), new Vector3(1f, 0f, 0f));
+        }
+        return new TileArrays(verts, norms, cols, w / 3);
+    }
+
+    private static int EmitTriangle(IHeightSource field, Vector3[] verts, Vector3[] norms, Color[] colors, int w, Vector3 a, Vector3 b, Vector3 c)
     {
         Vector3 n = (b - a).Cross(c - a);
         n = n.LengthSquared() > 1e-12f ? n.Normalized() : Vector3.Up;
         if (n.Y < 0f) n = -n;
         Vector3 centroid = (a + b + c) / 3f;
-        Color col = _field.SampleColor(centroid, n);
+        Color col = field.SampleColor(centroid, n);
 
         verts[w] = a; norms[w] = n; colors[w] = col; w++;
         verts[w] = b; norms[w] = n; colors[w] = col; w++;
         verts[w] = c; norms[w] = n; colors[w] = col; w++;
         return w;
+    }
+
+    /// <summary>Two triangles from an edge segment down <see cref="SkirtDepth"/>, wound to face <paramref name="outward"/>.</summary>
+    private static int EmitSkirt(IHeightSource field, Vector3[] verts, Vector3[] norms, Color[] cols, int w, Vector3 p0, Vector3 p1, Vector3 outward)
+    {
+        Vector3 q0 = p0 - Vector3.Up * SkirtDepth, q1 = p1 - Vector3.Up * SkirtDepth;
+        Color col = field.SampleColor((p0 + p1) * 0.5f, Vector3.Up);
+        w = Facing(verts, norms, cols, w, p0, p1, q0, outward, col);
+        w = Facing(verts, norms, cols, w, p1, q1, q0, outward, col);
+        return w;
+
+        static int Facing(Vector3[] verts, Vector3[] norms, Color[] cols, int w, Vector3 a, Vector3 b, Vector3 c, Vector3 outward, Color col)
+        {
+            if ((b - a).Cross(c - a).Dot(outward) < 0f) (b, c) = (c, b);
+            verts[w] = a; norms[w] = Vector3.Up; cols[w] = col; w++;
+            verts[w] = b; norms[w] = Vector3.Up; cols[w] = col; w++;
+            verts[w] = c; norms[w] = Vector3.Up; cols[w] = col; w++;
+            return w;
+        }
     }
 }

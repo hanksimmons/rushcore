@@ -201,6 +201,10 @@ public partial class GameBootstrap : Node3D, IDebugActions
             if (_cellSizeDwell > 0.5f) RestartSameSeed();
         }
 
+        // The fine terrain window follows the ball (docs/13 §3.3): finished tiles are committed, and after 100 m of travel
+        // the window is re-evaluated. Physics never waits on it: the collider covers the whole stage.
+        _world.UpdateTerrainWindow(_player.FocusPosition);
+
         // Generated stage: progression anchors replace the toy's rolling auto-checkpoint (04 §13).
         _player.AutoCheckpoint = !_world.IsStage;
         if (_world.IsStage && !GetTree().Paused && _world.UpdateStageProgress(_player.GlobalPosition, (float)delta) is { } anchor)

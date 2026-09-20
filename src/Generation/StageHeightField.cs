@@ -820,7 +820,8 @@ public sealed class StageHeightField : IHeightSource
                 int k = stations.Length;
                 var pts = new Vector3[n * k];
                 var valid = new bool[n * k];
-                for (int i = 0; i < n; i++)
+                // A vertex per task (docs/13 §3.3: the field is pure once generated; the four canyon strips took 0.3 s on one core).
+                System.Threading.Tasks.Parallel.For(0, n, i =>
                 {
                     float lx = -Mathf.Sin(line.Heading[i]) * sideSign, lz = Mathf.Cos(line.Heading[i]) * sideSign;
                     for (int j = 0; j < k; j++)
@@ -839,10 +840,10 @@ public sealed class StageHeightField : IHeightSource
                         bool tunnelOk = line.Tunnel ? TunnelGuard(px, pz) > 0f : !InTunnelCut(px, pz);
                         valid[i * k + j] = owned && tunnelOk && uEnd[i] > 0f && Mathf.Abs(px) <= SizeX * 0.5f && Mathf.Abs(pz) <= SizeZ * 0.5f && float.IsNaN(PitSurface(px, pz));
                     }
-                }
+                });
                 var norms = new Vector3[n * k];
                 var cols = new Color[n * k];
-                for (int i = 0; i < n; i++)
+                System.Threading.Tasks.Parallel.For(0, n, i =>
                 {
                     for (int j = 0; j < k; j++)
                     {
@@ -858,7 +859,7 @@ public sealed class StageHeightField : IHeightSource
                         if (line.Tunnel && line.Route.Covered(i)) col = col.Darkened(1f - TunnelProfile.Shade(PortalDistance(line.Route, i)));
                         cols[i * k + j] = col;
                     }
-                }
+                });
                 strips.Add(new WallShellStrip(n, k, pts, norms, cols, valid));
             }
         }

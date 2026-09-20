@@ -622,6 +622,15 @@ Delivered forms (D-096, D-111, D-113): the lid is a `BoxShape3D` and a box mesh;
 with; the camera's occlusion probe reads the terrain (the trench's own walls are in the heightfield) and the roof
 confinement handles the arch. The see-through tube's swept ring (D-101) was removed 2026-09-19 (D-112).
 
+The rendered ground is the **resident mesh** (`docs/13 §3.3`, D-115): the same flat-shaded tile builder over the same
+heights at two cell sizes, a coarse 16 m mesh resident over the whole stage and a fine window of 4 m tiles whose centres
+lie within 1.2 km of the ball (re-evaluated every 100 m of travel, 300 m of hysteresis, built on worker threads and
+committed on the main thread), coarse tiles hidden under fine ones, a 6 m skirt on every tile's edges. The collider is
+never windowed: one `HeightMapShape3D` at 4 m over the whole stage, so physics, the follow and the validators see one
+surface at all times. Known (D-115): Godot's Jolt module builds a non-square heightmap as a mesh shape (exact, 1.15 s at
+752 k samples); a square one as a true heightfield (0.1 s, samples quantised per block). The map stays non-square until
+the user decides.
+
 Do not default the entire terrain to one giant concave triangle collider.
 
 ## 10. Route constraints

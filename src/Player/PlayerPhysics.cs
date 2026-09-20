@@ -271,6 +271,10 @@ public partial class PlayerPhysics : RigidBody3D
         _keepChain = keepChain;
     }
 
+    /// <summary>Where the ball is, or is about to be: a teleport applies in the next physics step, and the terrain window
+    /// (docs/13 §3.3) follows this so a rebuild's start pad or a debug teleport is fine ground the moment the ball arrives.</summary>
+    public Vector3 FocusPosition => _pendingTeleport ? _teleportPos : GlobalPosition;
+
     // ---------------- physics ----------------
     public override void _IntegrateForces(PhysicsDirectBodyState3D state)
     {

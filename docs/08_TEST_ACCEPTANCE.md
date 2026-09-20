@@ -22,7 +22,8 @@ is seen. Launched windowed with `RUSHCORE_SHOTS=1` (no `--headless`; `docs/10`),
 the moments worth seeing and short bursts of consecutive frames for motion, under `shots/selftest/<archetype>/` (numbered
 in run order, git-ignored): the horizon from the start pad, a mid-stage burst on the drive, the lens under a lid, the
 spiral's descent, a canyon wall ride entering (a burst), on the wall and back on the corridor, at both aims, the tunnel
-portal ahead, a burst through the portal, the middle of the bore, the exit ahead and after it, and the branch exit's pad.
+portal ahead, a burst through the portal, the middle of the bore, the exit ahead and after it, the branch exit's pad, the
+fine/coarse seam ahead at the 2 km mark and a burst of the window filling after the tunnel drive's teleport (D-115).
 Whoever runs a slice looks at them, still and frame to frame, before calling the behaviour correct; a headless run skips
 them and says so. Shots are queued and taken in the physics step before the script advances, so a case's numbers are the
 same with shots on or off (the tunnel drive reads identically both ways). New moments are added with `Shot(name)` and
@@ -180,6 +181,11 @@ Required:
 - the far horizon (D-114, `docs/13 §4.4`): the ring builds on every archetype's batch seed with no point inside the
   footprint, its inner ring meeting the stage's own ground within 5 m at 16 probes and at most 60 k triangles; the built
   stage draws it,
+- the resident mesh (D-115, `docs/13 §3.4`): the world builds to its first frame within 2.5 s (2 s once the collider is a
+  heightfield, the user's call) with the fine window round the start pad complete and nothing still building; on every
+  kilometre of the drive every tile within 1.0 km of the ball has its fine mesh, no fine tile beyond 1.6 km is resident,
+  the resident triangles stay under 1.2 M, and the coarse mesh's height under the ball agrees with the collider within
+  its cell's own chord (the span of the cell's corners plus half a metre),
 - Summit Descent (D-107, `docs/12 §8`), once delivered: across the batch every primary vertex's corner limit holds the base cap; the rails and headwalls are continuous (sampled every 10 m, both sides, chute gaps and exit forks excepted); the base-cap profile has no launch on the switchback section; the descent is 540–660 m with every tier 90–170 m; every hairpin passes the sightline rule; every chute's free path is grounded, its half-charge landing falls inside its landing zone and its full-charge flight lands drivable; the face outside the rails drains to the valley. The harness drives a base-cap ball into a rail at 25° and straight into a headwall and asserts it stays on the bench both times, drives the switchbacks to the valley fully grounded, and drives a chute free and half-charged with the slam landing inside the zone,
 - exits (02 §4, D-105): every stage's exits are distinct, inside the footprint and on level pads; most seeds of each archetype offer a second exit (floors: Highlands 75%, Canyon Run 85%, Sky Terraces 65%, Dune Sea 40%); the harness drives the ball from the primary up a terminal line's ramp to its pad and asserts the stage ends by that exit with the plateau holding the ball grounded.
 
@@ -255,6 +261,15 @@ on to the exit.
 exit 148.5 m/s against the model's 148.5, the lens under the arch on all 297 ticks and never in the rock, the cap holds the
 ball as a floor; the wall-ride and lid checks unchanged. Canyon hashes re-recorded ("tunnel" and "tunnels + pit"); no other
 archetype's moved.
+
+**Result (the resident mesh, W1, D-115, 2026-09-19):** the Highlands drive seed builds to its first frame in 1.86 s (the
+canyon sample 2.1 s; 4.6 s before W1), 1.15 s of it the collider (a Jolt mesh shape, because the map is not square; the
+user's call, `docs/13 §3.3`); the window round the start pad is 8 tiles, 264 k triangles, complete with nothing pending;
+on the six kilometre marks of the drive 16–20 fine tiles are resident, none uncovered within 1.0 km and none beyond
+1.6 km, peak 769 k resident triangles, the coarse mesh under the ball within 0.09 m of the collider (cell spans 0.5–1.6 m);
+the node count stays flat across regenerations (the window owns no nodes of its own). Default 393/393; canyon 419/419 (first frame 2.23 s on its drive seed, 15–20 fine tiles per kilometre, the same 769 k peak, coarse within 0.01 m of the collider).
+The M1 cell-size check now compares the fine window's triangles (106 k at 4 m, 26 k at 8 m), the coarse mesh being resident
+at 16 m whatever the cell size.
 
 **Result (Sky Terraces, first cut, D-103, 2026-09-07):** the sky batch places terraces on floor 2 and floor 3
 (100 seeds: 100 valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped by the drain or

@@ -255,7 +255,19 @@ rendering architecture this plan adds:
   the follow and the validators see one surface at all times.
 
 Budget: heights 9 MB, collider ~20 MB, coarse mesh 24 MB, fine window ≤ 60 MB, shells ≤ 40 MB. Draw: ~800 k
-triangles on screen at the worst view. The camera's far plane goes to 30 km for the horizon (`Camera › Far Plane`);
+triangles on screen at the worst view.
+
+**Delivered (W1, D-115, 2026-09-19)** as written, with these measurements on the 6 km canyon sample: the coarse mesh is
+106 k triangles (94 k ground, the rest skirts) in 48 tiles; the window round the start pad is 8 tiles, 264 k triangles;
+the whole window peaks at 20 tiles. Every tile keeps two mesh instances for its life (coarse and fine, the fine one empty
+while out of the window), so the window never adds or removes nodes. Fine tiles build on the thread pool nearest first
+and commit one per `AddSurfaceFromArrays`; the heights and the wall shells are sampled in parallel too (the field is pure
+once generated). Time to first frame: 2.1 s from 4.6 s, of which **1.15 s is the collider**: Godot's Jolt module builds a
+non-square `HeightMapShape3D` as a 1.5 M-triangle mesh shape (a square map of the same 752 k samples builds as a true
+heightfield in 0.1 s, but Jolt quantises a heightfield's samples per block, up to about 10 cm on a steep unshelled
+slope, where the mesh is exact). Reaching 2.0 s means padding the map to a square, a change to the collider under the
+frozen ball: the user's call, and W2's problem at 3× (the mesh build there would be about 3.5 s). The rest of the build:
+generation 0.13 s, heights 0.2 s, mesh 0.12 s, shells 0.2 s, dressing 0.27 s. The camera's far plane goes to 30 km for the horizon (`Camera › Far Plane`);
 depth fog begins at 800 m and ends at 6 km (§4.3).
 
 ### 3.4 Harness (08 §5 additions)
@@ -271,7 +283,7 @@ depth fog begins at 800 m and ends at 6 km (§4.3).
 ### 3.5 Slices
 
 - **W1 — the resident mesh on the 6 km stage.** Coarse mesh, fine window, worker-thread tile build, hide rule,
-  build-time and window checks. No generator change, no hash moves.
+  build-time and window checks. No generator change, no hash moves. **Delivered 2026-09-19 (D-115).**
 - **W2 — the length.** Footprint and route length ×3, acts, per-stage counts, the far plane and fog; every golden
   hash moves and is re-recorded; regression seeds re-picked; the harness drive policy above.
 
@@ -334,15 +346,17 @@ decision logged (D-113 onward) and its owning doc updated. The user plays after 
 
 ## 7. Post-compaction handoff
 
-T1 (D-113) and H1 (D-114) are delivered; the user plays them next (`-- --canyon --seed 1`). The next session starts at
-**W1, the resident mesh on the 6 km stage** (§3.3, §3.4): the coarse 16 m mesh resident, the 4 m fine window as a disc
-of 1.2 km around the ball (≤ 20 tiles, re-evaluated every 100 m with 300 m of hysteresis), tiles built on a worker
-thread over `_heights` and committed on the main thread, 6 m skirts on every tile, coarse tiles hidden under fine ones,
-the collider never windowed, the window complete before the run starts; harness: time to first frame ≤ 2 s, window
-bounds asserted every kilometre of the drive, resident triangles ≤ 1.2 M, the coarse mesh's height under the ball within
-a coarse cell's chord of the collider. No generator change, no hash moves. Read, in order: `README.md`, this document
-(§0, §3, §5), `DECISIONS` D-111–D-114, `08 §1` (screenshots) and `§5`, `04 §9`, then the code: `MovementToyWorld`
-(`Build`, `BuildTerrainTiles`, `BuildTile`, `SampleHeight`, `GridHeight`, `BuildStructures`, `BuildHorizon`),
-`HorizonRing`, `WorldDressing.CreateTerrainMaterial`, and in `tests/MovementToySelfTest.cs` `RunGeneratedStageCase` (the
-drive loop with its per-kilometre marks is where the window checks go) and the shot rig (`Shot`, `Motion`,
-`TakeDueShots`). After W1: T2 the dive, W2 the length, H2 the cloud dome, T3 pockets (§5).
+T1 (D-113), H1 (D-114) and W1 (D-115, the resident mesh) are delivered; the user plays T1 + H1 next (`-- --canyon --seed 1`)
+and owns two decisions from W1: the tunnel numbers (V-017) and whether the collider becomes a square heightfield (§3.3, the
+last second of the first frame; a physics change under the frozen ball). The next session starts at **T2, the dive** (§2.2,
+§2.3): a tunnel line on every archetype that drops beneath the landscape (a negative-height offset line), the ground
+continuing over it, with `ArchetypeRules.TunnelChance` lifted off zero on the Highlands, Dune Sea and Sky Terraces; the
+same `TunnelProfile`, roof strips, cap-aware height query and confined camera as T1; the T1 validators plus the dive's own
+(cover depth along the whole run, the descent and climb grades within the corridor's, no crossing of another line's
+corridor); the tunnel drive borrowing a seed per archetype; golden hashes move on every archetype that gains tunnels and
+are re-recorded in the same commit. Read, in order: `README.md`, this document (§0, §2, §5), `DECISIONS` D-113–D-115,
+`08 §1` (screenshots) and `§5`, `04 §5D` and `§12`, then the code: `OptionalLineBuilder` (the tunnel shape and site rule),
+`StageHeightField` (`AddLine`, `TunnelCut`, `TunnelGuard`, `Sample`, `RoofStrips`, `ArchOver`, `CapOver`),
+`StageGenerator.ValidateTunnels`, `TunnelProfile`, `MovementToyWorld` (`SampleHeight`, `BuildStructures`, the resident
+mesh section), and in `tests/MovementToySelfTest.cs` the canyon tunnel drive and the shot rig. After T2: W2 the length
+(with the collider decision), H2 the cloud dome, T3 pockets (§5).

@@ -276,8 +276,11 @@ Until the implementation plan advances:
 > camera inside), courses three times longer, and the far-horizon skybox. **D-113 (2026-09-19, `docs/13` slice T1):** the portal
 > tunnel on Canyon Run is delivered (a tunnel line cut into the wall and under the mesa, the horseshoe roof and cap, the confined
 > camera inside, the tunnel drive in the harness; sample stage 1 is canyon seed 1). **D-114 (H1):** the horizon ring, a 20 km
-> mesh of the stage's own ground with the archetype's far shapes, fog to 6 km, the far plane 30 km. Next per `docs/13 §5`: W1
-> the resident mesh, then T2, W2, H2, T3; the user plays after T1 + H1.
+> mesh of the stage's own ground with the archetype's far shapes, fog to 6 km, the far plane 30 km. **D-115 (W1):** the resident
+> mesh, a coarse 16 m mesh over the whole stage and a fine 4 m window of tiles within 1.2 km of the ball built on worker threads,
+> skirts on every tile, the collider never windowed; the first frame 2.1 s from 4.6 s, the last 1.15 s being Godot's mesh-shape
+> build of a non-square heightmap (padding it square is the user's call: a heightfield quantises). Next per `docs/13 §5`: T2 the
+> dive, then W2, H2, T3; the user plays after T1 + H1.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

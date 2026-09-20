@@ -261,7 +261,10 @@ Preferred tools:
 - shared `ShaderMaterial`/materials,
 - `GPUParticles3D` for transient repeated effects,
 - `MultiMeshInstance3D` for high-count repeated static/cosmetic geometry when justified,
-- wall shells (D-111): the terrain material, one indexed mesh per strip.
+- wall shells (D-111): the terrain material, one indexed mesh per strip,
+- the resident terrain mesh (D-115, `docs/13 §3.3`): `MovementToyWorld` owns a coarse 16 m mesh over the whole stage
+  and a fine 4 m window that follows the ball; every tile keeps one coarse and one fine `MeshInstance3D` for its life,
+  so the window never changes the node count.
 
 Reuse Mesh/Material resources.
 
@@ -291,6 +294,11 @@ If profiling requires workers:
 - compute pure data off-thread,
 - keep active SceneTree mutation in controlled main-thread work,
 - avoid shared mutable engine collections.
+
+In use since D-115 (the first frame measured 4.6 s): the stage's height source is pure once generated, so the world
+samples the heightfield a row per task, the wall shells a vertex per task, and builds fine terrain tiles' vertex arrays
+on the thread pool (`Task.Run`, results through a `ConcurrentQueue`); every `ArrayMesh`, node and physics-server call
+stays on the main thread, and a result from an earlier build is dropped by generation number.
 
 ## 17. Persistence
 

@@ -1196,7 +1196,7 @@ public partial class MovementToySelfTest : Node
                 _debug.RestartSameSeed();
                 foreach (var _ in Frames(3)) yield return null;
                 world = _debug.World;
-                tris[k] = world.Triangles;
+                tris[k] = world.FineTriangles;   // the fine window's own count: the coarse mesh is resident at 16 m whatever the cell size (D-115)
                 buildMs[k] = world.BuildMillis;
                 foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.X(3400f), 0f, m.BallRadius + 0.4f), 0.6f)) yield return null;
                 _player.LinearVelocity = Vector3.Left * 60f;
@@ -1238,7 +1238,7 @@ public partial class MovementToySelfTest : Node
             string Col(int k) => $"{cells[k]:0} m{(follow[k] ? "" : " (follow off)")}: {tris[k] / 1000} k tris, build {buildMs[k]} ms, hops {hops[k]}, grounded {groundedFrac[k]:P0}, raw contact {rawFrac[k]:P0}, apex {apexSpeed[k]:0} m/s charge {(chargedAtApex[k] ? "held" : "LOST")}";
             GD.Print($"[SELFTEST] M1 budget  {Col(0)}   |   {Col(1)}   |   {Col(2)}   |   {Col(3)}");
             Check("cell size is a live world parameter", Mathf.IsEqualApprox(_debug.World.CellSize, 16f), $"cell={_debug.World.CellSize}");
-            Check("8 m cells cut the triangle count to about a quarter", tris[1] < tris[0] * 0.3f, $"{tris[0]} -> {tris[1]}");
+            Check("8 m cells cut the fine window's triangle count to about a quarter", tris[1] < tris[0] * 0.3f, $"{tris[0]} -> {tris[1]}");
             Check("the ground follow removes facet hops over the hill station at 4 and 8 m cells", hops[0] == 0 && hops[1] == 0, $"hops {hops[0]} / {hops[1]}");
             Check("the ground follow keeps raw contact on the hill station at 4 / 8 / 16 m cells", rawFrac[0] > 0.97f && rawFrac[1] > 0.97f && rawFrac[2] > 0.95f,
                 $"raw {rawFrac[0]:P0} / {rawFrac[1]:P0} / {rawFrac[2]:P0}");
@@ -2317,7 +2317,23 @@ public partial class MovementToySelfTest : Node
         var stage = world.Stage;
         Check("generated stage is the active terrain", world.IsStage && stage is not null && world.HalfX > 2900f, $"halfX={world.HalfX}");
         if (stage is null) { t.World.GeneratedStage = false; _debug.RestartSameSeed(); yield break; }
-        GD.Print($"[SELFTEST] generated stage: cells {world.CellSize:0} m, build {world.BuildMillis} ms, {world.SampleCount / 1000} k samples ({world.SampleCount * 4 / 1e6f:0.0} MB heights), {world.Triangles / 1000} k tris, {world.Tiles} tiles; {world.StageSummary}");
+        GD.Print($"[SELFTEST] generated stage: cells {world.CellSize:0} m, build {world.BuildMillis} ms, {world.SampleCount / 1000} k samples ({world.SampleCount * 4 / 1e6f:0.0} MB heights), " +
+                 $"coarse {world.CoarseTriangles / 1000} k tris at {world.CoarseCell:0} m, fine window {world.FineTiles} of {world.Tiles} tiles = {world.FineTriangles / 1000} k tris ({world.PendingTiles} pending); {world.StageSummary}");
+        // The resident mesh (docs/13 §3.3, §3.4, D-115): the world reaches its first frame within the budget, and the fine window
+        // round the start pad is complete, with nothing still building, before the run starts. Measured 2.1 s on the canyon sample
+        // (from 4.6 s): generation 0.13 s, the heights 0.2 s, the coarse mesh and first window 0.12 s, shells 0.2 s, dressing 0.27 s,
+        // and 1.15 s building the collider, which Godot's Jolt module makes a 1.5 M-triangle mesh shape because the map is not
+        // square (a square heightfield of the same samples builds in 0.1 s; whether to pad the map to one is the user's call,
+        // D-115). The plan's 2 s is reached only through that; the budget here is what the rest of the build can hold.
+        Check("the world builds to its first frame within 2.5 s (docs/13 §3.4; 2 s once the collider is a heightfield)", world.BuildMillis <= 2500, $"{world.BuildMillis} ms");
+        {
+            var spawn = new Vector2(world.SpawnPoint.X, world.SpawnPoint.Z);
+            int wanted = world.TerrainTileStates.Count(ts => ts.Centre.DistanceTo(spawn) <= MovementToyWorld.FineWindowRadius);
+            int missing = world.TerrainTileStates.Count(ts => ts.Centre.DistanceTo(spawn) <= MovementToyWorld.FineWindowRadius && !ts.Fine);
+            Check("the fine window round the start pad is complete before the run starts (docs/13 §3.3)",
+                wanted > 0 && missing == 0 && world.PendingTiles == 0 && world.CoarseTriangles > 0,
+                $"{wanted} tiles wanted, {missing} missing, {world.PendingTiles} pending, coarse {world.CoarseTriangles} tris");
+        }
         Check("the built stage draws its horizon ring (docs/13 §4, D-114)", world.HorizonTriangles > 0 && world.HorizonTriangles <= 60000 && world.HorizonEdge.Length > 0, $"{world.HorizonTriangles} triangles");
         Check("generated stage passed its own validation", stage.Report.Passed && !stage.Report.UsedFallback,
             string.Join("; ", stage.Report.Failures.Select(f => f.Name + " " + f.Detail)));
@@ -2450,6 +2466,10 @@ public partial class MovementToySelfTest : Node
         var crestLandS = new float[features.Count];
         var launchArmed = new bool[features.Count];   // the ball must be grounded inside the window first: a gap's dive is still airborne when the far-rim window opens
         var quietKm = new List<(int km, float raw)>();
+        // The resident mesh on every kilometre (docs/13 §3.4): every tile within 1.0 km of the ball has its fine mesh, no fine
+        // tile farther than 1.6 km is resident, the resident triangles stay under 1.2 M, and the coarse mesh under the ball
+        // agrees with the collider within its cell's own chord (the span of the cell's corners, plus half a metre).
+        string windowFail = "", windowLog = "", chordFail = ""; int windowMarks = 0, maxResident = 0;
         // T5 instrument 4 (RUSHCORE_MEASURE=1): after every real flight landing, how many route metres the ball takes
         // to come back within 2% of the model's speed there, against the model's 100 m reservation (D-094, D-100).
         bool measure = System.Environment.GetEnvironmentVariable("RUSHCORE_MEASURE") == "1";
@@ -2561,6 +2581,24 @@ public partial class MovementToySelfTest : Node
                 float rawFrac = markRaw / (float)Mathf.Max(1, markTicks);
                 int km = (int)(nextMark / 1000f) - 1;
                 if (!crestKm.Contains(km)) quietKm.Add((km, rawFrac));
+                {
+                    var here = new Vector2(p.X, p.Z);
+                    int uncovered = 0, stray = 0, resident = 0;
+                    foreach (var ts in world.TerrainTileStates)
+                    {
+                        float d = ts.Centre.DistanceTo(here);
+                        if (ts.Fine) resident++;
+                        if (d <= 1000f && !ts.Fine) uncovered++;
+                        if (d > 1600f && ts.Fine) stray++;
+                    }
+                    windowMarks++;
+                    maxResident = Mathf.Max(maxResident, world.Triangles);
+                    if (uncovered > 0 || stray > 0 || world.Triangles >= 1_200_000) windowFail += $" {nextMark:0} m: {uncovered} uncovered, {stray} stray, {world.Triangles / 1000} k tris;";
+                    float coarseH = world.CoarseHeight(p.X, p.Z, out float span), gridH = world.GridHeight(p.X, p.Z);
+                    if (Mathf.Abs(coarseH - gridH) > span + 0.5f) chordFail += $" {nextMark:0} m: coarse {coarseH:0.0} vs collider {gridH:0.0} (span {span:0.0});";
+                    windowLog += $" {nextMark:0} m: {resident} fine tiles, {world.PendingTiles} pending, {world.Triangles / 1000} k tris, coarse {coarseH - gridH:0.00} m over span {span:0.0};";
+                    if (km == 1) Shot("window_seam_ahead_km2");
+                }
                 marks += $" {nextMark:0} m: ball {ballT:0.0} s model {modelT:0.0} s ({_player.LocomotionSpeed:0} vs {profile.SpeedAt(along):0} m/s, grounded {markGrounded / (float)Mathf.Max(1, markTicks):P0}, raw {rawFrac:P0}{(crestKm.Contains(km) ? ", crest" : "")});";
                 nextMark += 1000f;
                 markTicks = 0; markGrounded = 0; markRaw = 0;
@@ -2601,6 +2639,11 @@ public partial class MovementToySelfTest : Node
         GD.Print($"[SELFTEST] generated stage drive: {progressed:0} of {stage.PrimaryRoute.Length:0} m in {ticks / (float)Engine.PhysicsTicksPerSecond:0.0} s " +
                  $"(model {profile.TotalTime:0.0} s, {timeErr:P1}), grounded {groundedFrac:P0}, max {maxSpeed:0.0} m/s, off-line ≤ {maxOffLine:0} m, stage clock {world.StageClock:0.0} s;{marks}");
         Check("the ball drives the whole generated route to the exit pad", exitTick > 0, $"{progressed:0} of {stage.PrimaryRoute.Length:0} m");
+        GD.Print($"[SELFTEST] resident mesh on the drive:{windowLog} peak {maxResident / 1000} k tris");
+        Check("the fine window covers every tile within 1.0 km on every kilometre, none beyond 1.6 km, under 1.2 M triangles (docs/13 §3.4)",
+            windowMarks > 0 && windowFail.Length == 0, windowFail.Length == 0 ? $"{windowMarks} marks, peak {maxResident / 1000} k tris" : windowFail);
+        Check("the coarse mesh under the ball agrees with the collider within its cell's chord on every kilometre (docs/13 §3.4)",
+            windowMarks > 0 && chordFail.Length == 0, chordFail.Length == 0 ? $"{windowMarks} marks" : chordFail);
         Check("route speed model predicts the whole-route base-kit time within 10% (08 §5)", exitTick > 0 && timeErr <= 0.10f,
             $"ball {ballTime:0.0} s, model {profile.TotalTime:0.0} s ({timeErr:P1}); marks:{marks}");
         Check("the follower stays inside the corridor for the whole route", maxOffLine < StageHeightField.CorridorHalfWidth, $"off-line ≤ {maxOffLine:0} m");
@@ -3108,6 +3151,7 @@ public partial class MovementToySelfTest : Node
                     foreach (var bv in tv) path.Add(bv.Position);
                     for (int i = tunnel.JoinEnd + 1; i < Mathf.Min(verts.Count, tunnel.JoinEnd + 40); i++) path.Add(verts[i].Position);
                     var rig2 = (Rushcore.Camera.CameraRig)_player.CameraBasis!;
+                    Motion("window_fill_after_teleport", 8, 4);   // the fine tiles arriving round the fork, frame to frame (docs/13 §3.3)
                     foreach (var _ in Settle(world.SurfacePoint(path[0].X, path[0].Z, m.BallRadius + 0.6f), 0.5f)) yield return null;
                     rig2.SnapYawToward(new Vector3(Mathf.Cos(verts[tunnel.JoinStart].Heading), 0f, Mathf.Sin(verts[tunnel.JoinStart].Heading)));
                     int pn = 0, pt = 0, insideTicks = 0, insideGrounded = 0, lensAbove = 0, lensOutside = 0, lensInside = 0, impactsAt = _player.ImpactCount, portalImpacts = 0;

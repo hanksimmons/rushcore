@@ -100,6 +100,44 @@ ball flying into the wall faster than one snap per tick. `Movement › Tube Cont
 reading; outside tubes nothing changes. Measured: 100% grounded through a 2 km tube, exit speed equal to the
 model's.
 
+### Wall ride (D-108)
+
+The user's rule (2026-09-19): the ball rides walls seamlessly, from the ground up a wall and back to the ground or
+into the air. It is the ground rule extended, not a verb: no input starts or ends it.
+
+```text
+wall band  = WallRideMinNormalDot (−0.2) ≤ n·up < MinGroundNormalDot, with |v| ≥ WallRideMinSpeed (30 m/s)
+contacts   in the band count as ground (the tube rule, D-101, applied everywhere)
+follow     runs in the band too; on a concave stretch (κ ≥ 0) a ball that was grounded last tick is carried
+           round it however fast it arrives, its speed conserved (the fillet does no work) and the coming
+           step's dip into the curve cancelled in advance (½·v²·κ·dt, the tube follow's term); the rest height
+           on a concave stretch sits the facets' chord sagitta (κ·cell²/8) off the smooth surface
+steering   on a wall the stick is read in the wall's frame: forward along travel, lateral turns the travel
+           direction about the wall's normal (clockwise for right, the ground rule's own convention), so
+           pushing toward a wall climbs it and pushing away comes down
+drive      × WallRideDriveMultiplier (0): a wall is ridden on momentum; gravity along the wall brings the ball
+           back, or the wall's top (convex, v²|κ| ≥ g·n.y) releases it into the air as any crest does
+climb      the up-wall speed is capped at WallRideMaxClimbSpeed (45 m/s, a 26 m climb at the game's gravity):
+           a fillet turns whatever speed points at the wall into a climb, and a head-on hit at the cap would
+           ride 200 m up and out of any canyon; the excess is shed, and the impact rule (§9) takes Flow for it,
+           which is the price of a missed line; an oblique ride under the limit loses nothing
+cap        the locomotion plane is the wall's, so the whole velocity is inside the cap while riding
+```
+
+Below the ride speed a wall is what it was: the ball slides off it and falls back. A hard hit on a wall is still a
+hard impact (§9); the seamless entry needs a fillet, which the collider's facets can only give a ball at speed
+when the foot is a real arc: the lab's quarter pipe (docs/10) has a 30 m one, and since D-109 every wall of a
+walled archetype is the authored profile (04 §5D). On such a stage the follow does not read the grid at all beyond
+the corridor's edge: `WallSurface` gives the exact surface normal, the perpendicular gap and the profile's
+curvature, and the carry (the hold, the conserved speed, the dip cancelled for the motion up or down the wall only,
+the rest height a diagonal chord's sagitta off the fillet) runs on that, so a stage wall rides like the lab's. `Movement › Wall
+Ride` off reproduces the D-092/D-101 controller exactly. Measured on the quarter pipe (harness, 2026-09-19): a ball
+turned 18° into the fillet at 134 m/s registers no impact, rides 17 m up on momentum alone with 83% of its entry
+speed at the lowest point (gravity and drag account for most of the rest) and returns to the plain grounded without
+an airborne tick; three ticks of stick toward the wall take it to 24 m with the same return; a longer push (18
+ticks) clears the 60 m top into the air and lands on the mesa; with the toggle off the same run never counts the
+wall as ground.
+
 Track only the state required for behavior:
 
 - grounded,
@@ -141,6 +179,10 @@ the normal lateral-authority rotation applies, so a hairpin is always the player
 never a direction picked by numerical noise.
 
 Steering curve/authority falloff was validated in the Movement Toy (§15, V-002).
+
+On a wall (§3, D-108) the camera's flat frame has nothing to project onto, so the same lateral authority turns the
+travel direction about the wall's normal instead: stick-right is clockwise about the normal, exactly as it is about
+the up normal on the ground, which makes "toward the wall" climb and "away" descend whichever side the wall is on.
 
 ### Charge-jump steering lock
 
@@ -376,14 +418,15 @@ Boost remains usable during jump charge, but charge steering lock still applies.
 
 ### Refill
 
-Baseline:
+Baseline (D-106):
 
-- slow emergency passive regeneration,
+- the run starts with `StartFraction` of the capacity (0.3); a restart resets to it, a stage transition carries the meter (P-010), a recovery leaves it alone,
+- no passive regeneration by default (`PassiveBoostRegen` 0; the slider stays for comparison),
+- boost rings on the ground, every `PickupSpacingMetres` of primary route on a generated stage,
 - meaningful refill from successful offensive play,
-- boost pickups/lines,
 - item/upgrade hooks.
 
-**VALIDATE:** exact capacity, drain, passive refill, active refill.
+**VALIDATE:** exact capacity, drain, start fraction, ring spacing, active refill.
 
 ## 11. Carve
 
@@ -503,6 +546,7 @@ terrain wavelength 1.005 are part of the same promotion.
 | Air control multiplier | 0.308 | ACCEPTED (D-078) |
 | Ball radius | 0.66 m (1.32 m diameter) | ACCEPTED (V-005, D-091; was 2.125: the visual-scale dial, physics and generation stay in metres) |
 | Ground follow / snap distance | on / 0.5 m (off = the contact-only D-091 controller) | ACCEPTED (D-092) |
+| Wall ride / min normal dot / min speed / drive / max climb | on / −0.2 / 30 m/s / 0 / 45 m/s (off = the D-092/D-101 controller) | ACCEPTED (D-108, D-109, user's call) |
 | Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
 | Max jump takeoff vertical speed | 84.63 m/s | ACCEPTED (V-010, D-091; was 58.21) |
 | Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |
@@ -522,7 +566,8 @@ terrain wavelength 1.005 are part of the same promotion.
 | Carve Flow gain / min turn | 0.10 / 30° | ACCEPTED (D-089, D-091) |
 | Boost acceleration | 88.64 m/s² | ACCEPTED (V-003, D-078) |
 | Boost direction blend | 0.25 | ACCEPTED |
-| Boost capacity / drain / passive regen | 100 / 30 per s / 4 per s | ACCEPTED (V-003) |
+| Boost capacity / drain / passive regen | 100 / 30 per s / 0 per s | ACCEPTED (V-003; regen 4 → 0 by D-106) |
+| Boost start fraction / ring spacing | 0.3 / 1200 m | ACCEPTED (D-106) |
 | Boost pickup refill | 35 | ACCEPTED (toy) |
 | Rush / Crush / Overdrive thresholds | 50 / 94.99 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush provisional ladder (V-004), readability/Flow hooks only |
 | VFX charge / slam / burst / carve / dust / squash / max visual roll | 3 / 3 / 1.73 / 2.275 / 1.925 / 1.935 / 3.285 rev/s (the rest 1) | ACCEPTED (D-091, D-095); presentation, no physics reads them |

@@ -43,6 +43,11 @@ Do not rely only on hue.
 
 Delivered palettes: Canyon Run is red rock on the walls with a pale rim (D-098); Dune Sea is sand from the troughs
 to pale crests with the lee faces darker, so the crest lines and the wave's direction read at a glance (D-099).
+Canyon walls (D-109): the rock is in the tint, not the mesh: strata bands every 14 m of height on steep faces, the
+lower ones darker, over the smooth authored profile; shape variety belongs above the lip, never on the ride band.
+Designed, not delivered (D-107, `docs/12 §7`): Summit Descent is a palette by height, snow above +350 m over the
+valley floor with blue shadow faces on the rails, scree +150 to +350, rock and moss on the valley run, grey rock
+headwalls at every height, a crest line on every rail, and a longer fog end so the valley reads from the summit.
 
 Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
 above which the fog thickens into a layer the top floor sits in and a fall drops through; a see-through

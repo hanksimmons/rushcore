@@ -382,8 +382,10 @@ public partial class WorldDressing : Node3D
         BuildStageScatter(stage, field);
         BuildEdgeMarkers(stage);
 
-        // Boost rings on the line every ~1.2 km so the toy's boost loop stays exercised.
-        for (float d = 900f; d < route.Length - 400f; d += 1200f)
+        // Boost rings on the primary at the tuned spacing (D-106): with no passive regen these are the meter's
+        // only refill on a stage, so the spacing is the scarcity dial. Never inside the first 900 m or the last 400 m.
+        float spacing = Mathf.Max(200f, _t.Boost.PickupSpacingMetres);
+        for (float d = 900f; d < route.Length - 400f; d += spacing)
         {
             var v = route.Vertices[route.IndexAtDistance(d)];
             AddPickup(v.Position.X, v.Position.Z, new Vector3(Mathf.Cos(v.Heading), 0f, Mathf.Sin(v.Heading)));
@@ -1183,6 +1185,10 @@ public partial class WorldDressing : Node3D
         // Uphill climb, mesa, launch ramps and their landing run.
         if (x > TerrainHeightField.Ramp1X - 95f && x < TerrainHeightField.Ramp3X + 95f
             && z > -180f && z < TerrainHeightField.ClimbStartZ + 60f) return false;
+
+        // Quarter pipe (D-108): its approach strip, fillet, face and the mesa behind it.
+        if (z > TerrainHeightField.QuarterPipeFootZ - 20f
+            && x > TerrainHeightField.QuarterPipeX0 - 40f && x < TerrainHeightField.QuarterPipeX1 + 40f) return false;
 
         // Banked hairpin track.
         float hdx = x - TerrainHeightField.HairpinX, hdz = z - TerrainHeightField.HairpinZ;

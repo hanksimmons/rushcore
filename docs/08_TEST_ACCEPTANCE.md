@@ -46,6 +46,7 @@ Toy contains only:
 - Standard gravity remains active without requiring a custom-force-integrator reimplementation.
 - Ground/contact reporting is configured and produces usable contact data during normal terrain contact.
 - Analytic ground follow (D-092): over the strip's 800 m / 80 m hill station the ball keeps raw contact on the whole approach at 4, 8 and 16 m cells with no facet hop; a charge held from 100 m before the apex survives to it and the release jumps there at every cell size; with the follow off, 16 m facets hop the ball and cancel the charge (the toggle is the baseline); on the generated stage every kilometre without a launch crest keeps ≥ 97% raw contact and every launch crest is left exactly when v² > g·r (never glued, never faked).
+- Wall ride (D-108) on the lab quarter pipe: a ball turned 18° into the 30 m fillet near the cap registers no impact, keeps at least 80% of its entry speed on the wall, rides the face as ground, returns to the plain grounded with few or no airborne ticks; three ticks of stick toward the wall climb higher; with `Wall Ride` off the wall is never ground.
 - Player accelerates from rest.
 - Hard locomotion speed cap is consistently enforced using the grounded-tangent / airborne-horizontal definition without clipping vertical jump/slam behavior or rotating velocity at state transitions.
 - Downhill terrain materially accelerates player until cap.
@@ -73,7 +74,7 @@ Toy contains only:
 - Carve (D-089): the button does nothing below the minimum speed; held above it while grounded the facing swings toward the input at the yaw rate while the velocity turns far less; the camera tracks behind the facing; release re-aims the velocity onto the facing with no speed lost; a real carve grants Flow.
 - Boost works on ground and air.
 - Boost cannot bypass hard locomotion cap.
-- Slow passive boost regeneration and active refill follow tuning.
+- A run starts at the tuned boost fraction; no passive boost regeneration by default; the drain, the passive rate and the pickup refill follow tuning (D-106).
 - Fall recovery restores a valid pose and resets physics interpolation so no old→new-position visual streak occurs.
 
 ### Manual playtest
@@ -156,6 +157,8 @@ Required:
 - archetype rules do not modify hidden player physics,
 - two speeds (04 §12, D-094): the ceiling profile is computed for every stage; no bend sits inside a flight or its landing run at the base cap or at the ceiling; a chainable line exists on the primary; every report carries seconds below the base cap,
 - vertical grammar (D-096), for each archetype that uses it: the headroom, wall-clearance, drain and tube-clearance validators hold across the batch; the harness drives the ball into a tube at the cap and asserts it is carried through and exits along the axis with no face crossed; a lid holds the ball from above and from below; from the top floor of a Sky Terraces stage a dropped ball lands and the follower drives from the landing back onto the primary; the camera stays outside a tube for a whole ride with a clear line of sight to the ball against the terrain layer on every tick, and stays inside the declared clearance through a wall tunnel,
+- the wall profile (D-109), on every walled archetype: beside the middle of the longest straight the ground rises from the corridor as the 30 m fillet and the 72° face on both sides within 1.5 m of `WallProfile`, and reaches the side terrain past the profile's top; the canyon drive borrows a canyon seed with a clear straight (no feature, lid or ledge beside it, and a wall that is not a neighbouring bend's inside), boosts from the centreline with a 20° aim at the wall and asserts no impact on entry, a ride of at least ten ticks as ground with most of them on the analytic profile, at least 75% of the entry speed kept on the wall (the climb limit sheds a little at 20°), and a grounded return onto the corridor,
+- Summit Descent (D-107, `docs/12 §8`), once delivered: across the batch every primary vertex's corner limit holds the base cap; the rails and headwalls are continuous (sampled every 10 m, both sides, chute gaps and exit forks excepted); the base-cap profile has no launch on the switchback section; the descent is 540–660 m with every tier 90–170 m; every hairpin passes the sightline rule; every chute's free path is grounded, its half-charge landing falls inside its landing zone and its full-charge flight lands drivable; the face outside the rails drains to the valley. The harness drives a base-cap ball into a rail at 25° and straight into a headwall and asserts it stays on the bench both times, drives the switchbacks to the valley fully grounded, and drives a chute free and half-charged with the slam landing inside the zone,
 - exits (02 §4, D-105): every stage's exits are distinct, inside the footprint and on level pads; most seeds of each archetype offer a second exit (floors: Highlands 75%, Canyon Run 85%, Sky Terraces 65%, Dune Sea 40%); the harness drives the ball from the primary up a terminal line's ramp to its pad and asserts the stage ends by that exit with the plateau holding the ball grounded.
 
 Manual sample:

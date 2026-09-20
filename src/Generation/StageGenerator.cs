@@ -624,6 +624,9 @@ public sealed class StageGenerator
             foreach (float side in new[] { 1f, -1f })
             {
                 if (bendAt[i] is { } bend && side * Mathf.Sign(bend.TurnAngle) > 0f && bend.Radius < reach + 10f) continue;
+                // A profiled wall (D-109) on a bend's outside continues the berm's slope into its fillet with no setback, so
+                // the probe there reads the berm rather than a wall face; the profile's origin is the level width itself.
+                if (field.WallHeight > 0f && bendAt[i] is { } b2 && side * Mathf.Sign(b2.TurnAngle) < 0f) continue;
                 worstWeight = Mathf.Min(worstWeight, field.PrimaryWeight(v[i].Position.X + lx * reach * side, v[i].Position.Z + lz * reach * side));
             }
         }

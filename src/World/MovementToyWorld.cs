@@ -349,6 +349,13 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     // IGroundSurface (D-092): the ground follow reads the grid the collider and mesh are built from.
     float Rushcore.Player.IGroundSurface.Height(float x, float z) => SampleHeight(x, z);
     bool Rushcore.Player.IGroundSurface.Contains(float x, float z) => Mathf.Abs(x) <= HalfX && Mathf.Abs(z) <= HalfZ;
+    /// <summary>The authored wall profile of a walled stage (D-109); the lab and the strip have none (their walls are grid-followed).</summary>
+    bool Rushcore.Player.IGroundSurface.WallSurface(Vector3 position, float ballRadius, out Vector3 normal, out float gap, out float curvature)
+    {
+        if (Stage?.HeightField is { } f) return f.WallSurface(position, ballRadius, out normal, out gap, out curvature);
+        normal = Vector3.Up; gap = float.MaxValue; curvature = 0f;
+        return false;
+    }
 
     /// <summary>Physics layer of structures (lids, tubes): the ball collides with it, the camera's occlusion probe does not (04 §9).</summary>
     public const uint StructureLayer = 2;

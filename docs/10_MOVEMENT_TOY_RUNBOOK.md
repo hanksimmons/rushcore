@@ -14,7 +14,7 @@ RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>                    # pure-data case
 RUSHCORE_CELL_SIZE=8 <same command>                             # the stage case at another cell size (8 or 16)
 <same command> --seed 8                                         # the stage case drives stage 8/0 (pick a seed with a gap or a ramp)
 RUSHCORE_DRIVE_TRACE=3020 <same command> --seed 8               # per-tick ball trace ±120 m around that route metre
-RUSHCORE_ARCHETYPE=canyon <same command> --seed 3               # the stage case drives a Canyon Run stage (D-098)
+RUSHCORE_ARCHETYPE=canyon <same command> --seed 3               # the stage case drives a Canyon Run stage (D-098); RUSHCORE_WALL_TRACE=1 prints the canyon wall ride per tick (D-109)
 RUSHCORE_ARCHETYPE=dunes <same command>                         # the stage case drives a Dune Sea stage (D-099)
 RUSHCORE_ARCHETYPE=sky <same command>                           # the stage case drives a Sky Terraces stage and drops the ball from its top floor (D-103)
 RUSHCORE_BATCH_FAILS=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>   # tally what attempt 1 failed on across each batch, with the first seed's features and bends
@@ -48,6 +48,7 @@ which is how the slam-dive framing lag was found (D-090 amendment).
 | W A S D / left stick | camera-relative steering. The camera follows the trajectory, so **W keeps going, A/D turn, S brakes** (never reverses, D-076). Spawn faces down the lane (−X). |
 | Space / A | press on ground = charge; release = jump; new press in air = slam; **press again at the slam touchdown = landing burst** (±0.10 s; a press during the slam is buffered; ×1.15 of your speed, D-088) |
 | Shift / X | boost (ground and air) |
+| (no key) | **wall ride** (D-108): drive into any wall above 30 m/s and it becomes ground; push the stick toward the wall to climb, away to come down; let go and gravity brings you back, or go over the top into the air |
 | Left Alt / LB | **carve** (hold): the ball drifts wide while its facing swings toward the stick; release to bite off along the facing at no less than your entry speed (D-089) |
 | Mouse wheel, + / −, D-pad up/down | camera zoom (bounded) |
 | F1 | tuning panel (mouse works while open; "Pause while editing" checkbox) |
@@ -57,7 +58,7 @@ which is how the slam-dive framing lag was found (D-090 amendment).
 | R | recover to last checkpoint |
 | T | teleport to spawn |
 | E | teleport 200 m short of exit A, on the primary (T1; the panel's "Teleport Near Exit") |
-| B | refill boost |
+| B | refill boost (debug; a run starts at `Boost › Start Fraction`, 30%, and there is no passive regen, D-106) |
 | K | kill the player (health to 0 → recover to the checkpoint → refill on arrival; T2) |
 | H | heal to full (T2) |
 
@@ -270,6 +271,7 @@ Terrain spans ±512 m, 4 m facets. Spawn on the flat plain at (470, 380). `World
 | Chasms | south rim z = −220 (34 m) and z = −380 (58 m) | gap jumps; 25° exit wall |
 | Bowl | centre (340, −320), r 160, floor −48 m | momentum storage |
 | Banked hairpin | centre (330, 155), r 145, berm +18 m; boost rings on the line | high-speed banked turns |
+| Quarter pipe | z 424 → 460 along x −160..280: a 30 m circular fillet from the plain up to an 80° face, 60 m to the mesa | wall ride (D-108): entry at speed, the ride up and back, the launch off the top; `RUSHCORE_WALL_TRACE=1` prints the harness ride per tick |
 
 Rocks, crystals, pylons, posts and pillars are solid (thin-object / CCD targets).
 
@@ -352,17 +354,18 @@ base-kit time, crests, lines, anchors and hash, and for a second-attempt seed th
 current seed (F5 = new seed, T = back to the start pad; the strip toggle is ignored while it is on).
 What you see: a 6.0 × 2.0 km footprint; a green **START** pad and blue **EXIT** pad 5.8 km apart along
 +X; the stamped 150 m corridor (wider and banked on bends) as a lighter track; **CREST ▲** signs on
-launch-crest straights; boost rings on the line every 1.2 km; scatter kept out of the corridor.
+launch-crest straights; boost rings on the primary every `Boost › Pickup Spacing (m)` (1200 m, D-106: the only refill on a stage, since the meter starts at 30% and never regenerates by itself); scatter kept out of the corridor.
 **Sample stages** (`World › Sample Stage` in the F1 panel, or the command lines below; `SampleStages.cs` is the list):
 
 | # | Name | Command | What to look at |
 |---|---|---|---|
 | 1 | tube | `-- --seed 9` | a see-through tube leaving the corridor at 1.1 km (D-101) |
-| 2 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102) |
+| 2 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102); walls are the authored profile since D-109 (hash re-recorded) |
 | 3 | sky floor 3 | `-- --sky --seed 30` | a floor-2 and floor-3 terrace stack (D-103) |
 | 4 | dune trains | `-- --dunes --seed 1` | a three-crest dune train and a tube (D-099) |
 | 5 | gap + turns | `-- --seed 8` | a mandatory gap and four committed banked turns (D-097) |
 | 6 | three exits | `-- --seed 4` | two terminal lines forking to exits B and C beside exit A (D-105) |
+| 7 | summit | `-- --summit --seed N` | *not yet built* (D-107, `docs/12`): five switchback tiers and a chute; the seed is pinned when S1 lands |
 
 Setting the selector picks the archetype and seed and rebuilds; the `seed` row shows the seed. Set it back to 0
 before F5 (a new random seed) or the archetype slider, or the sample re-applies when the selector changes again.

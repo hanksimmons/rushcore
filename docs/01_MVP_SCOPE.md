@@ -28,10 +28,11 @@ Anything not required to prove that proposition is deferred.
   - charging does not add artificial slowdown,
   - steering is disabled while charging.
 - Air steering.
+- Wall ride (D-108): above a minimum speed any wall a heightfield can make is ground; a fillet carries the ball up it without loss, gravity brings it back or it leaves the top into the air, and the stick is read in the wall's frame.
 - Carve: a held drift (Left Alt / LB) whose facing swings toward the stick while the ball understeers wide; release re-aims the velocity along the facing at no less than the entry speed (D-089).
 - Ground slam triggered by a new jump/slam press while airborne.
 - Every slam landing is a power impact; a Space press at the slam touchdown fires a landing burst (current speed multiplied by a tuned factor along the current heading, limited by the effective cap; D-088).
-- Boost with finite/refillable meter, including slow emergency passive regeneration plus active refill sources.
+- Boost with finite/refillable meter: a run starts at a tunable fraction of it, there is no passive regeneration by default, and refill comes from pickups on the ground and later active sources (D-106).
 - Boost usable in air.
 - Boost direction blended between current travel direction and desired input, with current trajectory dominating at high speed.
 - Health/damage.
@@ -75,6 +76,7 @@ Initial archetypes:
 2. Canyon Run — high-speed steering/carving.
 3. Dune Sea — jump rhythm/landing alignment.
 4. Sky Terraces — vertical commitment and fall management (D-096).
+5. Summit Descent — hairpin commitment and line choice on a 600 m descent (D-107; design in `docs/12`).
 
 Initial reusable challenge modules:
 
@@ -210,7 +212,7 @@ Unless later promoted:
 - infinite-world streaming,
 - destructible terrain,
 - complex physics destruction,
-- wall-running,
+- wall-running as a separate verb with its own input (the wall ride of D-108 is the ground rule extended to walls, not a verb),
 - grappling,
 - homing attacks,
 - double jump,
@@ -230,7 +232,7 @@ Unless later promoted:
 
 | Content/system | MVP ceiling |
 |---|---:|
-| Terrain archetypes | 4 |
+| Terrain archetypes | 5 (raised from 4 by D-107) |
 | Challenge modules | 11 |
 | Normal enemy archetypes | 4 |
 | Elite modifier families | 1 |

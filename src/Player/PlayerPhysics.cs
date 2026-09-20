@@ -85,7 +85,7 @@ public partial class PlayerPhysics : RigidBody3D
     public PlayerPhysics(GameplayTuning tuning)
     {
         _t = tuning;
-        _boost = tuning.Boost.BoostCapacity;
+        ResetBoostToStart();
     }
 
     // ---------------- public / debug state contract ----------------
@@ -94,6 +94,8 @@ public partial class PlayerPhysics : RigidBody3D
     public bool IsRawGrounded => _rawGrounded;
     /// <summary>True while the analytic ground follow is carrying the ball this tick (03 §3, D-092).</summary>
     public bool GroundFollowActive => _followActive;
+    /// <summary>True while grounded on a surface steeper than the ordinary ground limit outside a tube (D-108).</summary>
+    public bool IsWallRiding { get; private set; }
     /// <summary>The terrain grid the ground follow reads; null (the default) disables the follow.</summary>
     public IGroundSurface? Ground { get; set; }
     /// <summary>Structures whose walls carry the ball (tubes, D-101): the analytic shell the tube follow reads; null = none.</summary>
@@ -245,6 +247,11 @@ public partial class PlayerPhysics : RigidBody3D
     public void RefillBoost(float amount) =>
         _boost = Mathf.Clamp(_boost + amount, 0f, _t.Boost.BoostCapacity);
 
+    /// <summary>The run-start allocation (D-106): the tuned fraction of the capacity. Called on a run start and a
+    /// restart, never on a stage transition (P-010 carries the meter) and never on a recovery.</summary>
+    public void ResetBoostToStart() =>
+        _boost = Mathf.Clamp(_t.Boost.BoostCapacity * _t.Boost.StartFraction, 0f, _t.Boost.BoostCapacity);
+
     /// <summary>
     /// Stage outro (T1): steering, jump, boost and carve input is ignored while this is set, and a charge
     /// in progress is cancelled. Nothing else changes: gravity, drag and the ground follow keep running and
@@ -310,6 +317,9 @@ public partial class PlayerPhysics : RigidBody3D
         float speed = vT.Length();
 
         var m = _t.Movement;
+        // Wall ride (D-108): grounded on a surface the ordinary limit would call airborne. The plane, and so the
+        // cap, the steer and the drive, is the wall's; only the drive is scaled and the stick re-framed below.
+        IsWallRiding = m.WallRide && IsGrounded && !InTube && planeNormal.Y < m.MinGroundNormalDot;
         var f = _t.Flow;
         float cap = Mathf.Max(0.001f, m.HardMaxLocomotionSpeed);
         // Steering authority saturates at the base cap: the frozen curve (03 §4) is untouched by headroom.
@@ -369,6 +379,7 @@ public partial class PlayerPhysics : RigidBody3D
             lateral *= m.AirControlMultiplier;
             drive *= m.AirControlMultiplier;
         }
+        if (IsWallRiding) drive *= m.WallRideDriveMultiplier;   // a wall is ridden on momentum (D-108)
         if (_slamActive) lateral *= _t.JumpSlam.SlamSteeringMultiplier;
         // Charge locks line-control authority only; drive/gravity/boost are untouched (03 §4).
         if (_isCharging) lateral = 0f;
@@ -506,6 +517,7 @@ public partial class PlayerPhysics : RigidBody3D
     private void UpdateGroundState(PhysicsDirectBodyState3D state, float dt, ref Vector3 v)
     {
         if (_jumpLockout > 0f) _jumpLockout -= dt;
+        bool wasGrounded = IsGrounded;
 
         Vector3 sum = Vector3.Zero;
         int hits = 0;
@@ -513,7 +525,10 @@ public partial class PlayerPhysics : RigidBody3D
         // Tube contact (V-015 → D-101): inside a tube the walls carry the ball, so any contact is ground; the
         // normal it reports is the wall's, and drive and charge read from it.
         InTube = Structure is not null && Structure.Nearest(state.Transform.Origin, out _, out _, out float tubeRadius, out float tubeDist) && tubeDist <= tubeRadius * 2f;
-        float minDot = InTube && _t.Movement.TubeContact ? -1f : _t.Movement.MinGroundNormalDot;
+        // Wall ride (D-108): above the ride speed every wall a heightfield can make is ground too; below it a wall
+        // is what it was, so a slow ball slides off and falls back.
+        bool wallRide = _t.Movement.WallRide && v.Length() >= _t.Movement.WallRideMinSpeed;
+        float minDot = InTube && _t.Movement.TubeContact ? -1f : wallRide ? _t.Movement.WallRideMinNormalDot : _t.Movement.MinGroundNormalDot;
         for (int i = 0; i < contacts; i++)
         {
             Vector3 n = state.GetContactLocalNormal(i);
@@ -526,7 +541,7 @@ public partial class PlayerPhysics : RigidBody3D
 
         // The analytic follow reads the same terrain grid the collider is built from, so a facet
         // edge that would hop the ball for a few ticks reads as continuous ground instead (D-092).
-        _followActive = TryGroundFollow(state, dt, ref v, out Vector3 followNormal);
+        _followActive = TryGroundFollow(state, dt, ref v, minDot, wasGrounded, out Vector3 followNormal);
         Vector3 tubeNormal = Vector3.Up;
         TubeFollowActive = !_followActive && TryTubeFollow(state, dt, ref v, out tubeNormal);
         _rawGrounded = (hits > 0 || _followActive || TubeFollowActive) && _jumpLockout <= 0f;
@@ -556,7 +571,7 @@ public partial class PlayerPhysics : RigidBody3D
     /// never on a slope steeper than the ground limit, never against a falling ball (the solver
     /// lands that). A velocity rule only: no transform is written.
     /// </summary>
-    private bool TryGroundFollow(PhysicsDirectBodyState3D state, float dt, ref Vector3 v, out Vector3 normal)
+    private bool TryGroundFollow(PhysicsDirectBodyState3D state, float dt, ref Vector3 v, float minDot, bool wasGrounded, out Vector3 normal)
     {
         normal = Vector3.Up;
         var m = _t.Movement;
@@ -575,25 +590,75 @@ public partial class PlayerPhysics : RigidBody3D
         float hl = g.Height(c.X + q.X * cell, c.Z + q.Z * cell), hr = g.Height(c.X - q.X * cell, c.Z - q.Z * cell);
         float sd = (hf - hb) / (2f * cell), sq = (hl - hr) / (2f * cell);
         Vector3 n = new Vector3(-(sd * d.X + sq * q.X), 1f, -(sd * d.Z + sq * q.Z)).Normalized();
-        if (n.Y < m.MinGroundNormalDot) return false;
-
         float gap = (c.Y - h0) * n.Y - m.BallRadius;              // perpendicular distance from the resting height
+        float kappa = 0f;
+        // The authored wall (D-109): in the wall band a walled stage's stamp knows the exact surface, so the follow
+        // reads that instead of the grid and the ride never depends on the facets. Below the band the grid rule stands.
+        bool analytic = false;
+        if (m.WallRide && g.WallSurface(c, m.BallRadius, out Vector3 wallN, out float wallGap, out float wallK)
+            && Mathf.Abs(wallGap) <= m.GroundFollowSnapDistance)
+        {
+            analytic = true; n = wallN; gap = wallGap; kappa = wallK;
+        }
+        if (n.Y < minDot) return false;
         if (Mathf.Abs(gap) > m.GroundFollowSnapDistance) return false;
         float vN = v.Dot(n);
-        if (vN < -m.GroundFollowSnapDistance / dt) return false;   // arriving faster than one snap per tick: a landing
 
-        // Contact possibility: a surface curving away demands v²κ of centripetal acceleration; gravity supplies g·n.Y.
-        float span = 3f * cell;
-        float hF = g.Height(c.X + d.X * span, c.Z + d.Z * span), hB = g.Height(c.X - d.X * span, c.Z - d.Z * span);
-        float second = (hF - 2f * h0 + hB) / (span * span);
-        float slope2 = 1f + sd * sd;
-        float kappa = second / (slope2 * Mathf.Sqrt(slope2));       // signed curvature along travel; negative = convex
+        if (!analytic)
+        {
+            // Contact possibility: a surface curving away demands v²κ of centripetal acceleration; gravity supplies g·n.Y.
+            float span = 3f * cell;
+            float hF = g.Height(c.X + d.X * span, c.Z + d.Z * span), hB = g.Height(c.X - d.X * span, c.Z - d.Z * span);
+            float second = (hF - 2f * h0 + hB) / (span * span);
+            float slope2 = 1f + sd * sd;
+            kappa = second / (slope2 * Mathf.Sqrt(slope2));         // signed curvature along travel; negative = convex
+        }
         Vector3 vT = v - n * vN;
+        // Wall carry (D-108): in the wall band, where the baseline follow never ran, a ball grounded last tick is held
+        // to the wall the way the tube follow holds the shell: its normal motion is the closing rate, its speed is
+        // conserved (the wall does no work), and the coming step's dip into a concave wall is cancelled in advance.
+        // Below the band the follow is the D-092 rule byte for byte, so ordinary ground is untouched.
+        bool carry = m.WallRide && wasGrounded && (analytic || n.Y < m.MinGroundNormalDot) && kappa >= 0f;
+        if (!carry && vN < -m.GroundFollowSnapDistance / dt) return false;   // arriving faster than one snap per tick: a landing
         if (kappa < 0f && vT.LengthSquared() * -kappa >= m.Gravity * n.Y) return false;
 
-        float excess = Mathf.Max(0f, Mathf.Abs(gap) - GroundFollowDeadband) * Mathf.Sign(gap);
+        // On a concave wall the collider's flat facets are chords on the ball's side of the smooth surface, so the rest
+        // height sits the chord's sagitta off it (κ·chord²/8, the chord a cell's diagonal since the wall runs at any angle
+        // to the grid), as the tube follow holds the inscribed circle.
+        float rest = carry && kappa > 0f ? Mathf.Min(kappa * cell * cell * 0.25f, m.GroundFollowSnapDistance * 0.5f) : 0f;
+        float off = gap - rest;
+        float excess = Mathf.Max(0f, Mathf.Abs(off) - GroundFollowDeadband) * Mathf.Sign(off);
         float target = -excess / GroundFollowCloseSeconds;         // toward the surface; zero inside the deadband
-        vN = gap >= 0f ? Mathf.Min(vN, target) : Mathf.Max(vN, target);
+        vN = carry ? target : off >= 0f ? Mathf.Min(vN, target) : Mathf.Max(vN, target);
+        if (carry)
+        {
+            // The wall does no work: what the removed normal component took comes back along the tangent, and the
+            // coming straight step's dip into a concave wall (½·v²κ·dt, the tube follow's term) is cancelled in advance.
+            float total = v.Length();
+            float tLen = vT.Length();
+            if (tLen > 1e-3f) vT *= Mathf.Sqrt(Mathf.Max(0f, total * total - vN * vN)) / tLen;
+            Vector3 upWall = Vector3.Up - n * n.Y;
+            float upLen = upWall.Length();
+            Vector3 upDir = upLen > 1e-3f ? upWall / upLen : Vector3.Zero;
+            float across = vT.Dot(upDir);
+            // The climb limit: a fillet turns however much of the speed points at the wall into a climb, and a head-on
+            // hit at the cap would ride 200 m up and out of any canyon. Above the limit the excess up-wall speed is
+            // shed; the impact rule then takes Flow for it, which is the price of the missed line. Oblique rides under
+            // the limit lose nothing.
+            if (across > m.WallRideMaxClimbSpeed)
+            {
+                vT -= upDir * (across - m.WallRideMaxClimbSpeed);
+                across = m.WallRideMaxClimbSpeed;
+            }
+            if (kappa > 0f)
+            {
+                // The curvature is across the profile, so only the motion up or down the wall dips into the curve
+                // (the tube follow's "around" term): the motion along the wall sees a straight surface. Counting the
+                // whole tangent speed here pushed a lengthwise ride 4 m/s off the wall every tick, and the close pulled
+                // it back into the facets, which bled the ride's speed.
+                vN += 0.5f * across * across * kappa * dt;
+            }
+        }
         v = vT + n * vN;
         normal = n;
         return true;
@@ -875,6 +940,17 @@ public partial class PlayerPhysics : RigidBody3D
         // letting WASD redirect the ball (03 §4).
         if (_isCharging) return curDir;
 
+        // On a wall the camera's flat frame has nothing to project onto, so the stick is read in the wall's own
+        // frame (03 §4, D-108): forward is along travel; lateral turns the travel direction about the wall's normal,
+        // clockwise for right, which is the ground rule's own convention (stick-right is clockwise about the up
+        // normal) carried onto the wall. Pushing toward the wall therefore climbs it, pushing away comes down.
+        if (IsWallRiding && curDir != Vector3.Zero)
+        {
+            Vector3 lateralDir = curDir.Rotated(planeNormal, -Mathf.Pi / 2f);
+            Vector3 onWall = curDir * driveInput.Y + lateralDir * driveInput.X;
+            return onWall.LengthSquared() > 1e-6f ? onWall.Normalized() : Vector3.Zero;
+        }
+
         Vector3 fwd = CameraBasis?.FlatForward ?? Vector3.Forward;
         Vector3 right = CameraBasis?.FlatRight ?? Vector3.Right;
         Vector3 desired = right * driveInput.X + fwd * driveInput.Y;
@@ -959,4 +1035,7 @@ public interface IGroundSurface
     float CellSize { get; }
     bool Contains(float x, float z);
     float Height(float x, float z);
+    /// <summary>The analytic wall under a point on a walled stage (D-109): its normal (off the wall, up), the perpendicular
+    /// gap from the ball's rest height on it, and the profile's curvature across; false where no authored wall stands.</summary>
+    bool WallSurface(Vector3 position, float ballRadius, out Vector3 normal, out float gap, out float curvature);
 }

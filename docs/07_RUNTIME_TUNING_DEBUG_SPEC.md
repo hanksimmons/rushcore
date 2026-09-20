@@ -27,6 +27,7 @@ Expose first:
 - GroundSteeringAuthority / high-speed falloff
 - HardMaxLocomotionSpeed
 - AirControlMultiplier
+- WallRide, WallRideMinNormalDot, WallRideMinSpeed, WallRideDriveMultiplier, WallRideMaxClimbSpeed (D-108, D-109)
 - MinJumpTakeoffVerticalSpeed
 - MaxJumpTakeoffVerticalSpeed
 - MaxJumpChargeSeconds
@@ -42,7 +43,9 @@ Expose first:
 - BoostDirectionBlend
 - BoostCapacity
 - BoostDrainRate
-- PassiveBoostRegen
+- StartFraction (D-106)
+- PassiveBoostRegen (0 by default, D-106)
+- PickupRefillAmount and PickupSpacingMetres (D-106; spacing applies on the next restart)
 - active refill values
 - Rush/Crush/Overdrive thresholds
 

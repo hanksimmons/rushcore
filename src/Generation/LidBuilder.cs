@@ -44,7 +44,8 @@ public static class LidBuilder
                 Centre = new Vector3(mid.Position.X, 0f, mid.Position.Z),
                 Heading = mid.Heading,
                 Length = length,
-                Width = 2f * (StageHeightField.CorridorHalfWidth + WorldScale.WallSetback + rules.WallFalloff),
+                // Wall to wall (D-109): the roof's ends sit inside the wall where the profile has risen past the roof's top.
+                Width = 2f * (StageHeightField.CorridorHalfWidth + WorldScale.WallSetback + WallProfile.LateralAtHeight(WorldScale.LidClearance + WorldScale.LidThickness + 6f)),
                 Thickness = WorldScale.LidThickness,
                 RoofBottom = top + WorldScale.LidClearance,
             });

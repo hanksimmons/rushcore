@@ -329,7 +329,8 @@ minimum minus 120 m, so a fall is never a restore.
 - Wall margin: 2 cells (8 m) outside the corridor's level width, so the ground follow's ±1 cell lateral
   sample never reads the face. The 150 m corridor already leaves 75 m; slots at the 75 m minimum are
   the case to measure. *Delivered (D-098):* `WorldScale.WallSetback` 8 m; Canyon Run walls 60–120 m over a
-  12 m falloff (about 80°), the inside of every bend over 120 m.
+  12 m falloff (about 80°), the inside of every bend over 120 m. *Superseded by D-109:* the wall is the authored
+  profile (30 m fillet, 72° face, 30° on a bend's inside), 04 §5D.
 - Sightline: a wall on the inside of a bend hides the 445 m (base cap) / 764 m (ceiling) read horizon.
   Walls sit on the outside of bends until difficulty is reassessed after Phase 4.
 - Spiral pit / ramp: successive turns differ in radius by Δr ≥ 200 m (150 m corridor plus both wall

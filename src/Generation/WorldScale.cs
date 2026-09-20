@@ -142,8 +142,21 @@ public static class WorldScale
     // ---- Canyon Run (04 §6, D-098; docs/11 §7c walls) ----
     /// <summary>Side terrain above the channel floor.</summary>
     public const float CanyonWallHeightMin = 60f, CanyonWallHeightMax = 120f;
-    /// <summary>Slot wall: the channel blends into the side terrain over three cells, an ~80° face at 100 m.</summary>
+    /// <summary>Slot wall blend on the inside of bends and wherever the profile does not apply (blind corners, 04 §10).</summary>
     public const float CanyonWallFalloff = 12f;
+    /// <summary>The wall profile (D-109, `WallProfile`): a 30 m circular foot fillet tangent to the floor, a 72° face (4–8
+    /// cells across for 60–120 m of wall, so the facets carry the plane exactly), and a lip rounded into the side terrain
+    /// over 8 m of height. Replaces the 12 m smoothstep foot, whose bottom had a curvature radius of 0.4 m: a kink the
+    /// facets turned into a hit and no follow could carry (D-108).</summary>
+    public const float WallFootRadius = 30f, WallFaceDegrees = 72f, WallLipEase = 8f;
+    /// <summary>Face angle the profile eases to on the inside of a bend (with the bend's own fade): a 60 m wall then spans
+    /// about 100 m, the blind-corner rule's reach (04 §10), and the wall is continuous along the route instead of
+    /// switching between two blends at the bend's first vertex.</summary>
+    public const float WallInsideFaceDegrees = 30f;
+    /// <summary>Route over which the inside face eases from 72° to 30° before and after a bend: the face then recedes at
+    /// about 12° along the route, a curve a ball riding the wall into the bend steers along, rather than the 45° step
+    /// the bend's own 60 m fade made (the first ride into a bend's inside fell off the end of the face).</summary>
+    public const float WallInsideFaceFade = 200f;
     /// <summary>Every wall stands this far outside the corridor's level width, so the ground follow's ±1 cell lateral samples never read it.</summary>
     public const float WallSetback = 8f;
     /// <summary>Canyon bends carry a taller berm: banked lines are the archetype's skill (04 §6).</summary>

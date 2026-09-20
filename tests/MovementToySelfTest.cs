@@ -390,9 +390,11 @@ public partial class MovementToySelfTest : Node
         // ---- the same must hold on the real generated terrain, not just the rig ----
         foreach (var e in RunRealTerrainSlopeCase()) yield return e;
         foreach (var e in RunBoostPickupCase()) yield return e;
+        foreach (var e in RunWallRideCase()) yield return e;
 
         // ---- uphill propulsion still works without boost ----
         foreach (var _ in Settle(RampSurfacePoint(-60f) + Vector3.Up * 3f, 1.0f)) yield return null;
+        if (_player.CameraBasis is Rushcore.Camera.CameraRig uphillRig) uphillRig.SnapYawToward(Vector3.Right);   // the drive is camera-relative
         _worldDrive = Vector3.Right;             // +X is uphill on the test ramp
         foreach (var _ in Seconds(1.2f)) yield return null;
         float uphillY = _player.GlobalPosition.Y;
@@ -680,6 +682,7 @@ public partial class MovementToySelfTest : Node
 
         // ---- cap decomposition across the grounded/airborne transition ----
         foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+        _player.RefillBoost(t.Boost.BoostCapacity);
         Input.ActionPress(InputBootstrap.MoveForward, 1f);
         Input.ActionPress(InputBootstrap.Boost, 1f);
         foreach (var _ in Seconds(5f)) yield return null;
@@ -732,7 +735,12 @@ public partial class MovementToySelfTest : Node
         float boostAfterDrain = _player.BoostAmount;
         foreach (var _ in Seconds(1.0f)) yield return null;
         CheckNear("passive boost regeneration follows tuning",
-            _player.BoostAmount - boostAfterDrain, t.Boost.PassiveBoostRegen, t.Boost.PassiveBoostRegen * 0.3f);
+            _player.BoostAmount - boostAfterDrain, t.Boost.PassiveBoostRegen, t.Boost.PassiveBoostRegen * 0.3f + 0.01f);
+        Check("no passive boost regeneration by default (D-106)", t.Boost.PassiveBoostRegen == 0f,
+            $"regen={t.Boost.PassiveBoostRegen}");
+        _player.ResetBoostToStart();
+        CheckNear("a run starts with the tuned boost fraction (D-106)", _player.BoostAmount,
+            t.Boost.BoostCapacity * t.Boost.StartFraction, 0.01f);
         ReleaseAll();
 
         // ---- CCD: a max-speed run into a 0.3 m plate must stop, not tunnel ----
@@ -792,7 +800,11 @@ public partial class MovementToySelfTest : Node
         _worldDrive = _laneFwd;
         Input.ActionPress(InputBootstrap.Boost, 1f);
         int landGuard = 0;
-        while (_player.IsGrounded && landGuard++ < 900) yield return null;       // reach the crest and leave it
+        while (_player.IsGrounded && landGuard++ < 900)                          // reach the crest and leave it
+        {
+            _player.RefillBoost(t.Boost.BoostCapacity);   // the run outlasts one meter; the case wants the cap at the crest, not the economy (D-106)
+            yield return null;
+        }
         Input.ActionRelease(InputBootstrap.Boost);
         _worldDrive = null;
         bool leftCrest = landGuard < 900;
@@ -1362,6 +1374,99 @@ public partial class MovementToySelfTest : Node
     /// The toy's active-refill hook: rolling the 15 deg reward line must collect rings
     /// and refill the meter by the tuned amount (03 §10, D-020).
     /// </summary>
+    /// <summary>
+    /// Wall ride (03 §3, D-108) on the lab's quarter pipe: a boosted ball at the cap runs into the 60 m wall at 15°,
+    /// is carried up the fillet without an impact, rides the wall grounded, and gravity brings it back onto the
+    /// plain; pushing the stick toward the wall climbs higher; with the toggle off the same run never counts the
+    /// wall as ground (the baseline).
+    /// </summary>
+    private IEnumerable RunWallRideCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        const float footZ = TerrainHeightField.QuarterPipeFootZ;
+        Vector3 approach = new Vector3(-Mathf.Cos(Mathf.DegToRad(18f)), 0f, Mathf.Sin(Mathf.DegToRad(18f))).Normalized();
+
+        IEnumerable Ride(bool steerIntoWall, bool expectRide, string label)
+        {
+            // West of the spawn pillars and clear of the lane's posts (z 404-408 at every 50 m of x): boost along the wall
+            // for 0.85 s, then turn 18° into it, so the ball meets the fillet near the cap at x ≈ 235 with 18° of the
+            // speed across the wall (≈ 43 m/s: a 24 m climb, into the band above 60° and under the 60 m top).
+            Vector3 start = _debug.World.SurfacePoint(330f, 413f, m.BallRadius + 1.5f);
+            foreach (var _ in Settle(start, 0.5f)) yield return null;
+            _player.RefillBoost(t.Boost.BoostCapacity);
+            _worldDrive = Vector3.Left;
+            Input.ActionPress(InputBootstrap.Boost, 1f);
+            foreach (var _ in Seconds(0.85f)) yield return null;
+            _worldDrive = approach;
+
+            int impactsBefore = _player.ImpactCount;
+            int wallTicks = 0, airTicks = 0, steerTicks = 0, guard = 0, wallGroundedLowNormal = 0;
+            float entrySpeed = 0f, minSpeed = float.MaxValue, maxHeight = 0f;
+            bool onWall = false, backOnPlain = false, released = false;
+            string why = "time";
+            bool trace = System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_TRACE") == "1";
+            while (guard++ < 60 * 8)
+            {
+                Vector3 pos = _player.GlobalPosition;
+                if (trace && pos.Z > footZ - 6f) GD.Print($"[WALLDBG] {label} t{guard} pos ({pos.X:0.0},{pos.Y:0.00},{pos.Z:0.0}) v ({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) loc {_player.LocomotionSpeed:0.0} g {_player.IsGrounded} raw {_player.IsRawGrounded} follow {_player.GroundFollowActive} wall {_player.IsWallRiding} n ({_player.GroundNormal.X:0.00},{_player.GroundNormal.Y:0.00},{_player.GroundNormal.Z:0.00}) c {_player.GetContactCount()} imp {_player.ImpactCount} boost {_player.BoostActive} in F{Input.IsActionPressed(InputBootstrap.MoveForward)} L{Input.IsActionPressed(InputBootstrap.MoveLeft)} R{Input.IsActionPressed(InputBootstrap.MoveRight)} rel {released}");
+                if (_player.IsGrounded && _player.GroundNormal.Y < m.MinGroundNormalDot) wallGroundedLowNormal++;
+                // From the fillet's foot the ride is momentum only: no drive, no boost, so gravity decides the return (a
+                // held direction lets the steering authority hold the ball up the fillet like a rail).
+                if (!released && pos.Z > footZ + 1f)
+                {
+                    released = true; entrySpeed = _player.Velocity.Length(); _worldDrive = null;
+                    Input.ActionRelease(InputBootstrap.Boost);
+                    foreach (var act in new[] { InputBootstrap.MoveForward, InputBootstrap.MoveLeft, InputBootstrap.MoveRight, InputBootstrap.MoveBack }) Input.ActionRelease(act);
+                }
+                if (_player.IsWallRiding)
+                {
+                    onWall = true;
+                    wallTicks++;
+                    minSpeed = Mathf.Min(minSpeed, _player.Velocity.Length());
+                    maxHeight = Mathf.Max(maxHeight, pos.Y);
+                    if (steerIntoWall && steerTicks < 3) { Input.ActionPress(InputBootstrap.MoveLeft, 1f); steerTicks++; }   // 3 ticks: ≈ +16 m/s up the wall, under the top
+                    else Input.ActionRelease(InputBootstrap.MoveLeft);
+                }
+                else if (onWall)
+                {
+                    if (!_player.IsGrounded) airTicks++;
+                    maxHeight = Mathf.Max(maxHeight, pos.Y);
+                    if (_player.IsGrounded && _player.GroundNormal.Y > 0.9f && pos.Z < footZ + 3f && pos.Y < 1.5f) { backOnPlain = true; why = "back"; break; }
+                }
+                else if (!expectRide && pos.Z > footZ + 6f && guard > 60) { why = "met the wall"; break; }   // met the wall without riding it
+                if (pos.X < TerrainHeightField.QuarterPipeX0 + 10f) { why = "ran out of wall"; break; }
+                yield return null;
+            }
+            Input.ActionRelease(InputBootstrap.MoveLeft);
+            int impacts = _player.ImpactCount - impactsBefore;
+            GD.Print($"[SELFTEST] wall ride {label}: wall ticks {wallTicks}, entry {entrySpeed:0.0} m/s, min on wall {(wallTicks > 0 ? minSpeed : 0f):0.0}, peak {maxHeight:0.0} m, air ticks after {airTicks}, impacts {impacts}, back on plain {backOnPlain} ({why} at {_player.GlobalPosition}), low-normal grounded ticks {wallGroundedLowNormal}");
+            ReleaseAll();
+            _lastRide = (wallTicks, entrySpeed, wallTicks > 0 ? minSpeed : 0f, maxHeight, airTicks, impacts, backOnPlain, wallGroundedLowNormal);
+        }
+
+        foreach (var _ in Ride(false, true, "momentum")) yield return null;
+        var a = _lastRide;
+        Check("the ball rides the quarter pipe as ground (D-108)", a.wallTicks >= 10, $"wall ticks={a.wallTicks}");
+        Check("the fillet is entered without an impact (seamless, D-108)", a.impacts == 0, $"impacts={a.impacts}");
+        Check("the wall ride keeps its speed (≥ 80% of entry on the wall)", a.wallTicks > 0 && a.minSpeed >= a.entrySpeed * 0.8f, $"entry={a.entrySpeed:0.0} min={a.minSpeed:0.0}");
+        Check("the wall ride climbs the wall", a.peak >= 6f, $"peak={a.peak:0.0} m");
+        Check("gravity brings the ride back onto the plain, grounded", a.backOnPlain, $"back={a.backOnPlain} air ticks={a.airTicks}");
+        Check("the return to the plain is seamless (few or no airborne ticks)", a.airTicks <= 6, $"air ticks={a.airTicks}");
+
+        foreach (var _ in Ride(true, true, "stick toward the wall")) yield return null;
+        var b = _lastRide;
+        Check("pushing the stick toward the wall climbs higher (wall-frame steering, D-108)", b.wallTicks >= 10 && b.peak > a.peak + 2f, $"peak {b.peak:0.0} vs {a.peak:0.0}");
+
+        m.WallRide = false;
+        foreach (var _ in Ride(false, false, "toggle off")) yield return null;
+        var c = _lastRide;
+        m.WallRide = true;
+        Check("with Wall Ride off the wall is never ground (the baseline)", c.wallTicks == 0 && c.lowNormal == 0, $"wall ticks={c.wallTicks} low-normal grounded={c.lowNormal}");
+    }
+
+    private (int wallTicks, float entrySpeed, float minSpeed, float peak, int airTicks, int impacts, bool backOnPlain, int lowNormal) _lastRide;
+
     private IEnumerable RunBoostPickupCase()
     {
         var t = _debug.Tuning;
@@ -1843,6 +1948,7 @@ public partial class MovementToySelfTest : Node
         Check("Flow headroom raises the effective cap", flowCap > baseCap + 5f, $"cap {flowCap:0.0} base {baseCap:0.0} headroom {fl.Headroom:0.00}");
 
         // Drive and boost on: the ball rises above the base cap and never above the effective cap.
+        _player.RefillBoost(t.Boost.BoostCapacity);
         Input.ActionPress(InputBootstrap.Boost, 1f);
         float maxSpeed = 0f, capViolations = 0f;
         foreach (var _ in Seconds(3.0f))
@@ -2024,7 +2130,41 @@ public partial class MovementToySelfTest : Node
             Check($"{A}: " + "most seeds carry a dune train of at least two crests", seedsWithTrain >= Count * 0.6f, $"{seedsWithTrain}/{Count} seeds, {trains} trains, {crests} crests");
         Check($"{A}: " + "the batch places see-through tubes and every tube passes its validators (clearance, mouths, carried profile)", tubes > 0 && tubesPassed == tubes, $"{tubes} tubes, {tubesPassed} pass, {seedsWithTube} seeds");
         if (archetype == TerrainArchetype.CanyonRun)
+        {
             Check($"{A}: " + "the batch places wall tunnels and spiral pits and every lid keeps its clearance (D-102)", lids > 0 && lidsPassed == lids && spirals > 0, $"{lids} lids ({lidsPassed} pass), {spirals} spiral pits");
+            // The wall profile (D-109): beside the middle of the longest straight, the ground rises from the corridor as
+            // the 30 m fillet and the 72° face on both sides, and reaches the wall's height before the profile's top.
+            var probe = gen.Generate(new StageGenerationRequest(SampleStages.All[1].Seed, 0, TerrainArchetype.CanyonRun));
+            var pv = probe.PrimaryRoute.Vertices; var pf = probe.HeightField!;
+            int pi = -1, bestRun = 0;
+            for (int a = 0; a < pv.Count;)
+            {
+                if (pv[a].Kind != RouteSegmentKind.Straight) { a++; continue; }
+                int b = a; while (b < pv.Count && pv[b].Kind == RouteSegmentKind.Straight) b++;
+                if (b - a > bestRun && pv[(a + b) / 2].Distance > 400f) { bestRun = b - a; pi = (a + b) / 2; }
+                a = b;
+            }
+            float worst = 0f, reached = 0f; string where = "no straight";
+            if (pi >= 0)
+            {
+                float lx = -Mathf.Sin(pv[pi].Heading), lz = Mathf.Cos(pv[pi].Heading);
+                float edge = StageHeightField.CorridorHalfWidth + WorldScale.WallSetback, hc = pf.PrimaryHeight(pi);
+                reached = float.MaxValue;
+                foreach (float side in new[] { 1f, -1f })
+                {
+                    foreach (float u in new[] { 4f, 12f, 20f, 28f, 36f })
+                    {
+                        float want = hc + WallProfile.Height(u), got = pf.Sample(pv[pi].Position.X + lx * (edge + u) * side, pv[pi].Position.Z + lz * (edge + u) * side);
+                        if (want - hc < pf.WallHeight - WorldScale.WallLipEase - 2f) worst = Mathf.Max(worst, Mathf.Abs(got - want));
+                    }
+                    float uTop = WallProfile.LateralAtHeight(pf.WallHeight) + 12f;
+                    reached = Mathf.Min(reached, pf.Sample(pv[pi].Position.X + lx * (edge + uTop) * side, pv[pi].Position.Z + lz * (edge + uTop) * side) - hc);
+                }
+                where = $"vertex {pi} at {pv[pi].Distance:0} m (straight of {bestRun * WorldScale.RouteSampleSpacing:0} m), walls {pf.WallHeight:0} m";
+            }
+            Check($"{A}: " + "the canyon wall is the authored profile: a 30 m fillet and a 72° face on both sides of a straight (D-109)", pi >= 0 && worst < 1.5f, $"worst profile error {worst:0.00} m, {where}");
+            Check($"{A}: " + "the canyon wall reaches the side terrain past the profile's top", pi >= 0 && reached >= pf.WallHeight * 0.7f, $"rise {reached:0.0} m of {pf.WallHeight:0} m, {where}");
+        }
         if (archetype == TerrainArchetype.SkyTerraces)
             Check($"{A}: " + "the batch places terraces on floor 2 and floor 3 (D-103)", floor2 > 0 && floor3 > 0, $"{floor2} floor-2 and {floor3} floor-3 terraces ({seedsWithFloor3} seeds with a floor 3)");
         Check($"{A}: " + "route lengths sit around the 6 km target", lenMin >= WorldScale.PrimaryRouteLength * 0.9f && lenMax <= WorldScale.PrimaryRouteLength * 1.3f,
@@ -2312,8 +2452,19 @@ public partial class MovementToySelfTest : Node
                 }
                 wasGrounded = _player.IsGrounded;
             }
-            if (System.Environment.GetEnvironmentVariable("RUSHCORE_DRIVE_TRACE") is { } tr && float.TryParse(tr, out float trAt) && Mathf.Abs(along - trAt) < 120f)
-                GD.Print($"[TRACE] {along:0} m y={p.Y:0.00} ground={world.SampleHeight(p.X, p.Z):0.00} v=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) grounded={_player.IsGrounded} raw={_player.IsRawGrounded}");
+            // RUSHCORE_DRIVE_TRACE=<metre>[,<metre>...] traces ±RUSHCORE_DRIVE_TRACE_SPAN (120) m around each, every third tick.
+            if (System.Environment.GetEnvironmentVariable("RUSHCORE_DRIVE_TRACE") is { } tr && ticks % 3 == 0)
+            {
+                float span = float.TryParse(System.Environment.GetEnvironmentVariable("RUSHCORE_DRIVE_TRACE_SPAN"), out float sp) ? sp : 120f;
+                bool inWindow = false;
+                foreach (var part in tr.Split(',')) if (float.TryParse(part, out float trAt) && Mathf.Abs(along - trAt) < span) inWindow = true;
+                if (inWindow)
+                {
+                    bool hasWall = stage.HeightField is { } hfT && hfT.WallSurface(p, m.BallRadius, out Vector3 tn, out float tg, out _) && Mathf.Abs(tg) < 5f;
+                    float lat = new Vector2(verts[nearest].Position.X - p.X, verts[nearest].Position.Z - p.Z).Length();
+                    GD.Print($"[TRACE] {along:0} m {verts[nearest].Kind} lat {lat:0.0} y={p.Y:0.00} ground={world.SampleHeight(p.X, p.Z):0.00} corr={verts[nearest].Position.Y:0.0} v=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) |v|={_player.Velocity.Length():0.0} g={_player.IsGrounded} raw={_player.IsRawGrounded} follow={_player.GroundFollowActive} wall={_player.IsWallRiding} n.y={_player.GroundNormal.Y:0.00} c={_player.GetContactCount()} analytic={hasWall} imp={_player.ImpactCount}");
+                }
+            }
             if (along >= nextMark)
             {
                 float ballT = ticks / (float)Engine.PhysicsTicksPerSecond, modelT = profile.TimeAt(along);
@@ -2947,6 +3098,179 @@ public partial class MovementToySelfTest : Node
                 Check("a ball dropped off a spiral turn's inner edge lands on the turn below and drives on to the exit (a fall is a setback)", !float.IsNaN(landedY) && drop > 20f && fn >= verts.Count - 3, $"drop {drop:0.0} m, vertex {fn}/{verts.Count - 1}");
             }
             else Check("stage has a spiral pit to test", true, "none on this seed nor on seeds 1–80");
+            // The ride wants a clear straight: the approach at 20° needs 230 m to reach the wall and the ride 100 m more,
+            // clear of every feature and lid, and on a wall that is not a neighbouring bend's inside (the inside face eases
+            // over the inside fade, and a wall curving away in plan launches the ball: real physics, the seamless exit).
+            // Either wall will do, so each window is judged per side; borrow the first canyon seed with one, as the
+            // structures did.
+            static (int start, float side, float len) FindRideWindow(StageDefinition d)
+            {
+                var v2 = d.PrimaryRoute.Vertices;
+                (int start, float side, float len) best = (-1, 1f, 0f);
+                for (int a2 = 0; a2 < v2.Count;)
+                {
+                    if (v2[a2].Kind != RouteSegmentKind.Straight) { a2++; continue; }
+                    int b2 = a2; while (b2 < v2.Count && v2[b2].Kind == RouteSegmentKind.Straight) b2++;
+                    float s0 = v2[a2].Distance, s1 = v2[b2 - 1].Distance;
+                    float insideBefore = 0f, insideAfter = 0f;
+                    foreach (var bend in d.PrimaryRoute.Bends)
+                    {
+                        if (bend.EndIndex <= a2 && a2 - bend.EndIndex < 3) insideBefore = Mathf.Sign(bend.TurnAngle);
+                        if (bend.StartIndex >= b2 - 1 && bend.StartIndex - b2 < 3) insideAfter = Mathf.Sign(bend.TurnAngle);
+                    }
+                    foreach (float side in new[] { 1f, -1f })
+                    {
+                        float w0 = s0 + 20f, w1 = s1;
+                        if (insideBefore == side) w0 = Mathf.Max(w0, s0 + WorldScale.WallInsideFaceFade + 30f);
+                        if (insideAfter == side) w1 = Mathf.Min(w1, s1 - WorldScale.WallInsideFaceFade - 60f);
+                        var cuts = new List<(float from, float to)>();
+                        foreach (var f in d.PrimaryRoute.Features) cuts.Add((f.CentreDistance - 250f, f.ReservedEnd + 50f));
+                        foreach (var l in d.Lids) cuts.Add((v2[l.StartIndex].Distance - 100f, v2[l.EndIndex].Distance + 100f));
+                        cuts.Sort((u, w) => u.from.CompareTo(w.from));
+                        float cur = w0;
+                        var windows = new List<(float from, float to)>();
+                        foreach (var c in cuts)
+                        {
+                            if (c.to < cur) continue;
+                            if (c.from > cur) windows.Add((cur, Mathf.Min(c.from, w1)));
+                            cur = Mathf.Max(cur, c.to);
+                            if (cur >= w1) break;
+                        }
+                        if (cur < w1) windows.Add((cur, w1));
+                        foreach (var w in windows)
+                        {
+                            float len = w.to - w.from;
+                            if (len <= best.len || w.from < 400f || w.to > d.PrimaryRoute.Length - 600f) continue;
+                            // A ledge beside the wall cuts into it, and the ride would meet the blend rather than the profile.
+                            var midV = v2[d.PrimaryRoute.IndexAtDistance(0.5f * (w.from + w.to))].Position;
+                            bool ledgeNear = false;
+                            foreach (var ol in d.OptionalLines) foreach (var lv2 in ol.Vertices)
+                                if (new Vector2(lv2.Position.X - midV.X, lv2.Position.Z - midV.Z).Length() < 400f) { ledgeNear = true; break; }
+                            if (!ledgeNear) best = (d.PrimaryRoute.IndexAtDistance(w.from), side, len);
+                        }
+                    }
+                    a2 = b2;
+                }
+                return best;
+            }
+
+            {
+                var here = FindRideWindow(stage);
+                if (here.len < 330f)
+                {
+                    var gen2 = new StageGenerator(t.Movement, t.Flow, t.JumpSlam);
+                    for (int sd = 1; sd <= 60; sd++)
+                    {
+                        var d2 = gen2.Generate(new StageGenerationRequest(sd, 0, TerrainArchetype.CanyonRun));
+                        if (FindRideWindow(d2).len >= 330f)
+                        {
+                            world.Regenerate(sd);
+                            foreach (var _ in Frames(3)) yield return null;
+                            stage = world.Stage!;
+                            verts = stage.PrimaryRoute.Vertices;
+                            canyonSeed = sd;
+                            GD.Print($"[SELFTEST] canyon wall ride: borrowing seed {sd}/0 for a clear straight");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            {
+                var pick = FindRideWindow(stage);
+                int wi = pick.start; float bestRun = pick.len, rideSide = pick.side;
+                if (wi >= 0 && bestRun >= 330f)
+                {
+                    var wv = verts[wi];
+                    float hx = Mathf.Cos(wv.Heading), hz = Mathf.Sin(wv.Heading), lx = -Mathf.Sin(wv.Heading), lz = Mathf.Cos(wv.Heading);
+                    int from = wi;
+                    foreach (var _ in Settle(verts[from].Position + Vector3.Up * (m.BallRadius + 0.6f), 0.5f)) yield return null;
+                    rig.SnapYawToward(new Vector3(hx, 0f, hz));
+                    _player.RefillBoost(t.Boost.BoostCapacity);
+                    Input.ActionPress(InputBootstrap.Boost, 1f);
+                    float aimDeg = float.TryParse(System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_AIM"), out float aimEnv) ? aimEnv : 20f;
+                    float aim = Mathf.DegToRad(aimDeg);   // under the climb limit (45 m/s up the wall at the cap is 17.6°… 20° sheds 6 m/s), into the band
+                    if (System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_PROBE") == "1")
+                    {
+                        // Geometry probe: along the wall for 120 m at several lateral depths, the stamp, the collider's bilinear
+                        // height, and the analytic normal's plan direction, to measure any corrugation along the route.
+                        var hfp = stage.HeightField!;
+                        float edgeP = StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
+                        foreach (float uP in new[] { 1f, 3f, 6f, 10f, 15f, 20f, 26f, 32f })
+                        {
+                            var hs = new List<float>(); var cs = new List<float>(); var angs = new List<float>(); int found = 0, total = 0; float maxGapDiff = 0f;
+                            for (float sP = 0f; sP <= 120f; sP += 0.5f)
+                            {
+                                int ia = stage.PrimaryRoute.IndexAtDistance(wv.Distance + sP);
+                                int ib = Mathf.Min(ia + 1, verts.Count - 1);
+                                float ta = verts[ib].Distance > verts[ia].Distance ? (wv.Distance + sP - verts[ia].Distance) / (verts[ib].Distance - verts[ia].Distance) : 0f;
+                                Vector3 cP = verts[ia].Position.Lerp(verts[ib].Position, Mathf.Clamp(ta, 0f, 1f));
+                                float hdg = verts[ia].Heading; float lxP = -Mathf.Sin(hdg), lzP = Mathf.Cos(hdg);
+                                float px = cP.X + lxP * rideSide * (edgeP + uP), pz = cP.Z + lzP * rideSide * (edgeP + uP);
+                                float hS = hfp.Sample(px, pz); float hC = _debug.World.SampleHeight(px, pz);
+                                hs.Add(hS); cs.Add(hC - hS); total++;
+                                var probeP = new Vector3(px, hS + m.BallRadius, pz);
+                                if (hfp.WallSurface(probeP, m.BallRadius, out Vector3 pn, out float pg, out _))
+                                {
+                                    found++;
+                                    float angP = Mathf.RadToDeg(Mathf.Atan2(pn.X * lzP - pn.Z * lxP, -(pn.X * lxP + pn.Z * lzP) * rideSide));
+                                    angs.Add(angP); maxGapDiff = Mathf.Max(maxGapDiff, Mathf.Abs(pg));
+                                }
+                            }
+                            float ripple = 0f;
+                            for (int k = 4; k < hs.Count - 4; k++) { float avg = 0f; for (int j = -4; j <= 4; j++) avg += hs[k + j]; avg /= 9f; ripple = Mathf.Max(ripple, Mathf.Abs(hs[k] - avg)); }
+                            float cMax = 0f, cMin = 0f; foreach (float cv in cs) { cMax = Mathf.Max(cMax, cv); cMin = Mathf.Min(cMin, cv); }
+                            float aMax = float.MinValue, aMin = float.MaxValue; foreach (float av in angs) { aMax = Mathf.Max(aMax, av); aMin = Mathf.Min(aMin, av); }
+                            GD.Print($"[WALLPROBE] u {uP:0} m: stamp h {hs[0]:0.00}..{hs[hs.Count-1]:0.00} ripple(±2m detrend) {ripple:0.000} m | collider-stamp {cMin:0.000}..{cMax:0.000} m | analytic {found}/{total} plan-angle swing {(angs.Count > 0 ? aMax - aMin : 0f):0.00}° gap<= {maxGapDiff:0.00}");
+                        }
+                    }
+                    _worldDrive = new Vector3(hx * Mathf.Cos(aim) + lx * rideSide * Mathf.Sin(aim), 0f, hz * Mathf.Cos(aim) + lz * rideSide * Mathf.Sin(aim));
+                    var hf = stage.HeightField!;
+                    int wallTicks = 0, guard = 0, impactsAtEntry = _player.ImpactCount, airAfter = 0, analyticTicks = 0;
+                    float entry = 0f, minOnWall = float.MaxValue, peak = 0f; bool released = false, onWall = false, back = false;
+                    bool trace = System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_TRACE") == "1";
+                    while (guard++ < Engine.PhysicsTicksPerSecond * 8)
+                    {
+                        Vector3 p = _player.GlobalPosition;
+                        float wgt = hf.PrimaryWeight(p.X, p.Z);
+                        if (trace && (released || guard % 3 == 0))
+                        {
+                            bool hasWall = hf.WallSurface(p, m.BallRadius, out Vector3 tn, out float tg, out float tk);
+                            int ni = hf.Nearest(p.X, p.Z, out float nd);
+                            GD.Print($"[WALLDBG] canyon kind {(ni >= 0 ? verts[Mathf.Min(ni, verts.Count - 1)].Kind.ToString() : "?")} grid {_debug.World.SampleHeight(p.X, p.Z):0.0} t{guard} pos ({p.X:0.0},{p.Y:0.00},{p.Z:0.0}) v ({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) |v| {_player.Velocity.Length():0.0} loc {_player.LocomotionSpeed:0.0} g {_player.IsGrounded} follow {_player.GroundFollowActive} wall {_player.IsWallRiding} n ({_player.GroundNormal.X:0.00},{_player.GroundNormal.Y:0.00},{_player.GroundNormal.Z:0.00}) c {_player.GetContactCount()} wgt {wgt:0.00} | analytic {hasWall} gap {tg:0.00} n ({tn.X:0.00},{tn.Y:0.00},{tn.Z:0.00}) k {tk:0.000} vtx {ni} d {nd:0.0} corrH {(ni >= 0 ? hf.PrimaryHeight(ni) : 0f):0.0} ground {hf.Sample(p.X, p.Z):0.0} imp {_player.ImpactCount} flow {_player.Flow:0.00} cap {_player.FlowCap:0.0}");
+                        }
+                        if (!released && wgt < 0.99f)
+                        {
+                            released = true; entry = _player.Velocity.Length(); _worldDrive = null;
+                            foreach (var act in AllActions) Input.ActionRelease(act);
+                        }
+                        if (_player.IsWallRiding)
+                        {
+                            onWall = true; wallTicks++;
+                            minOnWall = Mathf.Min(minOnWall, _player.Velocity.Length());
+                            peak = Mathf.Max(peak, p.Y - hf.PrimaryHeight(hf.Nearest(p.X, p.Z, out _)));
+                            if (hf.WallSurface(p, m.BallRadius, out _, out float wg, out _) && Mathf.Abs(wg) <= m.GroundFollowSnapDistance) analyticTicks++;
+                        }
+                        else if (onWall)
+                        {
+                            if (!_player.IsGrounded) airAfter++;
+                            if (_player.IsGrounded && _player.GroundNormal.Y > 0.9f && wgt >= 0.99f) { back = true; break; }
+                        }
+                        if (released && guard > Engine.PhysicsTicksPerSecond * 6) break;
+                        yield return null;
+                    }
+                    ReleaseAll();
+                    int impacts = _player.ImpactCount - impactsAtEntry;
+                    string bendsNear = "";
+                    foreach (var bend in stage.PrimaryRoute.Bends) if (Mathf.Abs(verts[bend.StartIndex].Distance - wv.Distance) < 900f) bendsNear += $" [bend at {verts[bend.StartIndex].Distance:0}-{verts[bend.EndIndex].Distance:0} m r {bend.Radius:0} turn {Mathf.RadToDeg(bend.TurnAngle):0}°]";
+                    GD.Print($"[SELFTEST] canyon wall ride from {wv.Distance:0} m on the {(rideSide > 0f ? "left" : "right")} wall ({bestRun:0} m of clear straight; bends near:{bendsNear}): entry {entry:0.0} m/s, wall ticks {wallTicks} ({analyticTicks} on the analytic profile), peak {peak:0.0} m above the corridor, min on wall {(wallTicks > 0 ? minOnWall : 0f):0.0}, air ticks after {airAfter}, impacts {impacts}, back on the corridor {back}");
+                    Check("a canyon wall is entered from the corridor without an impact (the fillet foot, D-109)", released && impacts == 0, $"impacts={impacts}");
+                    Check("a canyon wall is ridden as ground on the analytic profile (D-108, D-109)", wallTicks >= 10 && analyticTicks >= wallTicks * 0.8f, $"wall ticks={wallTicks}, analytic={analyticTicks}");
+                    Check("the canyon wall ride keeps at least 75% of its entry speed (the climb limit sheds a little at 20°)", wallTicks > 0 && minOnWall >= entry * 0.75f, $"entry={entry:0.0} min={minOnWall:0.0}");
+                    Check("the canyon wall ride comes back onto the corridor grounded", back, $"back={back} air ticks={airAfter}");
+                }
+                else Check("stage has a straight long enough for a wall ride", true, $"none on seed {world.Seed}");
+            }
         }
 
         // Sky Terraces (08 §5, D-103): from the top floor a dropped ball lands on the drain and the follower drives it back onto the primary.
@@ -2967,6 +3291,7 @@ public partial class MovementToySelfTest : Node
                     GD.Print($"[SELFTEST] sky terraces: drive seed has no floor 3; using seed {skySeed}/0");
                 }
             }
+
             var top = stage.OptionalLines.FirstOrDefault(l => l.Floor == 3) ?? stage.OptionalLines.FirstOrDefault(l => l.Floor == 2);
             if (top is not null)
             {

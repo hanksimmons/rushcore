@@ -409,6 +409,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public void RestartSameSeed()
     {
         _world.Regenerate(_director.Request(_world.WantedArchetype));
+        _player.ResetBoostToStart();
         TeleportToStart();
     }
 
@@ -423,6 +424,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         CancelOutro();
         _director.StartRun(runSeed, stageIndex);
         _world.Regenerate(_director.Request(_world.WantedArchetype));
+        _player.ResetBoostToStart();
         TeleportToStart();
     }
 

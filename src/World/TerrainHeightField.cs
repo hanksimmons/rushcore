@@ -26,6 +26,8 @@ namespace Rushcore.World;
 ///       Steep south rim, 25 deg north wall so a missed jump can always be driven out of.</item>
 /// <item>Bowl — centre (340, -320), radius 160, floor y=-48.</item>
 /// <item>Banked hairpin — centre (330, 155), radius 145, track half-width 46, outer berm +18.</item>
+/// <item>Quarter pipe — a 60 m wall along z ≈ 424..460 (x −160..280): a 30 m circular fillet from the plain
+///       up to an 80° face, the wall-ride instrument (D-108); the plain north of it is a 60 m mesa to the rim.</item>
 /// <item>Rolling hills — everything else, three octaves with a slow amplitude modulation.</item>
 /// </list>
 /// </summary>
@@ -98,6 +100,30 @@ public sealed class TerrainHeightField : IHeightSource
     /// <summary>Banked hairpin. Track floor sits at plain level so both ends tie in seamlessly.</summary>
     public const float HairpinX = 330f, HairpinZ = 155f;
     public const float HairpinRadius = 145f, HairpinHalfWidth = 46f, HairpinBank = 18f;
+
+    /// <summary>Quarter pipe (D-108): a wall the ball rides up from the plain and back down. Its foot is a circular
+    /// fillet of <see cref="QuarterPipeFillet"/> radius starting at <see cref="QuarterPipeFootZ"/> and tangent to the
+    /// plain, turning up to 80° (a heightfield cannot be vertical); the 80° face continues to the mesa height.</summary>
+    public const float QuarterPipeFootZ = 424f, QuarterPipeFillet = 30f, QuarterPipeHeight = 60f;
+    public const float QuarterPipeX0 = -160f, QuarterPipeX1 = 280f;   // ends short of the spawn pillars (x ≥ 314 at z 442)
+    private const float QuarterPipeFaceDeg = 80f;
+    /// <summary>Z where the 80° face begins (the fillet's end) and where the mesa top begins.</summary>
+    public static readonly float QuarterPipeFaceZ = QuarterPipeFootZ + QuarterPipeFillet * Mathf.Sin(Mathf.DegToRad(QuarterPipeFaceDeg));
+    private static readonly float QuarterPipeFilletTop = QuarterPipeFillet * (1f - Mathf.Cos(Mathf.DegToRad(QuarterPipeFaceDeg)));
+    public static readonly float QuarterPipeTopZ = QuarterPipeFaceZ + (QuarterPipeHeight - QuarterPipeFilletTop) / Mathf.Tan(Mathf.DegToRad(QuarterPipeFaceDeg));
+
+    /// <summary>Height of the quarter pipe's profile above the plain at z (0 south of the foot, the mesa beyond the top).</summary>
+    public static float QuarterPipeProfile(float z)
+    {
+        if (z <= QuarterPipeFootZ) return 0f;
+        if (z <= QuarterPipeFaceZ)
+        {
+            float u = z - QuarterPipeFootZ;
+            return QuarterPipeFillet - Mathf.Sqrt(Mathf.Max(0f, QuarterPipeFillet * QuarterPipeFillet - u * u));
+        }
+        if (z <= QuarterPipeTopZ) return QuarterPipeFilletTop + (z - QuarterPipeFaceZ) * Mathf.Tan(Mathf.DegToRad(QuarterPipeFaceDeg));
+        return QuarterPipeHeight;
+    }
 
     // ------------------------------------------------------------------ state
 
@@ -180,6 +206,12 @@ public sealed class TerrainHeightField : IHeightSource
             float u = Mathf.Clamp((hd + HairpinHalfWidth * 0.35f) / (HairpinHalfWidth * 1.35f), 0f, 1f);
             Blend(ref wsum, ref hsum, hairW, HairpinBank * u * u);
         }
+
+        // 6. quarter pipe: a smoothstep wall from the plain (z 428) to +60 m (z 440), mesa beyond. Weighted far
+        // above the plain's 1 so the normalised blend leaves its height whole rather than averaging it with 0.
+        float qpW = Mathf.SmoothStep(QuarterPipeFootZ - 18f, QuarterPipeFootZ - 4f, z)
+                  * Mathf.SmoothStep(QuarterPipeX0 - 30f, QuarterPipeX0, x) * (1f - Mathf.SmoothStep(QuarterPipeX1, QuarterPipeX1 + 30f, x));
+        if (qpW > 0f) Blend(ref wsum, ref hsum, qpW * 200f, QuarterPipeProfile(z));
 
         float blend = Mathf.Min(wsum, 1f);
         float feature = wsum > 1e-4f ? hsum / wsum : 0f;

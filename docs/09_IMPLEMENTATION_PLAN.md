@@ -122,6 +122,18 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 
 Gate: **G0** per archetype, plus the vertical-grammar checks in 08 §5.
 
+## Phase 3B — Summit Descent (D-107)
+
+Inserted 2026-09-19 after the user's playtest brief (more verticality, switchbacks, hairpins, walls that make the
+player commit). One new archetype, designed in `docs/12` against the frozen kit; three slices, one PR each:
+
+- S1 the mountain: skeleton, face, benches, rails, headwalls, berms, valley run, exits, the first five validators,
+  the harness wall test, `--summit` and the sample,
+- S2 the chute and the read: chutes, the notch and sightline rule, boards and posts, the harness chute drive,
+- S3 the vista: summit cone, cirque walls, snowline palette, fog, scatter suit; fold into `04 §6`.
+
+The user's playtest is on S1 + S2. Gate: **G0 (Summit Descent)** per `08 §5`. Phase 4 follows.
+
 ## Parallel track (2026-09-07)
 
 Between Phase 3 and Phase 4 a second agent works ahead on slices that do not touch route topology, generator rules or the

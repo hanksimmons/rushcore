@@ -139,6 +139,24 @@ Modify terrain around the primary route to enforce:
 
 The route is not required to be flat. It may descend, climb, bank, crest, and roll.
 
+**The wall profile (D-109).** On a walled archetype the ground beyond a corridor's edge is not a blend but a
+shape (`WallProfile`): the height above the corridor as a function of the lateral distance beyond the level width
+and the setback: a **30 m circular fillet** tangent to the ground it leaves, a **72° face**, and a lip rounded into
+the side terrain over 8 m of height. Along the route the profile is constant, so the heightfield's facets carry the
+face exactly (a plane through grid samples is that plane) and the fillet's chords sit a sagitta off the arc; the
+controller reads the same profile analytically (03 §3, `StageHeightField.WallSurface`), so a wall ride never
+depends on the facets. On the outside of a bend the berm's slope carries straight into the fillet from the berm's
+top, with no setback and no lip (a berm that flattened before the wall launched a cap ball). On the inside of a bend
+the face eases to **30°**, which is the blind-corner rule's reach (§10) as one continuous surface rather than two
+blends meeting at the bend's first vertex; the ease, like the bend's extra width and its berm, runs over 200 m of
+route before and after the bend (`WorldScale.WallInsideFaceFade`), because a wall that recedes faster than a ride can
+follow drops the rider off the end of the face. A ledge's corridor wins over the primary's wall zone where its ramp
+crosses it. A wall curving away in plan, the inside of any bend, launches a rider: that is real physics and the
+ride's exit to the air. The relief noise never enters the face: it
+returns only above the lip. Before D-109 the wall was a 12 m smoothstep whose foot had a curvature radius of
+0.4 m, a kink the facets turned into a hit and a shelf at every bend entry; the choppiness the user saw on the
+canyon walls was that aliasing, not the flat shading.
+
 The stamped profile is continuous along the route: the corridor height at any point interpolates
 the profile between the two route samples it lies between (D-093). A nearest-sample height is a
 staircase at the sample spacing, invisible to validators that read the samples but resolved by a
@@ -372,6 +390,12 @@ pale rim. Ridge lines become ledges cut into the wall 25–40 m above the floor.
 holds what an archetype changes (geometry only, §7); `World › Archetype`, `-- --canyon` and
 `RUSHCORE_ARCHETYPE=canyon` select it.
 
+**The wall profile, delivered 2026-09-19 (D-109, §5D).** The slot walls are the authored profile: the 30 m fillet, the
+72° face, the rounded lip, the berm flowing into the fillet on bend outsides, the 30° inside face; wall tunnels
+therefore span 226 m wall to wall (the roof's ends sit inside the wall where the profile has risen past the roof's
+top) instead of 190 m. The rock is in the tint: strata bands every 14 m of height on the faces (06 §3). Every canyon
+hash moved with it (the golden table was re-recorded).
+
 **Wall tunnels and the spiral pit, delivered 2026-09-07 (D-102).** A **lid** roofs a plain slot straight
 150–300 m long, wall to wall (190 m), its underside 15 m above the highest corridor point under it and 6 m
 thick; the module declares its ceiling (§10 headroom: the roof refuses a charged jump), the camera confines
@@ -457,6 +481,27 @@ Archetype rules (D-098, extended D-099): an `ArchetypeRules` record per archetyp
 the wall and inside falloffs, the bend mix, the straight lengths, the bank scale, the swell slope budget,
 the feature spacing / chance / mix, the dune-train crest count and the heading limit; the skeleton builder,
 the height field and the validators read it and nothing else differs between archetypes.
+
+### Summit Descent (D-107)
+
+**Primary skill:** hairpin commitment and line choice at the cap on a continuous descent.
+
+Geometry (design owned by `docs/12` until delivered; this entry is the pointer):
+
+- summit start, 600 m of descent to a valley run, no mandatory climb,
+- 4–6 switchback tiers: a leg across the face at grade 0.06–0.13, then a 140–156° hairpin of 80–120 m radius
+  (holdable at the base cap, never below 80 m on the primary) carrying 45–85 m of drop as a banked descending curve,
+  every convex exit eased to the 560 m crest radius so the base-cap ball never launches,
+- walls everywhere: 24 m near-vertical rails on every downhill edge, 90 m headwalls behind every hairpin's berm,
+  the cut face uphill; a miss is a hard impact, never a fall; the face outside the rails drains to the valley,
+- blind hairpins by construction, paid for by a notched inside wedge, a hairpin board and a sightline validator
+  (the archetype's declared exception to §10's outside-walls-only rule),
+- the chute as the optional inside line: a 40 m rail gap, a 150 m eased lip onto a 0.35 walled straight through
+  the wedge, a merge bend onto the next leg; free path grounded, paid path a half charge and a slam landing,
+- the valley run as the family wander with 12 m guide banks; exits fork there (§5J).
+
+Not delivered. The new validators (holdable hairpins, rail continuity, grounded primary, descent budget, sightline,
+chute, face drain) are listed in `docs/12 §8`; `08 §5` carries the gate lines.
 
 ## 7. Archetype physics rule
 

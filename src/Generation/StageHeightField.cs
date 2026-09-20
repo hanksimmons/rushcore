@@ -47,6 +47,12 @@ public sealed class StageHeightField : IHeightSource
     {
         public readonly int N;
         public readonly float[] X, Z, H, Heading, BankHeight, BankSide;
+        /// <summary>A bend's fade in 0..1 at each vertex (the bank's own), read by the wall profile (D-109).</summary>
+        public readonly float[] Fade;
+        /// <summary>How far (0..1) the wall on a bend's inside has eased toward the inside face at each vertex, over
+        /// <see cref="WorldScale.WallInsideFaceFade"/> of route before and after the bend, and which raw lateral sign
+        /// that inside is (+1 left, −1 right; 0 = none in reach) (D-109).</summary>
+        public readonly float[] InsideEase, InsideSign;
         /// <summary>Extra half-width on bends, faded in and out with the bank so the wall line never jogs at a bend's ends.</summary>
         public readonly float[] Extra;
         public readonly bool[] Bend;
@@ -58,15 +64,19 @@ public sealed class StageHeightField : IHeightSource
         /// <summary>Vertex indices sorted by X: the coarse map scans an X window whatever order the route visits it in (D-096: no monotonic-X assumption).</summary>
         private readonly int[] _byX;
         private readonly float _wallFalloff, _insideFalloff;
+        /// <summary>Walled archetypes (D-109): the wall beyond the edge is the authored profile, not a blend.</summary>
+        private readonly bool _profiled;
 
         public StampedLine(RouteSkeleton route, float[] profile, float sizeX, float sizeZ, ArchetypeRules rules)
         {
             _wallFalloff = rules.WallFalloff;
             _insideFalloff = rules.InsideFalloff;
+            _profiled = rules.WallHeightMax > 0f;
             var v = route.Vertices;
             N = v.Count;
             X = new float[N]; Z = new float[N]; H = profile; Heading = new float[N];
-            BankHeight = new float[N]; BankSide = new float[N]; Bend = new bool[N]; Extra = new float[N];
+            BankHeight = new float[N]; BankSide = new float[N]; Bend = new bool[N]; Extra = new float[N]; Fade = new float[N];
+            InsideEase = new float[N]; InsideSign = new float[N];
             HalfWidth = route.CorridorHalfWidth;
             _side = route.Side;
             _innerFalloff2 = route.InnerFalloff > 0f ? route.InnerFalloff : rules.WallFalloff;
@@ -90,7 +100,24 @@ public sealed class StageHeightField : IHeightSource
                     fade *= Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, routeEnd - d) * Mathf.SmoothStep(WorldScale.PadRadius, WorldScale.PadRadius * 2.5f, d);
                     BankHeight[i] = height * fade;
                     BankSide[i] = side;
+                    Fade[i] = fade;
                     Extra[i] = BendExtraHalfWidth * fade;
+                }
+                // The inside face eases in along the straight before the bend and out after it (D-109).
+                float insideSign = Mathf.Sign(b.TurnAngle);
+                int i0 = route.IndexAtDistance(Mathf.Max(0f, startD - WorldScale.WallInsideFaceFade));
+                int i1 = route.IndexAtDistance(Mathf.Min(routeEnd, endD + WorldScale.WallInsideFaceFade));
+                for (int i = i0; i <= i1 && i < N; i++)
+                {
+                    float d = v[i].Distance;
+                    float ease = d < startD ? Mathf.SmoothStep(0f, WorldScale.WallInsideFaceFade, d - (startD - WorldScale.WallInsideFaceFade))
+                               : d > endD ? Mathf.SmoothStep(0f, WorldScale.WallInsideFaceFade, (endD + WorldScale.WallInsideFaceFade) - d)
+                               : 1f;
+                    if (ease > InsideEase[i]) { InsideEase[i] = ease; InsideSign[i] = insideSign; }
+                    // On a walled archetype the bend's extra half-width eases over the same run (D-109): faded with the bank
+                    // over 60 m it jogged the wall line 25 m outward at a bend's entry, a 29° recession no wall ride could
+                    // follow. Open landscapes keep the bank's fade (their hashes are pinned).
+                    if (_profiled) Extra[i] = Mathf.Max(Extra[i], BendExtraHalfWidth * ease);
                 }
             }
 
@@ -153,10 +180,53 @@ public sealed class StageHeightField : IHeightSource
             return BankSide[i] != 0f ? lateral * BankSide[i] : lateral;
         }
 
-        /// <summary>Corridor weight at a point d metres from the line at vertex i: 1 inside the level width plus the
-        /// wall setback, then falling over the archetype's falloff, the long one on the inside of a bend (blind corners).</summary>
-        public float Weight(int i, float x, float z, float d)
+        /// <summary>Whether the authored wall profile applies at a point beside vertex i, and its lateral distance u
+        /// beyond the edge (D-109): every wall of a walled archetype except the inside of a bend, which keeps the long
+        /// blend so the inside wall never hides the read horizon (04 §10).</summary>
+        public bool ProfileAt(int i, float x, float z, float d, out float u, out float footSlope, out float faceTan)
         {
+            u = d - (Width(i) + WorldScale.WallSetback);
+            footSlope = 0f; faceTan = WallProfile.FaceTan;
+            if (!_profiled) return false;
+            // The inside of a bend, and the run into and out of it: the face eases to the blind-corner angle over the
+            // inside fade, so the wall is one continuous surface along the route that a ride steers along.
+            float rawLateral = -Mathf.Sin(Heading[i]) * (x - X[i]) + Mathf.Cos(Heading[i]) * (z - Z[i]);
+            if (InsideEase[i] > 0f && rawLateral * InsideSign[i] > 0f)
+            {
+                faceTan = Mathf.Lerp(WallProfile.FaceTan, WallProfile.InsideFaceTan, InsideEase[i]);
+                return true;
+            }
+            if (BankSide[i] == 0f) return true;
+            float lateral = Lateral(i, x, z);
+            if (lateral < 0f) return true;
+            // The outside of a bend: the berm's slope carries straight into the fillet from the berm's top, with no
+            // setback and no lip (a berm that flattened before the wall was a launch at the cap).
+            float width = Width(i);
+            if (BankHeight[i] > 0f && width > 1f)
+            {
+                u = d - (width + WorldScale.WallSetback * (1f - Fade[i]));   // the setback goes with the bank's fade, no step
+                footSlope = BankHeight[i] / width;
+            }
+            return true;
+        }
+
+        /// <summary>Corridor weight at a point d metres from the line at vertex i: 1 inside the level width plus the
+        /// wall setback, then falling over the archetype's falloff, the long one on the inside of a bend (blind corners).
+        /// On a walled archetype (D-109) the fall is the wall profile instead: the weight is the share of the rise to
+        /// the side terrain (<paramref name="top"/> metres above the corridor here) the profile has not yet made, so
+        /// the stamp lays the fillet, the face and the rounded lip exactly.</summary>
+        public float Weight(int i, float x, float z, float d, float top)
+        {
+            if (top > 0f && ProfileAt(i, x, z, d, out float u, out float s0, out float ft))
+            {
+                if (u <= 0f) return 1f;
+                // The lip alone is rounded (SoftMax0 on the remaining rise); the foot is already tangent to the ground it
+                // leaves, and a two-ended clamp would lift the wall a metre at the corridor edge (a step the ball hits,
+                // and a stamp weight the wall-clearance validator refuses).
+                float ease = Mathf.Min(WorldScale.WallLipEase, top * 0.9f);
+                float rise = top - SoftMax0(top - WallProfile.Height(u, s0, ft), ease);
+                return 1f - Mathf.Clamp(rise / top, 0f, 1f);
+            }
             float edge = Width(i) + WorldScale.WallSetback;
             float lateral = Lateral(i, x, z);
             // An offset line's falloffs are per side (toward the primary or away, D-103); the primary's follow the bend.
@@ -426,18 +496,92 @@ public sealed class StageHeightField : IHeightSource
     public float PrimaryWeight(float x, float z)
     {
         int i = _primary.Nearest(x, z, SizeX, SizeZ, out float d);
-        return i < 0 ? 0f : _primary.Weight(i, x, z, d);
+        return i < 0 ? 0f : _primary.Weight(i, x, z, d, SideHeight(x, z) - _primary.Height(i, x, z));
+    }
+
+    /// <summary>A line's wall-profile surface height at a point (corridor height plus the profile's rise, before the lip
+    /// rounding); false where the point is inside the corridor or off the profile. Used to measure the surface's tilt
+    /// along the route for the analytic wall's normal.</summary>
+    private float ProfileHeightAt(StampedLine line, float x, float z, float side, out bool ok)
+    {
+        ok = false;
+        int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
+        if (i < 0 || d < 1e-3f) return 0f;
+        if (!line.ProfileAt(i, x, z, d, out float u, out float s0, out float ft) || u <= 0f) return 0f;
+        float hc = line.Height(i, x, z);
+        float rise = WallProfile.Height(u, s0, ft);
+        if (side - hc <= 0f) return 0f;
+        ok = true;
+        return hc + rise;
+    }
+
+    /// <summary>The side terrain a corridor is cut into: relief plus the wall height, or the pit surface inside a spiral's rim.</summary>
+    public float SideHeight(float x, float z)
+    {
+        float pitH = PitSurface(x, z);
+        return float.IsNaN(pitH) ? Relief(x, z) + WallHeight : pitH;
+    }
+
+    /// <summary>
+    /// The analytic wall under a point (D-109, the wall twin of a tube's <c>Nearest</c>): on a walled archetype, the
+    /// nearest stamped wall's surface normal (pointing off the wall, toward the corridor and up), the perpendicular gap
+    /// from the ball's rest height on it, and the profile's curvature across (the fillet's, or 0 on the face). False
+    /// inside a corridor, on a bend's inside, at the rounded lip (real physics launches the ball there), where the side
+    /// terrain is not above the corridor, and on every archetype without walls.
+    /// </summary>
+    public bool WallSurface(Vector3 p, float ballRadius, out Vector3 normal, out float gap, out float curvature)
+    {
+        normal = Vector3.Up; gap = float.MaxValue; curvature = 0f;
+        if (WallHeight <= 0f) return false;
+        float side = SideHeight(p.X, p.Z);
+        // A line's wall is real only where the stamped ground is that wall: the stamps blend in order (Sample), so
+        // beside a ledge cut into the wall, or inside another corridor, the ground is a mix or another line's floor, and
+        // the follow reads the grid there instead. Without this the query reported a ledge's face inside the primary's
+        // corridor and the follow lifted the ball up it.
+        float stamped = Sample(p.X, p.Z);
+        bool found = false;
+        foreach (var line in _lines)
+        {
+            int i = line.Nearest(p.X, p.Z, SizeX, SizeZ, out float d);
+            if (i < 0 || d < 1e-3f) continue;
+            if (!line.ProfileAt(i, p.X, p.Z, d, out float u, out float s0, out float ft) || u <= 0f) continue;
+            float hc = line.Height(i, p.X, p.Z);
+            float top = side - hc;
+            float rise = WallProfile.Height(u, s0, ft);
+            if (top <= 0f || rise > top - WorldScale.WallLipEase) continue;
+            if (Mathf.Abs(stamped - (hc + rise)) > 0.3f) continue;
+            // The foot's first metres are ground the grid follow already reads well; the analytic wall begins where the
+            // fillet has a slope to hold (about 8°), so a flat stretch that merely agrees in height (a fork, a ledge's
+            // start) never counts as a wall.
+            float s = WallProfile.Slope(u, s0, ft);
+            if (s < 0.15f) continue;
+            // The surface also tilts along the route: the corridor's grade, and the wall's own origin and face moving
+            // with a bend's extra width, berm and inside ease. The follow holds the ball to the surface's true normal,
+            // so that tilt is measured on the same profile function four metres either way along the heading; without it
+            // a wall receding at 7° along the route slid out from under a ride at 16 m/s and the follow lost the ball.
+            float tx = Mathf.Cos(line.Heading[i]), tz = Mathf.Sin(line.Heading[i]);
+            const float delta = 4f;
+            float hAhead = ProfileHeightAt(line, p.X + tx * delta, p.Z + tz * delta, side, out bool okA);
+            float hBehind = ProfileHeightAt(line, p.X - tx * delta, p.Z - tz * delta, side, out bool okB);
+            float along = okA && okB ? (hAhead - hBehind) / (2f * delta) : 0f;
+            float ex = (p.X - line.X[i]) / d, ez = (p.Z - line.Z[i]) / d;
+            var n = new Vector3(-(ex * s + tx * along), 1f, -(ez * s + tz * along)).Normalized();
+            float g = (p.Y - (hc + rise)) * n.Y - ballRadius;
+            if (Mathf.Abs(g) < Mathf.Abs(gap)) { gap = g; normal = n; curvature = WallProfile.Curvature(u, s0, ft); found = true; }
+        }
+        return found;
     }
 
     /// <summary>Combined corridor weight at a point: 1 inside any corridor, 0 beyond every falloff.</summary>
     public float CorridorWeight(float x, float z)
     {
         float w = 0f;
+        float side = SideHeight(x, z);
         foreach (var line in _lines)
         {
             int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
             if (i < 0) continue;
-            w = Mathf.Max(w, line.Weight(i, x, z, d));
+            w = Mathf.Max(w, line.Weight(i, x, z, d, side - line.Height(i, x, z)));
         }
         return w;
     }
@@ -463,14 +607,23 @@ public sealed class StageHeightField : IHeightSource
         // profile is exact (a ridge's transition beside it must never kink the centreline: a metre over a
         // cell launches a ceiling ball) while a ridge's own centreline is its profile wherever the primary
         // has faded. Their heights agree where both are full, so the overlap is continuous.
+        float wOpt = 0f;
         for (int k = _lines.Count - 1; k >= 0; k--)
         {
             var line = _lines[k];
             int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
             if (i < 0) continue;
-            float w = line.Weight(i, x, z, d);
+            float lineH = line.Height(i, x, z);
+            float w = line.Weight(i, x, z, d, h - lineH);   // the wall rises from this line to whatever stands beyond it
             if (w <= 0f) continue;
-            h = Mathf.Lerp(h, line.Height(i, x, z), w);
+            if (ReferenceEquals(line, _primary))
+            {
+                // The primary's corridor is exact; its wall zone (D-109, wide now) yields to an optional line's corridor
+                // where a ledge's ramp crosses it, so the ramp keeps its shape instead of being pulled toward the floor.
+                if (line.ProfileAt(i, x, z, d, out float u, out _, out _) && u > 0f) w *= 1f - wOpt;   // walled archetypes only
+            }
+            else wOpt = Mathf.Max(wOpt, w);
+            h = Mathf.Lerp(h, lineH, w);
         }
         return h;
     }
@@ -503,6 +656,11 @@ public sealed class StageHeightField : IHeightSource
             // Canyon palette (06 §3): red rock on the walls, a paler rim on the side terrain, the floor unchanged.
             float above = Mathf.Clamp((point.Y - Relief(point.X, point.Z)) / WallHeight, 0f, 1f);
             c = c.Lerp(CanyonRock, Mathf.SmoothStep(0.05f, 0.4f, above) * (0.55f + 0.45f * Mathf.SmoothStep(0.2f, 0.6f, slope)));
+            // Strata (D-109): the rock is in the tint, not the mesh. Bands of height every 14 m on steep faces, the
+            // deeper ones darker, so a smooth face still reads as layered stone at speed.
+            float band = 0.5f + 0.5f * Mathf.Sin(point.Y * (Mathf.Tau / 14f));
+            float strata = Mathf.SmoothStep(0.3f, 0.7f, slope) * Mathf.SmoothStep(0.05f, 0.3f, above) * (0.35f * band + 0.15f * (1f - above));
+            c = c.Lerp(CanyonRock.Darkened(0.35f), strata);
             c = c.Lerp(CanyonRim, Mathf.SmoothStep(0.85f, 1f, above) * (1f - slope) * 0.6f);
         }
         float track = 0f;

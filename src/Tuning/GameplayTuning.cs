@@ -57,6 +57,21 @@ public sealed class MovementTuning
     public bool TubeContact = true;
     /// <summary>Metres above (or below) the surface within which the follow acts.</summary>
     public float GroundFollowSnapDistance = 0.5f;
+    /// <summary>Wall ride (03 §3, D-108): above <see cref="WallRideMinSpeed"/> any surface whose normal is at least
+    /// <see cref="WallRideMinNormalDot"/> off straight down counts as ground, the follow carries the ball through a
+    /// concave fillet without losing speed, the stick is read in the wall's frame and drive is scaled by
+    /// <see cref="WallRideDriveMultiplier"/>. Off reproduces the D-092/D-101 controller exactly.</summary>
+    public bool WallRide = true;
+    /// <summary>dot(normal, Up) a surface needs to be ridden: −0.2 is every wall a heightfield can make and no ceiling.</summary>
+    public float WallRideMinNormalDot = -0.2f;
+    /// <summary>Below this speed a steep surface is not ground: the ball slides off it and falls back.</summary>
+    public float WallRideMinSpeed = 30f;
+    /// <summary>Drive on a steep surface as a fraction of ground drive. Zero: a wall is ridden on momentum and gravity brings the ball back.</summary>
+    public float WallRideDriveMultiplier = 0f;
+    /// <summary>Fastest the ball may travel up a wall (m/s). A smooth fillet would turn a head-on hit at the cap into a
+    /// 200 m climb out of any canyon; above this the excess up-wall speed is shed, which the impact rule prices as the
+    /// hard hit a missed line is. 45 m/s is a 26 m climb, so any wall 30 m above its foot contains every ride.</summary>
+    public float WallRideMaxClimbSpeed = 45f;
     /// <summary>Speed bands are readability/Flow hooks only (02 §5); no physics reads them.
     /// Ladder set against the accepted cap: Rush ~1/3, Crush ~2/3, Overdrive ~95% (V-004).</summary>
     public float RushThreshold = 50f;
@@ -148,8 +163,16 @@ public sealed class BoostTuning
     public float BoostDirectionBlend = 0.25f;
     public float BoostCapacity = 100f;
     public float BoostDrainRate = 30f;
-    public float PassiveBoostRegen = 4f;
+    /// <summary>Fraction of the capacity the meter holds at the start of a run (D-106). Stage transitions carry
+    /// whatever is left (P-010); only a run start and a restart reset to this.</summary>
+    public float StartFraction = 0.3f;
+    /// <summary>Per second while not boosting. Zero by default (D-106): boost is picked up on the ground, never
+    /// regained by waiting. The slider is kept so the old emergency trickle can be compared.</summary>
+    public float PassiveBoostRegen = 0f;
     public float PickupRefillAmount = 35f;
+    /// <summary>Metres of primary route between boost rings on a generated stage (D-106). Read when the stage is
+    /// dressed, so a change applies on the next restart. Generation never reads it: the mandatory route needs no boost.</summary>
+    public float PickupSpacingMetres = 1200f;
 }
 
 public sealed class CameraTuning
@@ -327,6 +350,11 @@ public sealed class GameplayTuning
         B(CatMovement, "Ground Follow", () => m.GroundFollow, v => m.GroundFollow = v);
         B(CatMovement, "Tube Contact", () => m.TubeContact, v => m.TubeContact = v);
         F(CatMovement, "Ground Follow Snap (m)", 0f, 2f, () => m.GroundFollowSnapDistance, v => m.GroundFollowSnapDistance = v);
+        B(CatMovement, "Wall Ride", () => m.WallRide, v => m.WallRide = v);
+        F(CatMovement, "Wall Ride Min Normal Dot", -1f, 0.5f, () => m.WallRideMinNormalDot, v => m.WallRideMinNormalDot = v);
+        F(CatMovement, "Wall Ride Min Speed", 0f, 120f, () => m.WallRideMinSpeed, v => m.WallRideMinSpeed = v);
+        F(CatMovement, "Wall Ride Drive Mult", 0f, 1f, () => m.WallRideDriveMultiplier, v => m.WallRideDriveMultiplier = v);
+        F(CatMovement, "Wall Ride Max Climb (m/s)", 5f, 150f, () => m.WallRideMaxClimbSpeed, v => m.WallRideMaxClimbSpeed = v);
         F(CatMovement, "Rush Threshold", 1f, 250f, () => m.RushThreshold, v => m.RushThreshold = v);
         F(CatMovement, "Crush Threshold", 1f, 250f, () => m.CrushThreshold, v => m.CrushThreshold = v);
         F(CatMovement, "Overdrive Threshold", 1f, 250f, () => m.OverdriveThreshold, v => m.OverdriveThreshold = v);
@@ -370,8 +398,10 @@ public sealed class GameplayTuning
         F(CatBoost, "Direction Blend", 0f, 1f, () => b.BoostDirectionBlend, v => b.BoostDirectionBlend = v);
         F(CatBoost, "Capacity", 10f, 400f, () => b.BoostCapacity, v => b.BoostCapacity = v);
         F(CatBoost, "Drain Rate", 0f, 150f, () => b.BoostDrainRate, v => b.BoostDrainRate = v);
+        F(CatBoost, "Start Fraction", 0f, 1f, () => b.StartFraction, v => b.StartFraction = v);
         F(CatBoost, "Passive Regen", 0f, 60f, () => b.PassiveBoostRegen, v => b.PassiveBoostRegen = v);
         F(CatBoost, "Pickup Refill", 0f, 200f, () => b.PickupRefillAmount, v => b.PickupRefillAmount = v);
+        F(CatBoost, "Pickup Spacing (m)", 200f, 4000f, () => b.PickupSpacingMetres, v => b.PickupSpacingMetres = v);
 
         var k = Camera;
         F(CatCamera, "Distance", 6f, 90f, () => k.Distance, v => k.Distance = v);

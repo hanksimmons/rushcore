@@ -220,15 +220,17 @@ Boost is finite and refillable.
 
 Baseline sources:
 
-- normal stage/start allocation,
-- **slow emergency passive regeneration**,
+- the run-start allocation: a tunable fraction of the meter (0.3, D-106), carried across stage transitions (P-010),
+- boost pickups/lanes on the ground: the only refill on a stage until offensive play exists,
 - meaningful refill from successful offensive play,
-- boost pickups/lanes,
 - items/upgrades.
 
-Passive regeneration must be too slow to support continuous boost. Its purpose is to prevent an empty meter from producing a long dead-energy state.
+There is **no passive regeneration by default** (D-106, replacing D-020's emergency trickle): an empty meter stays
+empty until the player drives through a ring, so boost is scarce and where it is placed matters. The passive rate
+remains a tuning value at 0 so the trickle can be compared. The base kit at the base cap is never dead energy: drive,
+slope and Flow headroom need no boost.
 
-Exact rates are **VALIDATE**.
+Exact rates and ring spacing are **VALIDATE**.
 
 Boost does not require Flow as a primary refill source. If Flow later affects boost, keep the relationship modest to prevent runaway positive feedback.
 

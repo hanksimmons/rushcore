@@ -78,7 +78,8 @@ The Movement Toy must implement these accepted behaviors:
 - landing-burst logic stays simple and local (two timers, one window),
 - boost works in air,
 - boost direction blends current travel and desired input,
-- slow emergency passive boost refill plus active refill hooks,
+- no passive boost refill by default (D-106): the meter starts a run at a tunable fraction (0.3) and refills only from boost rings on the ground and later active sources; the passive rate stays a slider at 0,
+- **wall ride** (D-108, the user's call 2026-09-19): above a minimum speed any wall a heightfield can make is ground; the follow carries the ball round a concave fillet without loss, the stick is read in the wall's frame (toward the wall climbs), drive is off on the wall so gravity brings the ball back or the top releases it into the air; the up-wall speed is capped (45 m/s, a 26 m climb) so a head-on hit is a shed of speed and a Flow loss, never a climb out of the stage; no input, no verb; `Movement › Wall Ride` off = the D-092/D-101 controller,
 - **carve** (D-089; the D-007 removal covered a different, speed-costing verb): hold Left Alt / LB while grounded above a minimum speed; the facing swings toward the stick at a tunable yaw rate while the velocity understeers wide; release (or ground loss) re-aims the velocity along the facing at no less than the entry speed; the camera tracks the facing; a real turn grants Flow.
 
 Do not reinterpret charge jump as “jump on press with variable gravity.” Jump occurs on **release**.
@@ -170,7 +171,7 @@ Current accepted direction:
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
 - the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
 - `HeightMapShape3D` main terrain,
-- structures (D-096): lids as `BoxShape3D`, tubes as inward-facing `ConcavePolygonShape3D` with backface collision, on a structure layer; the ground follow reads the terrain heightfield only; inside a tube the tube follow (D-101, `Movement › Tube Contact`) holds the ball to the analytic shell and counts any contact as ground, a rule scoped to tubes.
+- structures (D-096): lids as `BoxShape3D`, tubes as inward-facing `ConcavePolygonShape3D` with backface collision, on a structure layer; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); inside a tube the tube follow (D-101, `Movement › Tube Contact`) holds the ball to the analytic shell and counts any contact as ground, a rule scoped to tubes.
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
 
@@ -265,7 +266,10 @@ Until the implementation plan advances:
 > the first cut of Sky Terraces (D-103: terrace floors with cliff edges onto the floor below, drains, the cloud band),
 > the stage debug views (D-104), and branching exits (D-105: terminal lines ending on their own pads; one to three exits
 > per stage, and the pad reached decides the next stage). Phase 3's listed slices are all delivered; Gate G0 per archetype holds in the
-> harness and the manual sample is the user's. Difficulty stays parked until after Phase 4.
+> harness and the manual sample is the user's. Difficulty stays parked until after Phase 4. **Phase 3B (2026-09-19, D-107):** a fifth archetype, Summit Descent,
+> designed in `docs/12` (summit start, 4–6 switchback tiers with cap-holdable hairpins, walls everywhere, the chute as
+> the inside line, 600 m of descent); slices S1–S3 in `docs/09`; the user playtests S1 + S2. The boost economy
+> changed by the user's call on the same day (D-106: start at 30%, no passive regen, rings as the refill).
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

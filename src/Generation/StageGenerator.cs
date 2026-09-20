@@ -71,8 +71,12 @@ public sealed class StageGenerator
         // B–D: archetype relief and the stamped corridor become the one logical height source;
         // the route polyline is then lifted onto it so every later check sees real geometry.
         var field = new StageHeightField(route, request.StageSeed, rules);
-        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed, rules);
-        foreach (var line in optional) field.AddLine(line);
+        var optional = straight ? new List<RouteSkeleton>() : OptionalLineBuilder.Build(route, request.StageSeed, rules, field);
+        // A tunnel the ground does not roof (a dive under too shallow a swell, docs/13 §2.2) stamps nothing and is dropped here.
+        var uncovered = new List<string>();
+        for (int k = optional.Count - 1; k >= 0; k--)
+            if (!field.AddLine(optional[k])) { uncovered.Add($"tunnel at {route.Vertices[optional[k].JoinStart].Distance:0} m: no covered run of {WorldScale.TunnelCoveredMin:0} m"); optional.RemoveAt(k); }
+        uncovered.Reverse();
         Lift(route, field);
         foreach (var line in optional) Lift(line, field);
         report.Timings.Add(("relief + corridors", sw.Elapsed.TotalMilliseconds)); sw.Restart();
@@ -99,6 +103,10 @@ public sealed class StageGenerator
             var line = optional[k];
             var baseProfile = _speed.Integrate(line.Polyline(), profile.Speed[line.JoinStart]);
             var verdict = FlightsHoldCorners(baseProfile, line.Polyline(), _speed);
+            // A tunnel line flies nowhere at the base cap (docs/13 §2.4): a dive's ramps are built to the knee rule, but where the
+            // primary's own swell is convex under a ramp the two knees add up, and a flight into a slot ends on the arch or the far
+            // wall. Such a dive is dropped, not the stage (the D-100 rule).
+            if (verdict.ok && line.IsTunnel && baseProfile.Flights.Count > 0) verdict = (false, $"{baseProfile.Flights.Count} flights at the cap on a tunnel line");
             if (!verdict.ok)
             {
                 string trace = "";
@@ -127,8 +135,8 @@ public sealed class StageGenerator
             def.OptionalProfiles.Add(_speed.Integrate(line.Polyline(), profile.Speed[line.JoinStart]));
             def.OptionalCeilingProfiles.Add(_ceiling.Integrate(line.Polyline(), ceiling.Speed[line.JoinStart], chainFromBaseCap: true));
         }
-        def.DroppedLines = dropped.Count;
-        def.DroppedDetail = string.Join("; ", dropped);
+        def.DroppedLines = dropped.Count + uncovered.Count;
+        def.DroppedDetail = string.Join("; ", dropped.Concat(uncovered));
         if (!straight) def.Lids.AddRange(LidBuilder.Build(route, request.StageSeed, rules, optional));
         // Exits (02 §4, D-105): the primary's pad is A; each terminal line's pad follows in route order of its fork.
         def.Exits.Add(new StageExit(0, "A", route.Exit, route.Vertices[^1].Heading, -1));
@@ -409,12 +417,14 @@ public sealed class StageGenerator
             }
             for (int i = 0; i < prof.Count; i++) minLimit = Mathf.Min(minLimit, prof.CornerLimit[i]);
             float primaryTime = def.SpeedProfile.TimeAt(pv[line.JoinEnd].Distance) - def.SpeedProfile.TimeAt(pv[line.JoinStart].Distance);
-            bool ok = covered && minDepth >= TunnelProfile.PortalDepth - 0.5f && floorErr <= 0.3f && stampErr <= 1f && !prof.Stalled
+            // No launch at the base cap anywhere on the line (docs/13 §2.4): a dive's ramps are built to the knee rule, and a
+            // flight into a slot would end on the arch or the far wall.
+            bool ok = covered && minDepth >= TunnelProfile.PortalDepth - 0.5f && floorErr <= 0.3f && stampErr <= 1f && !prof.Stalled && prof.Flights.Count == 0
                       && minLimit >= baseCap - 1f && nearestLine >= WorldScale.MinCorridorWidth && nearestLid >= WorldScale.TunnelPortalClearance;
             allOk &= ok;
-            detail += $" [tunnel at {pv[line.JoinStart].Distance:0} m: covered {line.CoveredLength:0} m of {line.Length:0}, rock over the floor ≥ {(covered ? minDepth : 0f):0.0} m, floor error {floorErr:0.00} m, stamp error {stampErr:0.00} m, corner limit ≥ {minLimit:0} m/s, nearest line {(nearestLine == float.MaxValue ? -1f : nearestLine):0} m, nearest lid or portal {(nearestLid == float.MaxValue ? -1f : nearestLid):0} m, {prof.TotalTime:0.0} s vs the primary's {primaryTime:0.0} s{(ok ? "" : " FAIL")}]";
+            detail += $" [{(line.RidgeHeight < 0f ? "dive" : "tunnel")} at {pv[line.JoinStart].Distance:0} m: covered {line.CoveredLength:0} m of {line.Length:0}, rock over the floor ≥ {(covered ? minDepth : 0f):0.0} m, floor error {floorErr:0.00} m, stamp error {stampErr:0.00} m, corner limit ≥ {minLimit:0} m/s, {prof.Flights.Count} flights at the cap, nearest line {(nearestLine == float.MaxValue ? -1f : nearestLine):0} m, nearest lid or portal {(nearestLid == float.MaxValue ? -1f : nearestLid):0} m, {prof.TotalTime:0.0} s vs the primary's {primaryTime:0.0} s{(ok ? "" : " FAIL")}]";
         }
-        report.Add("tunnels are covered, their trench is the tunnel profile, their corridor holds the base cap and their portals stand clear (docs/13 §2.7)", allOk, $"{tunnels.Count} tunnels{detail}");
+        report.Add("tunnels are covered, their trench is the tunnel profile, their corridor holds the base cap without a launch and their portals stand clear (docs/13 §2.7)", allOk, $"{tunnels.Count} tunnels{detail}");
     }
 
     /// <summary>Geometric flight check for any polyline (D-100): a flight's straight path may not drift more than the

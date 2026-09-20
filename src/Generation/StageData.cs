@@ -187,6 +187,8 @@ public sealed class RouteSkeleton
     /// <summary>Offset lines (D-100, D-103): lateral offset from the primary, the S-transition length at each end, and the
     /// climb / descent ramp length just inside the transitions.</summary>
     public float Offset = WorldScale.RidgeOffset, Transition = WorldScale.RidgeTransition, RampLength = WorldScale.RidgeRampLength;
+    /// <summary>How far before the transition's end the plateau's ramp begins (a dive's descent starts inside its S, D-116); 0 elsewhere.</summary>
+    public float RampLead;
     /// <summary>Sky Terraces (D-103): the floor this line is (1 = the primary's floor, 2 and 3 the terraces above it).</summary>
     public int Floor = 1;
     /// <summary>Which side of the primary the line lies on (+1 its left, −1 its right); the primary is toward −Side.</summary>

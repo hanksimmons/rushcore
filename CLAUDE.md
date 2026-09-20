@@ -171,7 +171,7 @@ Current accepted direction:
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
 - the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
 - `HeightMapShape3D` main terrain,
-- structures (D-096, D-111, D-112, D-113): lids as `BoxShape3D`, wall shells and tunnel roofs (`docs/13 §2`) as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk beneath it (a metre; three under a tunnel's 6 m fillet), and the world's height query answers with the stamp there; a tunnel is a slot cut into the finished ground with an arched roof over its covered run, and its cap is the one place two surfaces stack over one XZ: the height query takes the asker's own height (`SampleHeight(x, z, y)`, `IGroundSurface.Height`) and answers the cap above it, the trench below; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); the see-through tubes and the tube follow (D-101) were removed on 2026-09-19 (D-112).
+- structures (D-096, D-111, D-112, D-113): lids as `BoxShape3D`, wall shells and tunnel roofs (`docs/13 §2`) as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk beneath it (a metre; three under a tunnel's 6 m fillet), and the world's height query answers with the stamp there; a tunnel is a slot cut into the finished ground with an arched roof over its covered run, and its cap is the one place two surfaces stack over one XZ: the height query takes the asker's own height (`SampleHeight(x, z, y)`, `IGroundSurface.Height`) and answers the cap above it, the trench below; a dive (D-116) is the same tunnel beneath an open landscape, its trench filling as well as cutting where the ground beside lies below its floor; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); the see-through tubes and the tube follow (D-101) were removed on 2026-09-19 (D-112).
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
 
@@ -279,8 +279,13 @@ Until the implementation plan advances:
 > mesh of the stage's own ground with the archetype's far shapes, fog to 6 km, the far plane 30 km. **D-115 (W1):** the resident
 > mesh, a coarse 16 m mesh over the whole stage and a fine 4 m window of tiles within 1.2 km of the ball built on worker threads,
 > skirts on every tile, the collider never windowed; the first frame 2.1 s from 4.6 s, the last 1.15 s being Godot's mesh-shape
-> build of a non-square heightmap (padding it square is the user's call: a heightfield quantises). Next per `docs/13 §5`: T2 the
-> dive, then W2, H2, T3; the user plays after T1 + H1.
+> build of a non-square heightmap (padding it square is the user's call: a heightfield quantises). **D-116 (T2, 2026-09-20):** the
+> dive, a tunnel line beneath an open landscape (a cosine descent 52 m below the ground beside the primary plus the site's
+> deficit, ramps to the knee rule, the fill where the ground beside is lower, the floor's convexity checked before stamping) on
+> the Highlands, Sky Terraces and Dune Sea; the tunnel drive and the cap drive on every archetype. **D-117 (found with it):** every
+> offset line's ramps are shaped in the line's own distance and the speed model's launch stencil reads uneven vertex spacing
+> correctly (both hid or made convex kinks at bend boundaries); every golden hash re-recorded. Next per `docs/13 §5`: W2 the
+> length (with the collider decision), then H2, T3; the user plays after T1 + H1 + T2.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

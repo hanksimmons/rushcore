@@ -109,6 +109,28 @@ restores the surface at its original height, so a player on the primary can also
 
 Both placements are the same builder with one flag, and the same shell code.
 
+**Delivered (T2, D-116, 2026-09-20), with these rules learned on the way.** With the T1 arch the portal depth is 44 m
+(crown 40 m plus the cap), not the 16 m above, so a dive digs 52 m below the ground beside the primary (`DiveCoverMargin`
+8 m over the portal depth; the ramps' cosine knees hold the cap's 560 m contact radius with a 10% margin, 400 m each at
+that depth), plus whatever the ground beside the primary lies below the primary's own floor at that site (a swell's side
+slope, up to 30 m absorbed; the ramps lengthen to match). The descent begins halfway through the leaving S, where the
+trench already lies past the primary's level width, and the run at full depth stretches from 60 m to 500 m to span the
+bends the site shadows (the S's must lie on straights; the ramps and run may curve round a bend on the outside, which the
+dive takes). Only the two S's must be clear of features (the run at 200 m lies past the primary's stamp reach), and the site
+is scanned for a position whose S's clear them. Two things made the dive launch the base kit until they were rules: the
+primary's own swell under a ramp's convex knee adds its curvature to the knee's, so the planned floor's sharpest convexity
+along the line is checked before the line is stamped (`DiveFloorConvexity`) and the site is skipped if it exceeds the
+contact radius; and a trench that only *cut* rode the natural ground where that ground lay below the planned floor, then
+dropped into the cut at full weight (a kink that flew), so a tunnel's stamp now also **fills** where the ground beside is
+lower, over the archetype's falloff, and the floor is the planned floor from the fork on (a portal never fills: the canyon's
+side terrain is always above its floor). Two older defects surfaced on the way and are D-117: every offset line's ramps were
+shaped in the primary's distance and kinked where a bend began or ended under them, and the speed model's launch stencil could
+not see it; the dive's ramps, and every ridge's and terrace's, now run in the line's own distance, and the model reads uneven
+spacing correctly. The shots found a third, older still: the wall shells' faces were wound inside-out since D-111, so the cap
+was invisible from above and the arch from inside; flipped with T2. A site a dive cannot take keeps its ridge. Measured over 100 seeds: dives on 20% of
+Highlands seeds (chance 0.5), 29% of Sky Terraces (0.4, a site no terrace fits), 8% of Dune Sea (tried at every site: its
+straights are trains); covered runs 450–1100 m; two sky dives per hundred stages dropped for a flight at the cap.
+
 ### 2.3 Pockets
 
 A **pocket** is a region no surface route reaches: a bowl 120–200 m across sunk 25–40 m below the surrounding
@@ -202,6 +224,7 @@ animated; nothing depends on the environment.
   move (all canyon samples); re-recorded in the same commit.
 - **T2 — the dive (every archetype).** The open cut, the portal placed where the ground rises, `SampleWithout`,
   the cap over open ground, the cap drive; `TunnelChance` per archetype; hashes of every archetype's samples move.
+  **Delivered 2026-09-20 (D-116)**, with D-117 (ramps in the line's distance, the model's stencil): every golden hash moved.
 - **T3 — pockets.** The bowl stamp, the in-and-out tunnels, the rim validator, the reward placement, the pocket fall.
 
 ## 3. The 3× course
@@ -346,17 +369,15 @@ decision logged (D-113 onward) and its owning doc updated. The user plays after 
 
 ## 7. Post-compaction handoff
 
-T1 (D-113), H1 (D-114) and W1 (D-115, the resident mesh) are delivered; the user plays T1 + H1 next (`-- --canyon --seed 1`)
-and owns two decisions from W1: the tunnel numbers (V-017) and whether the collider becomes a square heightfield (§3.3, the
-last second of the first frame; a physics change under the frozen ball). The next session starts at **T2, the dive** (§2.2,
-§2.3): a tunnel line on every archetype that drops beneath the landscape (a negative-height offset line), the ground
-continuing over it, with `ArchetypeRules.TunnelChance` lifted off zero on the Highlands, Dune Sea and Sky Terraces; the
-same `TunnelProfile`, roof strips, cap-aware height query and confined camera as T1; the T1 validators plus the dive's own
-(cover depth along the whole run, the descent and climb grades within the corridor's, no crossing of another line's
-corridor); the tunnel drive borrowing a seed per archetype; golden hashes move on every archetype that gains tunnels and
-are re-recorded in the same commit. Read, in order: `README.md`, this document (§0, §2, §5), `DECISIONS` D-113–D-115,
-`08 §1` (screenshots) and `§5`, `04 §5D` and `§12`, then the code: `OptionalLineBuilder` (the tunnel shape and site rule),
-`StageHeightField` (`AddLine`, `TunnelCut`, `TunnelGuard`, `Sample`, `RoofStrips`, `ArchOver`, `CapOver`),
-`StageGenerator.ValidateTunnels`, `TunnelProfile`, `MovementToyWorld` (`SampleHeight`, `BuildStructures`, the resident
-mesh section), and in `tests/MovementToySelfTest.cs` the canyon tunnel drive and the shot rig. After T2: W2 the length
-(with the collider decision), H2 the cloud dome, T3 pockets (§5).
+T1 (D-113), H1 (D-114), W1 (D-115) and T2 (D-116, the dive) are delivered; the user plays T1 + H1 + T2 next (`-- --canyon --seed 1`
+for the portal, `-- --seed 1` for the dive) and owns three decisions: the tunnel numbers (V-017, now with the dive's), whether
+the collider becomes a square heightfield (§3.3), and the dive chances per archetype. The next session starts at **W2, the
+length** (§3.1, §3.5): footprint 18 × 2 km, route 19–21 km, three acts of 6 km with their own feature and line spacing
+multipliers on `ArchetypeRules`, per-stage counts ×3 (lids, lines, checkpoints, rings keep their spacing), the far plane and
+fog as set, the collider decision applied first (a mesh shape at 3× builds in about 3.5 s; a square heightfield in a few
+hundred milliseconds, quantised), every golden hash re-recorded and the regression seeds re-picked, the harness drive
+policy of §3.4 (the full drive on one archetype per run, the others their first 6 km, wall time under 4 minutes). Read, in
+order: `README.md`, this document (§0, §3, §5), `DECISIONS` D-113–D-116, `08 §1` and `§5`, `04 §5`, `04 §8`, `04 §9`, then
+the code: `WorldScale` (footprint and spacing constants), `RouteSkeletonBuilder`, `StageGenerator`, `MovementToyWorld` (the
+heights, the collider, the resident mesh), `HorizonRing`, and in `tests/MovementToySelfTest.cs` the batch (`RunGenerationBatch`)
+and `RunGeneratedStageCase`. After W2: H2 the cloud dome, T3 pockets (§5).

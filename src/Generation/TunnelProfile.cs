@@ -37,6 +37,14 @@ public static class TunnelProfile
     public static readonly float PortalDepth = Crown + WorldScale.TunnelCapThickness;
     /// <summary>Half the arc's angle, from the crown to a spring point: past the horizontal by the face's lean (a horseshoe).</summary>
     public static readonly float ArchHalfAngle = Mathf.Pi - FaceAngle;
+    /// <summary>A dive's floor below the ground it leaves (docs/13 §2.2, D-116): the portal depth plus the cover margin.</summary>
+    public static readonly float DiveDepth = PortalDepth + WorldScale.DiveCoverMargin;
+    /// <summary>The deepest a dive digs: the dive depth plus the largest site deficit it will absorb.</summary>
+    public static readonly float DiveDepthMax = DiveDepth + WorldScale.DiveDeficitMax;
+    /// <summary>A dive's ramp length for a depth: the cosine ramp's convex knee (radius 2L²/π²H) clears the cap's contact radius by the knee margin, rounded up to 10 m.</summary>
+    public static float DiveRampFor(float depth) => Mathf.Ceil(Mathf.Sqrt(Mathf.Pi * Mathf.Pi * depth * WorldScale.CapContactRadius * WorldScale.DiveKneeMargin * 0.5f) / 10f) * 10f;
+    /// <summary>The ramp at the dive depth (the shortest dive).</summary>
+    public static readonly float DiveRamp = DiveRampFor(DiveDepth);
 
     /// <summary>The arch's underside height above the floor at a lateral distance from the centreline (clamped to the span; the
     /// upper branch of the horseshoe).</summary>

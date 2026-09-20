@@ -16,7 +16,7 @@ public static class RegressionSeeds
         // Refreshed 2026-09-07 (D-099, D-100): the builder's clipped-feature and clipped-turn rules moved every wander
         // and the ridge redesign moved every line, so the reasons describe the stages as they generate now.
         new(20260905, 0, "toy default seed: the first playtested stage (one launch crest, 2 ridge lines)"),
-        new(1, 0, "the harness drive seed: two committed banked turns, no feature straight, 2 ridge lines"),
+        new(1, 0, "the harness drive seed: two committed banked turns, no feature straight, a dive (D-116) and a ridge line"),
         new(1, 1, "a mandatory gap on the first attempt"),
         new(8, 0, "a mandatory gap plus four committed banked turns on one route"),
         new(15, 5, "a launch ramp and a banked turn (once the grade-delta regeneration case, D-084)"),

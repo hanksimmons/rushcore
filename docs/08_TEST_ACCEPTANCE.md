@@ -178,6 +178,12 @@ Required:
   tunnel's floor along the covered run (the hole), the ball is grounded at least 95% of the time inside, neither portal is an
   impact, the lens stays under the arch and inside the walls on every tick inside, the exit speed is within 10% of the
   model's, and a ball set down on the surface over the covered run rests on the cap as a floor,
+- dives (D-116, `docs/13 §2.8`), on the open archetypes: the batch places covered dives on at least 12% of Highlands seeds, 20%
+  of Sky Terraces and 5% of Dune Sea (the measured shares less margin; sites, not the chance, are the limit) and every one
+  passes the tunnel validators, which now also refuse a flight at the base cap anywhere on a tunnel line; the tunnel drive
+  above runs on whichever archetype the harness drives (borrowing a seed of that archetype with a covered tunnel) and adds the
+  **cap drive**: the ball driven along the surface over the covered run, from a fifth in to a fifth before its end, stays
+  grounded at least 90% of the way and never below the cap's top,
 - the far horizon (D-114, `docs/13 §4.4`): the ring builds on every archetype's batch seed with no point inside the
   footprint, its inner ring meeting the stage's own ground within 5 m at 16 probes and at most 60 k triangles; the built
   stage draws it,
@@ -261,6 +267,16 @@ on to the exit.
 exit 148.5 m/s against the model's 148.5, the lens under the arch on all 297 ticks and never in the rock, the cap holds the
 ball as a floor; the wall-ride and lid checks unchanged. Canyon hashes re-recorded ("tunnel" and "tunnels + pit"); no other
 archetype's moved.
+
+**Result (dives, T2, D-116 with D-117, 2026-09-20):** 100 seeds per archetype: dives on 20 Highlands seeds (chance 0.5), 29
+Sky Terraces (0.4), 8 Dune Sea (1), covered 450–1100 m, every one passing its validators, two sky dives per hundred stages
+dropped for a flight at the cap; the canyon's portals 68 on 59 seeds (chance 0.7; six dropped by the corrected launch
+stencil, which also drops 14 / 15 / 5 / 36 lines per hundred Highlands / Canyon / Dune / Sky stages that the blind stencil
+passed). The dive drive on Highlands seed 1 (fork at 2058 m, covered 513→1398 m of an 1862 m line): 362 ticks inside,
+grounded 100%, min speed inside 148.5 m/s, no portal impact, exit 148.5 m/s against the model's 148.5, the lens under
+the arch on every tick; the cap drive over 433 m of the covered run grounded 100%, never below the cap's top. Before
+D-117 the same drive was 84% grounded inside: the ball flew off the trench's start, where a floor that only cut rode the
+lower ground beside the primary and then dropped into the cut. Default 405/405; canyon 423/423 (its portal drive unchanged: 289 ticks inside grounded 100%, exit at the model's speed); sky 406/406 (the dive drive on sky seed 1: 294 ticks inside, grounded 100%, exit 148.5 m/s, the cap drive 100% over 528 m); the windowed default run 404/405 with only the known camera-band check, the dive's open cut, portal, bore and cap seen in its shots.
 
 **Result (the resident mesh, W1, D-115, 2026-09-19):** the Highlands drive seed builds to its first frame in 1.86 s (the
 canyon sample 2.1 s; 4.6 s before W1), 1.15 s of it the collider (a Jolt mesh shape, because the map is not square; the

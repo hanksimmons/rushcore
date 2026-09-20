@@ -222,11 +222,14 @@ public sealed class RouteSpeedModel
         {
             cosSlope[i] = 1f;
             if (i < CurvatureSpan || i + CurvatureSpan >= n) continue;
-            float span = 0.5f * (profile.Distance[i + CurvatureSpan] - profile.Distance[i - CurvatureSpan]);
-            if (span <= 1e-3f) continue;
+            // Over the actual distances either side (D-116): an offset line's vertices sit one per primary vertex, so round a bend
+            // they are stretched on the outside and bunched on the inside, and where that spacing changes under a sloped floor the
+            // even-spacing difference read a constant grade as a 100 m crest, a phantom flight that dropped every dive on a bend.
+            float dB = profile.Distance[i] - profile.Distance[i - CurvatureSpan], dF = profile.Distance[i + CurvatureSpan] - profile.Distance[i];
+            if (dB <= 1e-3f || dF <= 1e-3f) continue;
             float yF = polyline[i + CurvatureSpan].Y, y0 = polyline[i].Y, yB = polyline[i - CurvatureSpan].Y;
-            float second = (yF - 2f * y0 + yB) / (span * span);
-            float slope = (yF - yB) / (2f * span);
+            float second = 2f * ((yF - y0) / dF - (y0 - yB) / dB) / (dB + dF);
+            float slope = (yF - yB) / (dB + dF);
             float slope2 = 1f + slope * slope;
             launchDemand[i] = second / (slope2 * Mathf.Sqrt(slope2));
             cosSlope[i] = 1f / Mathf.Sqrt(slope2);

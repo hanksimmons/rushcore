@@ -74,11 +74,6 @@ public sealed class StageHeightField : IHeightSource
         /// <summary>The line's wall profile (D-113): the fillet radius, the face slope, the setback beyond the level width and the sink
         /// under its shell (the canyon's, or a tunnel's).</summary>
         public readonly float Radius, FaceTan, Setback, ShellSink;
-        /// <summary>A tunnel's floor is another line's profile read at the point's projection onto that line (the primary's base
-        /// profile: the canyon floor continued into the rock), so the trench's floor meets the primary's exactly wherever the
-        /// two overlap; the line's own profile is the fallback beyond that line's reach.</summary>
-        public StampedLine? FloorFrom;
-        public float[]? FloorProfile;
 
         public StampedLine(RouteSkeleton route, float[] profile, float sizeX, float sizeZ, ArchetypeRules rules)
         {
@@ -313,11 +308,6 @@ public sealed class StageHeightField : IHeightSource
         /// plus the outer-half bank.</summary>
         public float Height(int i, float x, float z)
         {
-            if (FloorFrom is { } from && FloorProfile is { } fp)
-            {
-                int k = from.Nearest(x, z, _sizeX, _sizeZ, out _);
-                if (k >= 0) return from.ProfileHeight(fp, k, x, z);
-            }
             float dx = x - X[i], dz = z - Z[i];
             Toward(i, x, z, out int j, out float t);
             float h = Mathf.Lerp(H[i], H[j], t);
@@ -513,27 +503,31 @@ public sealed class StageHeightField : IHeightSource
 
     /// <summary>Corridor centreline height of the primary route at a vertex.</summary>
     public float PrimaryHeight(int index) => _primaryProfile[index];
+    /// <summary>The primary's base profile at a vertex (before features): what an optional line's floor is measured from.</summary>
+    public float PrimaryBaseHeight(int index) => _primaryBase[index];
+
     public ArchetypeRules Rules => _rules;
 
     /// <summary>
     /// Stamps an optional line. A ridge line rides the primary's profile between its joins, raised
-    /// onto a plateau by its ridge height, so both ends meet the primary exactly.
+    /// onto a plateau by its ridge height, so both ends meet the primary exactly. A tunnel line (docs/13) is stamped only
+    /// when the ground roofs it for at least <see cref="WorldScale.TunnelCoveredMin"/>: returns false, stamping nothing, for
+    /// a tunnel the ground does not cover (a dive under too shallow a swell), so the generator drops the line.
     /// </summary>
-    public void AddLine(RouteSkeleton line)
+    public bool AddLine(RouteSkeleton line)
     {
         var v = line.Vertices;
         var pv = _primaryRoute.Vertices;
         var profile = new float[v.Count];
-        // The plateau envelope runs in the primary's distance, as the offset envelope does: the line's own distance
-        // is longer around the outside of the bend it shadows, and in it the descent slid into the return transition,
-        // where the primary's falloff blend squeezed it into a launch (D-100).
-        float span = Mathf.Max(1f, pv[line.JoinEnd].Distance - pv[line.JoinStart].Distance);
+        // The ramps are anchored in the primary's distance (the climb begins once the line has left the primary's falloff, the
+        // descent ends before the return transition, D-100) but shaped in the line's own distance (D-117): the line is longer
+        // round the outside of a bend, and a ramp shaped in the primary's distance kinked wherever a bend began or ended under it.
+        var (up0, down1) = OptionalLineBuilder.RampAnchors(_primaryRoute, line);
         for (int i = 0; i < v.Count; i++)
         {
             int pi = Mathf.Clamp(line.JoinStart + i, 0, _primaryProfile.Length - 1);
-            float pd = pv[pi].Distance - pv[line.JoinStart].Distance;
-            profile[i] = _primaryBase[pi] + line.RidgeHeight * (line.Terminal ? OptionalLineBuilder.TerminalPlateau(pd, line.Transition, line.RampLength)
-                                                                                : OptionalLineBuilder.Plateau(pd, span, line.Transition, line.RampLength));
+            profile[i] = _primaryBase[pi] + line.RidgeHeight * (line.Terminal ? OptionalLineBuilder.TerminalEnvelope(up0, line.RampLength, v[i].Distance)
+                                                                                : OptionalLineBuilder.RampEnvelope(up0, down1, line.RampLength, v[i].Distance));
         }
         if (line.Terminal)
         {
@@ -550,12 +544,9 @@ public sealed class StageHeightField : IHeightSource
         var stamped = new StampedLine(line, profile, SizeX, SizeZ, _rules);
         if (line.IsTunnel)
         {
-            // A tunnel's floor is the primary's base profile read at the point's projection onto the primary (docs/13 §2.1):
-            // the canyon floor continued into the rock, so the trench's floor meets the primary's exactly through the mouth.
-            stamped.FloorFrom = _primary;
-            stamped.FloorProfile = _primaryBase;
-            _tunnels.Add(stamped);
-            // The covered run: the longest contiguous stretch where the ground without any tunnel stands the portal depth
+            // A tunnel's floor is the primary's base along the line (the canyon floor continued into the rock, meeting the primary's
+            // exactly through the mouth: the S's lie on straights, where the base along the line is the base at the projection) less
+            // a dive's descent (D-116). The covered run: the longest contiguous stretch where the ground without any tunnel stands the portal depth
             // above the floor; its ends are the portals.
             int n = line.Vertices.Count, bestStart = -1, bestLen = 0, runStart = -1;
             for (int i = 0; i <= n; i++)
@@ -567,8 +558,28 @@ public sealed class StageHeightField : IHeightSource
             bool enough = bestStart >= 0 && bestLen >= 2 && line.Vertices[bestStart + bestLen - 1].Distance - line.Vertices[bestStart].Distance >= WorldScale.TunnelCoveredMin;
             line.CoverStart = enough ? bestStart : -1;
             line.CoverEnd = enough ? bestStart + bestLen - 1 : -1;
+            if (!enough) return false;
+            _tunnels.Add(stamped);
         }
         _lines.Add(stamped);
+        return true;
+    }
+
+    /// <summary>Instrument: a tunnel line's own floor at a point (the primary's base at the projection less the dive envelope) and its
+    /// cut weight there, for tracing the stamped floor against the planned one.</summary>
+    public (float floor, float weight, float without) TunnelFloorAt(RouteSkeleton line, float x, float z)
+    {
+        foreach (var t in _tunnels)
+        {
+            if (!ReferenceEquals(t.Route, line)) continue;
+            int i = t.Nearest(x, z, SizeX, SizeZ, out float d);
+            float without = SampleWithoutTunnels(x, z);
+            if (i < 0) return (float.NaN, 0f, without);
+            float f = t.Height(i, x, z);
+            float top = without - f;
+            return (f, top > 0f ? t.Weight(i, x, z, d, top) * TunnelGuard(x, z) : 0f, without);
+        }
+        return (float.NaN, 0f, float.NaN);
     }
 
     /// <summary>The tunnel lines (docs/13) with a covered run, and their stamps.</summary>
@@ -584,7 +595,10 @@ public sealed class StageHeightField : IHeightSource
     }
 
     /// <summary>The tunnels' cut at a point (docs/13 §2.1): the strongest tunnel corridor weight there, given the ground without
-    /// tunnels; 0 away from every tunnel. The point's floor and the cutting line come back for the stamp.</summary>
+    /// tunnels; 0 away from every tunnel. The point's floor and the cutting line come back for the stamp. Where the ground lies
+    /// below the line's floor (a dive's S and ramp start beside a swell's low side, D-116) the trench is a fill instead, blended
+    /// over the archetype's falloff: the floor is the planned floor from the fork on (a floor that rode the lower ground and then
+    /// dropped into the cut was a convex kink that launched the base kit). A portal's floor is never above the canyon's ground.</summary>
     private float TunnelCut(float x, float z, float hWithout, out float floor)
     {
         float best = 0f; floor = hWithout;
@@ -595,7 +609,6 @@ public sealed class StageHeightField : IHeightSource
             if (i < 0 || d > 80f || t.BeyondEnd(i, x, z)) continue;
             float f = t.Height(i, x, z);
             float top = hWithout - f;
-            if (top <= 0f) continue;                       // a cut only: a tunnel never raises the ground
             float w = t.Weight(i, x, z, d, top) * TunnelGuard(x, z);
             if (w > best) { best = w; floor = f; }
         }
@@ -695,8 +708,8 @@ public sealed class StageHeightField : IHeightSource
     public bool WallSurface(Vector3 p, float ballRadius, out Vector3 normal, out float gap, out float curvature)
     {
         normal = Vector3.Up; gap = float.MaxValue; curvature = 0f;
-        if (WallHeight <= 0f) return false;
-        float side = SideHeight(p.X, p.Z);
+        if (WallHeight <= 0f && _tunnels.Count == 0) return false;   // a dive's trench is a wall on any archetype (D-116)
+        float side = SideHeight(p.X, p.Z), sideTunnel = _tunnels.Count > 0 ? SampleWithoutTunnels(p.X, p.Z) : side;
         // A line's wall is real only where the stamped ground is that wall: the stamps blend in order (Sample), so
         // beside a ledge cut into the wall, or inside another corridor, the ground is a mix or another line's floor, and
         // the follow reads the grid there instead. Without this the query reported a ledge's face inside the primary's
@@ -718,7 +731,7 @@ public sealed class StageHeightField : IHeightSource
             if (Mathf.Abs(exRaw * Mathf.Cos(line.Heading[i]) + ezRaw * Mathf.Sin(line.Heading[i])) > 0.5f) continue;
             if (!line.ProfileAt(i, p.X, p.Z, d, out float u, out float s0, out float ft) || u <= 0f) continue;
             float hc = line.Height(i, p.X, p.Z);
-            float top = side - hc;
+            float top = (line.Tunnel ? sideTunnel : side) - hc;   // a tunnel's wall rises to whatever ground stands over the trench
             float rise = WallProfile.Height(u, s0, ft, line.Radius);
             if (top <= 0f || rise > top - WorldScale.WallLipEase) continue;
             if (Mathf.Abs(stamped - (hc + rise)) > 0.3f) continue;
@@ -733,8 +746,9 @@ public sealed class StageHeightField : IHeightSource
             // a wall receding at 7° along the route slid out from under a ride at 16 m/s and the follow lost the ball.
             float tx = Mathf.Cos(line.Heading[i]), tz = Mathf.Sin(line.Heading[i]);
             const float delta = 4f;
-            float hAhead = ProfileHeightAt(line, p.X + tx * delta, p.Z + tz * delta, side, out bool okA);
-            float hBehind = ProfileHeightAt(line, p.X - tx * delta, p.Z - tz * delta, side, out bool okB);
+            float sideAlong = line.Tunnel ? sideTunnel : side;
+            float hAhead = ProfileHeightAt(line, p.X + tx * delta, p.Z + tz * delta, sideAlong, out bool okA);
+            float hBehind = ProfileHeightAt(line, p.X - tx * delta, p.Z - tz * delta, sideAlong, out bool okB);
             float along = okA && okB ? (hAhead - hBehind) / (2f * delta) : 0f;
             float ex = exRaw, ez = ezRaw;
             var n = new Vector3(-(ex * s + tx * along), 1f, -(ez * s + tz * along)).Normalized();
@@ -752,7 +766,7 @@ public sealed class StageHeightField : IHeightSource
     /// last four so the shell and the grid coincide at both edges. Zero elsewhere, and on every unwalled archetype.</summary>
     public float Sink(float x, float z)
     {
-        if (WallHeight <= 0f || !float.IsNaN(PitSurface(x, z))) return 0f;
+        if ((WallHeight <= 0f && _tunnels.Count == 0) || !float.IsNaN(PitSurface(x, z))) return 0f;
         float best = 0f, side = float.NaN;
         // Inside a tunnel's cut the other lines' shells have a hole (docs/13 §2.1), so their sink stops there too; the tunnel's
         // own band (guarded out of the primary's level width, like its cut) sinks the trench's walls.
@@ -765,7 +779,7 @@ public sealed class StageHeightField : IHeightSource
             float rawLateral = -Mathf.Sin(line.Heading[i]) * (x - line.X[i]) + Mathf.Cos(line.Heading[i]) * (z - line.Z[i]);
             if (d > line.Reach(i, Mathf.Sign(rawLateral))) continue;      // past the ray's reach on a bend's inside: no shell there
             if (float.IsNaN(side)) side = SideHeight(x, z);
-            float top = side - line.Height(i, x, z);
+            float top = (line.Tunnel ? SampleWithoutTunnels(x, z) : side) - line.Height(i, x, z);
             if (top <= 0f) continue;
             float uLip = WallProfile.LateralAtHeight(top, s0, ft, line.Radius);
             // The sink begins one cell inside the shell's foot, at the corridor's edge (D-113): the grid is bilinear over 4 m cells,
@@ -787,10 +801,9 @@ public sealed class StageHeightField : IHeightSource
     public List<WallShellStrip> ShellStrips()
     {
         var strips = new List<WallShellStrip>();
-        if (WallHeight <= 0f) return strips;
         foreach (var line in _lines)
         {
-            if (!line.Profiled) continue;
+            if (!line.Profiled) continue;   // every line of a walled archetype; a tunnel's trench on any archetype (D-116)
             int n = line.N;
             foreach (float sideSign in new[] { 1f, -1f })
             {
@@ -806,7 +819,7 @@ public sealed class StageHeightField : IHeightSource
                     edge[i] = dProbe - u0;
                     float fx = line.X[i] + lx * (edge[i] + 40f), fz = line.Z[i] + lz * (edge[i] + 40f);
                     line.ProfileAt(i, fx, fz, edge[i] + 40f, out _, out float s0, out float ft);
-                    float top = SideHeight(fx, fz) - line.Height(i, fx, fz);
+                    float top = (line.Tunnel ? SampleWithoutTunnels(fx, fz) : SideHeight(fx, fz)) - line.Height(i, fx, fz);
                     uEnd[i] = top > 0f ? WallProfile.LateralAtHeight(top, s0, ft, line.Radius) + WorldScale.WallShellPastLip : 0f;
                     // A tunnel's walls stop at the arch's spring line under the roof (docs/13 §2.1); the open cut before the
                     // portal keeps the whole trench wall.
@@ -818,6 +831,18 @@ public sealed class StageHeightField : IHeightSource
                 if (uMax <= 0f) continue;
                 float[] stations = WallProfile.ShellStations(uMax, line.Radius, line.Tunnel ? WorldScale.TunnelFaceDegrees : null);
                 int k = stations.Length;
+                // The fillet's stations are absolute (the arc is the same at every vertex); the face's are proportional to each
+                // vertex's own lip (D-116: the face is planar, so any station on it is exact, and absolute stations folded past a
+                // lower lip made a sawtooth along every lip whose height changed vertex to vertex).
+                float uFillet = line.Radius * Mathf.Sin(Mathf.DegToRad(line.Tunnel ? WorldScale.TunnelFaceDegrees : WorldScale.WallFaceDegrees));
+                float StationAt(int vi, int sj)
+                {
+                    float st = stations[sj], top = uEnd[vi];
+                    if (top <= 0f) return Mathf.Min(st, 0f);
+                    if (top < uFillet) return st <= 0f ? st : st * top / uFillet;
+                    if (st <= uFillet || uMax - uFillet < 1e-3f) return Mathf.Min(st, top);
+                    return uFillet + (top - uFillet) * (st - uFillet) / (uMax - uFillet);
+                }
                 var pts = new Vector3[n * k];
                 var valid = new bool[n * k];
                 // A vertex per task (docs/13 §3.3: the field is pure once generated; the four canyon strips took 0.3 s on one core).
@@ -826,7 +851,7 @@ public sealed class StageHeightField : IHeightSource
                     float lx = -Mathf.Sin(line.Heading[i]) * sideSign, lz = Mathf.Cos(line.Heading[i]) * sideSign;
                     for (int j = 0; j < k; j++)
                     {
-                        float u = Mathf.Min(stations[j], uEnd[i]);
+                        float u = StationAt(i, j);
                         float d = Mathf.Min(edge[i] + u, reach[i]);
                         float px = line.X[i] + lx * d, pz = line.Z[i] + lz * d;
                         pts[i * k + j] = new Vector3(px, Sample(px, pz), pz);

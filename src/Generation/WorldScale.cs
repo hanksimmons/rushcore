@@ -130,6 +130,8 @@ public static class WorldScale
     // ---- Flow ceiling (04 §12, D-094; derived at D-091: 148.5 × 1.715 = 254.7 m/s, steering saturated at 322.9 m/s²) ----
     // Generation computes the live values from tuning; these are the family's reference numbers.
     public const float CeilingSpeedReference = 254.7f;
+    /// <summary>v²/g at the base cap: the smallest convex knee the base kit rolls over without launching (D-100; every cosine ramp's knee clears it).</summary>
+    public const float CapContactRadius = 560f;
     public const float CeilingCrestRadius = 1647f;         // v²/g at the ceiling: every swell launches a full-chain ball
     public const float CeilingBendRadius = 201f;           // holds the ceiling; 68 m holds the base cap at D-091
     /// <summary>Straight route required past any touchdown (base kit or ceiling) before a bend may start.</summary>
@@ -272,6 +274,22 @@ public static class WorldScale
     public const float TunnelRimSize = 1.5f, TunnelGuideSpacing = 25f, TunnelGuideHeight = 1.5f;
     /// <summary>Inside, the rock darkens to this share of its lit colour this far from the nearer portal (06 §3).</summary>
     public const float TunnelShadeFloor = 0.45f, TunnelShadeDepth = 60f;
+    /// <summary>The dive (docs/13 §2.2, D-116): on an open landscape a tunnel line descends beneath the ground on a cosine ramp to a
+    /// floor this much deeper than the portal depth (so the covered run begins on the ramp, before the run at full depth, and a
+    /// swell's dip over the run keeps it covered), runs <c>DivePlateau</c> at full depth and climbs out the same way. The ramp is
+    /// as long as the knee rule asks (<c>TunnelProfile.DiveRamp</c>: the convex knee's radius 2L²/π²H clears the cap's contact
+    /// radius by <c>DiveKneeMargin</c>), so the base kit never launches into or out of a dive; the ceiling ball does, and lands
+    /// on the ramp below the knee in the open cut.</summary>
+    public const float DiveCoverMargin = 8f, DivePlateau = 60f, DivePlateauMax = 500f, DiveKneeMargin = 1.1f;
+    /// <summary>A dive's run at full depth stretches from <c>DivePlateau</c> to <c>DivePlateauMax</c> to span the bends its site
+    /// shadows (its ramps and run may curve round a bend on the outside; only its two S's must lie on straights), so a longer
+    /// section is a longer covered run rather than no dive.</summary>
+    /// <summary>A dive's descent begins this fraction of the S before the S ends (its floor is exact once the trench lies past the
+    /// primary's level width, at about 0.4 of a cosine S), so the line is 290 m shorter and fits the sites a ridge does.</summary>
+    public const float DiveRampLead = 0.5f;
+    /// <summary>A dive digs deeper where the ground beside the primary lies below the primary's own floor (a swell's side slope,
+    /// up to 36 m over the 200 m offset): the site's deficit is added to the depth, and its ramps lengthen to match, up to this much.</summary>
+    public const float DiveDeficitMax = 30f;
 
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;

@@ -196,10 +196,12 @@ leaning forward like a ramp, and the carry turned that into a 99 m/s vertical la
 **The tunnel (D-113, `docs/13 §2`).** A tunnel line (`RouteLineKind.Tunnel`) is an offset line with the ridge's 200 m offset,
 a cosine S as long as its two straights allow (290–450 m: r 85–205 m, so the slot holds the base cap with margin and often the
 ceiling), no climb and a narrow corridor (`TunnelProfile`: half-width 15 m, a 6 m fillet, a 78° face, no setback). Its floor
-is **the primary's base profile read at the point's projection onto the primary**, the canyon floor continued into the
-rock beside it, so the trench meets the primary's floor exactly wherever the two overlap. Tunnels stamp **after every
+is **the primary's base profile at each vertex's primary vertex**, the canyon floor continued into the rock beside it, so
+the trench meets the primary's floor exactly through the S (D-113 read it at the point's projection; D-117 made it the
+line's own per-vertex profile like every line's, the same values on a straight). Tunnels stamp **after every
 other line, as cuts**: the ground without tunnels (`StageHeightField.SampleWithoutTunnels`) is computed first, and each
-tunnel lowers it toward its floor by its corridor weight wherever the ground stands above the floor (never raising it);
+tunnel lowers it toward its floor by its corridor weight wherever the ground stands above the floor (and, since D-116, fills
+where the ground lies below a dive's floor, so the floor is the planned floor from the fork on);
 inside the primary's level width and setback a tunnel cuts nothing (the primary's corridor stays exact) and the trench
 fades in over the first 8 m of the fillet's foot (`TunnelMouthFade`). The result is the trench cut into whatever stands
 there: a notch through the canyon's fillet and face, a slot beneath the mesa. A tunnel line measures a point's distance to
@@ -208,10 +210,25 @@ face between the shell's stations and the analytic wall, and the ball was punted
 walls, 83 m out, keep the vertex distance and their hashes). Under a tunnel's shell the grid is sunk 3 m (`TunnelShellSink`), not
 the wall's 1 m: a 4 m cell straddles most of a 6 m fillet and its chords stand up to 1.5 m proud of the arc. The **covered run**
 is where the ground
-without the tunnel stands `TunnelProfile.PortalDepth` (the crown plus a 4 m cap, about 29 m) above the floor
+without the tunnel stands `TunnelProfile.PortalDepth` (the crown plus a 4 m cap, 44 m at the shipped arch) above the floor
 (`RouteSkeleton.CoverStart/CoverEnd`); its ends are the portals. The tunnel's own wall shell runs to the lip in the open cut
 and stops at the arch's spring line (5 m) under the roof; the other lines' shells have a **hole** wherever a tunnel's cut
 reaches, and their sink stops there (the tunnel's own band takes over). The roof is a structure (§5I).
+
+**The dive (D-116, `docs/13 §2.2`).** On an open archetype the tunnel line is the same construct with a negative height:
+its floor is the primary's base at the projection less a cosine descent to `TunnelProfile.DiveDepth` (the portal depth plus
+8 m) plus the site's deficit (how far the ground beside the primary lies below the primary's floor there, up to 30 m), a run
+at full depth (60–500 m, stretched to span the bends the site shadows) and the climb back, the descent beginning halfway
+through the leaving S. Each ramp is as long as the knee rule asks (`TunnelProfile.DiveRampFor`: the cosine knee's radius
+2L²/π²H clears the cap's contact radius by 10%), the planned floor's sharpest convexity along the line, the primary's own
+swell included, is checked against that radius before the line is stamped, and a site that fails keeps its ridge. Only a
+dive's two S's must be clear of features; the site is scanned for a position where they are. Where the ground beside lies
+below the planned floor a tunnel's stamp **fills** as well as cuts (blended over the archetype's falloff), so the floor is
+the planned floor from the fork on; the covered run is where the ground without the tunnel stands the portal depth above
+that floor, the trench before it the open cut. `ArchetypeRules.TunnelChance`: Canyon 0.7 (portals), Highlands 0.5, Sky 0.4
+(a site no terrace fits), Dune Sea 1 (its straights are trains, so its sites are few). A tunnel line carries its wall shell,
+the sink beneath it and the analytic wall on every archetype (they were the walled archetypes' alone), its wall top being the
+ground without tunnels.
 
 The stamped profile is continuous along the route: the corridor height at any point interpolates
 the profile between the two route samples it lies between (D-093). A nearest-sample height is a

@@ -14,9 +14,9 @@ public static class OptionalLineBuilder
 
     /// <summary>Geometry of one kind of offset line: a ridge (D-100) or a terrace floor (D-103).</summary>
     private readonly record struct LineShape(RouteLineKind Kind, int Floor, float Offset, float Transition, float Ramp, float HeightMin, float HeightMax,
-                                             float Plateau = 80f, float HalfWidth = WorldScale.MinCorridorWidth * 0.5f)
+                                             float Plateau = 80f, float HalfWidth = WorldScale.MinCorridorWidth * 0.5f, float RampLead = 0f)
     {
-        public float Length => 2f * Transition + 2f * Ramp + Plateau;
+        public float Length => 2f * Transition + 2f * Ramp + Plateau - 2f * RampLead;
         /// <summary>A terminal line (D-105): the leaving S, the climb, the widening, a level run and the pad's flat.</summary>
         public float TerminalLength(float spread) => Transition + Ramp + spread + WorldScale.ExitLineRun + WorldScale.PadRadius * 2.5f;
     }
@@ -26,9 +26,15 @@ public static class OptionalLineBuilder
     /// <summary>A tunnel (docs/13 §2, D-113): the ridge's offset and S, no climb (its floor is the primary's own, continued into the
     /// rock beside it), a narrow corridor, a short run at full offset; the height field roofs it where the ground stands deep enough.</summary>
     private static readonly LineShape Tunnel = new(RouteLineKind.Tunnel, 1, WorldScale.TunnelOffset, WorldScale.TunnelTransition, 0f, 0f, 0f, WorldScale.TunnelPlateau, WorldScale.TunnelHalfWidth);
+    /// <summary>A dive (docs/13 §2.2, D-116): the same tunnel line on an open landscape, its floor descending on a cosine ramp to the dive
+    /// depth below the primary's own floor (a negative ridge height), a run at full depth, the climb back; the ground over it stands
+    /// the portal depth above the floor over the run and the last part of each ramp, so that is the covered run, and the trench
+    /// before it is the open cut the ground swallows the line into.</summary>
+    private static readonly LineShape Dive = new(RouteLineKind.Tunnel, 1, WorldScale.TunnelOffset, WorldScale.TunnelTransition, TunnelProfile.DiveRamp, -TunnelProfile.DiveDepth, -TunnelProfile.DiveDepth, WorldScale.DivePlateau, WorldScale.TunnelHalfWidth, WorldScale.TunnelTransition * WorldScale.DiveRampLead);
     private static readonly LineShape Floor3 = new(RouteLineKind.Terrace, 3, WorldScale.Floor3Offset, WorldScale.Floor3Transition, WorldScale.Floor3Ramp, 2f * WorldScale.FloorStep, 2f * WorldScale.FloorStep);
 
-    public static List<RouteSkeleton> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules? rules = null)
+    /// <param name="field">The stage's height field with the primary stamped (a dive reads the ground beside the primary to set its depth; none = no dives).</param>
+    public static List<RouteSkeleton> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules? rules = null, StageHeightField? field = null)
     {
         rules ??= ArchetypeRules.RollingHighlands;
         var rng = new SeededRandom(SeedChain.Derive(stageSeed, "optional"));
@@ -60,32 +66,109 @@ public static class OptionalLineBuilder
             float ps = k == 0 ? 0f : v[bends[k - 1].EndIndex].Distance;
             bool placed = false;
             // A tunnel takes the site instead of a ridge by the archetype's chance (docs/13, D-113); drawn only where tunnels
-            // exist, so an archetype without them keeps its stream and its hashes.
-            bool tunnelHere = rules.TunnelChance > 0f && floorsWanted < 2 && rng.Chance(rules.TunnelChance);
+            // exist, so an archetype without them keeps its stream and its hashes. A walled archetype's tunnel is a portal through
+            // the wall, an open one's a dive beneath the ground (D-116); on Sky Terraces a tunnel takes only a site no terrace fits.
+            bool tunnelHere = rules.TunnelChance > 0f && rng.Chance(rules.TunnelChance);
+            bool walled = rules.WallHeightMax > 0f;
+            var tunnelShape = walled ? Tunnel : Dive;
+            if (!walled && field is null) tunnelHere = false;   // a dive reads the ground beside the primary
+            // A site a dive does not fit takes a ridge instead (D-116; a terraced stage has no ridges, so there it stays empty). A
+            // portal's site does not: a ridge there blocked the next site by the line spacing and the canyon lost a fifth of its tunnels.
+            var tier1 = tunnelHere ? (floorsWanted >= 2 || walled ? new[] { tunnelShape } : new[] { tunnelShape, Ridge }) : new[] { Ridge };
+            // A dive's site deficit (below), sampled once per side over the widest section this bend can anchor (three bends on).
+            float[] deficitBySide = { float.NaN, float.NaN };
+            float neMax = k + 3 < bends.Count ? v[bends[k + 3].StartIndex].Distance : primary.Length;
             // The tallest stack first (a floor-3 section carries its floor 2), then a lone floor 2, or the ridge (or a tunnel).
             for (int tier = floorsWanted >= 3 ? 3 : floorsWanted >= 2 ? 2 : 1; tier >= 1 && !placed; tier--)
+            foreach (var tierShape in tier == 3 ? new[] { Floor3 } : tier == 2 ? new[] { Floor2 } : tier1)
             for (int extra = 0; extra <= 2 && k + extra < bends.Count && !placed; extra++)
             {
-                if (floorsWanted >= 2 && tier == 1) break;
-                var shape = tier == 3 ? Floor3 : tier == 2 ? Floor2 : tunnelHere ? Tunnel : Ridge;
+                if (floorsWanted >= 2 && tier == 1 && !tunnelHere) break;
+                bool dive = tierShape.Kind == RouteLineKind.Tunnel && tierShape.Ramp > 0f;
                 float beLast = v[bends[k + extra].EndIndex].Distance;
                 float ne = k + extra + 1 < bends.Count ? v[bends[k + extra + 1].StartIndex].Distance : primary.Length;
-                // A tunnel's S is as long as its two straights allow (docs/13, D-113): a slot wants the gentlest entry its site has.
-                if (shape.Kind == RouteLineKind.Tunnel)
+                // A dive takes the outside of the bend it shadows (inside, its ramps shorten with the arc and their knees launch the
+                // cap), the other side if the outside will not do; every other shape picks its side below.
+                float outside = -Mathf.Sign(bends[k].TurnAngle);
+                foreach (float trySide in dive ? new[] { outside, -outside } : new[] { 0f })
+                {
+                var shape = tierShape;
+                if (dive)
+                {
+                    // The dive digs to the dive depth below the ground beside the primary, not below the primary's own floor (D-116): a
+                    // swell's side slope can put that ground well below the floor, and a dive under it would never be covered. The
+                    // site's deficit over the whole section it might use is added to the depth, and the ramps lengthen to match.
+                    int sideIndex = trySide > 0f ? 0 : 1;
+                    if (float.IsNaN(deficitBySide[sideIndex]))
+                    {
+                        float worst = 0f;
+                        for (int i = primary.IndexAtDistance(ps); i <= primary.IndexAtDistance(neMax) && i < v.Count; i += 8)
+                        {
+                            float h = v[i].Heading;
+                            var q = v[i].Position + new Vector3(-Mathf.Sin(h), 0f, Mathf.Cos(h)) * (shape.Offset * trySide);
+                            worst = Mathf.Max(worst, field!.PrimaryBaseHeight(i) - field.SampleWithoutTunnels(q.X, q.Z));
+                        }
+                        deficitBySide[sideIndex] = worst;
+                    }
+                    float deficit = deficitBySide[sideIndex];
+                    if (deficit > WorldScale.DiveDeficitMax) { Tally("dive: ground too low beside"); continue; }
+                    float depth = TunnelProfile.DiveDepth + deficit;
+                    float ramp = TunnelProfile.DiveRampFor(depth);
+                    // The run at full depth stretches to span the bends the site shadows (the S's must lie on the straights either side).
+                    float plateau = Mathf.Clamp(beLast - bs - 2f * ramp + 2f * shape.RampLead + 20f, WorldScale.DivePlateau, WorldScale.DivePlateauMax);
+                    shape = shape with { Ramp = ramp, HeightMin = -depth, HeightMax = -depth, Plateau = plateau };
+                }
+                // A portal's S is as long as its two straights allow (docs/13, D-113): a slot wants the gentlest entry its site has.
+                // A dive keeps the shortest S (r 85 holds the cap): with its ramps it is already the longest line there is.
+                else if (shape.Kind == RouteLineKind.Tunnel)
                     shape = shape with { Transition = Mathf.Clamp(Mathf.Min(bs - ps, ne - beLast) - 20f, WorldScale.TunnelTransition, WorldScale.TunnelTransitionMax) };
                 float T = shape.Transition, L = shape.Length;
                 float dLo = Mathf.Max(Mathf.Max(ps, beLast + T - L), lastEnd + WorldScale.OptionalLineSpacing);
                 float dHi = Mathf.Min(bs - T, Mathf.Min(ne - L, stop - L));
-                if (dHi < dLo) continue;
-                float d = 0.5f * (dLo + dHi), dEnd = d + L;
+                if (dHi < dLo) { if (dive) Tally("dive: no room"); continue; }
+                float d = 0.5f * (dLo + dHi);
+                if (dive)
+                {
+                    // A dive's S's must clear the features on their straights (below): the site is scanned for a position where
+                    // they do, rather than centred, since a crest and its landing run take most of an open landscape's straight.
+                    // And the ground under each convex knee (the top half of each ramp) must be flat or concave along the route: the
+                    // ramp's knee is built to the cap's contact radius, and a swell's crest under it adds its own curvature (every
+                    // dive placed on a crest launched the base kit and was dropped).
+                    float spare = 1f / WorldScale.CapContactRadius - Mathf.Pi * Mathf.Pi * (-shape.HeightMin) / (2f * shape.Ramp * shape.Ramp);
+                    float lead = shape.RampLead;
+                    bool found = false; string why = "features";
+                    for (float dd = dLo; dd <= dHi && !found; dd += 50f)
+                    {
+                        if (OverlapsFeature(primary, dd - 30f, dd + T + 30f) || OverlapsFeature(primary, dd + L - T - 30f, dd + L + 30f)) continue;
+                        why = "a crest under a knee";
+                        if (BaseConvexity(primary, field!, dd + T - lead, dd + T - lead + shape.Ramp * 0.5f) > spare) continue;
+                        if (BaseConvexity(primary, field!, dd + L - T + lead - shape.Ramp * 0.5f, dd + L - T + lead) > spare) continue;
+                        d = dd; found = true;
+                    }
+                    if (!found) { Tally("dive: " + why); continue; }
+                }
+                float dEnd = d + L;
                 int a = primary.IndexAtDistance(d), b = primary.IndexAtDistance(dEnd);
                 // A terrace prefers the side toward the axis (its long falloff needs the room); a ridge picks at random.
-                float first = shape.Kind == RouteLineKind.Terrace ? -Mathf.Sign(v[a].Position.Z + v[b].Position.Z + 1e-3f) : rng.Sign();
+                float first = dive ? trySide : shape.Kind == RouteLineKind.Terrace ? -Mathf.Sign(v[a].Position.Z + v[b].Position.Z + 1e-3f) : rng.Sign();
                 float Offset(int i) => shape.Offset * Bump(v[i].Distance - v[a].Distance, v[b].Distance - v[a].Distance, shape.Transition, shape.Kind == RouteLineKind.Tunnel);
-                float side = SideValid(primary, turnSign, a, b, first, Offset) ? first : SideValid(primary, turnSign, a, b, -first, Offset) ? -first : 0f;
-                if (side == 0f || OverlapsFeature(primary, d, dEnd) || !JoinsOnStraights(primary, a, b, T) || Occupied(d, dEnd, side)) continue;
+                float side = SideValid(primary, turnSign, a, b, first, Offset) ? first : !dive && SideValid(primary, turnSign, a, b, -first, Offset) ? -first : 0f;
+                // A ridge rides beside the whole section, so no feature may stamp into it; a dive's run at full offset lies beyond the
+                // primary's stamp reach (200 m out, past the corridor and its falloff), so only its two S's, which cross that stamp,
+                // must be clear of features (D-116). A portal keeps the whole-section rule: the canyon's wall band is the primary's stamp.
+                bool overlaps = dive ? OverlapsFeature(primary, d - 30f, d + T + 30f) || OverlapsFeature(primary, dEnd - T - 30f, dEnd + 30f) : OverlapsFeature(primary, d, dEnd);
+                if (side == 0f || overlaps || !JoinsOnStraights(primary, a, b, T) || Occupied(d, dEnd, side))
+                {
+                    if (dive) Tally(side == 0f ? "dive: side" : overlaps ? "dive: features" : !JoinsOnStraights(primary, a, b, T) ? "dive: bends under an S" : "dive: exit line there");
+                    continue;
+                }
                 var line = BuildLine(primary, a, b, side, shape, rng.Range(shape.HeightMin, shape.HeightMax));
-                if (line is null) continue;
+                if (line is null) { if (dive) Tally("dive: band"); continue; }
+                // The dive's floor as it will be stamped (the primary's base less the ramp envelope, along the line's own geometry,
+                // which a bend stretches or shortens) must hold the base cap everywhere: its sharpest convex knee no tighter than
+                // the cap's contact radius. Checked here, before the field is stamped, so a dive that would fly costs no rebuild.
+                if (dive && DiveFloorConvexity(primary, field!, line) > 1f / (WorldScale.CapContactRadius * 1.02f)) { Tally("dive: knee launches"); continue; }
+                if (dive) Tally("dive: placed");
                 if (tier == 3)
                 {
                     // Floor 2 under floor 3 on the same section: its outer edge is the cliff up to floor 3.
@@ -97,6 +180,8 @@ public static class OptionalLineBuilder
                 lines.Add(line);
                 lastEnd = dEnd;
                 placed = true;
+                break;
+                }
             }
         }
         if (rules.Floors >= 2) terminals = PlaceTerminals(primary, rules, exitRng, turnSign, terminalStop, lines);
@@ -160,6 +245,71 @@ public static class OptionalLineBuilder
     public static readonly Dictionary<string, int> TerminalTally = new();
     private static void Tally(string reason) { if (System.Environment.GetEnvironmentVariable("RUSHCORE_EXIT_TRACE") == "1") TerminalTally[reason] = TerminalTally.GetValueOrDefault(reason) + 1; }
 
+    /// <summary>Where an offset line's ramps begin and end, in the line's own distance (D-116, D-117): the climb (or a dive's descent)
+    /// begins where the primary's distance passes the transition less the ramp lead, and the descent back ends the same way
+    /// before the rejoin; each ramp then runs one ramp length along the line itself. Shaped in the primary's distance (D-100's
+    /// rule), a ramp's grade along the line jumped by the bend's stretch factor wherever a bend began or ended under it, a convex
+    /// kink at a bend's entry under every climb that the speed model's even-spacing stencil read as exactly flat.</summary>
+    public static (float up0, float down1) RampAnchors(RouteSkeleton primary, RouteSkeleton line)
+    {
+        var pv = primary.Vertices; var lv = line.Vertices;
+        float lead = line.Transition - line.RampLead;
+        float pStart = pv[line.JoinStart].Distance, span = pv[line.JoinEnd].Distance - pStart;
+        float up0 = lv[^1].Distance, down1 = lv[^1].Distance;
+        bool gotUp = false;
+        for (int k = 0; k < lv.Count; k++)
+        {
+            float pd = pv[Mathf.Min(pv.Count - 1, line.JoinStart + k)].Distance - pStart;
+            if (!gotUp && pd >= lead) { up0 = lv[k].Distance; gotUp = true; }
+            if (pd >= span - lead) { down1 = lv[k].Distance; break; }
+        }
+        return (up0, down1);
+    }
+    /// <summary>The plateau envelope of a rejoining line at a line distance: up one ramp from <paramref name="up0"/>, down one before <paramref name="down1"/>.</summary>
+    public static float RampEnvelope(float up0, float down1, float ramp, float lineDistance) =>
+        CosineStep(up0, up0 + ramp, lineDistance) * (1f - CosineStep(down1 - ramp, down1, lineDistance));
+    /// <summary>A terminal line's envelope (D-105): the climb once the line has left the primary, then level to the pad.</summary>
+    public static float TerminalEnvelope(float up0, float ramp, float lineDistance) => CosineStep(up0, up0 + ramp, lineDistance);
+
+    /// <summary>The sharpest convexity (1/radius, positive where the floor curves away downward) of a dive's floor along the line:
+    /// the primary's base at each line vertex's primary vertex less the ramp envelope, over the line's own distances (uneven round a
+    /// bend), from second differences over five vertices either side.</summary>
+    private static float DiveFloorConvexity(RouteSkeleton primary, StageHeightField field, RouteSkeleton line)
+    {
+        var lv = line.Vertices; var pv = primary.Vertices;
+        int n = lv.Count;
+        var (up0, down1) = RampAnchors(primary, line);
+        var h = new float[n];
+        for (int i = 0; i < n; i++)
+            h[i] = field.PrimaryBaseHeight(Mathf.Min(pv.Count - 1, line.JoinStart + i)) + line.RidgeHeight * RampEnvelope(up0, down1, line.RampLength, lv[i].Distance);
+        float worst = float.MinValue;
+        for (int i = 5; i < n - 5; i++)
+        {
+            float dBack = lv[i].Distance - lv[i - 5].Distance, dFwd = lv[i + 5].Distance - lv[i].Distance;
+            if (dBack < 1f || dFwd < 1f) continue;
+            float second = 2f * ((h[i + 5] - h[i]) / dFwd - (h[i] - h[i - 5]) / dBack) / (dBack + dFwd);
+            worst = Mathf.Max(worst, -second);
+        }
+        return worst;
+    }
+
+    /// <summary>The largest convexity of the primary's base profile over a span of route (positive where the ground curves away
+    /// downward, as a crest does; 1/radius), from second differences over 20 m.</summary>
+    private static float BaseConvexity(RouteSkeleton primary, StageHeightField field, float from, float to)
+    {
+        var v = primary.Vertices;
+        int i0 = Mathf.Max(5, primary.IndexAtDistance(from)), i1 = Mathf.Min(v.Count - 6, primary.IndexAtDistance(to));
+        float worst = float.MinValue;
+        for (int i = i0; i <= i1; i++)
+        {
+            float ds = v[i + 5].Distance - v[i - 5].Distance;
+            if (ds < 1f) continue;
+            float second = (field.PrimaryBaseHeight(i + 5) - 2f * field.PrimaryBaseHeight(i) + field.PrimaryBaseHeight(i - 5)) / (0.25f * ds * ds);
+            worst = Mathf.Max(worst, -second);
+        }
+        return worst;
+    }
+
     /// <summary>The exit pad lies inside the footprint with its radius to spare and, on a pit stage, outside the disc.</summary>
     private static bool PadClear(RouteSkeleton primary, RouteSkeleton line)
     {
@@ -204,7 +354,7 @@ public static class OptionalLineBuilder
                 Terminal = terminal,
                 CorridorHalfWidth = shape.HalfWidth,
                 RidgeHeight = height,
-                Offset = shape.Offset, Transition = shape.Transition, RampLength = shape.Ramp,
+                Offset = shape.Offset, Transition = shape.Transition, RampLength = shape.Ramp, RampLead = shape.RampLead,
                 Side = side,
                 InnerFalloff = shape.Kind == RouteLineKind.Terrace ? WorldScale.TerraceCliffFalloff : 0f,
                 OuterFalloff = shape.Kind == RouteLineKind.Terrace ? WorldScale.TerraceOuterFalloff(height) : 0f,
@@ -325,6 +475,7 @@ public static class OptionalLineBuilder
 
     private static float CosineStep(float a, float b, float d)
     {
+        if (b - a < 1e-3f) return d < a ? 0f : 1f;   // a zero-length ramp (a portal's) is a step, never 0/0
         float t = Mathf.Clamp((d - a) / (b - a), 0f, 1f);
         return 0.5f * (1f - Mathf.Cos(Mathf.Pi * t));
     }

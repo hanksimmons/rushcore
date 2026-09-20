@@ -42,8 +42,11 @@ public sealed record ArchetypeRules(
     /// <summary>Branching exits (D-105): how far a terminal line widens beyond its shape's offset before its pad; 0 keeps a
     /// canyon's exit slot within its wall and a sky exit's cliff on the primary's flank.</summary>
     float ExitSpread,
-    /// <summary>Tunnels (docs/13, D-113): the chance a rejoining line's site takes a tunnel rather than a ridge. Canyon Run's
-    /// portals only until the dive (T2) gives open landscapes a roof to go under.</summary>
+    /// <summary>Tunnels (docs/13, D-113, D-116): the chance a rejoining line's site tries a tunnel before a ridge: a portal through
+    /// the wall on a walled archetype, a dive beneath the landscape on an open one (on Sky Terraces, only a site no terrace fits).
+    /// A site a dive cannot take keeps its ridge. Trying one at every site places a dive on 43% of Highlands seeds, 68% of Sky
+    /// Terraces and 8% of Dune Sea (its straights are trains); the plan's 0.5 and 0.4 keep dives hidden on the first two, the
+    /// dune sea tries everywhere. Provisional (V-017).</summary>
     float TunnelChance = 0f)
 {
     public bool HasDunes => TrainCrestsMax > 0;
@@ -51,7 +54,7 @@ public sealed record ArchetypeRules(
     public static readonly ArchetypeRules RollingHighlands = new(
         TerrainArchetype.RollingHighlands, 0f, 0f, StageHeightField.FalloffWidth, StageHeightField.FalloffWidth,
         0.50f, 0.35f, 250f, 600f, 1f,
-        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0f, 0f, 1, WorldScale.ExitLineSpread);
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0f, 0f, 1, WorldScale.ExitLineSpread, 0.5f);
 
     /// <summary>Canyon Run (04 §6): a winding low channel between walls, broad banked bends, the inside wall set back.</summary>
     public static readonly ArchetypeRules CanyonRun = new(
@@ -63,14 +66,14 @@ public sealed record ArchetypeRules(
     public static readonly ArchetypeRules DuneSea = new(
         TerrainArchetype.DuneSea, 0f, 0f, StageHeightField.FalloffWidth, StageHeightField.FalloffWidth,
         0.60f, 0.30f, 250f, 600f, 1f,
-        WorldScale.DuneSwellMaxSlope, 300f, 0.85f, 0.7f, 0.15f, WorldScale.DuneTrainCrestsMin, WorldScale.DuneTrainCrestsMax, Mathf.Pi / 15f, 0f, 0f, 1, WorldScale.ExitLineSpread);
+        WorldScale.DuneSwellMaxSlope, 300f, 0.85f, 0.7f, 0.15f, WorldScale.DuneTrainCrestsMin, WorldScale.DuneTrainCrestsMax, Mathf.Pi / 15f, 0f, 0f, 1, WorldScale.ExitLineSpread, 1f);
 
     /// <summary>Sky Terraces (04 §6, D-103): the Highlands family with terrace lines on two floors above the primary and a
     /// corridor falloff long enough that every terrace edge drains inside the route grade.</summary>
     public static readonly ArchetypeRules SkyTerraces = new(
         TerrainArchetype.SkyTerraces, 0f, 0f, WorldScale.SkyPrimaryFalloff, WorldScale.SkyPrimaryFalloff,
         0.50f, 0.35f, 500f, 900f, 1f,
-        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0f, 0f, 3, 0f);
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0f, 0f, 3, 0f, 0.4f);
 
     public static ArchetypeRules For(TerrainArchetype archetype) => archetype switch
     {

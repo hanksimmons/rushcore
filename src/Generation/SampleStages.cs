@@ -11,8 +11,9 @@ public static class SampleStages
     public static readonly Entry[] All =
     {
         new("tunnel", TerrainArchetype.CanyonRun, 1, "a portal tunnel through the canyon wall (docs/13, D-113)"),
+        new("dive", TerrainArchetype.RollingHighlands, 1, "a dive beneath the Highlands: the open cut, the portal, the cap over it (docs/13, D-116)"),
         new("tunnels + pit", TerrainArchetype.CanyonRun, 2, "two wall tunnels and the spiral pit finale (D-102)"),
-        new("sky floor 3", TerrainArchetype.SkyTerraces, 30, "a floor-2 and floor-3 terrace stack (D-103)"),
+        new("sky floor 3", TerrainArchetype.SkyTerraces, 32, "a floor-2 and floor-3 terrace stack (D-103; seed 30 until D-116 moved the line stream)"),
         new("dune trains", TerrainArchetype.DuneSea, 1, "a three-crest dune train (D-099)"),
         new("gap + turns", TerrainArchetype.RollingHighlands, 8, "a mandatory gap and four committed banked turns (D-097)"),
         new("three exits", TerrainArchetype.RollingHighlands, 4, "two terminal lines forking to exits B and C beside exit A (D-105)"),

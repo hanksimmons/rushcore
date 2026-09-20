@@ -360,12 +360,13 @@ launch-crest straights; boost rings on the primary every `Boost › Pickup Spaci
 | # | Name | Command | What to look at |
 |---|---|---|---|
 | 1 | tunnel | `-- --canyon --seed 1` | a portal tunnel through the canyon wall (D-113, `docs/13 §2`): the open cut, the arched portal, the covered run beside the primary |
-| 2 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102); walls are the authored profile since D-109 (hash re-recorded) |
-| 3 | sky floor 3 | `-- --sky --seed 30` | a floor-2 and floor-3 terrace stack (D-103) |
-| 4 | dune trains | `-- --dunes --seed 1` | a three-crest dune train (D-099) |
-| 5 | gap + turns | `-- --seed 8` | a mandatory gap and four committed banked turns (D-097) |
-| 6 | three exits | `-- --seed 4` | two terminal lines forking to exits B and C beside exit A (D-105) |
-| 7 | summit | `-- --summit --seed N` | *not yet built* (D-107, `docs/12`): five switchback tiers and a chute; the seed is pinned when S1 lands |
+| 2 | dive | `-- --seed 1` | a dive beneath the Highlands (D-116, `docs/13 §2.2`): the line leaves the primary, the ground swallows it down an open cut, the portal, the cap over the covered run |
+| 3 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102); walls are the authored profile since D-109 (hash re-recorded) |
+| 4 | sky floor 3 | `-- --sky --seed 32` | a floor-2 and floor-3 terrace stack (D-103; seed 30 until D-116 moved the line stream) |
+| 5 | dune trains | `-- --dunes --seed 1` | a three-crest dune train (D-099) |
+| 6 | gap + turns | `-- --seed 8` | a mandatory gap and four committed banked turns (D-097) |
+| 7 | three exits | `-- --seed 4` | two terminal lines forking to exits B and C beside exit A (D-105) |
+| 8 | summit | `-- --summit --seed N` | *not yet built* (D-107, `docs/12`): five switchback tiers and a chute; the seed is pinned when S1 lands |
 
 Setting the selector picks the archetype and seed and rebuilds; the `seed` row shows the seed. Set it back to 0
 before F5 (a new random seed) or the archetype slider, or the sample re-applies when the selector changes again.

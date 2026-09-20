@@ -49,7 +49,8 @@ Designed, not delivered (D-107, `docs/12 §7`): Summit Descent is a palette by h
 valley floor with blue shadow faces on the rails, scree +150 to +350, rock and moss on the valley run, grey rock
 headwalls at every height, a crest line on every rail, and a longer fog end so the valley reads from the summit.
 
-Tunnels (D-113, `docs/13 §2.6`): rock, not glass. The trench's walls, the arch, the cap and the portal faces use the
+Tunnels (D-113, `docs/13 §2.6`; the dive beneath an open landscape D-116 uses the same rock, its open cut a slot the ground
+swallows the line into and a low embankment where the ground beside lies below the floor): rock, not glass. The trench's walls, the arch, the cap and the portal faces use the
 terrain material with the canyon's tint; inside, the vertex colour darkens toward the middle (full light at the mouths,
 45% at 60 m in, `TunnelProfile.Shade`). Two cues at speed: an emissive guide strip on each wall at ball height every
 25 m of the covered run (a lantern band in the rock, the glow material, no collider) and the far portal's daylight,

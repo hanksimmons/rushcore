@@ -47,9 +47,12 @@ public static class WallShellMesh
     {
         Vector3 faceN = (s.Points[b] - s.Points[a]).Cross(s.Points[c] - s.Points[a]);
         if (faceN.LengthSquared() < 1e-4f) return;                    // a collapsed station: no face
-        // Godot front faces are clockwise: order each triangle so its face normal points along the surface normal.
+        // Godot front faces are clockwise, so a triangle's right-hand normal points away from the side it is seen from: order
+        // each triangle so that normal points against the surface normal, and the face shows on the surface's side (D-116: wound
+        // the other way, every shell drew inside-out from D-111 on, the sunk grid standing in for the walls, a tunnel's cap
+        // invisible from above and its arch from below).
         Vector3 outward = s.Normals[a] + s.Normals[b] + s.Normals[c];
-        if (faceN.Dot(outward) < 0f) (b, c) = (c, b);
+        if (faceN.Dot(outward) > 0f) (b, c) = (c, b);
         idx.Add(a); idx.Add(b); idx.Add(c);
         tris.Add(s.Points[a]); tris.Add(s.Points[b]); tris.Add(s.Points[c]);
     }

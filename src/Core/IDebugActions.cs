@@ -20,6 +20,8 @@ public interface IDebugActions
     /// <summary>The player HUD (T2); the harness measures the widths it draws.</summary>
     Rushcore.UI.PlayerHud Hud { get; }
     string SeedText { get; }
+    /// <summary>The telemetry plate (F2); the harness hides it while it takes screenshots (08 §1).</summary>
+    bool TelemetryVisible { get; set; }
     /// <summary>True while the stage-completion outro is playing (controls locked, fade running).</summary>
     bool StageOutroActive { get; }
 

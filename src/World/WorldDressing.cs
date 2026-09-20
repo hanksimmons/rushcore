@@ -123,11 +123,11 @@ public partial class WorldDressing : Node3D
             FogEnabled = true,
             FogMode = Godot.Environment.FogModeEnum.Depth,
             FogLightColor = new Color(0.60f, 0.68f, 0.76f),
-            FogDepthBegin = 380f,
-            FogDepthEnd = 2400f,
+            FogDepthBegin = 800f,
+            FogDepthEnd = 6000f,
             FogDepthCurve = 1.6f,
             FogDensity = 0.8f,
-            FogSkyAffect = 0.35f,
+            FogSkyAffect = 0.55f,      // the horizon ring fades into the sky gradient (docs/13 §4.3, D-114)
             // Player emissive cues (charge buildup, Overdrive band, the slam-landing and
             // burst flashes) drive emission above 1.0; without HDR glow they would simply
             // clip to white and lose the readability those cues exist for (06 §6/§7).
@@ -149,13 +149,13 @@ public partial class WorldDressing : Node3D
 
     private Godot.Environment _env = null!;
 
-    /// <summary>World › Fog End is a live sightline instrument (M1); begin tracks it at 16%.</summary>
+    /// <summary>World › Fog End is a live sightline instrument (M1); begin tracks it at 13% (800 m at the 6 km default, D-114).</summary>
     private void ApplyFog()
     {
         float end = Mathf.Max(300f, _t.World.FogEnd);
         if (Mathf.IsEqualApprox(_env.FogDepthEnd, end)) return;
         _env.FogDepthEnd = end;
-        _env.FogDepthBegin = end * 0.16f;
+        _env.FogDepthBegin = end * 0.133f;
     }
 
     /// <summary>

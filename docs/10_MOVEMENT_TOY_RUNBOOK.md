@@ -9,7 +9,8 @@
 dotnet build                                                    # offline: Godot nupkgs from the app bundle
 /Applications/Godot_mono.app/Contents/MacOS/godot --path .      # play (or open in the Godot editor and press Play)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --seed 34     # play a named world seed (stage 34/0)
-/Applications/Godot_mono.app/Contents/MacOS/godot --headless --fixed-fps 60 --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0 per archetype; ~50 s
+/Applications/Godot_mono.app/Contents/MacOS/godot --headless --fixed-fps 60 --path . -- --rushcore-selftest    # objective checks: M0, M1 strip, model calibration, G0 per archetype; ~4 min
+RUSHCORE_SHOTS=1 RUSHCORE_ARCHETYPE=canyon /Applications/Godot_mono.app/Contents/MacOS/godot --path . --fixed-fps 60 -- --rushcore-selftest   # the same run windowed (the project's 1600×900), saving screenshots and motion bursts to shots/selftest/canyon (08 §1); wall-clock checks may differ
 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>                    # pure-data cases only (generation batch, regression seeds, model closed forms)
 RUSHCORE_CELL_SIZE=8 <same command>                             # the stage case at another cell size (8 or 16)
 <same command> --seed 8                                         # the stage case drives stage 8/0 (pick a seed with a gap or a ramp)
@@ -413,7 +414,8 @@ log prints the exit time against the route speed model's base-kit prediction. Me
 **Deferred M1 feel verdicts to take here** (D-082): fog onset at the cap (`World › Fog End` /
 `Camera › Far Plane` are live); corridor width at the cap (150 m typical here; the 75 m minimum is
 still a strip question); whether the swells read as a landscape and the crests as intended launches;
-frame time at the cap with F2 (and again at Fog End 4000 / Far Plane 5000). Ramp and gap verdicts
+frame time at the cap with F2 (and again at Fog End 4000 / Far Plane 5000; since D-114 the defaults are Fog End 6000 and
+Far Plane 30000, for the horizon ring). Ramp and gap verdicts
 wait for the Phase 3 modules or the strip.
 
 ### Terrain budget (the other half of M1, D-080)

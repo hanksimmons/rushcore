@@ -6,7 +6,9 @@ generator at the cap), the arch is a horseshoe tangent to the 78° walls springi
 (a 12 m crown with a crease at 5 m threw every wall ride into the ceiling), the S is a cosine of 290–450 m as the site allows,
 the tunnel's floor is the primary's base profile at the point's projection onto the primary, tunnels stamp last as cuts, and
 the portal-tunnel covered runs are 490–750 m because the whole run at offset lies under the mesa (the plan's 60–250 m
-described a wall pierced transversely, which the offset-line geometry does not make). Slices H1, W1, T2, W2, H2, T3 remain.
+described a wall pierced transversely, which the offset-line geometry does not make). **H1 (the horizon ring) delivered
+2026-09-19 (D-114)** as §4.1 and §4.3 say, with a polar ring (256 rays × 48 geometric rings from 64 m) in place of the three
+resolutions. Slices W1, T2, W2, H2, T3 remain.
 **Authority:** below `04` and `03` where they overlap; this document owns the tunnel, the resident-mesh architecture
 and the horizon until each slice folds its delivered form back into `04`, `05`, `06` and `11`.
 **Read with:** `04 §5D` (the wall profile and the wall shell, D-109/D-111), `04 §5I` (the vertical grammar), `03 §3`
@@ -332,9 +334,15 @@ decision logged (D-113 onward) and its owning doc updated. The user plays after 
 
 ## 7. Post-compaction handoff
 
-The next session starts at T1. It should read, in order: `README.md`, this document, `04 §5D` and `§5I`,
-`03 §3` (the follow and the wall ride), `DECISIONS` D-108–D-112, `08 §5`, then the code: `StageHeightField`
-(`StampedLine`, `ProfileAt`, `Weight`, `Sample`, `Sink`, `ShellStrips`, `WallSurface`), `WallProfile`,
-`WallShellMesh`, `OptionalLineBuilder`, `LidBuilder`, `CameraRig.ConfineUnderLids`, `MovementToyWorld`
-(`SampleHeight`, `BuildStructures`), `PlayerPhysics.TryGroundFollow`, and the harness canyon cases in
-`tests/MovementToySelfTest.cs` (the wall ride and the lid checks are the templates for the tunnel drive).
+T1 (D-113) and H1 (D-114) are delivered; the user plays them next (`-- --canyon --seed 1`). The next session starts at
+**W1, the resident mesh on the 6 km stage** (§3.3, §3.4): the coarse 16 m mesh resident, the 4 m fine window as a disc
+of 1.2 km around the ball (≤ 20 tiles, re-evaluated every 100 m with 300 m of hysteresis), tiles built on a worker
+thread over `_heights` and committed on the main thread, 6 m skirts on every tile, coarse tiles hidden under fine ones,
+the collider never windowed, the window complete before the run starts; harness: time to first frame ≤ 2 s, window
+bounds asserted every kilometre of the drive, resident triangles ≤ 1.2 M, the coarse mesh's height under the ball within
+a coarse cell's chord of the collider. No generator change, no hash moves. Read, in order: `README.md`, this document
+(§0, §3, §5), `DECISIONS` D-111–D-114, `08 §1` (screenshots) and `§5`, `04 §9`, then the code: `MovementToyWorld`
+(`Build`, `BuildTerrainTiles`, `BuildTile`, `SampleHeight`, `GridHeight`, `BuildStructures`, `BuildHorizon`),
+`HorizonRing`, `WorldDressing.CreateTerrainMaterial`, and in `tests/MovementToySelfTest.cs` `RunGeneratedStageCase` (the
+drive loop with its per-kilometre marks is where the window checks go) and the shot rig (`Shot`, `Motion`,
+`TakeDueShots`). After W1: T2 the dive, W2 the length, H2 the cloud dome, T3 pockets (§5).

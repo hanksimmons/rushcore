@@ -275,8 +275,9 @@ Until the implementation plan advances:
 > see-through tubes are removed; `docs/13` plans their replacement (tunnels through walls and beneath the landscape, the
 > camera inside), courses three times longer, and the far-horizon skybox. **D-113 (2026-09-19, `docs/13` slice T1):** the portal
 > tunnel on Canyon Run is delivered (a tunnel line cut into the wall and under the mesa, the horseshoe roof and cap, the confined
-> camera inside, the tunnel drive in the harness; sample stage 1 is canyon seed 1). Next per `docs/13 §5`: H1 the horizon ring,
-> then W1, T2, W2, H2, T3.
+> camera inside, the tunnel drive in the harness; sample stage 1 is canyon seed 1). **D-114 (H1):** the horizon ring, a 20 km
+> mesh of the stage's own ground with the archetype's far shapes, fog to 6 km, the far plane 30 km. Next per `docs/13 §5`: W1
+> the resident mesh, then T2, W2, H2, T3; the user plays after T1 + H1.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

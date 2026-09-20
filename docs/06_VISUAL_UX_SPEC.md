@@ -55,6 +55,14 @@ terrain material with the canyon's tint; inside, the vertex colour darkens towar
 25 m of the covered run (a lantern band in the rock, the glow material, no collider) and the far portal's daylight,
 which is real. The portal has a 1.5 m rock rim round the arch so the opening reads against the wall from far off.
 
+The far horizon (D-114, `docs/13 §4.1`): every generated stage sits in a ring of its own ground drawn to 20 km
+(`HorizonRing`): the stamp itself at the footprint's edge (no seam), the relief and side terrain beyond, plus a distance
+envelope rising from 2 km to 12 km into the archetype's far shapes: mesas and buttes in three flat tiers on Canyon Run
+(700 m), rolling ridges on the Highlands (600 m), a flat sea to 6 km then a ridged range on Dune Sea (800 m), peaks on Sky
+Terraces (900 m), all from the stage's own noise stream and coloured by the stage's own palette. One flat-shaded mesh of
+24 k triangles, no collider. Depth fog runs 800 m to 6 km with the sky affect raised, so the ring fades into the sky
+gradient; the far plane is 30 km (`Camera › Far Plane`, `World › Fog End` stay live instruments).
+
 Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
 above which the fog thickens into a layer the top floor sits in and a fall drops through. (The see-through
 tube's glass shell and ribs were removed 2026-09-19, D-112; tunnels are rock, `docs/13`.) The cloud band (D-103) is two unshaded

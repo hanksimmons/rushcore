@@ -7,3 +7,6 @@ bin/
 obj/
 *.user
 .DS_Store
+
+# Harness screenshots (RUSHCORE_SHOTS=1)
+shots/

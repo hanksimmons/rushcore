@@ -635,6 +635,9 @@ public sealed class StageHeightField : IHeightSource
     /// the channel floor follows the valleys and the walls are the difference.</summary>
     public float Relief(float x, float z) => Base(x, z) + _dunes.At(x, z);
 
+    /// <summary>Seeded value noise in [−1, 1] at a wavelength, from the stage's own noise stream: the far horizon's shapes (docs/13 §4, D-114).</summary>
+    public float HorizonNoise(float x, float z, float wavelength) => ValueNoise(x / wavelength, z / wavelength, _noiseSeedA);
+
     /// <summary>The wave of a dune sea at a point (0 elsewhere).</summary>
     public float DuneHeight(float x, float z) => _dunes.At(x, z);
 

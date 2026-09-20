@@ -221,7 +221,7 @@ public sealed class CameraTuning
     /// <summary>How fast the camera eases back out once the line of sight clears (1/s).</summary>
     public float OcclusionRecoverSpeed = 4f;
     /// <summary>Camera far plane in metres. 8 km sees the whole scale strip; a draw-distance instrument for M1.</summary>
-    public float FarPlane = 8000f;
+    public float FarPlane = 30000f;   // the far horizon (docs/13 §4, D-114) reaches 20 km
 }
 
 public sealed class VfxTuning
@@ -289,7 +289,7 @@ public sealed class WorldTuning
     /// coarse candidate the ground follow (D-092) makes drivable.</summary>
     public float CellSize = 4f;
     /// <summary>Depth-fog end in metres; begin is 16% of it. A sightline instrument for M1.</summary>
-    public float FogEnd = 2400f;
+    public float FogEnd = 6000f;   // docs/13 §4.3 (D-114): the horizon ring fades into the sky gradient; the sightline instrument still
 }
 
 /// <summary>
@@ -429,7 +429,7 @@ public sealed class GameplayTuning
         B(CatCamera, "Occlusion Probe", () => k.OcclusionProbe, v => k.OcclusionProbe = v);
         F(CatCamera, "Occlusion Margin", 0.1f, 3f, () => k.OcclusionMargin, v => k.OcclusionMargin = v);
         F(CatCamera, "Occlusion Recover Speed", 0.5f, 20f, () => k.OcclusionRecoverSpeed, v => k.OcclusionRecoverSpeed = v);
-        F(CatCamera, "Far Plane (m)", 1000f, 20000f, () => k.FarPlane, v => k.FarPlane = v);
+        F(CatCamera, "Far Plane (m)", 1000f, 40000f, () => k.FarPlane, v => k.FarPlane = v);
 
         var x = Vfx;
         F(CatVfx, "Charge Effect", 0f, 3f, () => x.ChargeEffectStrength, v => x.ChargeEffectStrength = v);
@@ -465,7 +465,7 @@ public sealed class GameplayTuning
         B(CatWorld, "Enemy Showcase (lab row: enemies, elite, pickups)", () => w.EnemyShowcase, v => w.EnemyShowcase = v);
         F(CatWorld, "Sample Stage (" + Rushcore.Generation.SampleStages.Label + ")", 0f, Rushcore.Generation.SampleStages.All.Length, () => w.SampleStage, v => w.SampleStage = Mathf.Round(v));
         F(CatWorld, "Cell Size (m)", 2f, 16f, () => w.CellSize, v => w.CellSize = v);
-        F(CatWorld, "Fog End (m)", 300f, 12000f, () => w.FogEnd, v => w.FogEnd = v);
+        F(CatWorld, "Fog End (m)", 300f, 20000f, () => w.FogEnd, v => w.FogEnd = v);
 
         foreach (var e in p) e.DefaultValue = e.Get();
         foreach (var e in t) e.DefaultValue = e.Get();

@@ -44,6 +44,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public GameplayTuning Tuning => _tuning;
     public PlayerPhysics Player => _player;
     public MovementToyWorld World => _world;
+    public bool TelemetryVisible { get => _telemetry.Visible; set => _telemetry.Visible = value; }
     public RunDirector Run => _director;
     public PlayerHealth Health => _health;
     public PlayerHud Hud => _hud;

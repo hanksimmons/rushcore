@@ -90,12 +90,63 @@ public partial class MovementToySelfTest : Node
         // frame runs as fast as the CPU allows and the physics stays byte-identical to real time.
         // (Engine.TimeScale is not that lever: it scales the step size, not the tick count.)
         _clock = System.Diagnostics.Stopwatch.StartNew();
+        InitShots();
         _script = Run();
         GD.Print($"[SELFTEST] starting ({Engine.PhysicsTicksPerSecond} Hz ticks)");
     }
 
     private System.Diagnostics.Stopwatch _clock = null!;
     private string Stamp => $"@{_clock.Elapsed.TotalSeconds:0.0}s";
+
+    // ---------------------------------------------------------------- screenshots (08 §1, D-114)
+    // With RUSHCORE_SHOTS=1 and a window (no --headless) the harness saves the rendered frame at the moments worth
+    // seeing (a wall ride at its peak, the lens inside a tunnel, the horizon from the start pad) and short bursts of
+    // consecutive frames for motion, so a run can be judged by eye as well as by its numbers. Headless runs skip it.
+    private string? _shotDir;
+    private int _shotIndex;
+    private long _tick;
+    private readonly List<(long tick, string name)> _shotQueue = new();
+    private readonly HashSet<string> _shotNames = new();
+    private void InitShots()
+    {
+        if (System.Environment.GetEnvironmentVariable("RUSHCORE_SHOTS") != "1") return;
+        if (DisplayServer.GetName() == "headless") { GD.Print("[SELFTEST] shots requested but the run is headless: launch without --headless to capture"); return; }
+        string archetype = System.Environment.GetEnvironmentVariable("RUSHCORE_ARCHETYPE") ?? "default";
+        string root = System.Environment.GetEnvironmentVariable("RUSHCORE_SHOTS_DIR") ?? ProjectSettings.GlobalizePath("res://shots/selftest");
+        _shotDir = System.IO.Path.Combine(root, archetype);
+        System.IO.Directory.CreateDirectory(_shotDir);
+        foreach (var old in System.IO.Directory.GetFiles(_shotDir, "*.png")) System.IO.File.Delete(old);
+        _debug.TelemetryVisible = false;   // the plate covers half the frame; its numbers are in the log
+        GD.Print($"[SELFTEST] shots go to {_shotDir}");
+    }
+    public bool ShotsOn => _shotDir is not null;
+    /// <summary>Asks for the rendered frame under a name. Shots are queued and taken in the physics step before the script
+    /// advances, so a case's tick count and its numbers are the same with shots on or off (a capture that consumed ticks
+    /// inside a drive loop left the follower's target stale and changed a tunnel drive's result). A name is taken once.</summary>
+    private void Shot(string name, int ticksFromNow = 0)
+    {
+        if (_shotDir is null || !_shotNames.Add(name)) return;
+        _shotQueue.Add((_tick + ticksFromNow, name));
+    }
+    /// <summary>A burst of frames for motion: <paramref name="frames"/> shots every <paramref name="every"/> ticks from now.</summary>
+    private void Motion(string name, int frames, int every = 2)
+    {
+        for (int f = 0; f < frames; f++) Shot($"{name}_f{f:00}", f * every);
+    }
+    private void TakeDueShots()
+    {
+        _tick++;
+        if (_shotQueue.Count == 0) return;
+        for (int i = _shotQueue.Count - 1; i >= 0; i--)
+        {
+            if (_shotQueue[i].tick > _tick) continue;
+            var img = GetViewport().GetTexture().GetImage();
+            string path = System.IO.Path.Combine(_shotDir!, $"{_shotIndex++:000}_{_shotQueue[i].name}.png");
+            var err = img.SavePng(path);
+            GD.Print($"[SHOT] {path} {(err == Error.Ok ? "" : err.ToString())} {Stamp}");
+            _shotQueue.RemoveAt(i);
+        }
+    }
 
     public override void _Process(double delta)
     {
@@ -110,6 +161,7 @@ public partial class MovementToySelfTest : Node
     public override void _PhysicsProcess(double delta)
     {
         if (_done) return;
+        TakeDueShots();
 
         if (!_player.Velocity.IsFinite())
         {
@@ -2035,6 +2087,18 @@ public partial class MovementToySelfTest : Node
                 }
             }
             if (i == 0) GD.Print($"[SELFTEST] generation timings: " + string.Join(", ", def.Report.Timings.Select(t => $"{t.phase} {t.ms:0.00} ms")));
+            if (i == 0 && def.HeightField is { } hfr)
+            {
+                // The far horizon (docs/13 §4.4, D-114): the ring builds on every archetype, stays outside the footprint, meets
+                // the stage's own edge, and keeps its triangle budget.
+                var ring = Rushcore.World.HorizonRing.Build(hfr, archetype);
+                int inside = ring.Vertices.Count(q => Mathf.Abs(q.X) < hfr.SizeX * 0.5f - 1f && Mathf.Abs(q.Z) < hfr.SizeZ * 0.5f - 1f);
+                float worstEdge = 0f;
+                for (int e = 0; e < 16; e++) { var q = ring.Edge[e * ring.Edge.Length / 16]; worstEdge = Mathf.Max(worstEdge, Mathf.Abs(q.Y - hfr.Sample(q.X, q.Z))); }
+                float top = ring.Vertices.Max(q => q.Y), side = hfr.SideHeight(0f, hfr.SizeZ * 0.5f);
+                GD.Print($"[SELFTEST] {A} horizon ring: {ring.Triangles} triangles, {inside} points inside the footprint, edge error {worstEdge:0.00} m, highest point {top:0} m ({top - side:0} m over the side terrain at the edge)");
+                Check($"{A}: " + "the horizon ring builds outside the footprint, meets the stage's edge and keeps its budget (docs/13 §4.4)", ring.Triangles > 0 && ring.Triangles <= 60000 && inside == 0 && worstEdge <= 5f, $"{ring.Triangles} tris, {inside} inside, edge error {worstEdge:0.00} m");
+            }
             if (def.DroppedLines > 0 && droppedShown++ < 2) GD.Print($"[SELFTEST] {A} seed {req.RunSeed}/{req.StageIndex} dropped optional lines: {def.DroppedDetail}");
             if (def.Hash() == again.Hash()) deterministic++;
             hashes.Add(def.Hash());
@@ -2254,6 +2318,7 @@ public partial class MovementToySelfTest : Node
         Check("generated stage is the active terrain", world.IsStage && stage is not null && world.HalfX > 2900f, $"halfX={world.HalfX}");
         if (stage is null) { t.World.GeneratedStage = false; _debug.RestartSameSeed(); yield break; }
         GD.Print($"[SELFTEST] generated stage: cells {world.CellSize:0} m, build {world.BuildMillis} ms, {world.SampleCount / 1000} k samples ({world.SampleCount * 4 / 1e6f:0.0} MB heights), {world.Triangles / 1000} k tris, {world.Tiles} tiles; {world.StageSummary}");
+        Check("the built stage draws its horizon ring (docs/13 §4, D-114)", world.HorizonTriangles > 0 && world.HorizonTriangles <= 60000 && world.HorizonEdge.Length > 0, $"{world.HorizonTriangles} triangles");
         Check("generated stage passed its own validation", stage.Report.Passed && !stage.Report.UsedFallback,
             string.Join("; ", stage.Report.Failures.Select(f => f.Name + " " + f.Detail)));
         Check("generated stage builds within the budget", world.BuildMillis < 8000, $"{world.BuildMillis} ms");
@@ -2352,6 +2417,7 @@ public partial class MovementToySelfTest : Node
         }
 
         foreach (var _ in Seconds(1.0f)) yield return null;
+        Shot("horizon_from_start_pad");
         Check("player spawns grounded on the start pad facing the route",
             _player.IsGrounded && Forward.Dot(stage.StartFacing) > 0.98f && _player.GlobalPosition.DistanceTo(stage.StartPosition) < 12f,
             $"grounded={_player.IsGrounded} pos={_player.GlobalPosition} fwd={Forward}");
@@ -2362,7 +2428,7 @@ public partial class MovementToySelfTest : Node
         var profile = stage.SpeedProfile;
         int ticks = 0, grounded = 0, nearest = 0, exitTick = -1, impactsBefore = _player.ImpactCount;
         int maxTicks = Engine.PhysicsTicksPerSecond * 100;
-        float maxSpeed = 0f, maxOffLine = 0f, nextMark = 1000f, worstMark = 0f;
+        float maxSpeed = 0f, maxOffLine = 0f, nextMark = 1000f, worstMark = 0f; bool midDriveShot = false;
         int markTicks = 0, markGrounded = 0, markRaw = 0;
         string marks = "";
         // Ground follow (D-092): raw contact per km, and whether each launch crest was taken as physics says.
@@ -2406,6 +2472,7 @@ public partial class MovementToySelfTest : Node
             }
             maxOffLine = Mathf.Max(maxOffLine, Mathf.Sqrt(best));
             float along = verts[nearest].Distance;
+            if (along >= 3000f && !midDriveShot) { midDriveShot = true; Motion("drive_mid_stage", 6, 3); }
             for (int c = 0; c < crests.Count; c++)
             {
                 float rel = along - crests[c].CentreDistance;
@@ -2676,6 +2743,7 @@ public partial class MovementToySelfTest : Node
                     if (charging && ++chargeTicks >= Engine.PhysicsTicksPerSecond / 2) { Input.ActionRelease(InputBootstrap.Jump); charging = false; jumped = true; }
                     if (lid.Covers(p.X, p.Z))
                     {
+                        if (underTicks == 20) Shot("lid_under_the_roof");
                         underTicks++;
                         ballMaxY = Mathf.Max(ballMaxY, p.Y);
                         Vector3 lens = rig.Camera.GlobalPosition;
@@ -2704,6 +2772,7 @@ public partial class MovementToySelfTest : Node
                 int sn = sIdx, st = 0; float minSpeed = float.MaxValue, spMax = 0f; int sg = 0;
                 while (st++ < Engine.PhysicsTicksPerSecond * 40 && sn < verts.Count - 3)
                 {
+                    if (st == 300 || st == 900) Shot($"spiral_descent_{st}");
                     Vector3 p = _player.GlobalPosition;
                     float best = float.MaxValue;
                     for (int i = Mathf.Max(0, sn - 5); i < Mathf.Min(verts.Count, sn + 60); i++)
@@ -2933,6 +3002,8 @@ public partial class MovementToySelfTest : Node
                         if (atWall <= 0f && _player.IsGrounded && hf.WallSurface(p, m.BallRadius, out _, out float wgEntry, out _) && Mathf.Abs(wgEntry) <= m.GroundFollowSnapDistance && hf.PrimaryWeight(p.X, p.Z) < 0.999f) atWall = _player.Velocity.Length();
                         if (_player.IsWallRiding)
                         {
+                            if (wallTicks == 2) Motion($"wallride{aimDeg:0}_entry", 8);
+                            if (wallTicks == 24) Shot($"wallride{aimDeg:0}_on_the_wall");
                             onWall = true; wallTicks++;
                             minOnWall = Mathf.Min(minOnWall, _player.Velocity.Length());
                             peak = Mathf.Max(peak, p.Y - hf.PrimaryHeight(hf.Nearest(p.X, p.Z, out _)));
@@ -2950,7 +3021,7 @@ public partial class MovementToySelfTest : Node
                         else if (onWall)
                         {
                             if (!_player.IsGrounded) airAfter++;
-                            if (_player.IsGrounded && _player.GroundNormal.Y > 0.9f && wgt >= 0.99f) { back = true; break; }
+                            if (_player.IsGrounded && _player.GroundNormal.Y > 0.9f && wgt >= 0.99f) { back = true; Shot($"wallride{aimDeg:0}_back_on_the_corridor"); break; }
                         }
                         if (released && guard > Engine.PhysicsTicksPerSecond * 6) break;
                         yield return null;
@@ -3054,6 +3125,11 @@ public partial class MovementToySelfTest : Node
                         maxOff = Mathf.Max(maxOff, Mathf.Sqrt(best));
                         int ti = pn - pathTunnelStart;
                         bool inside = ti >= tunnel.CoverStart && ti <= tunnel.CoverEnd;
+                        if (ti == tunnel.CoverStart - 40) Shot("tunnel_portal_ahead");
+                        if (ti == tunnel.CoverStart - 8) Motion("tunnel_through_the_portal", 10);
+                        if (ti == (tunnel.CoverStart + tunnel.CoverEnd) / 2) Shot("tunnel_inside_middle");
+                        if (ti == tunnel.CoverEnd - 10) Shot("tunnel_exit_ahead");
+                        if (ti == tunnel.CoverEnd + 12) Shot("tunnel_after_the_exit");
                         // Portal impacts: any impact within 40 m of either portal.
                         if (ti >= 0 && ti < tv.Count && (Mathf.Abs(tv[ti].Distance - coverStart) < 40f || Mathf.Abs(tv[ti].Distance - coverEnd) < 40f) && _player.ImpactCount > impactsAt) { portalImpacts += _player.ImpactCount - impactsAt; impactsAt = _player.ImpactCount; }
                         if (inside)
@@ -3214,7 +3290,7 @@ public partial class MovementToySelfTest : Node
                 }
                 maxOff = Mathf.Max(maxOff, Mathf.Sqrt(best));
                 if (pn >= rampEnd) { plateauTicks++; if (_player.IsGrounded) plateauGrounded++; }
-                if (world.StageExitIndex >= 0) break;
+                if (world.StageExitIndex >= 0) { Shot("branch_exit_pad_reached"); break; }
                 var tg = path[Mathf.Min(path.Count - 1, pn + 15)];
                 _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
                 yield return null;

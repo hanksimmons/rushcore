@@ -17,6 +17,19 @@ Each slice must pass:
 2. relevant automated/self-test checks,
 3. manual acceptance gate.
 
+**Screenshots as evidence (2026-09-19, the user's rule).** Numbers in a log are not the whole verdict on behaviour that
+is seen. Launched windowed with `RUSHCORE_SHOTS=1` (no `--headless`; `docs/10`), the harness saves the rendered frame at
+the moments worth seeing and short bursts of consecutive frames for motion, under `shots/selftest/<archetype>/` (numbered
+in run order, git-ignored): the horizon from the start pad, a mid-stage burst on the drive, the lens under a lid, the
+spiral's descent, a canyon wall ride entering (a burst), on the wall and back on the corridor, at both aims, the tunnel
+portal ahead, a burst through the portal, the middle of the bore, the exit ahead and after it, and the branch exit's pad.
+Whoever runs a slice looks at them, still and frame to frame, before calling the behaviour correct; a headless run skips
+them and says so. Shots are queued and taken in the physics step before the script advances, so a case's numbers are the
+same with shots on or off (the tunnel drive reads identically both ways). New moments are added with `Shot(name)` and
+`Motion(name, frames, every)` in the case that owns them. Known windowed-only differences: the camera's sideways framing
+check reads 23.8° against a 28° band (a viewport-size effect, open), and wall-clock budgets (scatter time) can miss under
+rendering; the headless run is the verdict on numbers, the windowed run the verdict on looks.
+
 ## 2. Build gate
 
 On target macOS arm64 development machine:
@@ -164,6 +177,9 @@ Required:
   tunnel's floor along the covered run (the hole), the ball is grounded at least 95% of the time inside, neither portal is an
   impact, the lens stays under the arch and inside the walls on every tick inside, the exit speed is within 10% of the
   model's, and a ball set down on the surface over the covered run rests on the cap as a floor,
+- the far horizon (D-114, `docs/13 §4.4`): the ring builds on every archetype's batch seed with no point inside the
+  footprint, its inner ring meeting the stage's own ground within 5 m at 16 probes and at most 60 k triangles; the built
+  stage draws it,
 - Summit Descent (D-107, `docs/12 §8`), once delivered: across the batch every primary vertex's corner limit holds the base cap; the rails and headwalls are continuous (sampled every 10 m, both sides, chute gaps and exit forks excepted); the base-cap profile has no launch on the switchback section; the descent is 540–660 m with every tier 90–170 m; every hairpin passes the sightline rule; every chute's free path is grounded, its half-charge landing falls inside its landing zone and its full-charge flight lands drivable; the face outside the rails drains to the valley. The harness drives a base-cap ball into a rail at 25° and straight into a headwall and asserts it stays on the bench both times, drives the switchbacks to the valley fully grounded, and drives a chute free and half-charged with the slam landing inside the zone,
 - exits (02 §4, D-105): every stage's exits are distinct, inside the footprint and on level pads; most seeds of each archetype offer a second exit (floors: Highlands 75%, Canyon Run 85%, Sky Terraces 65%, Dune Sea 40%); the harness drives the ball from the primary up a terminal line's ramp to its pad and asserts the stage ends by that exit with the plateau holding the ball grounded.
 

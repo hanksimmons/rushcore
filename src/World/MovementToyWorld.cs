@@ -29,6 +29,11 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     private Rushcore.Vfx.WorldVfx _vfx = null!;
     private Node3D _terrainRoot = null!;
     private Node3D _structureRoot = null!;
+    private Node3D _horizonRoot = null!;
+    /// <summary>The far horizon ring of the built stage (docs/13 §4, D-114): triangles, the inner ring's points on the footprint's edge, every point.</summary>
+    public int HorizonTriangles { get; private set; }
+    public Vector3[] HorizonEdge { get; private set; } = System.Array.Empty<Vector3>();
+    public Vector3[] HorizonPoints { get; private set; } = System.Array.Empty<Vector3>();
     private StaticBody3D _terrainBody = null!;
     private CollisionShape3D _terrainCollider = null!;
     private HeightMapShape3D _terrainShape = null!;
@@ -202,6 +207,8 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         AddChild(_terrainRoot);
         _structureRoot = new Node3D { Name = "Structures" };
         AddChild(_structureRoot);
+        _horizonRoot = new Node3D { Name = "Horizon" };
+        AddChild(_horizonRoot);
 
         // World one-shot VFX (T3, 06 §10): built once with a fixed pool, so a rebuild never disturbs it and
         // nothing is allocated when an effect fires.
@@ -277,6 +284,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
 
         BuildTerrainTiles(_dressing.CreateTerrainMaterial());
         BuildStructures();
+        BuildHorizon();
 
         Bounds = new Aabb(new Vector3(-HalfX, _minHeight, -HalfZ), new Vector3(_field.SizeX, _maxHeight - _minHeight, _field.SizeZ));
         KillPlaneY = _minHeight - 120f;
@@ -414,6 +422,30 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
             _structureRoot.AddChild(body);
             j++;
         }
+    }
+
+    /// <summary>The far horizon (docs/13 §4.1, D-114): one ring mesh from the footprint's edge to 20 km on a generated stage; the lab
+    /// and the strip have none. No collider.</summary>
+    private void BuildHorizon()
+    {
+        foreach (Node child in _horizonRoot.GetChildren())
+        {
+            _horizonRoot.RemoveChild(child);
+            child.QueueFree();
+        }
+        HorizonTriangles = 0;
+        HorizonEdge = System.Array.Empty<Vector3>();
+        HorizonPoints = System.Array.Empty<Vector3>();
+        if (Stage?.HeightField is not { } hf) return;
+        var built = HorizonRing.Build(hf, Archetype);
+        HorizonTriangles = built.Triangles;
+        HorizonEdge = built.Edge;
+        HorizonPoints = built.Vertices;
+        _horizonRoot.AddChild(new MeshInstance3D
+        {
+            Name = "HorizonRing", Mesh = built.Mesh, MaterialOverride = _dressing.CreateTerrainMaterial(),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        });
     }
 
     /// <summary>One shell strip as a drawn mesh and a concave collider on the structure layer; returns its triangle count.</summary>

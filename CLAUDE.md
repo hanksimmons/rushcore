@@ -171,7 +171,7 @@ Current accepted direction:
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
 - the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
 - `HeightMapShape3D` main terrain,
-- structures (D-096): lids as `BoxShape3D`, tubes as inward-facing `ConcavePolygonShape3D` with backface collision, on a structure layer; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); inside a tube the tube follow (D-101, `Movement › Tube Contact`) holds the ball to the analytic shell and counts any contact as ground, a rule scoped to tubes.
+- structures (D-096, D-111): lids as `BoxShape3D`, tubes and wall shells as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk a metre beneath it, and the world's height query answers with the stamp there; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); inside a tube the tube follow (D-101, `Movement › Tube Contact`) holds the ball to the analytic shell and counts any contact as ground, a rule scoped to tubes.
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
 
@@ -188,7 +188,7 @@ Start at 60 physics Hz. Only test/raise to 120 if measured high-speed behavior r
 - 1–3 meaningful optional lines,
 - mandatory traversal cannot require a stocked boost meter,
 - one logical height source for render/collision,
-- the ground is one single-valued heightfield; walls, terraces, slots and spirals are stamps in it; lids and tubes are the only structures (04 §5I, D-096); never a second height layer,
+- the ground is one single-valued heightfield; walls, terraces, slots and spirals are stamps in it; lids, tubes and wall shells are the only structures (04 §5I, D-096, D-111: a wall shell is the stamp's own wall band sampled finely and swept as a collider, with the heightfield sunk a metre beneath it); never a second height layer,
 - bounded validators/regeneration,
 - regression seeds for fixed failures.
 
@@ -269,7 +269,9 @@ Until the implementation plan advances:
 > harness and the manual sample is the user's. Difficulty stays parked until after Phase 4. **Phase 3B (2026-09-19, D-107):** a fifth archetype, Summit Descent,
 > designed in `docs/12` (summit start, 4–6 switchback tiers with cap-holdable hairpins, walls everywhere, the chute as
 > the inside line, 600 m of descent); slices S1–S3 in `docs/09`; the user playtests S1 + S2. The boost economy
-> changed by the user's call on the same day (D-106: start at 30%, no passive regen, rings as the refill).
+> changed by the user's call on the same day (D-106: start at 30%, no passive regen, rings as the refill). Before S1 the
+> walls themselves were made rideable on Canyon Run (D-108 wall ride, D-109 the authored profile, D-110 the climb scrub,
+> D-111 the wall shell over the sunk grid); the Summit's rails and headwalls use that shell.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

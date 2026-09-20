@@ -640,9 +640,11 @@ public partial class PlayerPhysics : RigidBody3D
         if (kappa < 0f && vT.LengthSquared() * -kappa >= m.Gravity * n.Y) return false;
 
         // On a concave wall the collider's flat facets are chords on the ball's side of the smooth surface, so the rest
-        // height sits the chord's sagitta off it (κ·chord²/8, the chord a cell's diagonal since the wall runs at any angle
-        // to the grid), as the tube follow holds the inscribed circle.
-        float rest = carry && kappa > 0f ? Mathf.Min(kappa * cell * cell * 0.25f, m.GroundFollowSnapDistance * 0.5f) : 0f;
+        // height sits the chord's sagitta off it, as the tube follow holds the inscribed circle. On the authored wall the
+        // collider is the shell (D-111), whose chords are the shell's stations, so the rest is the shell's; on a grid wall
+        // the chord is a cell's diagonal (κ·cell²/8), since the wall runs at any angle to the grid.
+        float rest = analytic ? Rushcore.Generation.WallProfile.ShellRest
+                   : carry && kappa > 0f ? Mathf.Min(kappa * cell * cell * 0.25f, m.GroundFollowSnapDistance * 0.5f) : 0f;
         float off = gap - rest;
         float excess = Mathf.Max(0f, Mathf.Abs(off) - GroundFollowDeadband) * Mathf.Sign(off);
         float target = -excess / GroundFollowCloseSeconds;         // toward the surface; zero inside the deadband

@@ -1380,6 +1380,8 @@ public partial class MovementToySelfTest : Node
     /// plain; pushing the stick toward the wall climbs higher; with the toggle off the same run never counts the
     /// wall as ground (the baseline).
     /// </summary>
+    private float _traceLastVy;
+
     private IEnumerable RunWallRideCase()
     {
         var t = _debug.Tuning;
@@ -2460,6 +2462,23 @@ public partial class MovementToySelfTest : Node
                 foreach (var part in tr.Split(',')) if (float.TryParse(part, out float trAt) && Mathf.Abs(along - trAt) < span) inWindow = true;
                 if (inWindow)
                 {
+                    // Shell instrument (D-111): at a sudden vertical jump, list the shell triangles within 6 m of the ball.
+                    if (stage.HeightField is { } hfS && Mathf.Abs(_player.Velocity.Y - _traceLastVy) > 30f)
+                    {
+                        GD.Print($"[TRACE-JUMP] {along:0} m vy {_traceLastVy:0.0} -> {_player.Velocity.Y:0.0} at ({p.X:0.0},{p.Y:0.0},{p.Z:0.0}) sink {hfS.Sink(p.X, p.Z):0.00} stamp {hfS.Sample(p.X, p.Z):0.00} grid {world.GridHeight(p.X, p.Z):0.00}");
+                        int strip = 0;
+                        foreach (var tris in world.WallShellData)
+                        {
+                            for (int q = 0; q + 2 < tris.Length; q += 3)
+                            {
+                                Vector3 cen = (tris[q] + tris[q + 1] + tris[q + 2]) / 3f;
+                                if (cen.DistanceTo(p) < 6f || tris[q].DistanceTo(p) < 6f || tris[q + 1].DistanceTo(p) < 6f || tris[q + 2].DistanceTo(p) < 6f)
+                                    GD.Print($"[TRACE-JUMP]   strip {strip} tri {q / 3}: ({tris[q].X:0.0},{tris[q].Y:0.0},{tris[q].Z:0.0}) ({tris[q + 1].X:0.0},{tris[q + 1].Y:0.0},{tris[q + 1].Z:0.0}) ({tris[q + 2].X:0.0},{tris[q + 2].Y:0.0},{tris[q + 2].Z:0.0})");
+                            }
+                            strip++;
+                        }
+                    }
+                    _traceLastVy = _player.Velocity.Y;
                     bool hasWall = stage.HeightField is { } hfT && hfT.WallSurface(p, m.BallRadius, out Vector3 tn, out float tg, out _) && Mathf.Abs(tg) < 5f;
                     float lat = new Vector2(verts[nearest].Position.X - p.X, verts[nearest].Position.Z - p.Z).Length();
                     GD.Print($"[TRACE] {along:0} m {verts[nearest].Kind} lat {lat:0.0} y={p.Y:0.00} ground={world.SampleHeight(p.X, p.Z):0.00} corr={verts[nearest].Position.Y:0.0} v=({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) |v|={_player.Velocity.Length():0.0} g={_player.IsGrounded} raw={_player.IsRawGrounded} follow={_player.GroundFollowActive} wall={_player.IsWallRiding} n.y={_player.GroundNormal.Y:0.00} c={_player.GetContactCount()} analytic={hasWall} imp={_player.ImpactCount}");
@@ -3179,6 +3198,25 @@ public partial class MovementToySelfTest : Node
             {
                 var pick = FindRideWindow(stage);
                 int wi = pick.start; float bestRun = pick.len, rideSide = pick.side;
+                Check("a walled stage builds its wall shells (D-111)", world.WallShellTriangles > 0, $"shell triangles={world.WallShellTriangles}");
+                if (wi >= 0)
+                {
+                    // Under the shell the grid is sunk by the shell sink; at the corridor's edge and past the lip the two coincide.
+                    var wvS = verts[wi]; float lxS = -Mathf.Sin(wvS.Heading), lzS = Mathf.Cos(wvS.Heading);
+                    var hfS = stage.HeightField!;
+                    float edgeS = StageHeightField.CorridorHalfWidth + WorldScale.WallSetback;
+                    float minSink = float.MaxValue, maxSink = 0f;
+                    foreach (float uS in new[] { 3f, 6f, 10f, 15f, 20f, 26f, 32f })
+                    {
+                        float px = wvS.Position.X + lxS * pick.side * (edgeS + uS), pz = wvS.Position.Z + lzS * pick.side * (edgeS + uS);
+                        float sunk = hfS.Sample(px, pz) - world.GridHeight(px, pz);
+                        minSink = Mathf.Min(minSink, sunk); maxSink = Mathf.Max(maxSink, sunk);
+                    }
+                    float px0 = wvS.Position.X + lxS * pick.side * (edgeS - 6f), pz0 = wvS.Position.Z + lzS * pick.side * (edgeS - 6f);
+                    float floorDiff = Mathf.Abs(hfS.Sample(px0, pz0) - world.GridHeight(px0, pz0));
+                    Check("the heightfield under the wall shell is sunk by the shell sink from the fillet to the face (D-111)", minSink > WorldScale.WallShellSink - 0.5f && maxSink <= WorldScale.WallShellSink + 0.3f, $"sink {minSink:0.00}..{maxSink:0.00} m");
+                    Check("the heightfield and the shell coincide on the corridor floor before the wall (D-111)", floorDiff < 0.15f, $"floor grid-stamp {floorDiff:0.00} m");
+                }
                 float[] aims = float.TryParse(System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_AIM"), out float aimEnv) ? new[] { aimEnv } : new[] { 20f, 90f };
                 if (wi >= 0 && bestRun >= 330f) foreach (float aimDeg in aims)
                 {
@@ -3207,7 +3245,7 @@ public partial class MovementToySelfTest : Node
                                 Vector3 cP = verts[ia].Position.Lerp(verts[ib].Position, Mathf.Clamp(ta, 0f, 1f));
                                 float hdg = verts[ia].Heading; float lxP = -Mathf.Sin(hdg), lzP = Mathf.Cos(hdg);
                                 float px = cP.X + lxP * rideSide * (edgeP + uP), pz = cP.Z + lzP * rideSide * (edgeP + uP);
-                                float hS = hfp.Sample(px, pz); float hC = _debug.World.SampleHeight(px, pz);
+                                float hS = hfp.Sample(px, pz); float hC = _debug.World.GridHeight(px, pz);
                                 hs.Add(hS); cs.Add(hC - hS); total++;
                                 var probeP = new Vector3(px, hS + m.BallRadius, pz);
                                 if (hfp.WallSurface(probeP, m.BallRadius, out Vector3 pn, out float pg, out _))
@@ -3221,13 +3259,13 @@ public partial class MovementToySelfTest : Node
                             for (int k = 4; k < hs.Count - 4; k++) { float avg = 0f; for (int j = -4; j <= 4; j++) avg += hs[k + j]; avg /= 9f; ripple = Mathf.Max(ripple, Mathf.Abs(hs[k] - avg)); }
                             float cMax = 0f, cMin = 0f; foreach (float cv in cs) { cMax = Mathf.Max(cMax, cv); cMin = Mathf.Min(cMin, cv); }
                             float aMax = float.MinValue, aMin = float.MaxValue; foreach (float av in angs) { aMax = Mathf.Max(aMax, av); aMin = Mathf.Min(aMin, av); }
-                            GD.Print($"[WALLPROBE] u {uP:0} m: stamp h {hs[0]:0.00}..{hs[hs.Count-1]:0.00} ripple(±2m detrend) {ripple:0.000} m | collider-stamp {cMin:0.000}..{cMax:0.000} m | analytic {found}/{total} plan-angle swing {(angs.Count > 0 ? aMax - aMin : 0f):0.00}° gap<= {maxGapDiff:0.00}");
+                            GD.Print($"[WALLPROBE] u {uP:0} m: stamp h {hs[0]:0.00}..{hs[hs.Count-1]:0.00} ripple(±2m detrend) {ripple:0.000} m | grid-stamp {cMin:0.000}..{cMax:0.000} m | analytic {found}/{total} plan-angle swing {(angs.Count > 0 ? aMax - aMin : 0f):0.00}° gap<= {maxGapDiff:0.00}");
                         }
                     }
                     _worldDrive = new Vector3(hx * Mathf.Cos(aim) + lx * rideSide * Mathf.Sin(aim), 0f, hz * Mathf.Cos(aim) + lz * rideSide * Mathf.Sin(aim));
                     var hf = stage.HeightField!;
                     int wallTicks = 0, guard = 0, impactsAtEntry = _player.ImpactCount, scrubsAtEntry = _player.WallScrubCount, airAfter = 0, analyticTicks = 0;
-                    float entry = 0f, minOnWall = float.MaxValue, peak = 0f, maxTickLoss = 0f, prevLoc = 0f, atWall = 0f; bool released = false, onWall = false, back = false;
+                    float entry = 0f, minOnWall = float.MaxValue, peak = 0f, maxTickLoss = 0f, prevLoc = 0f, atWall = 0f, prevGap = float.NaN, gapSwing = 0f; int contactFlips = 0, prevContacts = -1; bool released = false, onWall = false, back = false;
                     float wallTop = hf.SideHeight(wv.Position.X + lx * rideSide * (StageHeightField.CorridorHalfWidth + 60f), wv.Position.Z + lz * rideSide * (StageHeightField.CorridorHalfWidth + 60f)) - hf.PrimaryHeight(wi);
                     bool trace = System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_TRACE") == "1";
                     while (guard++ < Engine.PhysicsTicksPerSecond * 8)
@@ -3253,7 +3291,16 @@ public partial class MovementToySelfTest : Node
                             onWall = true; wallTicks++;
                             minOnWall = Mathf.Min(minOnWall, _player.Velocity.Length());
                             peak = Mathf.Max(peak, p.Y - hf.PrimaryHeight(hf.Nearest(p.X, p.Z, out _)));
-                            if (hf.WallSurface(p, m.BallRadius, out _, out float wg, out _) && Mathf.Abs(wg) <= m.GroundFollowSnapDistance) analyticTicks++;
+                            if (hf.WallSurface(p, m.BallRadius, out _, out float wg, out _) && Mathf.Abs(wg) <= m.GroundFollowSnapDistance)
+                            {
+                                analyticTicks++;
+                                if (!float.IsNaN(prevGap)) gapSwing = Mathf.Max(gapSwing, Mathf.Abs(wg - prevGap));
+                                prevGap = wg;
+                            }
+                            else prevGap = float.NaN;
+                            int contactsNow = _player.GetContactCount();
+                            if (prevContacts >= 0 && contactsNow != prevContacts) contactFlips++;
+                            prevContacts = contactsNow;
                         }
                         else if (onWall)
                         {
@@ -3268,13 +3315,16 @@ public partial class MovementToySelfTest : Node
                     string bendsNear = "";
                     foreach (var bend in stage.PrimaryRoute.Bends) if (Mathf.Abs(verts[bend.StartIndex].Distance - wv.Distance) < 900f) bendsNear += $" [bend at {verts[bend.StartIndex].Distance:0}-{verts[bend.EndIndex].Distance:0} m r {bend.Radius:0} turn {Mathf.RadToDeg(bend.TurnAngle):0}°]";
                     int scrubs = _player.WallScrubCount - scrubsAtEntry;
-                    GD.Print($"[SELFTEST] canyon wall ride at {aimDeg:0}° from {wv.Distance:0} m on the {(rideSide > 0f ? "left" : "right")} wall ({bestRun:0} m of clear straight; bends near:{bendsNear}): entry {entry:0.0} m/s, at the wall {atWall:0.0} m/s, wall ticks {wallTicks} ({analyticTicks} on the analytic profile), peak {peak:0.0} m above the corridor (wall top {wallTop:0.0} m), min on wall {(wallTicks > 0 ? minOnWall : 0f):0.0}, biggest one-tick loss {maxTickLoss:0.0} m/s, air ticks after {airAfter}, impacts {impacts}, scrubs {scrubs}, back on the corridor {back}");
+                    GD.Print($"[SELFTEST] canyon wall ride at {aimDeg:0}° from {wv.Distance:0} m on the {(rideSide > 0f ? "left" : "right")} wall ({bestRun:0} m of clear straight; bends near:{bendsNear}): entry {entry:0.0} m/s, at the wall {atWall:0.0} m/s, wall ticks {wallTicks} ({analyticTicks} on the analytic profile), peak {peak:0.0} m above the corridor (wall top {wallTop:0.0} m), min on wall {(wallTicks > 0 ? minOnWall : 0f):0.0}, biggest one-tick loss {maxTickLoss:0.0} m/s, gap swing tick-to-tick {gapSwing:0.000} m, contact-count changes {contactFlips}, air ticks after {airAfter}, impacts {impacts}, scrubs {scrubs}, back on the corridor {back}");
                     if (aimDeg < 45f)
                     {
                         Check("a canyon wall is entered from the corridor without an impact (the fillet foot, D-109)", released && impacts == 0, $"impacts={impacts}");
                         Check("a canyon wall is ridden as ground on the analytic profile (D-108, D-109)", wallTicks >= 10 && analyticTicks >= wallTicks * 0.8f, $"wall ticks={wallTicks}, analytic={analyticTicks}");
                         Check("the canyon wall ride keeps at least 75% of its entry speed (the climb limit sheds a little at 20°)", wallTicks > 0 && minOnWall >= entry * 0.75f, $"entry={entry:0.0} min={minOnWall:0.0}");
                         Check("the canyon wall ride comes back onto the corridor grounded", back, $"back={back} air ticks={airAfter}");
+                        // The wall shell (D-111): the ride holds its distance from the analytic wall tick to tick; before the shell the
+                        // follow and the grid's chords fought over the ball 30 times a second (gap 0.03 ↔ 0.45 m).
+                        Check("the canyon wall ride holds steady on the shell: gap swing under 10 cm tick to tick (D-111)", wallTicks > 0 && gapSwing < 0.1f, $"gap swing={gapSwing:0.000} contact-count changes={contactFlips}");
                     }
                     else
                     {

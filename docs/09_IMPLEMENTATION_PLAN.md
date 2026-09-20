@@ -132,6 +132,10 @@ player commit). One new archetype, designed in `docs/12` against the frozen kit;
 - S2 the chute and the read: chutes, the notch and sightline rule, boards and posts, the harness chute drive,
 - S3 the vista: summit cone, cirque walls, snowline palette, fog, scatter suit; fold into `04 §6`.
 
+Before S1, on the user's canyon playtests (2026-09-19): the wall ride (D-108), the authored wall profile (D-109), the
+climb scrub (D-110) and the wall shell over the sunk grid (D-111) landed on Canyon Run; the Summit's rails and
+headwalls are built on the shell, never on the grid's chords.
+
 The user's playtest is on S1 + S2. Gate: **G0 (Summit Descent)** per `08 §5`. Phase 4 follows.
 
 ## Parallel track (2026-09-07)

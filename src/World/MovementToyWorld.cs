@@ -264,7 +264,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
             for (int x = 0; x < nx; x++)
             {
                 float wx = x * CellSize - HalfX;
-                float h = _field.Sample(wx, wz);
+                float h = _field.Sample(wx, wz) - _field.Sink(wx, wz);   // under a wall shell the grid is sunk (D-111)
                 _heights[z * nx + x] = h / CellSize;   // shape space
                 if (h < _minHeight) _minHeight = h;
                 if (h > _maxHeight) _maxHeight = h;
@@ -332,7 +332,15 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
     }
 
     /// <summary>Authoritative height source. Bilinear over the same grid the collider uses.</summary>
+    /// <summary>The surface a ball rides at a point: the stamp itself under a wall shell (D-111: the shell is the stamp
+    /// sampled finely, and the grid lies sunk beneath it), the collided heightfield everywhere else.</summary>
     public float SampleHeight(float x, float z)
+    {
+        return _field.Sink(x, z) > 0f ? _field.Sample(x, z) : GridHeight(x, z);
+    }
+
+    /// <summary>The collided heightfield's own height (bilinear over the grid), sunk where a wall shell stands.</summary>
+    public float GridHeight(float x, float z)
     {
         float fx = Mathf.Clamp((x + HalfX) / CellSize, 0f, _nx - 1.001f);
         float fz = Mathf.Clamp((z + HalfZ) / CellSize, 0f, _nz - 1.001f);
@@ -359,6 +367,10 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
 
     /// <summary>Physics layer of structures (lids, tubes): the ball collides with it, the camera's occlusion probe does not (04 §9).</summary>
     public const uint StructureLayer = 2;
+    /// <summary>Collision triangles in the wall shells of the current stage (D-111); 0 on an unwalled archetype.</summary>
+    public int WallShellTriangles { get; private set; }
+    /// <summary>The wall shells' collision triangles per strip (harness instruments only).</summary>
+    public List<Vector3[]> WallShellData { get; } = new();
     /// <summary>The built stage's tubes, for the camera push-out and the harness; empty outside a stage.</summary>
     public IReadOnlyList<TubeDefinition> Tubes => Stage?.Tubes ?? (IReadOnlyList<TubeDefinition>)System.Array.Empty<TubeDefinition>();
 
@@ -404,6 +416,33 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface, 
             _structureRoot.AddChild(ribs);
             _structureRoot.AddChild(body);
             k++;
+        }
+        // Wall shells (D-111): the wall band of every profiled line as a swept surface of the stamp, collided as an
+        // outward-facing concave shape on the structure layer and drawn with the terrain material. The heightfield under
+        // it is sunk, so the shell is the wall the ball meets and the follow's analytic profile is exactly its surface.
+        WallShellTriangles = 0;
+        WallShellData.Clear();
+        int w = 0;
+        if (Stage.HeightField is { } hf)
+        {
+            foreach (var strip in hf.ShellStrips())
+            {
+                var built = WallShellMesh.Build(strip);
+                if (built.CollisionTriangles.Length == 0) continue;
+                WallShellTriangles += built.CollisionTriangles.Length / 3;
+                WallShellData.Add(built.CollisionTriangles);
+                _structureRoot.AddChild(new MeshInstance3D { Name = $"Wall{w}", Mesh = built.Mesh, MaterialOverride = _dressing.CreateTerrainMaterial(), CastShadow = GeometryInstance3D.ShadowCastingSetting.On });
+                var body = new StaticBody3D
+                {
+                    Name = $"Wall{w}Body",
+                    CollisionLayer = StructureLayer,
+                    CollisionMask = 0,
+                    PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+                };
+                body.AddChild(new CollisionShape3D { Shape = new ConcavePolygonShape3D { Data = built.CollisionTriangles, BackfaceCollision = true } });
+                _structureRoot.AddChild(body);
+                w++;
+            }
         }
         int j = 0;
         foreach (var lid in Stage.Lids)

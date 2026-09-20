@@ -157,6 +157,40 @@ returns only above the lip. Before D-109 the wall was a 12 m smoothstep whose fo
 0.4 m, a kink the facets turned into a hit and a shelf at every bend entry; the choppiness the user saw on the
 canyon walls was that aliasing, not the flat shading.
 
+**The wall shell (D-111).** The profile fixed the surface but not its collider: a 4 m grid samples horizontally, so
+where the fillet is steep one cell spans 8–13 m of arc and the collider's chords sit up to 0.64 m proud of the true
+surface (measured 0.17 m at 20 m out, 0.64 m at 26 m, 8 mm on the planar face), while the follow held the ball
+0.13 m off it; the follow and the solver fought over the ball thirty times a second and bled its speed. So on a
+walled archetype the wall band is a **shell**: for every profiled line and each side, the stamp itself sampled along
+the line's lateral rays at the shell's stations (`WallProfile.ShellStations`: the level floor 4 m inside the edge, the
+fillet every 6° of arc, a 3.1 m chord with 4 cm of sagitta, then the face every 4 m of lateral distance, planar and
+so exact, out to 6 m past each vertex's own lip), swept as one indexed mesh with smooth normals and the terrain's
+colour and collided as a concave shape on the structure layer (`StageHeightField.ShellStrips`, `WallShellMesh`).
+The shell is the stamp, so it agrees with the analytic wall the follow reads and with everything the stamp does at
+bends, berms, eases, ledges and forks. The heightfield under it is the same stamp **sunk one metre**
+(`StageHeightField.Sink`, `WorldScale.WallShellSink`), fading to nothing over the shell's first three metres and its
+last four so shell and grid coincide at both edges; the collider's coarse chords never reach the ball, and the
+follow holds the ball twice the shell's sagitta off the surface (`WallProfile.ShellRest`, 8 cm). The world's height
+query (`MovementToyWorld.SampleHeight`) answers with the stamp wherever the sink is positive, so the ground
+follow, the camera and the dressing all see the surface the ball rides; `GridHeight` is the sunk collider for
+measurement. On the inside of a bend a vertex's ray stops a metre short of the centre of curvature, where the
+rays would cross; stations past a vertex's lip fold onto its last point and make no face. Two lines' bands may
+overlap (a ledge beside the primary): both shells sample the same stamp there and coincide. The ground stays
+one single-valued heightfield; the shell is a structure like a lid or a tube, of the stamp's own surface.
+
+Two rules the shell forced on the stamp. **The wall's position is interpolated along the route** (the floor's D-093
+rule applied to the wall): the profile reads a bend's extra width, berm fade and height and inside ease
+interpolated toward the neighbour the point lies toward, not at the nearest vertex; as a step function they jogged
+the wall 0.56 m every 4 m wherever a bend's extra width eased in (1.7 m of height on the face), which the shell,
+sampled at the vertices, smoothed into a ramp while the analytic wall the follow reads still stepped, and the ride
+read the wall jumping half a metre tick to tick. **A line's band stops at the line's ends**: the nearest-vertex
+rule claims everything behind a line's first vertex and past its last for those vertices, so a ridge's wall band
+reached the primary's floor for a hundred metres behind the ridge's start with no shell over the sunk grid, and the
+ball drove under the shell's first ray and was popped up through it. The analytic wall query (03 §3) stops at a line's
+ends for the same reason, and requires the wall's outward direction to run across the line, not along it: an optional
+line's end vertex, nearest to a point on the primary's floor 40 m before the join, reported its fillet foot as a wall
+leaning forward like a ramp, and the carry turned that into a 99 m/s vertical launch on the canyon drive.
+
 The stamped profile is continuous along the route: the corridor height at any point interpolates
 the profile between the two route samples it lies between (D-093). A nearest-sample height is a
 staircase at the sample spacing, invisible to validators that read the samples but resolved by a

@@ -43,7 +43,7 @@ Do not rely only on hue.
 
 Delivered palettes: Canyon Run is red rock on the walls with a pale rim (D-098); Dune Sea is sand from the troughs
 to pale crests with the lee faces darker, so the crest lines and the wave's direction read at a glance (D-099).
-Canyon walls (D-109): the rock is in the tint, not the mesh: strata bands every 14 m of height on steep faces, the
+Canyon walls (D-109, D-111): the wall band is drawn as the wall shell, smooth-shaded from the stamp's own normals (the grid's seven flat bands across the fillet, and its checkerboard on a diagonal wall, are gone); the rock is in the tint, not the mesh: strata bands every 14 m of height on steep faces, the
 lower ones darker, over the smooth authored profile; shape variety belongs above the lip, never on the ride band.
 Designed, not delivered (D-107, `docs/12 §7`): Summit Descent is a palette by height, snow above +350 m over the
 valley floor with blue shadow faces on the rails, scree +150 to +350, rock and moss on the valley run, grey rock

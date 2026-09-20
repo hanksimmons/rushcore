@@ -66,6 +66,7 @@ public sealed class StageHeightField : IHeightSource
         private readonly float _wallFalloff, _insideFalloff;
         /// <summary>Walled archetypes (D-109): the wall beyond the edge is the authored profile, not a blend.</summary>
         private readonly bool _profiled;
+        public bool Profiled => _profiled;
 
         public StampedLine(RouteSkeleton route, float[] profile, float sizeX, float sizeZ, ArchetypeRules rules)
         {
@@ -188,26 +189,58 @@ public sealed class StageHeightField : IHeightSource
             u = d - (Width(i) + WorldScale.WallSetback);
             footSlope = 0f; faceTan = WallProfile.FaceTan;
             if (!_profiled) return false;
+            // Every per-vertex quantity the wall's position depends on is read interpolated toward the neighbour the point
+            // lies toward (D-111): as a step function of the nearest vertex the wall jogged 0.56 m every 4 m wherever a
+            // bend's extra width eased in, and the follow read that as the wall jumping tick to tick.
+            Toward(i, x, z, out int j, out float t);
+            float width = HalfWidth + Mathf.Lerp(Extra[i], Extra[j], t);
+            u = d - (width + WorldScale.WallSetback);
             // The inside of a bend, and the run into and out of it: the face eases to the blind-corner angle over the
             // inside fade, so the wall is one continuous surface along the route that a ride steers along.
             float rawLateral = -Mathf.Sin(Heading[i]) * (x - X[i]) + Mathf.Cos(Heading[i]) * (z - Z[i]);
-            if (InsideEase[i] > 0f && rawLateral * InsideSign[i] > 0f)
+            float insideSign = InsideSign[i] != 0f ? InsideSign[i] : InsideSign[j];
+            float ease = Mathf.Lerp(InsideSign[i] == insideSign ? InsideEase[i] : 0f, InsideSign[j] == insideSign ? InsideEase[j] : 0f, t);
+            if (ease > 0f && rawLateral * insideSign > 0f)
             {
-                faceTan = Mathf.Lerp(WallProfile.FaceTan, WallProfile.InsideFaceTan, InsideEase[i]);
+                faceTan = Mathf.Lerp(WallProfile.FaceTan, WallProfile.InsideFaceTan, ease);
                 return true;
             }
-            if (BankSide[i] == 0f) return true;
-            float lateral = Lateral(i, x, z);
+            float bankSide = BankSide[i] != 0f ? BankSide[i] : BankSide[j];
+            if (bankSide == 0f) return true;
+            float lateral = rawLateral * bankSide;
             if (lateral < 0f) return true;
             // The outside of a bend: the berm's slope carries straight into the fillet from the berm's top, with no
             // setback and no lip (a berm that flattened before the wall was a launch at the cap).
-            float width = Width(i);
-            if (BankHeight[i] > 0f && width > 1f)
+            float bank = Mathf.Lerp(BankSide[i] == bankSide ? BankHeight[i] : 0f, BankSide[j] == bankSide ? BankHeight[j] : 0f, t);
+            float fade = Mathf.Lerp(BankSide[i] == bankSide ? Fade[i] : 0f, BankSide[j] == bankSide ? Fade[j] : 0f, t);
+            if (bank > 0f && width > 1f)
             {
-                u = d - (width + WorldScale.WallSetback * (1f - Fade[i]));   // the setback goes with the bank's fade, no step
-                footSlope = BankHeight[i] / width;
+                u = d - (width + WorldScale.WallSetback * (1f - fade));   // the setback goes with the bank's fade, no step
+                footSlope = bank / width;
             }
             return true;
+        }
+
+        /// <summary>The inside-of-bend reach of a vertex's lateral ray on a side (+1 left, −1 right): a metre short of the
+        /// centre of curvature, where the rays would cross; unbounded on a straight or on the outside (D-111).</summary>
+        /// <summary>Whether a point lies beyond the line's end nearest to it (behind the first vertex or past the last),
+        /// where the nearest-vertex rule would still claim it for that vertex's wall band (D-111: the band stops at the
+        /// line's ends, as the shell's strips do; a ridge's band otherwise sank the primary's floor for a hundred metres
+        /// behind the ridge's start with no shell over it, and the ball drove under the shell's first ray and was
+        /// popped up through it).</summary>
+        public bool BeyondEnd(int i, float x, float z)
+        {
+            if (i != 0 && i != N - 1) return false;
+            float along = (x - X[i]) * Mathf.Cos(Heading[i]) + (z - Z[i]) * Mathf.Sin(Heading[i]);
+            return i == 0 ? along < 0f : along > 0f;
+        }
+
+        public float Reach(int i, float sideSign)
+        {
+            int ia = Mathf.Max(0, i - 1), ib = Mathf.Min(N - 1, i + 1);
+            float ds = Mathf.Sqrt((X[ib] - X[ia]) * (X[ib] - X[ia]) + (Z[ib] - Z[ia]) * (Z[ib] - Z[ia]));
+            float turn = ds > 1e-3f ? Mathf.AngleDifference(Heading[ia], Heading[ib]) / ds : 0f;
+            return turn * sideSign > 1e-5f ? 1f / (turn * sideSign) - 1f : float.MaxValue;
         }
 
         /// <summary>Corridor weight at a point d metres from the line at vertex i: 1 inside the level width plus the
@@ -242,15 +275,7 @@ public sealed class StageHeightField : IHeightSource
         public float Height(int i, float x, float z)
         {
             float dx = x - X[i], dz = z - Z[i];
-            int j = i + 1 < N ? i + 1 : i - 1;
-            if (j == i + 1 && i > 0 && dx * (X[j] - X[i]) + dz * (Z[j] - Z[i]) < 0f) j = i - 1;
-            float t = 0f;
-            if (j >= 0)
-            {
-                float ex = X[j] - X[i], ez = Z[j] - Z[i], len2 = ex * ex + ez * ez;
-                if (len2 > 1e-6f) t = Mathf.Clamp((dx * ex + dz * ez) / len2, 0f, 1f);
-            }
-            else j = i;
+            Toward(i, x, z, out int j, out float t);
             float h = Mathf.Lerp(H[i], H[j], t);
             float bank = Mathf.Lerp(BankHeight[i], BankHeight[j], t);
             if (bank > 0f)
@@ -260,6 +285,24 @@ public sealed class StageHeightField : IHeightSource
                 h += bank * Mathf.Clamp(lateral / Width(i), 0f, 1f);
             }
             return h;
+        }
+
+        /// <summary>The neighbour a point beside vertex i lies toward, and how far along toward it (0..1): the per-vertex
+        /// arrays are read interpolated along the route (D-093 for the floor height; D-111 for the wall's width, berm fade
+        /// and inside ease, whose nearest-vertex steps were a 0.56 m lateral staircase in the wall every 4 m where a bend's
+        /// extra width eased in, 1.7 m of height on the face, that the follow read as the wall jumping tick to tick).</summary>
+        private void Toward(int i, float x, float z, out int j, out float t)
+        {
+            float dx = x - X[i], dz = z - Z[i];
+            j = i + 1 < N ? i + 1 : i - 1;
+            if (j == i + 1 && i > 0 && dx * (X[j] - X[i]) + dz * (Z[j] - Z[i]) < 0f) j = i - 1;
+            t = 0f;
+            if (j >= 0)
+            {
+                float ex = X[j] - X[i], ez = Z[j] - Z[i], len2 = ex * ex + ez * ez;
+                if (len2 > 1e-6f) t = Mathf.Clamp((dx * ex + dz * ez) / len2, 0f, 1f);
+            }
+            else j = i;
         }
     }
 
@@ -544,6 +587,14 @@ public sealed class StageHeightField : IHeightSource
         {
             int i = line.Nearest(p.X, p.Z, SizeX, SizeZ, out float d);
             if (i < 0 || d < 1e-3f) continue;
+            // A line's wall stands beside the line, never beyond its ends (D-111): 40 m before an optional line joined the
+            // primary, its end vertex was the nearest to a point on the primary's floor, the distance to it ran along the
+            // route, its fillet's foot agreed with the floor within 0.3 m, and the "wall" reported leaned forward like a
+            // ramp; the carry turned 148 m/s of forward speed into a 99 m/s launch. The outward direction must also be
+            // across the line's heading, not along it.
+            if (line.BeyondEnd(i, p.X, p.Z)) continue;
+            float exRaw = (p.X - line.X[i]) / d, ezRaw = (p.Z - line.Z[i]) / d;
+            if (Mathf.Abs(exRaw * Mathf.Cos(line.Heading[i]) + ezRaw * Mathf.Sin(line.Heading[i])) > 0.5f) continue;
             if (!line.ProfileAt(i, p.X, p.Z, d, out float u, out float s0, out float ft) || u <= 0f) continue;
             float hc = line.Height(i, p.X, p.Z);
             float top = side - hc;
@@ -570,6 +621,109 @@ public sealed class StageHeightField : IHeightSource
             if (Mathf.Abs(g) < Mathf.Abs(gap)) { gap = g; normal = n; curvature = WallProfile.Curvature(u, s0, ft); found = true; }
         }
         return found;
+    }
+
+    /// <summary>The sink under the wall shell (D-111): how far below the stamp the collided heightfield sits at a point.
+    /// Inside a profiled line's wall band, from the level foot <see cref="WorldScale.WallShellFoot"/> metres inside the
+    /// edge to <see cref="WorldScale.WallShellPastLip"/> metres beyond the lip, the grid is sunk by
+    /// <see cref="WorldScale.WallShellSink"/>, fading to nothing over the first three metres and over the last four so the
+    /// shell and the grid coincide at both edges. Zero elsewhere, and on every unwalled archetype.</summary>
+    public float Sink(float x, float z)
+    {
+        if (WallHeight <= 0f || !float.IsNaN(PitSurface(x, z))) return 0f;
+        float best = 0f, side = float.NaN;
+        foreach (var line in _lines)
+        {
+            int i = line.Nearest(x, z, SizeX, SizeZ, out float d);
+            if (i < 0 || line.BeyondEnd(i, x, z) || !line.ProfileAt(i, x, z, d, out float u, out float s0, out float ft) || u <= -WorldScale.WallShellFoot) continue;
+            float rawLateral = -Mathf.Sin(line.Heading[i]) * (x - line.X[i]) + Mathf.Cos(line.Heading[i]) * (z - line.Z[i]);
+            if (d > line.Reach(i, Mathf.Sign(rawLateral))) continue;      // past the ray's reach on a bend's inside: no shell there
+            if (float.IsNaN(side)) side = SideHeight(x, z);
+            float top = side - line.Height(i, x, z);
+            if (top <= 0f) continue;
+            float uLip = WallProfile.LateralAtHeight(top, s0, ft);
+            float s = Mathf.SmoothStep(-WorldScale.WallShellFoot, -1f, u) * (1f - Mathf.SmoothStep(uLip + WorldScale.WallShellPastLip - 4f, uLip + WorldScale.WallShellPastLip, u));
+            best = Mathf.Max(best, s);
+        }
+        return best * WorldScale.WallShellSink;
+    }
+
+    /// <summary>The wall shells (D-111): for every profiled line and each side, the stamp sampled along the line's lateral
+    /// rays at the shell's stations, as a grid of points (vertex-major) with smooth normals and the terrain colour. The
+    /// shell is the stamp itself, sampled finely where it curves, so it agrees with the analytic wall the follow reads
+    /// and with the grid that lies sunk beneath it. On the inside of a bend the rays are cut short of the bend's centre,
+    /// where they would cross; stations past a vertex's own lip collapse onto its last point (skipped as faces).</summary>
+    public List<WallShellStrip> ShellStrips()
+    {
+        var strips = new List<WallShellStrip>();
+        if (WallHeight <= 0f) return strips;
+        foreach (var line in _lines)
+        {
+            if (!line.Profiled) continue;
+            int n = line.N;
+            foreach (float sideSign in new[] { 1f, -1f })
+            {
+                // Each vertex's edge, lip and reach along its ray.
+                var edge = new float[n]; var uEnd = new float[n]; var reach = new float[n];
+                float uMax = 0f;
+                for (int i = 0; i < n; i++)
+                {
+                    float lx = -Mathf.Sin(line.Heading[i]) * sideSign, lz = Mathf.Cos(line.Heading[i]) * sideSign;
+                    float dProbe = line.Width(i) + WorldScale.WallSetback;
+                    float px = line.X[i] + lx * dProbe, pz = line.Z[i] + lz * dProbe;
+                    line.ProfileAt(i, px, pz, dProbe, out float u0, out _, out _);
+                    edge[i] = dProbe - u0;
+                    float fx = line.X[i] + lx * (edge[i] + 40f), fz = line.Z[i] + lz * (edge[i] + 40f);
+                    line.ProfileAt(i, fx, fz, edge[i] + 40f, out _, out float s0, out float ft);
+                    float top = SideHeight(fx, fz) - line.Height(i, fx, fz);
+                    uEnd[i] = top > 0f ? WallProfile.LateralAtHeight(top, s0, ft) + WorldScale.WallShellPastLip : 0f;
+                    // The inside of a bend: the ray stops a metre short of the centre of curvature.
+                    reach[i] = line.Reach(i, sideSign);
+                    uMax = Mathf.Max(uMax, uEnd[i]);
+                }
+                if (uMax <= 0f) continue;
+                float[] stations = WallProfile.ShellStations(uMax);
+                int k = stations.Length;
+                var pts = new Vector3[n * k];
+                var valid = new bool[n * k];
+                for (int i = 0; i < n; i++)
+                {
+                    float lx = -Mathf.Sin(line.Heading[i]) * sideSign, lz = Mathf.Cos(line.Heading[i]) * sideSign;
+                    for (int j = 0; j < k; j++)
+                    {
+                        float u = Mathf.Min(stations[j], uEnd[i]);
+                        float d = Mathf.Min(edge[i] + u, reach[i]);
+                        float px = line.X[i] + lx * d, pz = line.Z[i] + lz * d;
+                        pts[i * k + j] = new Vector3(px, Sample(px, pz), pz);
+                        // A station is the wall of vertex i only while vertex i is still the nearest: past a bend's centre a
+                        // straight's ray runs on into the far side of the bend (across its exit corridor on a hairpin), and a
+                        // strip joining those points to the clamped neighbour laid a ramp across the corridor.
+                        int owner = line.Nearest(px, pz, SizeX, SizeZ, out float nd);
+                        bool owned = owner == i || nd >= d - 0.5f;
+                        valid[i * k + j] = owned && uEnd[i] > 0f && Mathf.Abs(px) <= SizeX * 0.5f && Mathf.Abs(pz) <= SizeZ * 0.5f && float.IsNaN(PitSurface(px, pz));
+                    }
+                }
+                var norms = new Vector3[n * k];
+                var cols = new Color[n * k];
+                for (int i = 0; i < n; i++)
+                {
+                    for (int j = 0; j < k; j++)
+                    {
+                        int ia = Mathf.Max(0, i - 1), ib = Mathf.Min(n - 1, i + 1), ja = Mathf.Max(0, j - 1), jb = Mathf.Min(k - 1, j + 1);
+                        Vector3 along = pts[ib * k + j] - pts[ia * k + j];
+                        Vector3 across = pts[i * k + jb] - pts[i * k + ja];
+                        Vector3 nrm = along.Cross(across);
+                        if (nrm.LengthSquared() < 1e-8f) nrm = Vector3.Up;
+                        nrm = nrm.Normalized();
+                        if (nrm.Y < 0f) nrm = -nrm;
+                        norms[i * k + j] = nrm;
+                        cols[i * k + j] = SampleColor(pts[i * k + j], nrm);
+                    }
+                }
+                strips.Add(new WallShellStrip(n, k, pts, norms, cols, valid));
+            }
+        }
+        return strips;
     }
 
     /// <summary>Combined corridor weight at a point: 1 inside any corridor, 0 beyond every falloff.</summary>
@@ -726,3 +880,7 @@ public sealed class StageHeightField : IHeightSource
         return ((h >> 40) * (1f / 16777216f)) * 2f - 1f;
     }
 }
+
+/// <summary>One wall shell (D-111): a vertex-major grid of <c>Vertices × Stations</c> points along a line's side, with
+/// smooth normals and terrain colours; a point marked invalid lies outside the footprint or on a vertex with no wall.</summary>
+public readonly record struct WallShellStrip(int Vertices, int Stations, Vector3[] Points, Vector3[] Normals, Color[] Colors, bool[] Valid);

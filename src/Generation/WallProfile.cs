@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace Rushcore.Generation;
@@ -65,12 +66,38 @@ public static class WallProfile
         return u < uEnd ? 1f / FootRadius : 0f;
     }
 
-    /// <summary>Lateral distance at which the level-footed 72° profile reaches a height (the inverse of <see cref="Height"/>).</summary>
-    public static float LateralAtHeight(float h)
+    /// <summary>Lateral distance at which the profile reaches a height (the inverse of <see cref="Height"/>).</summary>
+    public static float LateralAtHeight(float h, float s0 = 0f, float? faceTan = null)
     {
+        float ft = faceTan ?? FaceTan;
         if (h <= 0f) return 0f;
-        FilletEnd(0f, FaceTan, out float uEnd, out float hEnd, out _);
-        if (h < hEnd) return Mathf.Sqrt(Mathf.Max(0f, FootRadius * FootRadius - (FootRadius - h) * (FootRadius - h)));
-        return uEnd + (h - hEnd) / FaceTan;
+        FilletEnd(s0, ft, out float uEnd, out float hEnd, out float phi0);
+        if (h < hEnd)
+        {
+            // h = R(cos φ0 − cos φ) → φ, then u = R(sin φ − sin φ0).
+            float cosPhi = Mathf.Clamp(Mathf.Cos(phi0) - h / FootRadius, -1f, 1f);
+            float phi = Mathf.Acos(cosPhi);
+            return FootRadius * (Mathf.Sin(phi) - Mathf.Sin(phi0));
+        }
+        return uEnd + (h - hEnd) / ft;
+    }
+
+    /// <summary>The shell's chord sagitta on the fillet (D-111): a step of <see cref="WorldScale.WallShellStepDegrees"/> round
+    /// the 30 m arc puts each flat facet's middle this far inside the true surface.</summary>
+    public static readonly float ShellSagitta = FootRadius * (1f - Mathf.Cos(Mathf.DegToRad(WorldScale.WallShellStepDegrees) * 0.5f));
+    /// <summary>Where the analytic wall follow holds the ball above the true surface: twice the shell's sagitta, so the
+    /// facets never touch it (the tube follow's margin, T7).</summary>
+    public static readonly float ShellRest = ShellSagitta * 2f;
+
+    /// <summary>The shell's canonical lateral stations (D-111): the level foot inside the edge, the fillet by angle, then
+    /// the face by lateral step out to <paramref name="uMax"/>.</summary>
+    public static float[] ShellStations(float uMax)
+    {
+        var u = new List<float> { -WorldScale.WallShellFoot, -WorldScale.WallShellFoot * 0.5f, 0f };
+        for (float deg = WorldScale.WallShellStepDegrees; deg <= WorldScale.WallFaceDegrees + 1e-3f; deg += WorldScale.WallShellStepDegrees)
+            u.Add(FootRadius * Mathf.Sin(Mathf.DegToRad(deg)));
+        for (float f = u[^1] + WorldScale.WallShellFaceStep; f < uMax; f += WorldScale.WallShellFaceStep) u.Add(f);
+        u.Add(uMax);
+        return u.ToArray();
     }
 }

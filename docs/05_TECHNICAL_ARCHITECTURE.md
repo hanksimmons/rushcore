@@ -200,7 +200,7 @@ Accepted baseline:
 - sphere collision,
 - control in `_IntegrateForces()`,
 - `HeightMapShape3D` static main terrain,
-- structure colliders (D-096): `BoxShape3D` lids, `ConcavePolygonShape3D` tubes with backface collision, on a structure physics layer; the ground follow reads the terrain heightfield only,
+- structure colliders (D-096, D-111): `BoxShape3D` lids, `ConcavePolygonShape3D` tubes and wall shells with backface collision, on a structure physics layer; the ground follow reads the world's height query, which is the terrain heightfield except under a wall shell, where it is the stamp the shell was sampled from,
 - physics layers: terrain, structures, player, props; the camera occlusion probe masks terrain and lids and never tubes,
 - physics interpolation,
 - start at 60 physics ticks/sec.

@@ -159,6 +159,13 @@ public static class WorldScale
     public const float WallInsideFaceFade = 200f;
     /// <summary>Every wall stands this far outside the corridor's level width, so the ground follow's ±1 cell lateral samples never read it.</summary>
     public const float WallSetback = 8f;
+    /// <summary>The wall shell (D-111): the wall band is a swept shell of the stamp, sampled every this many degrees round
+    /// the fillet (a 3.1 m chord on the 30 m fillet, 4 cm of sagitta) and every <c>WallShellFaceStep</c> metres of lateral
+    /// distance on the face (planar, so any step is exact); it begins <c>WallShellFoot</c> metres inside the corridor's
+    /// edge on the level floor and ends <c>WallShellPastLip</c> metres beyond the lip. The heightfield under it is the same
+    /// stamp sunk by <c>WallShellSink</c> so its coarse chords (up to 0.64 m proud of the fillet at 4 m cells) never reach
+    /// the ball; the sink fades to nothing at both edges, where shell and grid coincide.</summary>
+    public const float WallShellStepDegrees = 6f, WallShellFaceStep = 4f, WallShellFoot = 4f, WallShellPastLip = 6f, WallShellSink = 1f;
     /// <summary>Canyon bends carry a taller berm: banked lines are the archetype's skill (04 §6).</summary>
     public const float CanyonBankScale = 1.5f;
 

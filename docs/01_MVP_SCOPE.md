@@ -93,7 +93,7 @@ Initial reusable challenge modules:
 - bridge.
 
 Vertical grammar (04 §5I, D-096): the ground stays one single-valued heightfield; walls, terraces, slots,
-cliff edges and spiral pits are stamps in it; lids and tubes are the only separate structures; floors are
+cliff edges and spiral pits are stamps in it; lids, tubes and wall shells (D-111: the stamp's wall band swept as a fine collider over the sunk grid) are the only separate structures; floors are
 terraces whose edges drain back to the primary. Stacked floors that share an XZ are not built.
 
 Generation guarantees a primary traversable route by construction and validates it before play.

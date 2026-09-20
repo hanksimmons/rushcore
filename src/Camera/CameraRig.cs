@@ -51,13 +51,14 @@ public partial class CameraRig : Node3D, ICameraBasis
         _player = player;
     }
 
-    /// <summary>World height source used for the focus/camera floors. Terrain only;
-    /// props are handled by the sphere casts.</summary>
-    public Func<float, float, float>? GroundHeight { get; set; }
-    /// <summary>The lid over a plan position, for the confined framing (D-102); null = none.</summary>
-    public Func<float, float, Rushcore.Generation.LidDefinition?>? LidOver { get; set; }
-    /// <summary>True on frames where the lid confinement lowered the lens.</summary>
-    public bool LidConfinedThisFrame { get; private set; }
+    /// <summary>World height source used for the focus/camera floors, given the asker's own height (a lens over a tunnel's
+    /// cap reads the cap, one inside reads the trench; docs/13). Terrain only; props are handled by the sphere casts.</summary>
+    public Func<float, float, float, float>? GroundHeight { get; set; }
+    /// <summary>The roof's underside over a plan position (a lid's bottom or a tunnel's arch), for the confined framing
+    /// (D-102, D-113); null = open sky.</summary>
+    public Func<float, float, float?>? RoofOver { get; set; }
+    /// <summary>True on frames where the roof confinement lowered the lens.</summary>
+    public bool RoofConfinedThisFrame { get; private set; }
 
     public Vector3 FlatForward { get; private set; } = Vector3.Forward;
     public Vector3 FlatRight { get; private set; } = Vector3.Right;
@@ -374,7 +375,7 @@ public partial class CameraRig : Node3D, ICameraBasis
     private Vector3 FloorAboveGround(Vector3 p, float clearance)
     {
         if (GroundHeight is null) return p;
-        float minY = GroundHeight(p.X, p.Z) + clearance;
+        float minY = GroundHeight(p.X, p.Z, p.Y) + clearance;
         if (p.Y < minY) p.Y = minY;
         return p;
     }
@@ -398,10 +399,10 @@ public partial class CameraRig : Node3D, ICameraBasis
 
         // Last resort: never let the lens go below the heightfield.
         FlooredThisFrame = false;
-        ConfineUnderLids();
+        ConfineUnderRoofs();
         if (GroundHeight is null) return;
         Vector3 gp = _camera.GlobalPosition;
-        float minY = GroundHeight(gp.X, gp.Z) + c.GroundClearance;
+        float minY = GroundHeight(gp.X, gp.Z, gp.Y) + c.GroundClearance;
         if (gp.Y < minY)
         {
             gp.Y = minY;
@@ -411,20 +412,25 @@ public partial class CameraRig : Node3D, ICameraBasis
         }
     }
 
-    /// <summary>Confined framing (06 §11, D-102): under a lid the lens stays below the roof by the margin, so a wall
-    /// tunnel never puts the camera in the rock above it; a ball on top of the roof (a bridge) lifts the rule.</summary>
-    private void ConfineUnderLids()
+    /// <summary>Confined framing (06 §11, D-102, D-113): under a roof (a lid, or a tunnel's arch at the lens's own lateral
+    /// offset) the lens stays below it by the margin, so a wall tunnel or a tunnel never puts the camera in the rock above
+    /// it; a ball on top of the roof (a bridge, a tunnel's cap) lifts the rule. The tunnel's answer eases upward over the
+    /// 30 m outside a portal, so the lens dips under the arch as the ball goes in and rises as it comes out.</summary>
+    private void ConfineUnderRoofs()
     {
-        LidConfinedThisFrame = false;
-        if (LidOver is null) return;
+        RoofConfinedThisFrame = false;
+        if (RoofOver is null) return;
         Vector3 lens = _camera.GlobalPosition;
-        var lid = LidOver(lens.X, lens.Z);
-        if (lid is null || _player.GlobalPosition.Y > lid.RoofBottom) return;
-        float maxY = lid.RoofBottom - WorldScale.LidCameraMargin;
+        float? roof = RoofOver(lens.X, lens.Z);
+        if (roof is null) return;
+        Vector3 ball = _player.GlobalPosition;
+        float? ballRoof = RoofOver(ball.X, ball.Z);
+        if (ballRoof is { } br && ball.Y > br) return;
+        float maxY = roof.Value - WorldScale.LidCameraMargin;
         if (lens.Y <= maxY) return;
         lens.Y = maxY;
         _camera.GlobalPosition = lens;
-        LidConfinedThisFrame = true;
+        RoofConfinedThisFrame = true;
     }
 
     private void SetZoom(float value) => _zoom = Mathf.Clamp(value, _t.Camera.ZoomMin, _t.Camera.ZoomMax);

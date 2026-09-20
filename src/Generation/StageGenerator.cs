@@ -231,9 +231,11 @@ public sealed class StageGenerator
                 for (int i = v.Count - 1; i > 0 && v[^1].Distance - v[i - 1].Distance <= WorldScale.PadRadius; i--)
                     padGrade = Mathf.Max(padGrade, Mathf.Abs(v[i].Position.Y - v[i - 1].Position.Y) / Mathf.Max(1e-3f, v[i].Distance - v[i - 1].Distance));
             bool ends = line.Terminal ? padGrade <= 0.03f : joinEnd < 2f;
-            bool ok = !prof.Stalled && maxGrade <= WorldScale.MaxRouteGrade && rise >= 15f && joinStart < 2f && ends;
+            // A tunnel is distinct by its cover, not its height (docs/13): its floor is the primary's own, continued into the rock.
+            bool distinct = line.IsTunnel ? line.CoveredLength >= WorldScale.TunnelCoveredMin : rise >= 15f;
+            bool ok = !prof.Stalled && maxGrade <= WorldScale.MaxRouteGrade && distinct && joinStart < 2f && ends;
             allOk &= ok;
-            detail += $" [{line.Kind}{(line.Terminal ? " → exit" : "")} {v[0].Distance:0}→{v[^1].Distance:0} m of {line.Length:0}, rise {rise:0} m, grade {maxGrade:0.00}, exit {prof.Speed[^1]:0} m/s{(ok ? "" : " FAIL")}]";
+            detail += $" [{line.Kind}{(line.Terminal ? " → exit" : "")} {v[0].Distance:0}→{v[^1].Distance:0} m of {line.Length:0}, {(line.IsTunnel ? $"covered {line.CoveredLength:0} m" : $"rise {rise:0} m")}, grade {maxGrade:0.00}, exit {prof.Speed[^1]:0} m/s{(ok ? "" : " FAIL")}]";
         }
         report.Add("optional lines are traversable, joined and distinct", allOk, $"{def.OptionalLines.Count} lines{detail}");
         // Flights on an optional line are judged on its own geometry (it has no bend list): no flight drifts through a
@@ -336,11 +338,83 @@ public sealed class StageGenerator
             lidDetail += $" [{lid.Detail}{(lid.Passed ? "" : " LOW")}]";
         }
         report.Add("lids keep the declared clearance over the corridor and span the slot (04 §10)", lidsOk, $"{def.Lids.Count} lids{lidDetail}");
+        ValidateTunnels(def, report);
 
         float apex = _fullTakeoff * _fullTakeoff / (2f * _gravity) + 2f * _ballRadius;
         float worst = float.MaxValue; string where = "";
         report.Add("headroom: nothing but a declared lid stands within the jump apex above the primary's centreline (04 §10)", worst == float.MaxValue,
             worst == float.MaxValue ? $"apex {apex:0} m clear; {def.Lids.Count} declared ceilings" : where);
+    }
+
+    /// <summary>
+    /// Tunnels (docs/13 §2.7, D-113). For every tunnel line: the covered run is at least the minimum and the ground without
+    /// the tunnel stands the portal depth above the floor at every covered vertex (the arch and the cap fit under it); the
+    /// trench's floor at the centreline is the line's floor; beside the middle of the covered run the ground rises from the
+    /// floor as the tunnel's fillet and face within a metre (the D-109 probe with the tunnel's numbers); the corridor holds
+    /// the base cap along its whole length (the S is the ridge's, r 70, so the entry is never a brake); no lid and no other
+    /// tunnel's portal within the portal clearance; the covered run never comes within a corridor of another line (a
+    /// single-valued heightfield cannot pass one floor under another). The fork-to-rejoin time against the primary's is a
+    /// note: a line that leaves through an S is longer than the straight it shadows.
+    /// </summary>
+    private void ValidateTunnels(StageDefinition def, ValidationReport report)
+    {
+        var field = def.HeightField!;
+        var pv = def.PrimaryRoute.Vertices;
+        var tunnels = def.OptionalLines.Where(l => l.IsTunnel).ToList();
+        bool allOk = true; string detail = "";
+        float baseCap = _speed.Cap;
+        for (int k = 0; k < def.OptionalLines.Count; k++)
+        {
+            var line = def.OptionalLines[k];
+            if (!line.IsTunnel) continue;
+            var v = line.Vertices;
+            var prof = def.OptionalProfiles[k];
+            bool covered = line.CoverStart >= 0 && line.CoveredLength >= WorldScale.TunnelCoveredMin;
+            float minDepth = float.MaxValue, floorErr = 0f, stampErr = 0f, minLimit = float.MaxValue, nearestLine = float.MaxValue, nearestLid = float.MaxValue;
+            if (covered)
+            {
+                for (int i = line.CoverStart; i <= line.CoverEnd; i++)
+                {
+                    var p = v[i].Position;
+                    minDepth = Mathf.Min(minDepth, field.SampleWithoutTunnels(p.X, p.Z) - p.Y);
+                    floorErr = Mathf.Max(floorErr, Mathf.Abs(field.Sample(p.X, p.Z) - p.Y));
+                    foreach (var o in def.OptionalLines)
+                    {
+                        if (ReferenceEquals(o, line)) continue;
+                        foreach (var ov in o.Vertices) nearestLine = Mathf.Min(nearestLine, new Vector2(ov.Position.X - p.X, ov.Position.Z - p.Z).Length());
+                    }
+                }
+                // The stamp beside the middle of the covered run, both sides.
+                int mid = (line.CoverStart + line.CoverEnd) / 2;
+                float lx = -Mathf.Sin(v[mid].Heading), lz = Mathf.Cos(v[mid].Heading);
+                foreach (float side in new[] { 1f, -1f })
+                    foreach (float u in new[] { 1f, 2f, 3f, 4f, 5f })
+                    {
+                        float px = v[mid].Position.X + lx * side * (WorldScale.TunnelHalfWidth + u), pz = v[mid].Position.Z + lz * side * (WorldScale.TunnelHalfWidth + u);
+                        float want = v[mid].Position.Y + WallProfile.Height(u, 0f, TunnelProfile.FaceTan, TunnelProfile.Radius);
+                        stampErr = Mathf.Max(stampErr, Mathf.Abs(field.Sample(px, pz) - want));
+                    }
+                // Portals: clear of lids and of every other tunnel's portals.
+                foreach (int pi in new[] { line.CoverStart, line.CoverEnd })
+                {
+                    var p = v[pi].Position;
+                    foreach (var lid in def.Lids) nearestLid = Mathf.Min(nearestLid, new Vector2(lid.Centre.X - p.X, lid.Centre.Z - p.Z).Length() - lid.Length * 0.5f);
+                    foreach (var o in tunnels)
+                    {
+                        if (ReferenceEquals(o, line) || o.CoverStart < 0) continue;
+                        foreach (int oi in new[] { o.CoverStart, o.CoverEnd })
+                            nearestLid = Mathf.Min(nearestLid, new Vector2(o.Vertices[oi].Position.X - p.X, o.Vertices[oi].Position.Z - p.Z).Length());
+                    }
+                }
+            }
+            for (int i = 0; i < prof.Count; i++) minLimit = Mathf.Min(minLimit, prof.CornerLimit[i]);
+            float primaryTime = def.SpeedProfile.TimeAt(pv[line.JoinEnd].Distance) - def.SpeedProfile.TimeAt(pv[line.JoinStart].Distance);
+            bool ok = covered && minDepth >= TunnelProfile.PortalDepth - 0.5f && floorErr <= 0.3f && stampErr <= 1f && !prof.Stalled
+                      && minLimit >= baseCap - 1f && nearestLine >= WorldScale.MinCorridorWidth && nearestLid >= WorldScale.TunnelPortalClearance;
+            allOk &= ok;
+            detail += $" [tunnel at {pv[line.JoinStart].Distance:0} m: covered {line.CoveredLength:0} m of {line.Length:0}, rock over the floor ≥ {(covered ? minDepth : 0f):0.0} m, floor error {floorErr:0.00} m, stamp error {stampErr:0.00} m, corner limit ≥ {minLimit:0} m/s, nearest line {(nearestLine == float.MaxValue ? -1f : nearestLine):0} m, nearest lid or portal {(nearestLid == float.MaxValue ? -1f : nearestLid):0} m, {prof.TotalTime:0.0} s vs the primary's {primaryTime:0.0} s{(ok ? "" : " FAIL")}]";
+        }
+        report.Add("tunnels are covered, their trench is the tunnel profile, their corridor holds the base cap and their portals stand clear (docs/13 §2.7)", allOk, $"{tunnels.Count} tunnels{detail}");
     }
 
     /// <summary>Geometric flight check for any polyline (D-100): a flight's straight path may not drift more than the

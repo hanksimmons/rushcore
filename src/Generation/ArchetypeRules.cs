@@ -41,7 +41,10 @@ public sealed record ArchetypeRules(
     int Floors,
     /// <summary>Branching exits (D-105): how far a terminal line widens beyond its shape's offset before its pad; 0 keeps a
     /// canyon's exit slot within its wall and a sky exit's cliff on the primary's flank.</summary>
-    float ExitSpread)
+    float ExitSpread,
+    /// <summary>Tunnels (docs/13, D-113): the chance a rejoining line's site takes a tunnel rather than a ridge. Canyon Run's
+    /// portals only until the dive (T2) gives open landscapes a roof to go under.</summary>
+    float TunnelChance = 0f)
 {
     public bool HasDunes => TrainCrestsMax > 0;
 
@@ -54,7 +57,7 @@ public sealed record ArchetypeRules(
     public static readonly ArchetypeRules CanyonRun = new(
         TerrainArchetype.CanyonRun, WorldScale.CanyonWallHeightMin, WorldScale.CanyonWallHeightMax, WorldScale.CanyonWallFalloff, StageHeightField.FalloffWidth,
         0.45f, 0.45f, 200f, 450f, WorldScale.CanyonBankScale,
-        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0.5f, 0.7f, 1, 0f);
+        WorldScale.LongSwellMaxSlope, WorldScale.LaunchCrestSpacing, 0.6f, 0.4f, 0.35f, 0, 0, Mathf.Pi / 4f, 0.5f, 0.7f, 1, 0f, 0.7f);
 
     /// <summary>Dune Sea (04 §6): broad repeating waves, most straights a train of launch crests, cruise-heavy bends.</summary>
     public static readonly ArchetypeRules DuneSea = new(

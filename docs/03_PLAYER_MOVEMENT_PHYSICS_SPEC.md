@@ -85,10 +85,15 @@ contact-only controller exactly, so the frozen baseline is unchanged by it.
 **Structures (D-096, D-111, D-112).** Lids, bridges and shells (04 §5I) are separate colliders, not part of the
 height source. On a lid the follow finds no carrying surface within the snap distance and returns false: the
 contact-only baseline runs there, on flat geometry that needs no follow. A wall shell is the stamp's own surface,
-so the follow reads the analytic wall (D-109) and holds the ball a hair off the shell. The tunnel shell (`docs/13`)
-is a slot with a roof: floor and walls are ground under the wall-ride rule below, the roof is a ceiling. The
-see-through tube and its tube follow (D-101, V-015) were removed on 2026-09-19; the wall ride carries what was
-learnt there (contacts in the band count as ground; the carry conserves speed and cancels the coming dip).
+so the follow reads the analytic wall (D-109) and holds the ball a hair off the shell. A tunnel (D-113, `docs/13 §2`)
+is a slot with a roof: its floor is the heightfield and its walls are wall shells with the tunnel's own profile (a 6 m
+fillet, 78°), so both are ground under the wall-ride rule below and `WallSurface` answers with the line's own fillet
+radius; the arch is a ceiling the ball can hit and never ground. The one thing the tunnel adds to the follow is the
+height query's third argument: `IGroundSurface.Height(x, z, y)` takes the ball's own height, and under a tunnel's
+cap answers the cap's top when the ball is above the cap less a ball, the trench below (04 §5I); the follow passes
+the ball's height on all five of its samples and nothing else changes. The see-through tube and its tube follow
+(D-101, V-015) were removed on 2026-09-19; the wall ride carries what was learnt there (contacts in the band count
+as ground; the carry conserves speed and cancels the coming dip).
 
 ### Wall ride (D-108)
 

@@ -230,6 +230,49 @@ public static class WorldScale
     /// <summary>The lens keeps this much below a roof it is under.</summary>
     public const float LidCameraMargin = 1.5f;
 
+    // ---- tunnels (docs/13 §2, D-113; every number provisional, V-017) ----
+    /// <summary>The tunnel corridor. The plan's 10 m half-width was a wall-hit generator for the harness follower at the cap through
+    /// the S (16 m off the line, every touch a climb): 15 m gives the line-holding error room, and the wall ride inside is still
+    /// a lane change, not a loop.</summary>
+    public const float TunnelHalfWidth = 15f;
+    /// <summary>The tunnel's own wall profile: a 6 m fillet that fits the slot and a 78° face (a tunnel wall is a wall, not a bank); no setback.</summary>
+    public const float TunnelFootRadius = 6f, TunnelFaceDegrees = 78f;
+    /// <summary>Where the arch springs from the walls (height above the floor). The arch is the circular arc tangent to the face
+    /// there (a horseshoe; <c>TunnelProfile.Crown</c> follows, about 33 m), so a ball riding up the wall runs onto the arch and
+    /// drops off it where the ceiling rule ends the ride, with no crease to hit. The wall stands this high so a touch at up to
+    /// 30 m/s of lateral speed (12° off the bore at the cap; a climb of v²/2g) rides the wall and comes back to the floor, and
+    /// only a worse line reaches the arch and falls from it (a priced landing). A full charge under it is refused, as under a lid.</summary>
+    public const float TunnelSpringHeight = 12f;
+    /// <summary>The arch is sampled every this many degrees of its arc.</summary>
+    public const float TunnelArchStepDegrees = 10f;
+    /// <summary>Rock over the crown a tunnel needs before it is covered (<c>TunnelProfile.PortalDepth</c> is the crown plus this); the
+    /// portal face stands where the surrounding ground reaches it.</summary>
+    public const float TunnelCapThickness = 4f;
+    /// <summary>The cap (the ground restored over the trench) runs this far past the trench's lip, like the wall shell past its lip.</summary>
+    public const float TunnelCapMargin = 6f;
+    /// <summary>The tunnel line's offset from the primary (the ridge's: on a canyon the trench then lies wholly beyond the wall's lip), its S
+    /// and the run at full offset between the two S's. The S is a cosine (peak curvature O·π²/2L², 18% under the smoothstep's) and
+    /// as long as its site allows: at least the ridge's 290 m (r ≈ 85 m, which holds the base cap with margin) and up to 450 m
+    /// (r ≈ 205 m, which holds the Flow ceiling), because both S's must lie on primary straights, 200–450 m on a canyon, and a slot
+    /// asks for a gentler entry than a 75 m corridor does.</summary>
+    public const float TunnelOffset = RidgeOffset, TunnelTransition = RidgeTransition, TunnelTransitionMax = 450f, TunnelPlateau = 120f;
+    /// <summary>The sink under a tunnel's wall shell (D-111 for the canyon wall is 1 m). A 4 m cell straddles most of a 6 m fillet, so
+    /// the grid's chords stand up to 1.5 m proud of the arc there (the ball hit them through the shell at 1 m: a 10 m/s loss and
+    /// a launch on the first tunnel drive); 3 m keeps every chord under the shell, and the trench is deep enough to hide it.</summary>
+    public const float TunnelShellSink = 3f;
+    /// <summary>A tunnel cuts nothing inside the primary's level width and setback; its trench fades in over this much of the fillet's foot.</summary>
+    public const float TunnelMouthFade = 8f;
+    /// <summary>The shortest covered run that counts as a tunnel.</summary>
+    public const float TunnelCoveredMin = 60f;
+    /// <summary>No lid and no other tunnel's portal within this much plan distance of a portal.</summary>
+    public const float TunnelPortalClearance = 100f;
+    /// <summary>The camera's confinement eases in over this much before a portal and out after it (06 §11).</summary>
+    public const float TunnelCameraEase = 30f;
+    /// <summary>The portal's rock rim around the arch, and the guide strips along the walls at ball height every this far.</summary>
+    public const float TunnelRimSize = 1.5f, TunnelGuideSpacing = 25f, TunnelGuideHeight = 1.5f;
+    /// <summary>Inside, the rock darkens to this share of its lit colour this far from the nearer portal (06 §3).</summary>
+    public const float TunnelShadeFloor = 0.45f, TunnelShadeDepth = 60f;
+
     // ---- heightfield (docs/11 §3g) ----
     public const float CellSize = 4f;
     /// <summary>Route polyline vertex spacing; equal to the cell size so relief and stamping see every facet.</summary>

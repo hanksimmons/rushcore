@@ -1253,6 +1253,7 @@ public partial class MovementToySelfTest : Node
                 var d = gen.Generate(new StageGenerationRequest(e.Seed, 0, e.Archetype));
                 bool shows = e.Name switch
                 {
+                    "tunnel" => d.OptionalLines.Any(l => l.IsTunnel && l.CoverStart >= 0),
                     "tunnels + pit" => d.Lids.Count > 0 && d.PrimaryRoute.Spiral is not null,
                     "sky floor 3" => d.OptionalLines.Any(l => l.Floor == 3),
                     "dune trains" => d.PrimaryRoute.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest) >= 3,
@@ -1271,6 +1272,7 @@ public partial class MovementToySelfTest : Node
                         var d2 = gen.Generate(new StageGenerationRequest(s2, 0, e.Archetype));
                         bool shows2 = e.Name switch
                         {
+                            "tunnel" => d2.OptionalLines.Any(l => l.IsTunnel && l.CoverStart >= 0),
                             "tunnels + pit" => d2.Lids.Count > 0 && d2.PrimaryRoute.Spiral is not null,
                             "sky floor 3" => d2.OptionalLines.Any(l => l.Floor == 3),
                             "dune trains" => d2.PrimaryRoute.Features.Count(f => f.Kind == RouteFeatureKind.LaunchCrest) >= 3,
@@ -2006,6 +2008,7 @@ public partial class MovementToySelfTest : Node
         float belowSum = 0f, ceilAir = 0f, widestGap = 0f; int ceilFlights = 0;
         int gaps = 0, ramps = 0, turns = 0, modulesPassed = 0, modulesTotal = 0, seedsWithGap = 0, seedsWithRamp = 0;
         int crests = 0, trains = 0, seedsWithTrain = 0, droppedShown = 0, droppedLines = 0, lids = 0, lidsPassed = 0, spirals = 0, floor2 = 0, floor3 = 0, seedsWithFloor3 = 0;
+        int tunnels = 0, tunnelsCovered = 0, seedsWithTunnel = 0; float coveredSum = 0f, coveredMin = float.MaxValue, coveredMax = 0f; List<int> tunnelSeeds = new();
         int exitLines = 0, seedsWithBranch = 0, seedsWithThree = 0; string exampleBranch = "", exampleThree = ""; List<int> threeAtZero = new(), floor3AtZero = new();
         string exampleGap = "", exampleRamp = "", exampleRegen = "", exampleTrain = "";
         double msSum = 0, msMax = 0;
@@ -2045,6 +2048,13 @@ public partial class MovementToySelfTest : Node
             linesTotal += def.OptionalLines.Count;
             droppedLines += def.DroppedLines;
             lids += def.Lids.Count; lidsPassed += def.Lids.Count(x => x.Passed);
+            foreach (var tl in def.OptionalLines.Where(l => l.IsTunnel))
+            {
+                tunnels++;
+                if (tl.CoverStart < 0) continue;
+                tunnelsCovered++; coveredSum += tl.CoveredLength; coveredMin = Mathf.Min(coveredMin, tl.CoveredLength); coveredMax = Mathf.Max(coveredMax, tl.CoveredLength);
+            }
+            if (def.OptionalLines.Any(l => l.IsTunnel && l.CoverStart >= 0)) { seedsWithTunnel++; if (req.StageIndex == 0 && tunnelSeeds.Count < 12) tunnelSeeds.Add(req.RunSeed); }
             floor2 += def.OptionalLines.Count(l => l.Floor == 2); floor3 += def.OptionalLines.Count(l => l.Floor == 3);
             if (def.OptionalLines.Any(l => l.Floor == 3)) { seedsWithFloor3++; if (req.StageIndex == 0) floor3AtZero.Add(req.RunSeed); }
             if (def.PrimaryRoute.Spiral is not null) spirals++;
@@ -2090,6 +2100,7 @@ public partial class MovementToySelfTest : Node
         GD.Print($"[SELFTEST] {A} modules over the batch: {gaps} gaps ({seedsWithGap} seeds, e.g. {exampleGap}), {ramps} ramps ({seedsWithRamp} seeds, e.g. {exampleRamp}), {turns} banked turns; {modulesPassed}/{modulesTotal} pass; {crests} crests, {trains} trains of ≥ 2 ({seedsWithTrain} seeds, e.g. {exampleTrain}); regeneration e.g. {exampleRegen}");
         GD.Print($"[SELFTEST] two speeds over the batch: seconds below the base cap avg {belowSum / Count:0.0} s; ceiling flights avg {ceilFlights / (float)Count:0.0} ({ceilAir / Count:0.0} s airborne avg); widest Flow-opportunity gap {widestGap:0} m");
         GD.Print($"[SELFTEST] {A} structures over the batch: {lids} lids ({lidsPassed} pass); {spirals} spiral pits; terraces: {floor2} on floor 2, {floor3} on floor 3 ({seedsWithFloor3} seeds; at stage 0: {string.Join(" ", floor3AtZero)})");
+        if (tunnels > 0) GD.Print($"[SELFTEST] {A} tunnels over the batch: {tunnels} tunnel lines, {tunnelsCovered} covered on {seedsWithTunnel} seeds; covered {coveredMin:0}–{coveredMax:0} m (avg {(tunnelsCovered > 0 ? coveredSum / tunnelsCovered : 0f):0} m); at stage 0: {string.Join(" ", tunnelSeeds)}");
         GD.Print($"[SELFTEST] {A} exits over the batch: {exitLines} terminal lines; {seedsWithBranch} seeds with a second exit (e.g. {exampleBranch}), {seedsWithThree} with three (e.g. {exampleThree}; at stage 0: {string.Join(" ", threeAtZero)})");
         if (OptionalLineBuilder.TerminalTally.Count > 0) { GD.Print($"[SELFTEST] {A} terminal candidates rejected: " + string.Join(", ", OptionalLineBuilder.TerminalTally.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}"))); OptionalLineBuilder.TerminalTally.Clear(); }
         if (fallbackReasons.Count > 0) GD.Print($"[SELFTEST] {A} attempt failures: " + string.Join(", ", fallbackReasons.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} ×{kv.Value}")));
@@ -2122,6 +2133,9 @@ public partial class MovementToySelfTest : Node
         if (archetype == TerrainArchetype.CanyonRun)
         {
             Check($"{A}: " + "the batch places wall tunnels and spiral pits and every lid keeps its clearance (D-102)", lids > 0 && lidsPassed == lids && spirals > 0, $"{lids} lids ({lidsPassed} pass), {spirals} spiral pits");
+            // Tunnels (docs/13 §2.8, D-113): the batch places covered portal tunnels, and every one passes its validators (a
+            // stage with a failing tunnel is not valid, which the batch's first check already refuses).
+            Check($"{A}: " + "the batch places covered portal tunnels on a fair share of seeds (docs/13 §2.8)", tunnelsCovered > 0 && seedsWithTunnel >= Count * 0.3f, $"{tunnelsCovered} covered tunnels on {seedsWithTunnel}/{Count} seeds");
             // The wall profile (D-109): beside the middle of the longest straight, the ground rises from the corridor as
             // the 30 m fillet and the 72° face on both sides, and reaches the wall's height before the profile's top.
             var probe = gen.Generate(new StageGenerationRequest(SampleStages.All.First(s => s.Name == "tunnels + pit").Seed, 0, TerrainArchetype.CanyonRun));
@@ -2666,7 +2680,7 @@ public partial class MovementToySelfTest : Node
                         ballMaxY = Mathf.Max(ballMaxY, p.Y);
                         Vector3 lens = rig.Camera.GlobalPosition;
                         if (lid.Covers(lens.X, lens.Z) && lens.Y > lid.RoofBottom) lensAbove++;
-                        if (rig.LidConfinedThisFrame) confined++;
+                        if (rig.RoofConfinedThisFrame) confined++;
                     }
                     yield return null;
                 }
@@ -2969,6 +2983,134 @@ public partial class MovementToySelfTest : Node
                     }
                 }
                 else Check("stage has a straight long enough for a wall ride", true, $"none on seed {world.Seed}");
+            }
+
+            // The tunnel drive (docs/13 §2.8, D-113): from the primary before a tunnel's fork the follower takes the line into
+            // the rock and out the far portal to the rejoin. Inside the covered run the ball stays grounded, no portal is an
+            // impact, the lens stays under the arch and inside the walls, and the exit speed matches the model. Then the cap:
+            // a ball set down on the ground over the covered run rests on it as a floor. A drive seed without a covered
+            // tunnel borrows the first canyon seed with one.
+            {
+                if (!stage.OptionalLines.Any(l => l.IsTunnel && l.CoverStart >= 0))
+                {
+                    var gen3 = new StageGenerator(t.Movement, t.Flow, t.JumpSlam);
+                    for (int sd = 1; sd <= 60; sd++)
+                    {
+                        var d3 = gen3.Generate(new StageGenerationRequest(sd, 0, TerrainArchetype.CanyonRun));
+                        if (d3.Report.Passed && d3.OptionalLines.Any(l => l.IsTunnel && l.CoverStart >= 0))
+                        {
+                            world.Regenerate(sd);
+                            foreach (var _ in Frames(3)) yield return null;
+                            stage = world.Stage!;
+                            verts = stage.PrimaryRoute.Vertices;
+                            canyonSeed = sd;
+                            GD.Print($"[SELFTEST] tunnel drive: borrowing seed {sd}/0 for a covered tunnel");
+                            break;
+                        }
+                    }
+                }
+                var tunnel = stage.OptionalLines.FirstOrDefault(l => l.IsTunnel && l.CoverStart >= 0);
+                Check("a canyon stage builds its tunnel roofs (docs/13 §2.1)", tunnel is null || world.TunnelRoofTriangles > 0, $"roof triangles={world.TunnelRoofTriangles}");
+                if (tunnel is not null)
+                {
+                    int tk = stage.OptionalLines.IndexOf(tunnel);
+                    var tv = tunnel.Vertices;
+                    var hf = stage.HeightField!;
+                    float coverStart = tv[tunnel.CoverStart].Distance, coverEnd = tv[tunnel.CoverEnd].Distance;
+                    // The hole (docs/13 §2.7): no shell vertex stands over the tunnel's floor along the covered run (the arch is well above it).
+                    int overFloor = 0;
+                    foreach (var tris in world.WallShellData)
+                        foreach (var q in tris)
+                        {
+                            int ni = -1; float nd = float.MaxValue;
+                            for (int i = tunnel.CoverStart; i <= tunnel.CoverEnd; i++) { float dd = new Vector2(tv[i].Position.X - q.X, tv[i].Position.Z - q.Z).LengthSquared(); if (dd < nd) { nd = dd; ni = i; } }
+                            if (ni < 0) continue;
+                            float lat = -Mathf.Sin(tv[ni].Heading) * (q.X - tv[ni].Position.X) + Mathf.Cos(tv[ni].Heading) * (q.Z - tv[ni].Position.Z);
+                            float alongOff = Mathf.Cos(tv[ni].Heading) * (q.X - tv[ni].Position.X) + Mathf.Sin(tv[ni].Heading) * (q.Z - tv[ni].Position.Z);
+                            if (Mathf.Abs(lat) < WorldScale.TunnelHalfWidth - WorldScale.WallShellFoot - 0.5f && Mathf.Abs(alongOff) < 2.5f && q.Y < tv[ni].Position.Y + 3f) overFloor++;
+                        }
+                    Check("no wall-shell vertex stands over a tunnel's floor along its covered run (the hole, docs/13 §2.7)", overFloor == 0, $"{overFloor} shell vertices over the floor");
+
+                    var path = new List<Vector3>();
+                    for (int i = Mathf.Max(0, tunnel.JoinStart - 38); i < tunnel.JoinStart; i++) path.Add(verts[i].Position);
+                    int pathTunnelStart = path.Count;
+                    foreach (var bv in tv) path.Add(bv.Position);
+                    for (int i = tunnel.JoinEnd + 1; i < Mathf.Min(verts.Count, tunnel.JoinEnd + 40); i++) path.Add(verts[i].Position);
+                    var rig2 = (Rushcore.Camera.CameraRig)_player.CameraBasis!;
+                    foreach (var _ in Settle(world.SurfacePoint(path[0].X, path[0].Z, m.BallRadius + 0.6f), 0.5f)) yield return null;
+                    rig2.SnapYawToward(new Vector3(Mathf.Cos(verts[tunnel.JoinStart].Heading), 0f, Mathf.Sin(verts[tunnel.JoinStart].Heading)));
+                    int pn = 0, pt = 0, insideTicks = 0, insideGrounded = 0, lensAbove = 0, lensOutside = 0, lensInside = 0, impactsAt = _player.ImpactCount, portalImpacts = 0;
+                    float exitSpeed = 0f, maxOff = 0f, minSpeedInside = float.MaxValue, lensAboveBy = 0f; bool wasInside = false, reachedEnd = false;
+                    bool trace = System.Environment.GetEnvironmentVariable("RUSHCORE_TUNNEL_TRACE") == "1";
+                    while (pt++ < Engine.PhysicsTicksPerSecond * 40)
+                    {
+                        Vector3 p = _player.GlobalPosition;
+                        float best = float.MaxValue;
+                        for (int i = Mathf.Max(0, pn - 5); i < Mathf.Min(path.Count, pn + 60); i++)
+                        {
+                            float d = new Vector2(path[i].X - p.X, path[i].Z - p.Z).LengthSquared();
+                            if (d < best) { best = d; pn = i; }
+                        }
+                        maxOff = Mathf.Max(maxOff, Mathf.Sqrt(best));
+                        int ti = pn - pathTunnelStart;
+                        bool inside = ti >= tunnel.CoverStart && ti <= tunnel.CoverEnd;
+                        // Portal impacts: any impact within 40 m of either portal.
+                        if (ti >= 0 && ti < tv.Count && (Mathf.Abs(tv[ti].Distance - coverStart) < 40f || Mathf.Abs(tv[ti].Distance - coverEnd) < 40f) && _player.ImpactCount > impactsAt) { portalImpacts += _player.ImpactCount - impactsAt; impactsAt = _player.ImpactCount; }
+                        if (inside)
+                        {
+                            insideTicks++;
+                            if (_player.IsGrounded) insideGrounded++;
+                            minSpeedInside = Mathf.Min(minSpeedInside, _player.Velocity.Length());
+                            Vector3 lens = rig2.Camera.GlobalPosition;
+                            float arch = hf.ArchOver(lens.X, lens.Z);
+                            if (!float.IsNaN(arch))
+                            {
+                                lensInside++;
+                                if (lens.Y > arch - WorldScale.LidCameraMargin + 0.05f) { lensAbove++; lensAboveBy = Mathf.Max(lensAboveBy, lens.Y - arch); }
+                            }
+                            else
+                            {
+                                // The lens's plan position is outside the arch's span: in the rock, unless it is still outside the portal.
+                                int li = -1; float ld = float.MaxValue;
+                                for (int i = tunnel.CoverStart; i <= tunnel.CoverEnd; i++) { float dd = new Vector2(tv[i].Position.X - lens.X, tv[i].Position.Z - lens.Z).LengthSquared(); if (dd < ld) { ld = dd; li = i; } }
+                                float lat = -Mathf.Sin(tv[li].Heading) * (lens.X - tv[li].Position.X) + Mathf.Cos(tv[li].Heading) * (lens.Z - tv[li].Position.Z);
+                                float along = Mathf.Cos(tv[li].Heading) * (lens.X - tv[li].Position.X) + Mathf.Sin(tv[li].Heading) * (lens.Z - tv[li].Position.Z);
+                                bool beforePortal = li == tunnel.CoverStart && along < 0f || li == tunnel.CoverEnd && along > 0f;
+                                if (!beforePortal && Mathf.Abs(lat) > TunnelProfile.SpringLateral) lensOutside++;
+                            }
+                            if (trace)
+                            {
+                                float latB = -Mathf.Sin(tv[ti].Heading) * (p.X - tv[ti].Position.X) + Mathf.Cos(tv[ti].Heading) * (p.Z - tv[ti].Position.Z);
+                                bool hasWall = hf.WallSurface(p, m.BallRadius, out Vector3 wn, out float wg, out _);
+                                GD.Print($"[TUNNEL] t{pt} ti {ti} pos ({p.X:0.0},{p.Y:0.00},{p.Z:0.0}) lat {latB:0.0} floor {tv[ti].Position.Y:0.00} ground {world.SampleHeight(p.X, p.Z, p.Y):0.00} grid {world.GridHeight(p.X, p.Z):0.00} v ({_player.Velocity.X:0.0},{_player.Velocity.Y:0.0},{_player.Velocity.Z:0.0}) |v| {_player.Velocity.Length():0.0} g {_player.IsGrounded} raw {_player.IsRawGrounded} follow {_player.GroundFollowActive} wall {_player.IsWallRiding} n.y {_player.GroundNormal.Y:0.00} c {_player.GetContactCount()} analytic {hasWall} gap {wg:0.00} wn.y {wn.Y:0.00} lens ({lens.X:0.0},{lens.Y:0.00},{lens.Z:0.0}) arch {arch:0.00} confined {rig2.RoofConfinedThisFrame} imp {_player.ImpactCount}");
+                            }
+                        }
+                        else if (wasInside && exitSpeed <= 0f) exitSpeed = _player.Velocity.Length();
+                        wasInside = inside;
+                        if (pn >= path.Count - 3) { reachedEnd = true; break; }
+                        // A slot asks the follower for a shorter look-ahead than the 60 m it uses on a 150 m corridor: aiming 32 m
+                        // ahead makes its correction for a lateral error twice as strong, and the corridor's walls are 15 m away.
+                        var tg = path[Mathf.Min(path.Count - 1, pn + 8)];
+                        _worldDrive = new Vector3(tg.X - p.X, 0f, tg.Z - p.Z);
+                        yield return null;
+                    }
+                    ReleaseAll();
+                    float modelExit = stage.OptionalProfiles[tk].SpeedAt(coverEnd);
+                    float insideFrac = insideGrounded / (float)Mathf.Max(1, insideTicks);
+                    GD.Print($"[SELFTEST] tunnel drive (seed {world.Seed}): fork at {verts[tunnel.JoinStart].Distance:0} m, covered {coverStart:0}→{coverEnd:0} m of {tunnel.Length:0}; {insideTicks} ticks inside, grounded {insideFrac:P0}, min speed inside {(insideTicks > 0 ? minSpeedInside : 0f):0.0} m/s, portal impacts {portalImpacts}, exit {exitSpeed:0.0} m/s vs model {modelExit:0.0}; lens: {lensInside} ticks under the arch ({lensAbove} above it by up to {lensAboveBy:0.00} m), {lensOutside} in the rock; reached the rejoin {reachedEnd}, max {maxOff:0} m off the path");
+                    Check("the follower drives the tunnel line into the rock and out to the rejoin (docs/13 §2.8)", reachedEnd && insideTicks > 10, $"reached={reachedEnd} inside ticks={insideTicks}");
+                    Check("inside the tunnel the ball stays grounded at least 95% of the time", insideTicks > 10 && insideFrac >= 0.95f, $"{insideFrac:P0}");
+                    Check("neither portal is an impact", portalImpacts == 0, $"{portalImpacts} impacts near the portals");
+                    Check("the lens stays under the arch and inside the walls through the tunnel (06 §11)", lensInside > 10 && lensAbove == 0 && lensOutside == 0, $"under {lensInside}, above {lensAbove} (by {lensAboveBy:0.00} m), in the rock {lensOutside}");
+                    Check("the tunnel's exit speed is within 10% of the model's", exitSpeed > 0f && Mathf.Abs(exitSpeed - modelExit) <= modelExit * 0.1f, $"exit={exitSpeed:0.0} model={modelExit:0.0}");
+                    // The cap: the surface over the covered run is a floor.
+                    int mid = (tunnel.CoverStart + tunnel.CoverEnd) / 2;
+                    float capTop = hf.SampleWithoutTunnels(tv[mid].Position.X, tv[mid].Position.Z);
+                    foreach (var _ in Settle(new Vector3(tv[mid].Position.X, capTop + m.BallRadius + 1f, tv[mid].Position.Z), 1.0f)) yield return null;
+                    float restY = _player.GlobalPosition.Y;
+                    Check("the tunnel's cap holds the ball from above: it rests on the surface over the covered run (docs/13 §2.1)", _player.IsGrounded && Mathf.Abs(restY - (capTop + m.BallRadius)) < 0.6f, $"y {restY:0.00} vs cap top + radius {capTop + m.BallRadius:0.00}, grounded {_player.IsGrounded}");
+                }
+                else Check("stage has a covered tunnel to drive", true, "none on this seed nor on seeds 1–60");
             }
         }
 

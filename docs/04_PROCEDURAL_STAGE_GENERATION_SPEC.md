@@ -168,8 +168,10 @@ so exact, out to 6 m past each vertex's own lip), swept as one indexed mesh with
 colour and collided as a concave shape on the structure layer (`StageHeightField.ShellStrips`, `WallShellMesh`).
 The shell is the stamp, so it agrees with the analytic wall the follow reads and with everything the stamp does at
 bends, berms, eases, ledges and forks. The heightfield under it is the same stamp **sunk one metre**
-(`StageHeightField.Sink`, `WorldScale.WallShellSink`), fading to nothing over the shell's first three metres and its
-last four so shell and grid coincide at both edges; the collider's coarse chords never reach the ball, and the
+(`StageHeightField.Sink`, `WorldScale.WallShellSink`), fading in over three metres from the corridor's edge, one cell inside
+the shell's foot (D-113: the grid is bilinear over 4 m cells, so a sunk node bends the collider for a whole cell round it; a
+fade that began at the foot itself dipped the floor before the shell started and stood the shell's edge proud of it, a launch
+ramp at the cap on the first tunnel drive), and out over the last four so shell and grid coincide at both edges; the collider's coarse chords never reach the ball, and the
 follow holds the ball twice the shell's sagitta off the surface (`WallProfile.ShellRest`, 8 cm). The world's height
 query (`MovementToyWorld.SampleHeight`) answers with the stamp wherever the sink is positive, so the ground
 follow, the camera and the dressing all see the surface the ball rides; `GridHeight` is the sunk collider for
@@ -190,6 +192,26 @@ ball drove under the shell's first ray and was popped up through it. The analyti
 ends for the same reason, and requires the wall's outward direction to run across the line, not along it: an optional
 line's end vertex, nearest to a point on the primary's floor 40 m before the join, reported its fillet foot as a wall
 leaning forward like a ramp, and the carry turned that into a 99 m/s vertical launch on the canyon drive.
+
+**The tunnel (D-113, `docs/13 §2`).** A tunnel line (`RouteLineKind.Tunnel`) is an offset line with the ridge's 200 m offset,
+a cosine S as long as its two straights allow (290–450 m: r 85–205 m, so the slot holds the base cap with margin and often the
+ceiling), no climb and a narrow corridor (`TunnelProfile`: half-width 15 m, a 6 m fillet, a 78° face, no setback). Its floor
+is **the primary's base profile read at the point's projection onto the primary**, the canyon floor continued into the
+rock beside it, so the trench meets the primary's floor exactly wherever the two overlap. Tunnels stamp **after every
+other line, as cuts**: the ground without tunnels (`StageHeightField.SampleWithoutTunnels`) is computed first, and each
+tunnel lowers it toward its floor by its corridor weight wherever the ground stands above the floor (never raising it);
+inside the primary's level width and setback a tunnel cuts nothing (the primary's corridor stays exact) and the trench
+fades in over the first 8 m of the fillet's foot (`TunnelMouthFade`). The result is the trench cut into whatever stands
+there: a notch through the canyon's fillet and face, a slot beneath the mesa. A tunnel line measures a point's distance to
+its polyline, not to its nearest vertex: 18 m out the vertex distance ripples 0.1 m every 4 m, half a metre of height on a 78°
+face between the shell's stations and the analytic wall, and the ball was punted off the shell at every station (the canyon's
+walls, 83 m out, keep the vertex distance and their hashes). Under a tunnel's shell the grid is sunk 3 m (`TunnelShellSink`), not
+the wall's 1 m: a 4 m cell straddles most of a 6 m fillet and its chords stand up to 1.5 m proud of the arc. The **covered run**
+is where the ground
+without the tunnel stands `TunnelProfile.PortalDepth` (the crown plus a 4 m cap, about 29 m) above the floor
+(`RouteSkeleton.CoverStart/CoverEnd`); its ends are the portals. The tunnel's own wall shell runs to the lip in the open cut
+and stops at the arch's spring line (5 m) under the roof; the other lines' shells have a **hole** wherever a tunnel's cut
+reaches, and their sink stops there (the tunnel's own band takes over). The roof is a structure (§5I).
 
 The stamped profile is continuous along the route: the corridor height at any point interpolates
 the profile between the two route samples it lies between (D-093). A nearest-sample height is a
@@ -302,12 +324,22 @@ Three kinds of thing, and the ball drives on all of them:
   in it, because a heightfield is happy with a near-vertical face. Nothing here needs a second representation.
 - **Structures**: a separate generated mesh plus collider, as §9 allows for bridges and overhangs. Three:
   the **lid** (a box roof over a slot: a wall tunnel, or a bridge when used as a floor), the **wall shell**
-  (D-111: the stamp's wall band swept finely over the sunk grid) and, planned, the **tunnel shell** (D-112,
-  `docs/13`: walls and an arched roof over a slot cut into the ground or through a wall). The see-through
+  (D-111: the stamp's wall band swept finely over the sunk grid) and the **tunnel roof** (D-113, `docs/13 §2`:
+  over a tunnel line's covered run, an arch from spring line to spring line (the circular arc tangent to the 78° face
+  at the two spring points, 5 m up: a horseshoe with its crown about 25 m up, sampled every 10°, so the surface from
+  the floor over the fillet, the face and the arch is tangent-continuous and a ball riding up the wall runs onto the
+  arch and drops off it where the ceiling rule ends the ride, with no crease to hit), the **cap** (the ground as it would be without
+  the tunnel, over the trench's footprint, so the surface continues over the tunnel and is drivable), a
+  **portal face** at each end (the rock between the trench's walls, the arch and the cap, in the portal's plane)
+  and its 1.5 m rim; `StageHeightField.RoofStrips`, built and collided like the wall shells). The see-through
   tube (D-101) was removed on 2026-09-19: a glass pipe in the air was the wrong idea for a landscape the
   player descends into and pierces through. Structures are never a second height layer: the ground follow,
   the route speed model's touchdown and the validators keep reading the one heightfield, and the contact
-  baseline carries the ball on a structure (03 §3).
+  baseline carries the ball on a structure (03 §3). The tunnel's cap is the one place a stage has two surfaces
+  over one XZ, and it is the lid-as-floor case: the world's height query takes the asker's own height and
+  answers the cap's top when the asker stands above the cap less a ball, the trench otherwise
+  (`MovementToyWorld.SampleHeight(x, z, y)`, `IGroundSurface.Height`); the ground follow passes the ball's
+  height, the camera its lens's, every other caller nothing.
 - **Floors**: terraces, not stacked layers. A jump step is 60–90 m (the full-charge apex is 91 m above
   the lip at any speed, because the takeoff sets the vertical and a ramp does not add to it, `docs/11
   §7`); larger lifts are spiral ramps, which a driven ball climbs at up to 35° without losing
@@ -397,6 +429,13 @@ holds what an archetype changes (geometry only, §7); `World › Archetype`, `--
 therefore span 226 m wall to wall (the roof's ends sit inside the wall where the profile has risen past the roof's
 top) instead of 190 m. The rock is in the tint: strata bands every 14 m of height on the faces (06 §3). Every canyon
 hash moved with it (the golden table was re-recorded).
+
+**Portal tunnels, delivered 2026-09-19 (D-113, `docs/13 §2`).** A rejoining line's site takes a tunnel instead of a ledge
+by `ArchetypeRules.TunnelChance` (0.7): the line leaves through the ridge's S, cuts a 20 m notch through the wall's fillet
+and face (the open cut, the read cue), goes under the mesa where 16 m of rock stands over its floor (the portal face with
+its arched opening and rim), runs 120 m at full offset and comes back out through the far portal to the rejoin. Inside,
+the floor and walls are ground (the wall ride applies), the arch a ceiling, the camera confined under it. Validators in
+§12; harness in 08 §5.
 
 **Wall tunnels and the spiral pit, delivered 2026-09-07 (D-102).** A **lid** roofs a plain slot straight
 150–300 m long, wall to wall (190 m), its underside 15 m above the highest corridor point under it and 6 m
@@ -578,10 +617,10 @@ Verified 2026-09-05: the Godot 4.7 `HeightMapShape3D` class reference states "Ho
 
 Special non-heightfield structures such as bridges/ramps/overhangs can use separate generated meshes/colliders.
 
-Delivered forms (D-096, D-111): the lid is a `BoxShape3D` and a box mesh; the wall shell is a `ConcavePolygonShape3D`
-of the stamp's wall band with backface collision. Both sit on a structure physics layer the ball collides with;
-the camera's occlusion probe reads terrain and lids. The see-through tube's swept ring (D-101) was removed
-2026-09-19 (D-112); the tunnel shell that replaces it is specified in `docs/13`.
+Delivered forms (D-096, D-111, D-113): the lid is a `BoxShape3D` and a box mesh; the wall shell and the tunnel roof are
+`ConcavePolygonShape3D`s of their strips with backface collision. All sit on a structure physics layer the ball collides
+with; the camera's occlusion probe reads the terrain (the trench's own walls are in the heightfield) and the roof
+confinement handles the arch. The see-through tube's swept ring (D-101) was removed 2026-09-19 (D-112).
 
 Do not default the entire terrain to one giant concave triangle collider.
 
@@ -657,6 +696,13 @@ the ceiling (D-096).
 - no required route crosses unrecoverable invalid terrain,
 - vertical grammar (D-096): headroom, wall clearance and drains hold; every exit has its landing zone; the line graph is acyclic in route distance and every line rejoins the primary or reaches an exit,
 - exits (D-105): at least the primary's; every pad inside the footprint, level, and any two 250 m apart; a terminal line's pad is level over the pad radius and its profile never stalls.
+
+- tunnels (D-113, `docs/13 §2.7`): every tunnel line's covered run is at least 60 m with 16 m of rock over the floor at
+  every covered vertex, the trench's floor at the centreline is the line's floor, the ground beside the middle of the
+  covered run rises from the floor as the tunnel's 6 m fillet and 78° face within a metre, the corridor's corner limits
+  hold the base cap along its whole length, no lid or other tunnel's portal stands within 100 m of a portal, and the
+  covered run never comes within a corridor width of another line; the fork-to-rejoin time against the primary's is
+  reported (a line that leaves through an S is longer than the straight it shadows).
 
 ### Secondary
 

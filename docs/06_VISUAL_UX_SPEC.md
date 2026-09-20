@@ -49,6 +49,12 @@ Designed, not delivered (D-107, `docs/12 §7`): Summit Descent is a palette by h
 valley floor with blue shadow faces on the rails, scree +150 to +350, rock and moss on the valley run, grey rock
 headwalls at every height, a crest line on every rail, and a longer fog end so the valley reads from the summit.
 
+Tunnels (D-113, `docs/13 §2.6`): rock, not glass. The trench's walls, the arch, the cap and the portal faces use the
+terrain material with the canyon's tint; inside, the vertex colour darkens toward the middle (full light at the mouths,
+45% at 60 m in, `TunnelProfile.Shade`). Two cues at speed: an emissive guide strip on each wall at ball height every
+25 m of the covered run (a lantern band in the rock, the glow material, no collider) and the far portal's daylight,
+which is real. The portal has a 1.5 m rock rim round the arch so the opening reads against the wall from far off.
+
 Vertical grammar (D-096): walls read as cliffs through the slope tint; the cloud band is a per-stage height
 above which the fog thickens into a layer the top floor sits in and a fall drops through. (The see-through
 tube's glass shell and ribs were removed 2026-09-19, D-112; tunnels are rock, `docs/13`.) The cloud band (D-103) is two unshaded
@@ -241,8 +247,13 @@ No extreme FOV distortion.
 
 ### Structures (D-096)
 
-- Tunnels (`docs/13`, planned): the camera flies through with the ball, under the confined framing the lids
-  use, for the tunnel's whole length.
+- Tunnels (D-113, `docs/13 §2.5`): the camera flies through with the ball. The lid's confinement became *confine
+  under roofs* (`CameraRig.ConfineUnderRoofs`): `RoofOver(x, z)` answers a lid's bottom or a tunnel's arch at the
+  lens's own lateral offset, the lens stays 1.5 m below it, and the answer rises over the 30 m outside a portal so
+  the lens dips under the arch as the ball goes in and rises as it comes out; a ball above the roof (on a lid, on the
+  cap) lifts the rule. The trench's walls are in the heightfield, so the occlusion probe pulls the lens in against
+  them as against any wall. The lens's ground floor reads the height query with the lens's own height, so a lens over
+  the cap never sinks into the rock and one inside reads the trench.
 - Wall tunnels (lids): confined framing, distance and pitch bounded to the declared clearance (`docs/11 §7`) — delivered D-102 as a lens ceiling: under a roof the lens stays 1.5 m below its underside, lifted when the ball is on top of the roof,
   still never clipping.
 - Floors: a fall keeps the yaw and the framing bands hold the ball; no cut, no fade.

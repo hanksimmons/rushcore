@@ -199,7 +199,9 @@ public partial class WorldDressing : Node3D
         _matInstanced.VertexColorUseAsAlbedo = true;
 
         LidMaterial = Flat(new Color(0.48f, 0.30f, 0.22f));
+        _matTunnelGuide = Glow(new Color(1.0f, 0.74f, 0.38f), 1.3f);
     }
+    private StandardMaterial3D _matTunnelGuide = null!;
 
     private static StandardMaterial3D Flat(Color albedo) => new()
     {
@@ -321,6 +323,27 @@ public partial class WorldDressing : Node3D
             var e = route.Vertices[lid.StartIndex];
             AddSign(_world.SurfacePoint(e.Position.X, e.Position.Z, lid.RoofBottom - e.Position.Y - 4f), "TUNNEL", 6f);
         }
+        // Tunnel guide strips (docs/13 §2.6, D-113): an emissive band on each wall at ball height every 25 m of the covered
+        // run, cut into the rock (no collider), so the bore reads at speed; the far portal's daylight is the other cue.
+        foreach (var line in stage.OptionalLines)
+        {
+            if (!line.IsTunnel || line.CoverStart < 0) continue;
+            var lv = line.Vertices;
+            float lateral = TunnelProfile.WallLateral(WorldScale.TunnelGuideHeight) + 0.05f;
+            for (float d = lv[line.CoverStart].Distance + WorldScale.TunnelGuideSpacing * 0.5f; d < lv[line.CoverEnd].Distance; d += WorldScale.TunnelGuideSpacing)
+            {
+                var c = lv[Mathf.Min(lv.Count - 1, line.IndexAtDistance(d))];
+                float lx = -Mathf.Sin(c.Heading), lz = Mathf.Cos(c.Heading);
+                foreach (float side in new[] { 1f, -1f })
+                    _content.AddChild(new MeshInstance3D
+                    {
+                        Name = "TunnelGuide", Mesh = _barMesh, MaterialOverride = _matTunnelGuide, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                        Position = new Vector3(c.Position.X + lx * side * lateral, c.Position.Y + WorldScale.TunnelGuideHeight, c.Position.Z + lz * side * lateral),
+                        Rotation = new Vector3(0f, -c.Heading, 0f),
+                        Scale = new Vector3(4f, 0.5f, 0.5f),
+                    });
+            }
+        }
         foreach (var line in stage.OptionalLines)
         {
             if (line.Kind != RouteLineKind.Terrace) continue;
@@ -353,7 +376,7 @@ public partial class WorldDressing : Node3D
         if (_t.World.RouteDebugLines)
         {
             BuildRouteLines(route);
-            foreach (var line in stage.OptionalLines) BuildRouteLines(line, line.Terminal ? ExitLineColor : line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : RouteOptionalColor);
+            foreach (var line in stage.OptionalLines) BuildRouteLines(line, line.Terminal ? ExitLineColor : line.IsTunnel ? TunnelLineColor : line.Floor == 3 ? FloorThreeColor : line.Floor == 2 ? FloorTwoColor : RouteOptionalColor);
             foreach (var cp in stage.Checkpoints) AddCheckpointPost(cp.Position);
         }
         if (_t.World.StageDebugViews) BuildStageDebugViews(stage);
@@ -384,6 +407,7 @@ public partial class WorldDressing : Node3D
     private static readonly Color StructureColor = new(1.0f, 0.55f, 0.85f);
     private static readonly Color DrainColor = new(0.95f, 0.45f, 0.35f);
     private static readonly Color ExitLineColor = new(1.0f, 0.75f, 0.55f);
+    private static readonly Color TunnelLineColor = new(1.0f, 0.55f, 0.25f);
 
     /// <summary>A collider-free post: debug markers may stand inside a corridor.</summary>
     private void AddMarker(Vector3 at, float height, Material material)
@@ -483,6 +507,20 @@ public partial class WorldDressing : Node3D
             {
                 Vector3 up = Vector3.Up * y;
                 BuildPolyline(new[] { c + a * hl + s * hw + up, c - a * hl + s * hw + up, c - a * hl - s * hw + up, c + a * hl - s * hw + up, c + a * hl + s * hw + up }, StructureColor, 0f);
+            }
+        }
+        // Tunnels (docs/13): the covered run drawn at the crown, with a bar across each portal.
+        foreach (var line in stage.OptionalLines)
+        {
+            if (!line.IsTunnel || line.CoverStart < 0) continue;
+            var lv = line.Vertices;
+            var crown = new List<Vector3>();
+            for (int i = line.CoverStart; i <= line.CoverEnd; i += 2) crown.Add(lv[i].Position + Vector3.Up * TunnelProfile.Crown);
+            if (crown.Count > 1) BuildPolyline(crown.ToArray(), StructureColor, 0f);
+            foreach (int pi in new[] { line.CoverStart, line.CoverEnd })
+            {
+                var c = lv[pi]; Vector3 s = new(-Mathf.Sin(c.Heading), 0f, Mathf.Cos(c.Heading));
+                BuildPolyline(new[] { c.Position - s * TunnelProfile.SpringLateral + Vector3.Up * WorldScale.TunnelSpringHeight, c.Position + s * TunnelProfile.SpringLateral + Vector3.Up * WorldScale.TunnelSpringHeight }, StructureColor, 0f);
             }
         }
         if (route.Spiral is { } pit)

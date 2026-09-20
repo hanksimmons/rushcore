@@ -118,7 +118,9 @@ public sealed class RouteBend
     public float CornerLimit;
 }
 
-public enum RouteLineKind { Primary, Ridge, Terrace }
+/// <summary>Kinds of line: the primary, a ridge (D-100; a ledge on a canyon), a terrace floor (D-103), and a tunnel (docs/13, D-113: a
+/// roofed slot beside the primary, through a wall or beneath the landscape).</summary>
+public enum RouteLineKind { Primary, Ridge, Terrace, Tunnel }
 
 /// <summary>
 /// A spiral pit (04 §5I, §6; D-102): the primary's last section turns inward through one full turn of shrinking
@@ -191,6 +193,13 @@ public sealed class RouteSkeleton
     public float Side = 1f;
     /// <summary>Offset lines: the stamp's falloff toward the primary (−Side) and away from it; 0 = the archetype's (D-103).</summary>
     public float InnerFalloff, OuterFalloff;
+    /// <summary>Tunnel lines (docs/13, D-113): the first and last vertex under the roof (the portals), set by the height field
+    /// where the surrounding ground stands <c>TunnelProfile.PortalDepth</c> above the floor; −1 = no covered run.</summary>
+    public int CoverStart = -1, CoverEnd = -1;
+    public bool IsTunnel => Kind == RouteLineKind.Tunnel;
+    public bool Covered(int i) => CoverStart >= 0 && i >= CoverStart && i <= CoverEnd;
+    /// <summary>Route length under the roof; 0 without one.</summary>
+    public float CoveredLength => CoverStart >= 0 ? Vertices[CoverEnd].Distance - Vertices[CoverStart].Distance : 0f;
     /// <summary>Primary route of a Dune Sea stage: the wave its dune trains ride (D-099).</summary>
     public DuneWave Dunes;
     /// <summary>Canyon Run's set-piece (04 §6, D-102): the spiral pit the route descends into at its end; null when the stage has none.</summary>

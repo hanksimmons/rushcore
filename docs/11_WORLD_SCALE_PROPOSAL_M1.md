@@ -345,5 +345,8 @@ Removed 2026-09-19 (D-112). The tunnel that replaces the tube is sized in `docs/
 ### 7e. Camera clearance
 
 The tube camera rule (the lens pushed outside the shell) went with the tubes (D-112). Lid tunnels use the confined
-framing: clearance ≥ 15 m above the ball, width ≥ 75 m (the minimum corridor), length ≤ 300 m provisional; the
-tunnel shell (`docs/13`) extends that framing to its whole length, with the camera inside.
+framing: clearance ≥ 15 m above the ball, width ≥ 75 m (the minimum corridor), length ≤ 300 m provisional. The tunnel
+(D-113, `docs/13 §2`) extends that framing to its whole covered run with the camera inside: a 20 m slot, a horseshoe arch
+tangent to the 78° walls at 5 m with its crown about 25 m up, the lens 1.5 m under the arch at its own lateral offset; the
+confinement eases in over the 30 m before a portal.
+The user's 6 m lens fits with room to spare; the numbers are provisional (V-017).

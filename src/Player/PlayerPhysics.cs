@@ -586,9 +586,9 @@ public partial class PlayerPhysics : RigidBody3D
         Vector3 flat = new(v.X, 0f, v.Z);
         Vector3 d = flat.LengthSquared() > 1e-4f ? flat.Normalized() : Vector3.Forward;
         Vector3 q = new(-d.Z, 0f, d.X);
-        float h0 = g.Height(c.X, c.Z);
-        float hf = g.Height(c.X + d.X * cell, c.Z + d.Z * cell), hb = g.Height(c.X - d.X * cell, c.Z - d.Z * cell);
-        float hl = g.Height(c.X + q.X * cell, c.Z + q.Z * cell), hr = g.Height(c.X - q.X * cell, c.Z - q.Z * cell);
+        float h0 = g.Height(c.X, c.Z, c.Y);
+        float hf = g.Height(c.X + d.X * cell, c.Z + d.Z * cell, c.Y), hb = g.Height(c.X - d.X * cell, c.Z - d.Z * cell, c.Y);
+        float hl = g.Height(c.X + q.X * cell, c.Z + q.Z * cell, c.Y), hr = g.Height(c.X - q.X * cell, c.Z - q.Z * cell, c.Y);
         float sd = (hf - hb) / (2f * cell), sq = (hl - hr) / (2f * cell);
         Vector3 n = new Vector3(-(sd * d.X + sq * q.X), 1f, -(sd * d.Z + sq * q.Z)).Normalized();
         float gap = (c.Y - h0) * n.Y - m.BallRadius;              // perpendicular distance from the resting height
@@ -609,7 +609,7 @@ public partial class PlayerPhysics : RigidBody3D
         {
             // Contact possibility: a surface curving away demands v²κ of centripetal acceleration; gravity supplies g·n.Y.
             float span = 3f * cell;
-            float hF = g.Height(c.X + d.X * span, c.Z + d.Z * span), hB = g.Height(c.X - d.X * span, c.Z - d.Z * span);
+            float hF = g.Height(c.X + d.X * span, c.Z + d.Z * span, c.Y), hB = g.Height(c.X - d.X * span, c.Z - d.Z * span, c.Y);
             float second = (hF - 2f * h0 + hB) / (span * span);
             float slope2 = 1f + sd * sd;
             kappa = second / (slope2 * Mathf.Sqrt(slope2));         // signed curvature along travel; negative = convex
@@ -971,7 +971,9 @@ public interface IGroundSurface
 {
     float CellSize { get; }
     bool Contains(float x, float z);
-    float Height(float x, float z);
+    /// <summary>The ground's height at a plan position; <paramref name="y"/> is the asker's own height, which decides between
+    /// the two surfaces a tunnel's cap stacks over one XZ (docs/13, D-113: the cap when the asker is above it, the trench below).</summary>
+    float Height(float x, float z, float y = float.NaN);
     /// <summary>The analytic wall under a point on a walled stage (D-109): its normal (off the wall, up), the perpendicular
     /// gap from the ball's rest height on it, and the profile's curvature across; false where no authored wall stands.</summary>
     bool WallSurface(Vector3 position, float ballRadius, out Vector3 normal, out float gap, out float curvature);

@@ -358,7 +358,7 @@ launch-crest straights; boost rings on the primary every `Boost › Pickup Spaci
 
 | # | Name | Command | What to look at |
 |---|---|---|---|
-| 1 | *(tube)* | — | removed 2026-09-19 (D-112); the slot is free for the first tunnel sample (`docs/13`) |
+| 1 | tunnel | `-- --canyon --seed 1` | a portal tunnel through the canyon wall (D-113, `docs/13 §2`): the open cut, the arched portal, the covered run beside the primary |
 | 2 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102); walls are the authored profile since D-109 (hash re-recorded) |
 | 3 | sky floor 3 | `-- --sky --seed 30` | a floor-2 and floor-3 terrace stack (D-103) |
 | 4 | dune trains | `-- --dunes --seed 1` | a three-crest dune train (D-099) |

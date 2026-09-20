@@ -158,6 +158,12 @@ Required:
 - two speeds (04 §12, D-094): the ceiling profile is computed for every stage; no bend sits inside a flight or its landing run at the base cap or at the ceiling; a chainable line exists on the primary; every report carries seconds below the base cap,
 - vertical grammar (D-096), for each archetype that uses it: the headroom, wall-clearance and drain validators hold across the batch; a lid holds the ball from above and from below; from the top floor of a Sky Terraces stage a dropped ball lands and the follower drives from the landing back onto the primary; the camera stays inside the declared clearance through a wall tunnel,
 - the wall profile (D-109), on every walled archetype: beside the middle of the longest straight the ground rises from the corridor as the 30 m fillet and the 72° face on both sides within 1.5 m of `WallProfile`, and reaches the side terrain past the profile's top; the canyon drive borrows a canyon seed with a clear straight (no feature, lid or ledge beside it, and a wall that is not a neighbouring bend's inside), boosts from the centreline with a 20° aim at the wall and asserts no impact on entry, a ride of at least ten ticks as ground with most of them on the analytic profile, at least 75% of the entry speed kept on the wall (the climb limit sheds a little at 20°), and a grounded return onto the corridor; the same window ridden head-on (90°) near the cap asserts the climb scrub (D-110): no impact and no tick losing the impact threshold, at least ten wall ticks and a 20 m climb priced once as a scrub, a peak below the lip, and a return to the corridor; the wall shell (D-111): a walled stage builds its shells, the heightfield beside the ride window is sunk by the shell sink from the fillet to the face and coincides with the stamp on the corridor floor before the wall, and the 20° ride's distance from the analytic wall moves under 10 cm tick to tick,
+- tunnels (D-113, `docs/13 §2.8`), on Canyon Run: the batch places covered portal tunnels on at least 30% of seeds and every
+  tunnel passes its validators (04 §12); the canyon drive borrows a seed with a covered tunnel and drives the ball from the
+  primary through the tunnel line to the rejoin, asserting the stage builds its roofs, no wall-shell vertex stands over the
+  tunnel's floor along the covered run (the hole), the ball is grounded at least 95% of the time inside, neither portal is an
+  impact, the lens stays under the arch and inside the walls on every tick inside, the exit speed is within 10% of the
+  model's, and a ball set down on the surface over the covered run rests on the cap as a floor,
 - Summit Descent (D-107, `docs/12 §8`), once delivered: across the batch every primary vertex's corner limit holds the base cap; the rails and headwalls are continuous (sampled every 10 m, both sides, chute gaps and exit forks excepted); the base-cap profile has no launch on the switchback section; the descent is 540–660 m with every tier 90–170 m; every hairpin passes the sightline rule; every chute's free path is grounded, its half-charge landing falls inside its landing zone and its full-charge flight lands drivable; the face outside the rails drains to the valley. The harness drives a base-cap ball into a rail at 25° and straight into a headwall and asserts it stays on the bench both times, drives the switchbacks to the valley fully grounded, and drives a chute free and half-charged with the slam landing inside the zone,
 - exits (02 §4, D-105): every stage's exits are distinct, inside the footprint and on level pads; most seeds of each archetype offer a second exit (floors: Highlands 75%, Canyon Run 85%, Sky Terraces 65%, Dune Sea 40%); the harness drives the ball from the primary up a terminal line's ramp to its pad and asserts the stage ends by that exit with the plateau holding the ball grounded.
 
@@ -226,6 +232,13 @@ with both (2/0) and asserts a charged jump under a lid never puts the ball above
 ball as a floor, the lens stays under the roof through the tunnel, the spiral drives to the exit pad on the pit
 floor at 134–149 m/s fully grounded, and a ball dropped off a turn's inner edge lands on the turn below and drives
 on to the exit.
+
+**Result (tunnels, T1, D-113, 2026-09-19):** 100 canyon seeds: 80 tunnel lines, all 80 covered, on 66 seeds (covered runs
+487–752 m, avg 573 m), every one passing its validators; the tunnel drive on seed 1 (fork at 535 m, covered 254→965 m of a
+1218 m line): 297 ticks inside, grounded 100%, min speed inside 126.7 m/s (a brush of the wall in the S), no portal impact,
+exit 148.5 m/s against the model's 148.5, the lens under the arch on all 297 ticks and never in the rock, the cap holds the
+ball as a floor; the wall-ride and lid checks unchanged. Canyon hashes re-recorded ("tunnel" and "tunnels + pit"); no other
+archetype's moved.
 
 **Result (Sky Terraces, first cut, D-103, 2026-09-07):** the sky batch places terraces on floor 2 and floor 3
 (100 seeds: 100 valid, 0 fallbacks, 96 floor-2 and 3 floor-3 terraces on 82 seeds, 13 dropped by the drain or

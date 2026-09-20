@@ -171,7 +171,7 @@ Current accepted direction:
 - contact monitoring plus a small sufficient contact-report budget for direct-state ground detection,
 - the analytic ground follow (03 §3, D-092): the controller reads the terrain grid under the ball and, where the surface could physically carry it (v²κ below gravity), removes the outward velocity and counts the ball as grounded, so the collider's facets never hop it; launches stay real; a velocity rule only, toggle off = baseline,
 - `HeightMapShape3D` main terrain,
-- structures (D-096, D-111, D-112): lids as `BoxShape3D`, wall shells (and the planned tunnel shells, `docs/13`) as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk a metre beneath it, and the world's height query answers with the stamp there; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); the see-through tubes and the tube follow (D-101) were removed on 2026-09-19 (D-112).
+- structures (D-096, D-111, D-112, D-113): lids as `BoxShape3D`, wall shells and tunnel roofs (`docs/13 §2`) as `ConcavePolygonShape3D` with backface collision, on a structure layer; a walled stage's wall band is a shell of the stamp over the heightfield sunk beneath it (a metre; three under a tunnel's 6 m fillet), and the world's height query answers with the stamp there; a tunnel is a slot cut into the finished ground with an arched roof over its covered run, and its cap is the one place two surfaces stack over one XZ: the height query takes the asker's own height (`SampleHeight(x, z, y)`, `IGroundSurface.Height`) and answers the cap above it, the trench below; the ground follow reads the terrain heightfield, and on a walled stage the authored wall profile analytically beyond the corridor's edge (D-109); the see-through tubes and the tube follow (D-101) were removed on 2026-09-19 (D-112).
 
 Never repeatedly set the rigid body's transform each frame to fake movement.
 
@@ -188,7 +188,7 @@ Start at 60 physics Hz. Only test/raise to 120 if measured high-speed behavior r
 - 1–3 meaningful optional lines,
 - mandatory traversal cannot require a stocked boost meter,
 - one logical height source for render/collision,
-- the ground is one single-valued heightfield; walls, terraces, slots and spirals are stamps in it; lids, wall shells and tunnel shells are the only structures (04 §5I, D-096, D-111, D-112: a wall shell is the stamp's own wall band sampled finely and swept as a collider, with the heightfield sunk a metre beneath it); never a second height layer,
+- the ground is one single-valued heightfield; walls, terraces, slots, spirals and tunnel trenches are stamps in it; lids, wall shells and tunnel roofs are the only structures (04 §5I, D-096, D-111, D-113: a wall shell is the stamp's own wall band sampled finely and swept as a collider, with the heightfield sunk beneath it; a tunnel roof is the arch, the cap and the portal faces over a tunnel line's covered run); never a second height layer,
 - bounded validators/regeneration,
 - regression seeds for fixed failures.
 
@@ -273,7 +273,10 @@ Until the implementation plan advances:
 > walls themselves were made rideable on Canyon Run (D-108 wall ride, D-109 the authored profile, D-110 the climb scrub,
 > D-111 the wall shell over the sunk grid); the Summit's rails and headwalls use that shell. **D-112 (2026-09-19):** the
 > see-through tubes are removed; `docs/13` plans their replacement (tunnels through walls and beneath the landscape, the
-> camera inside), courses three times longer, and the far-horizon skybox. Nothing of `docs/13` is built yet.
+> camera inside), courses three times longer, and the far-horizon skybox. **D-113 (2026-09-19, `docs/13` slice T1):** the portal
+> tunnel on Canyon Run is delivered (a tunnel line cut into the wall and under the mesa, the horseshoe roof and cap, the confined
+> camera inside, the tunnel drive in the harness; sample stage 1 is canyon seed 1). Next per `docs/13 §5`: H1 the horizon ring,
+> then W1, T2, W2, H2, T3.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

@@ -12,9 +12,11 @@ public static class GoldenHashes
     /// <summary>Sample name → hash (as <c>StageDefinition.Hash()</c> prints, upper-case hex). Empty = not yet recorded.</summary>
     public static readonly Dictionary<string, string> BySample = new()
     {
-        // Recorded 2026-09-07 with D-105 (branching exits); "tunnels + pit" re-recorded 2026-09-19 with D-109 (the wall
-        // profile); "sky floor 3" and "dune trains" re-recorded 2026-09-19 with D-112 (tubes removed: their tube axes left the hash).
-        ["tunnels + pit"] = "6222AEE6856136A7",
+        // Recorded 2026-09-07 with D-105 (branching exits); "sky floor 3" and "dune trains" re-recorded 2026-09-19 with D-112
+        // (tubes removed: their tube axes left the hash); "tunnel" recorded and "tunnels + pit" re-recorded 2026-09-19 with D-113
+        // (portal tunnels take ridge sites on Canyon Run by a new draw in the line stream: every canyon hash moved, no other did).
+        ["tunnel"] = "4DDDCDFFFFDC958C",
+        ["tunnels + pit"] = "717C9AEFF8460798",
         ["sky floor 3"] = "4C9CB24BB5B51F1D",
         ["dune trains"] = "347EA2AC04366D37",
         ["gap + turns"] = "3CA4CC5E70D0F945",

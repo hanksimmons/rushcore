@@ -114,7 +114,9 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 - the route skeleton ordered by route distance (headings unbounded, cell buckets), wall and terrace stamps, and the headroom / wall-clearance / drain validators — the stamp map, the footprint validator, the height-aware progress tracker, the wall stamp and the wall-clearance validator delivered with Canyon Run 2026-09-07 (D-098); the unbounded-heading builder arrives with the spiral pit, terrace stamps with the drain validator arrive with Sky Terraces, headroom with the lids,
 - Canyon Run: slots and banked lines — delivered 2026-09-07 (D-098); wall tunnels (lids with the confined camera) and the spiral pit set-piece — delivered 2026-09-07 (D-102, with the unbounded-heading finale and the headroom validator),
 - Dune Sea — delivered 2026-09-07 (D-099: the seeded dune wave, dune trains riding it, the swale between; the set-piece dune and a dune-specific optional line remain open),
-- tubes: delivered 2026-09-07 (D-101) and **removed 2026-09-19 (D-112)**; tunnels replace them per `docs/13`,
+- tubes: delivered 2026-09-07 (D-101) and **removed 2026-09-19 (D-112)**; tunnels replace them per `docs/13`: slice T1, the
+  portal tunnel on Canyon Run, delivered 2026-09-19 (D-113); H1 (the horizon ring), W1 (the resident mesh), T2 (the dive),
+  W2 (the 3× length), H2 (the cloud dome) and T3 (pockets) follow in that order,
 - Sky Terraces: terrace steps, drains, the cloud band and bridges between floors — first cut delivered 2026-09-07 (D-103: ramp-climbed terrace floors with cliff edges onto the floor below, the drain validator, the cloud band; jump steps, bridges and floor-3 branching remain open),
 - route/challenge/structure debug views — delivered 2026-09-07 (D-104: `World › Stage Debug Views`),
 - branching exits (02 §3, §4; 04 §5J) — delivered 2026-09-07 (D-105: terminal lines ending on their own pads, one to three exits per stage; the route cards on the fork signs and the next-stage seed from the exit taken arrive with Phase 6),

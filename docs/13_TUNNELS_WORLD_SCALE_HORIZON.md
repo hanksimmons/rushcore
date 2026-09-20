@@ -1,6 +1,12 @@
 # 13 — Tunnels, the 3× course and the far horizon
 
-**Status:** Design accepted in principle 2026-09-19 (D-112); nothing here is built. Slices T1–T3, W1–W2, H1–H2 below.
+**Status:** Design accepted in principle 2026-09-19 (D-112). **T1 (the portal tunnel on Canyon Run) delivered 2026-09-19
+(D-113)**; what it changed against §2 is recorded there and in `04 §5D`: the corridor is 15 m half-width (10 was a wall-hit
+generator at the cap), the arch is a horseshoe tangent to the 78° walls springing at 12 m with its crown about 33 m up
+(a 12 m crown with a crease at 5 m threw every wall ride into the ceiling), the S is a cosine of 290–450 m as the site allows,
+the tunnel's floor is the primary's base profile at the point's projection onto the primary, tunnels stamp last as cuts, and
+the portal-tunnel covered runs are 490–750 m because the whole run at offset lies under the mesa (the plan's 60–250 m
+described a wall pierced transversely, which the offset-line geometry does not make). Slices H1, W1, T2, W2, H2, T3 remain.
 **Authority:** below `04` and `03` where they overlap; this document owns the tunnel, the resident-mesh architecture
 and the horizon until each slice folds its delivered form back into `04`, `05`, `06` and `11`.
 **Read with:** `04 §5D` (the wall profile and the wall shell, D-109/D-111), `04 §5I` (the vertical grammar), `03 §3`

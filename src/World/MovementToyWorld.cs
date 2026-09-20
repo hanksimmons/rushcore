@@ -331,11 +331,14 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         StageCheckpointIndex = next;
     }
 
-    /// <summary>Authoritative height source. Bilinear over the same grid the collider uses.</summary>
     /// <summary>The surface a ball rides at a point: the stamp itself under a wall shell (D-111: the shell is the stamp
-    /// sampled finely, and the grid lies sunk beneath it), the collided heightfield everywhere else.</summary>
-    public float SampleHeight(float x, float z)
+    /// sampled finely, and the grid lies sunk beneath it), the collided heightfield everywhere else. Under a tunnel's cap
+    /// (docs/13, D-113) the stage has two surfaces over one XZ, the cap and the trench: given the asker's own height
+    /// <paramref name="y"/> (the ball's, or the camera lens's) the answer is the cap's top when the asker stands above
+    /// the cap's underside less a ball, the trench otherwise; with no height the trench, as every other caller expects.</summary>
+    public float SampleHeight(float x, float z, float y = float.NaN)
     {
+        if (!float.IsNaN(y) && Stage?.HeightField is { } hf && hf.CapOver(x, z, out float capTop) && y >= capTop - 2f * _t.Movement.BallRadius) return capTop;
         return _field.Sink(x, z) > 0f ? _field.Sample(x, z) : GridHeight(x, z);
     }
 
@@ -355,7 +358,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public Vector3 SurfacePoint(float x, float z, float above = 0f) => new(x, SampleHeight(x, z) + above, z);
 
     // IGroundSurface (D-092): the ground follow reads the grid the collider and mesh are built from.
-    float Rushcore.Player.IGroundSurface.Height(float x, float z) => SampleHeight(x, z);
+    float Rushcore.Player.IGroundSurface.Height(float x, float z, float y) => SampleHeight(x, z, y);
     bool Rushcore.Player.IGroundSurface.Contains(float x, float z) => Mathf.Abs(x) <= HalfX && Mathf.Abs(z) <= HalfZ;
     /// <summary>The authored wall profile of a walled stage (D-109); the lab and the strip have none (their walls are grid-followed).</summary>
     bool Rushcore.Player.IGroundSurface.WallSurface(Vector3 position, float ballRadius, out Vector3 normal, out float gap, out float curvature)
@@ -369,6 +372,8 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public const uint StructureLayer = 2;
     /// <summary>Collision triangles in the wall shells of the current stage (D-111); 0 on an unwalled archetype.</summary>
     public int WallShellTriangles { get; private set; }
+    /// <summary>Collision triangles in the tunnel roofs (docs/13, D-113): arches, caps, portal faces and rims.</summary>
+    public int TunnelRoofTriangles { get; private set; }
     /// <summary>The wall shells' collision triangles per strip (harness instruments only).</summary>
     public List<Vector3[]> WallShellData { get; } = new();
     /// <summary>Structures (04 §5I, §9): wall shells and lids, on the structure layer. Rebuilt with the terrain.</summary>
@@ -384,28 +389,15 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         // outward-facing concave shape on the structure layer and drawn with the terrain material. The heightfield under
         // it is sunk, so the shell is the wall the ball meets and the follow's analytic profile is exactly its surface.
         WallShellTriangles = 0;
+        TunnelRoofTriangles = 0;
         WallShellData.Clear();
-        int w = 0;
         if (Stage.HeightField is { } hf)
         {
-            foreach (var strip in hf.ShellStrips())
-            {
-                var built = WallShellMesh.Build(strip);
-                if (built.CollisionTriangles.Length == 0) continue;
-                WallShellTriangles += built.CollisionTriangles.Length / 3;
-                WallShellData.Add(built.CollisionTriangles);
-                _structureRoot.AddChild(new MeshInstance3D { Name = $"Wall{w}", Mesh = built.Mesh, MaterialOverride = _dressing.CreateTerrainMaterial(), CastShadow = GeometryInstance3D.ShadowCastingSetting.On });
-                var body = new StaticBody3D
-                {
-                    Name = $"Wall{w}Body",
-                    CollisionLayer = StructureLayer,
-                    CollisionMask = 0,
-                    PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
-                };
-                body.AddChild(new CollisionShape3D { Shape = new ConcavePolygonShape3D { Data = built.CollisionTriangles, BackfaceCollision = true } });
-                _structureRoot.AddChild(body);
-                w++;
-            }
+            int w = 0;
+            foreach (var strip in hf.ShellStrips()) WallShellTriangles += AddShell(strip, $"Wall{w++}");
+            // Tunnel roofs (docs/13 §2.1, D-113): the arch, the cap, the portal faces and rims, built and collided as the shells are.
+            int r = 0;
+            foreach (var strip in hf.RoofStrips()) TunnelRoofTriangles += AddShell(strip, $"Roof{r++}");
         }
         int j = 0;
         foreach (var lid in Stage.Lids)
@@ -424,11 +416,43 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         }
     }
 
+    /// <summary>One shell strip as a drawn mesh and a concave collider on the structure layer; returns its triangle count.</summary>
+    private int AddShell(WallShellStrip strip, string name)
+    {
+        var built = WallShellMesh.Build(strip);
+        if (built.CollisionTriangles.Length == 0) return 0;
+        WallShellData.Add(built.CollisionTriangles);
+        _structureRoot.AddChild(new MeshInstance3D { Name = name, Mesh = built.Mesh, MaterialOverride = _dressing.CreateTerrainMaterial(), CastShadow = GeometryInstance3D.ShadowCastingSetting.On });
+        var body = new StaticBody3D
+        {
+            Name = name + "Body",
+            CollisionLayer = StructureLayer,
+            CollisionMask = 0,
+            PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
+        };
+        body.AddChild(new CollisionShape3D { Shape = new ConcavePolygonShape3D { Data = built.CollisionTriangles, BackfaceCollision = true } });
+        _structureRoot.AddChild(body);
+        return built.CollisionTriangles.Length / 3;
+    }
+
     /// <summary>The lid whose roof a plan position is under, if any (the confined camera, D-102).</summary>
     public LidDefinition? LidOver(float x, float z)
     {
         if (Stage is null) return null;
         foreach (var lid in Stage.Lids) if (lid.Covers(x, z)) return lid;
+        return null;
+    }
+
+    /// <summary>The roof's underside over a plan position (docs/13 §2.5, D-113): a lid's bottom, or a tunnel's arch at that
+    /// lateral offset (eased upward over the 30 m outside a portal); null under open sky. The confined camera reads it.</summary>
+    public float? RoofOver(float x, float z)
+    {
+        if (LidOver(x, z) is { } lid) return lid.RoofBottom;
+        if (Stage?.HeightField is { } hf)
+        {
+            float arch = hf.ArchOver(x, z);
+            if (!float.IsNaN(arch)) return arch;
+        }
         return null;
     }
 

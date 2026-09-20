@@ -13,15 +13,19 @@ public static class OptionalLineBuilder
 {
 
     /// <summary>Geometry of one kind of offset line: a ridge (D-100) or a terrace floor (D-103).</summary>
-    private readonly record struct LineShape(RouteLineKind Kind, int Floor, float Offset, float Transition, float Ramp, float HeightMin, float HeightMax)
+    private readonly record struct LineShape(RouteLineKind Kind, int Floor, float Offset, float Transition, float Ramp, float HeightMin, float HeightMax,
+                                             float Plateau = 80f, float HalfWidth = WorldScale.MinCorridorWidth * 0.5f)
     {
-        public float Length => 2f * Transition + 2f * Ramp + 80f;
+        public float Length => 2f * Transition + 2f * Ramp + Plateau;
         /// <summary>A terminal line (D-105): the leaving S, the climb, the widening, a level run and the pad's flat.</summary>
         public float TerminalLength(float spread) => Transition + Ramp + spread + WorldScale.ExitLineRun + WorldScale.PadRadius * 2.5f;
     }
 
     private static readonly LineShape Ridge = new(RouteLineKind.Ridge, 1, WorldScale.RidgeOffset, WorldScale.RidgeTransition, WorldScale.RidgeRampLength, WorldScale.RidgeHeightMin, WorldScale.RidgeHeightMax);
     private static readonly LineShape Floor2 = new(RouteLineKind.Terrace, 2, WorldScale.Floor2Offset, WorldScale.Floor2Transition, WorldScale.Floor2Ramp, WorldScale.FloorStep, WorldScale.FloorStep);
+    /// <summary>A tunnel (docs/13 §2, D-113): the ridge's offset and S, no climb (its floor is the primary's own, continued into the
+    /// rock beside it), a narrow corridor, a short run at full offset; the height field roofs it where the ground stands deep enough.</summary>
+    private static readonly LineShape Tunnel = new(RouteLineKind.Tunnel, 1, WorldScale.TunnelOffset, WorldScale.TunnelTransition, 0f, 0f, 0f, WorldScale.TunnelPlateau, WorldScale.TunnelHalfWidth);
     private static readonly LineShape Floor3 = new(RouteLineKind.Terrace, 3, WorldScale.Floor3Offset, WorldScale.Floor3Transition, WorldScale.Floor3Ramp, 2f * WorldScale.FloorStep, 2f * WorldScale.FloorStep);
 
     public static List<RouteSkeleton> Build(RouteSkeleton primary, ulong stageSeed, ArchetypeRules? rules = null)
@@ -55,15 +59,21 @@ public static class OptionalLineBuilder
             float bs = v[bends[k].StartIndex].Distance;
             float ps = k == 0 ? 0f : v[bends[k - 1].EndIndex].Distance;
             bool placed = false;
-            // The tallest stack first (a floor-3 section carries its floor 2), then a lone floor 2, or the ridge.
+            // A tunnel takes the site instead of a ridge by the archetype's chance (docs/13, D-113); drawn only where tunnels
+            // exist, so an archetype without them keeps its stream and its hashes.
+            bool tunnelHere = rules.TunnelChance > 0f && floorsWanted < 2 && rng.Chance(rules.TunnelChance);
+            // The tallest stack first (a floor-3 section carries its floor 2), then a lone floor 2, or the ridge (or a tunnel).
             for (int tier = floorsWanted >= 3 ? 3 : floorsWanted >= 2 ? 2 : 1; tier >= 1 && !placed; tier--)
             for (int extra = 0; extra <= 2 && k + extra < bends.Count && !placed; extra++)
             {
                 if (floorsWanted >= 2 && tier == 1) break;
-                var shape = tier == 3 ? Floor3 : tier == 2 ? Floor2 : Ridge;
-                float T = shape.Transition, L = shape.Length;
+                var shape = tier == 3 ? Floor3 : tier == 2 ? Floor2 : tunnelHere ? Tunnel : Ridge;
                 float beLast = v[bends[k + extra].EndIndex].Distance;
                 float ne = k + extra + 1 < bends.Count ? v[bends[k + extra + 1].StartIndex].Distance : primary.Length;
+                // A tunnel's S is as long as its two straights allow (docs/13, D-113): a slot wants the gentlest entry its site has.
+                if (shape.Kind == RouteLineKind.Tunnel)
+                    shape = shape with { Transition = Mathf.Clamp(Mathf.Min(bs - ps, ne - beLast) - 20f, WorldScale.TunnelTransition, WorldScale.TunnelTransitionMax) };
+                float T = shape.Transition, L = shape.Length;
                 float dLo = Mathf.Max(Mathf.Max(ps, beLast + T - L), lastEnd + WorldScale.OptionalLineSpacing);
                 float dHi = Mathf.Min(bs - T, Mathf.Min(ne - L, stop - L));
                 if (dHi < dLo) continue;
@@ -71,7 +81,7 @@ public static class OptionalLineBuilder
                 int a = primary.IndexAtDistance(d), b = primary.IndexAtDistance(dEnd);
                 // A terrace prefers the side toward the axis (its long falloff needs the room); a ridge picks at random.
                 float first = shape.Kind == RouteLineKind.Terrace ? -Mathf.Sign(v[a].Position.Z + v[b].Position.Z + 1e-3f) : rng.Sign();
-                float Offset(int i) => shape.Offset * Bump(v[i].Distance - v[a].Distance, v[b].Distance - v[a].Distance, shape.Transition);
+                float Offset(int i) => shape.Offset * Bump(v[i].Distance - v[a].Distance, v[b].Distance - v[a].Distance, shape.Transition, shape.Kind == RouteLineKind.Tunnel);
                 float side = SideValid(primary, turnSign, a, b, first, Offset) ? first : SideValid(primary, turnSign, a, b, -first, Offset) ? -first : 0f;
                 if (side == 0f || OverlapsFeature(primary, d, dEnd) || !JoinsOnStraights(primary, a, b, T) || Occupied(d, dEnd, side)) continue;
                 var line = BuildLine(primary, a, b, side, shape, rng.Range(shape.HeightMin, shape.HeightMax));
@@ -192,7 +202,7 @@ public static class OptionalLineBuilder
                 JoinStart = a,
                 JoinEnd = b,
                 Terminal = terminal,
-                CorridorHalfWidth = WorldScale.MinCorridorWidth * 0.5f,
+                CorridorHalfWidth = shape.HalfWidth,
                 RidgeHeight = height,
                 Offset = shape.Offset, Transition = shape.Transition, RampLength = shape.Ramp,
                 Side = side,
@@ -205,7 +215,7 @@ public static class OptionalLineBuilder
             for (int i = a; i <= b; i++)
             {
                 float offset = terminal ? TerminalOffset(v[i].Distance - v[a].Distance, shape, terminalSpread)
-                                        : shape.Offset * Bump(v[i].Distance - v[a].Distance, sectionLength, shape.Transition);
+                                        : shape.Offset * Bump(v[i].Distance - v[a].Distance, sectionLength, shape.Transition, shape.Kind == RouteLineKind.Tunnel);
                 float h = v[i].Heading;
                 var p = v[i].Position + new Vector3(-Mathf.Sin(h), 0f, Mathf.Cos(h)) * (offset * side);
                 if (Mathf.Abs(p.Z) + bandRoom > WorldScale.OptionalBandHalfWidth) return null;
@@ -296,10 +306,12 @@ public static class OptionalLineBuilder
     /// <summary>T5 instrument, read-only: the shipped floor-3 shape's length, for the room table.</summary>
     internal static float Floor3Length => Floor3.Length;
 
-    /// <summary>Lateral offset envelope along a line of the given length: 0 at both joins, 1 between the transitions.</summary>
+    /// <summary>Lateral offset envelope along a line of the given length: 0 at both joins, 1 between the transitions. A tunnel's S
+    /// is a cosine (D-113): its peak curvature is 18% under the smoothstep's, so the slot's corridor holds the base cap with margin.</summary>
     public static float Bump(float d, float length) => Bump(d, length, WorldScale.RidgeTransition);
-    public static float Bump(float d, float length, float transition) =>
-        Mathf.SmoothStep(0f, transition, d) * (1f - Mathf.SmoothStep(length - transition, length, d));
+    public static float Bump(float d, float length, float transition, bool cosine = false) =>
+        cosine ? CosineStep(0f, transition, d) * (1f - CosineStep(length - transition, length, d))
+               : Mathf.SmoothStep(0f, transition, d) * (1f - Mathf.SmoothStep(length - transition, length, d));
 
     /// <summary>Plateau envelope: climbs once the line has left the primary, drops back before it rejoins.
     /// Cosine ramps: their knee curvature (π² H / 2L²) is 18% under a smoothstep's, and with each line's height and

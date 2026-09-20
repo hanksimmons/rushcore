@@ -3179,7 +3179,8 @@ public partial class MovementToySelfTest : Node
             {
                 var pick = FindRideWindow(stage);
                 int wi = pick.start; float bestRun = pick.len, rideSide = pick.side;
-                if (wi >= 0 && bestRun >= 330f)
+                float[] aims = float.TryParse(System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_AIM"), out float aimEnv) ? new[] { aimEnv } : new[] { 20f, 90f };
+                if (wi >= 0 && bestRun >= 330f) foreach (float aimDeg in aims)
                 {
                     var wv = verts[wi];
                     float hx = Mathf.Cos(wv.Heading), hz = Mathf.Sin(wv.Heading), lx = -Mathf.Sin(wv.Heading), lz = Mathf.Cos(wv.Heading);
@@ -3188,9 +3189,8 @@ public partial class MovementToySelfTest : Node
                     rig.SnapYawToward(new Vector3(hx, 0f, hz));
                     _player.RefillBoost(t.Boost.BoostCapacity);
                     Input.ActionPress(InputBootstrap.Boost, 1f);
-                    float aimDeg = float.TryParse(System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_AIM"), out float aimEnv) ? aimEnv : 20f;
-                    float aim = Mathf.DegToRad(aimDeg);   // under the climb limit (45 m/s up the wall at the cap is 17.6°… 20° sheds 6 m/s), into the band
-                    if (System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_PROBE") == "1")
+                    float aim = Mathf.DegToRad(aimDeg);   // 20°: under the climb limit (45 m/s up the wall at the cap is 17.6°… 20° sheds 6 m/s); 90°: head-on, the scrub (D-110)
+                    if (aimDeg == aims[0] && System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_PROBE") == "1")
                     {
                         // Geometry probe: along the wall for 120 m at several lateral depths, the stamp, the collider's bilinear
                         // height, and the analytic normal's plan direction, to measure any corrugation along the route.
@@ -3226,8 +3226,9 @@ public partial class MovementToySelfTest : Node
                     }
                     _worldDrive = new Vector3(hx * Mathf.Cos(aim) + lx * rideSide * Mathf.Sin(aim), 0f, hz * Mathf.Cos(aim) + lz * rideSide * Mathf.Sin(aim));
                     var hf = stage.HeightField!;
-                    int wallTicks = 0, guard = 0, impactsAtEntry = _player.ImpactCount, airAfter = 0, analyticTicks = 0;
-                    float entry = 0f, minOnWall = float.MaxValue, peak = 0f; bool released = false, onWall = false, back = false;
+                    int wallTicks = 0, guard = 0, impactsAtEntry = _player.ImpactCount, scrubsAtEntry = _player.WallScrubCount, airAfter = 0, analyticTicks = 0;
+                    float entry = 0f, minOnWall = float.MaxValue, peak = 0f, maxTickLoss = 0f, prevLoc = 0f, atWall = 0f; bool released = false, onWall = false, back = false;
+                    float wallTop = hf.SideHeight(wv.Position.X + lx * rideSide * (StageHeightField.CorridorHalfWidth + 60f), wv.Position.Z + lz * rideSide * (StageHeightField.CorridorHalfWidth + 60f)) - hf.PrimaryHeight(wi);
                     bool trace = System.Environment.GetEnvironmentVariable("RUSHCORE_WALL_TRACE") == "1";
                     while (guard++ < Engine.PhysicsTicksPerSecond * 8)
                     {
@@ -3244,6 +3245,9 @@ public partial class MovementToySelfTest : Node
                             released = true; entry = _player.Velocity.Length(); _worldDrive = null;
                             foreach (var act in AllActions) Input.ActionRelease(act);
                         }
+                        if (guard > 1) maxTickLoss = Mathf.Max(maxTickLoss, prevLoc - _player.LocomotionSpeed);
+                        prevLoc = _player.LocomotionSpeed;
+                        if (atWall <= 0f && _player.IsGrounded && hf.WallSurface(p, m.BallRadius, out _, out float wgEntry, out _) && Mathf.Abs(wgEntry) <= m.GroundFollowSnapDistance && hf.PrimaryWeight(p.X, p.Z) < 0.999f) atWall = _player.Velocity.Length();
                         if (_player.IsWallRiding)
                         {
                             onWall = true; wallTicks++;
@@ -3263,11 +3267,25 @@ public partial class MovementToySelfTest : Node
                     int impacts = _player.ImpactCount - impactsAtEntry;
                     string bendsNear = "";
                     foreach (var bend in stage.PrimaryRoute.Bends) if (Mathf.Abs(verts[bend.StartIndex].Distance - wv.Distance) < 900f) bendsNear += $" [bend at {verts[bend.StartIndex].Distance:0}-{verts[bend.EndIndex].Distance:0} m r {bend.Radius:0} turn {Mathf.RadToDeg(bend.TurnAngle):0}°]";
-                    GD.Print($"[SELFTEST] canyon wall ride from {wv.Distance:0} m on the {(rideSide > 0f ? "left" : "right")} wall ({bestRun:0} m of clear straight; bends near:{bendsNear}): entry {entry:0.0} m/s, wall ticks {wallTicks} ({analyticTicks} on the analytic profile), peak {peak:0.0} m above the corridor, min on wall {(wallTicks > 0 ? minOnWall : 0f):0.0}, air ticks after {airAfter}, impacts {impacts}, back on the corridor {back}");
-                    Check("a canyon wall is entered from the corridor without an impact (the fillet foot, D-109)", released && impacts == 0, $"impacts={impacts}");
-                    Check("a canyon wall is ridden as ground on the analytic profile (D-108, D-109)", wallTicks >= 10 && analyticTicks >= wallTicks * 0.8f, $"wall ticks={wallTicks}, analytic={analyticTicks}");
-                    Check("the canyon wall ride keeps at least 75% of its entry speed (the climb limit sheds a little at 20°)", wallTicks > 0 && minOnWall >= entry * 0.75f, $"entry={entry:0.0} min={minOnWall:0.0}");
-                    Check("the canyon wall ride comes back onto the corridor grounded", back, $"back={back} air ticks={airAfter}");
+                    int scrubs = _player.WallScrubCount - scrubsAtEntry;
+                    GD.Print($"[SELFTEST] canyon wall ride at {aimDeg:0}° from {wv.Distance:0} m on the {(rideSide > 0f ? "left" : "right")} wall ({bestRun:0} m of clear straight; bends near:{bendsNear}): entry {entry:0.0} m/s, at the wall {atWall:0.0} m/s, wall ticks {wallTicks} ({analyticTicks} on the analytic profile), peak {peak:0.0} m above the corridor (wall top {wallTop:0.0} m), min on wall {(wallTicks > 0 ? minOnWall : 0f):0.0}, biggest one-tick loss {maxTickLoss:0.0} m/s, air ticks after {airAfter}, impacts {impacts}, scrubs {scrubs}, back on the corridor {back}");
+                    if (aimDeg < 45f)
+                    {
+                        Check("a canyon wall is entered from the corridor without an impact (the fillet foot, D-109)", released && impacts == 0, $"impacts={impacts}");
+                        Check("a canyon wall is ridden as ground on the analytic profile (D-108, D-109)", wallTicks >= 10 && analyticTicks >= wallTicks * 0.8f, $"wall ticks={wallTicks}, analytic={analyticTicks}");
+                        Check("the canyon wall ride keeps at least 75% of its entry speed (the climb limit sheds a little at 20°)", wallTicks > 0 && minOnWall >= entry * 0.75f, $"entry={entry:0.0} min={minOnWall:0.0}");
+                        Check("the canyon wall ride comes back onto the corridor grounded", back, $"back={back} air ticks={airAfter}");
+                    }
+                    else
+                    {
+                        // The climb scrub (D-110): a head-on hit near the cap rides up the wall losing speed over tenths of a second,
+                        // never stops at the foot (no tick sheds what an impact would), is priced once as a scrub, and never
+                        // reaches the lip.
+                        Check("a head-on canyon wall hit at speed is scrubbed, not stopped: no tick loses the impact threshold (D-110)", atWall >= 100f && impacts == 0 && maxTickLoss < t.Flow.ImpactSpeedLoss, $"at wall={atWall:0.0} impacts={impacts} biggest tick loss={maxTickLoss:0.0}");
+                        Check("a head-on canyon wall hit rides up the wall and is priced once as a scrub (D-110)", wallTicks >= 10 && peak >= 20f && scrubs == 1, $"wall ticks={wallTicks} peak={peak:0.0} scrubs={scrubs}");
+                        Check("a head-on canyon wall hit at the cap peaks below the lip (D-110)", peak < wallTop - WorldScale.WallLipEase, $"peak={peak:0.0} wall top={wallTop:0.0}");
+                        Check("a head-on canyon wall hit comes back to the corridor", back, $"back={back} air ticks={airAfter}");
+                    }
                 }
                 else Check("stage has a straight long enough for a wall ride", true, $"none on seed {world.Seed}");
             }

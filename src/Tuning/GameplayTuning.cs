@@ -68,10 +68,15 @@ public sealed class MovementTuning
     public float WallRideMinSpeed = 30f;
     /// <summary>Drive on a steep surface as a fraction of ground drive. Zero: a wall is ridden on momentum and gravity brings the ball back.</summary>
     public float WallRideDriveMultiplier = 0f;
-    /// <summary>Fastest the ball may travel up a wall (m/s). A smooth fillet would turn a head-on hit at the cap into a
-    /// 200 m climb out of any canyon; above this the excess up-wall speed is shed, which the impact rule prices as the
-    /// hard hit a missed line is. 45 m/s is a 26 m climb, so any wall 30 m above its foot contains every ride.</summary>
+    /// <summary>Fastest the ball may travel up a wall without scrubbing (m/s). A smooth fillet would turn a head-on hit at
+    /// the cap into a 200 m climb out of any canyon; above this the excess up-wall speed is scrubbed off over
+    /// <see cref="WallRideClimbScrubSeconds"/> (D-110), and a scrub that takes what an impact would have costs one Flow
+    /// loss. 45 m/s alone is a 26 m climb.</summary>
     public float WallRideMaxClimbSpeed = 45f;
+    /// <summary>Time constant of the climb scrub (s): the excess up-wall speed decays by e each this many seconds. The ball
+    /// rides up the wall visibly losing speed; the surface it travels while scrubbing is bounded at any entry speed, about
+    /// 40 m at the Flow ceiling with 0.1 s; a head-on hit peaks 20 m up at 125 m/s, about 30 m at the cap (D-110).</summary>
+    public float WallRideClimbScrubSeconds = 0.1f;
     /// <summary>Speed bands are readability/Flow hooks only (02 §5); no physics reads them.
     /// Ladder set against the accepted cap: Rush ~1/3, Crush ~2/3, Overdrive ~95% (V-004).</summary>
     public float RushThreshold = 50f;
@@ -355,6 +360,7 @@ public sealed class GameplayTuning
         F(CatMovement, "Wall Ride Min Speed", 0f, 120f, () => m.WallRideMinSpeed, v => m.WallRideMinSpeed = v);
         F(CatMovement, "Wall Ride Drive Mult", 0f, 1f, () => m.WallRideDriveMultiplier, v => m.WallRideDriveMultiplier = v);
         F(CatMovement, "Wall Ride Max Climb (m/s)", 5f, 150f, () => m.WallRideMaxClimbSpeed, v => m.WallRideMaxClimbSpeed = v);
+        F(CatMovement, "Wall Ride Scrub Time (s)", 0.02f, 1f, () => m.WallRideClimbScrubSeconds, v => m.WallRideClimbScrubSeconds = v);
         F(CatMovement, "Rush Threshold", 1f, 250f, () => m.RushThreshold, v => m.RushThreshold = v);
         F(CatMovement, "Crush Threshold", 1f, 250f, () => m.CrushThreshold, v => m.CrushThreshold = v);
         F(CatMovement, "Overdrive Threshold", 1f, 250f, () => m.OverdriveThreshold, v => m.OverdriveThreshold = v);

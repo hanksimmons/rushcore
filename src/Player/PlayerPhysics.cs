@@ -118,6 +118,10 @@ public partial class PlayerPhysics : RigidBody3D
     public float FlowCap => Mathf.Max(0.001f, _t.Movement.HardMaxLocomotionSpeed) * (1f + Flow * Mathf.Max(0f, _t.Flow.Headroom));
     /// <summary>Hard impacts counted (one-tick locomotion loss above the tuned threshold).</summary>
     public int ImpactCount { get; private set; }
+    /// <summary>Wall scrubs counted (D-110): rides whose scrubbed up-wall speed reached the impact threshold, priced once each.</summary>
+    public int WallScrubCount { get; private set; }
+    private float _scrubThisTick, _scrubRide, _sinceScrub = float.PositiveInfinity;
+    private bool _scrubCharged;
     public SpeedBand Band { get; private set; } = SpeedBand.Roll;
     public bool IsCharging => _isCharging;
     public float ChargeSeconds => _chargeSeconds;
@@ -306,6 +310,7 @@ public partial class PlayerPhysics : RigidBody3D
         _landedThisTick = false;
         _sinceSlamLanding += dt;
         _sinceSlamPress += dt;
+        _scrubThisTick = 0f;
         UpdateGroundState(state, dt, ref v);
         HandleLanding(wasGrounded, preVerticalSpeed);
         UpdateJumpInput(dt, ref v);
@@ -328,11 +333,23 @@ public partial class PlayerPhysics : RigidBody3D
         // Flow mistakes read from the ball, not from a subsystem: a hard impact sheds locomotion
         // speed in one tick between two grounded (or two airborne) ticks; brake and idle are below.
         _sinceFlowGain += dt;
-        if (wasGrounded == IsGrounded && _prevLocSpeed - speed > f.ImpactSpeedLoss)
+        // A wall scrub (D-110) is a deliberate, rate-limited shed, priced by its own rule below, so its share of this
+        // tick's loss is not an impact.
+        if (wasGrounded == IsGrounded && _prevLocSpeed - speed - _scrubThisTick > f.ImpactSpeedLoss)
         {
             ImpactCount++;
             LoseFlow(f.LossImpact);
         }
+        // The scrub's price: one Flow loss per ride once the scrubbed speed reaches what an impact would have taken; a
+        // half-second without scrubbing ends the ride's account.
+        _sinceScrub = _scrubThisTick > 0f ? 0f : _sinceScrub + dt;
+        if (_scrubRide >= f.ImpactSpeedLoss && !_scrubCharged)
+        {
+            _scrubCharged = true;
+            WallScrubCount++;
+            LoseFlow(f.LossImpact);
+        }
+        if (_sinceScrub > 0.5f) { _scrubRide = 0f; _scrubCharged = false; }
 
         // Landing converts world-horizontal speed into ground-tangent speed, which is
         // larger by 1/cos(slope). Clipping that in one tick reads as hitting a wall, so
@@ -641,14 +658,23 @@ public partial class PlayerPhysics : RigidBody3D
             float upLen = upWall.Length();
             Vector3 upDir = upLen > 1e-3f ? upWall / upLen : Vector3.Zero;
             float across = vT.Dot(upDir);
-            // The climb limit: a fillet turns however much of the speed points at the wall into a climb, and a head-on
-            // hit at the cap would ride 200 m up and out of any canyon. Above the limit the excess up-wall speed is
-            // shed; the impact rule then takes Flow for it, which is the price of the missed line. Oblique rides under
-            // the limit lose nothing.
-            if (across > m.WallRideMaxClimbSpeed)
+            // The climb scrub (D-110): a fillet turns however much of the speed points at the wall into a climb, and a
+            // head-on hit at the cap would ride 200 m up and out of any canyon. Above the climb limit the excess up-wall
+            // speed decays with the scrub time constant, so the ball visibly rides up the wall losing speed instead of
+            // stopping at the foot (the D-108 one-tick clip read as an invisible wall: 137 to 63 m/s in one tick). The
+            // decay bounds the climb at any entry speed: the surface travelled while scrubbing is about
+            // limit·τ·ln(excess/limit) + excess·τ, under 40 m at the Flow ceiling with τ = 0.1 s (measured: 20 m up at
+            // 125 m/s head-on, about 30 m at the cap, near 50 m at the ceiling). Oblique rides under the limit lose nothing.
+            float excessUp = across - m.WallRideMaxClimbSpeed;
+            if (excessUp > 0f)
             {
-                vT -= upDir * (across - m.WallRideMaxClimbSpeed);
-                across = m.WallRideMaxClimbSpeed;
+                float shed = excessUp * Mathf.Min(1f, dt / Mathf.Max(dt, m.WallRideClimbScrubSeconds));
+                float before = vT.Length();
+                vT -= upDir * shed;
+                across -= shed;
+                float lost = Mathf.Max(0f, before - vT.Length());
+                _scrubThisTick += lost;
+                _scrubRide += lost;
             }
             if (kappa > 0f)
             {

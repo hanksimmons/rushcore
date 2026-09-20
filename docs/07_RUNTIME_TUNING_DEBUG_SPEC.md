@@ -27,7 +27,7 @@ Expose first:
 - GroundSteeringAuthority / high-speed falloff
 - HardMaxLocomotionSpeed
 - AirControlMultiplier
-- WallRide, WallRideMinNormalDot, WallRideMinSpeed, WallRideDriveMultiplier, WallRideMaxClimbSpeed (D-108, D-109)
+- WallRide, WallRideMinNormalDot, WallRideMinSpeed, WallRideDriveMultiplier, WallRideMaxClimbSpeed, WallRideClimbScrubSeconds (D-108, D-109, D-110)
 - MinJumpTakeoffVerticalSpeed
 - MaxJumpTakeoffVerticalSpeed
 - MaxJumpChargeSeconds

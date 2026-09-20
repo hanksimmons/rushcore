@@ -354,9 +354,10 @@ without loss, gravity brings it back or the top releases it. That changes what t
 - **Rails** (24 m) become the thing a leg is ridden on: a wide line goes up the rail and comes back, at no cost,
   and a deliberate line rides the rail through a bend. The rail's foot is a **30 m arc**, never a smoothstep (a
   smoothstep foot is a kink the facets turn into a hit); the rail's top is a convex lip a fast ball leaves, so a
-  rail must be tall enough that a momentum ride never reaches the top: with the climb limit (D-109, 45 m/s up the
-  wall, a 26 m climb) any wall 30 m above its foot contains every ride at every speed, so **rails go to 30 m** and
-  the harness measures it; a head-on hit sheds its excess and costs Flow, which is the commitment.
+  rail must be tall enough that a momentum ride never reaches the top: with the climb scrub (D-110, 45 m/s up the
+  wall plus the scrubbed run-up: measured 20 m at 125 m/s head-on, about 30 m at the cap, near 50 m at the Flow ceiling) a wall 55 m above its foot
+  contains every ride at every speed, so **rails go to 55 m** (was 30 m under the D-108 clip) and the harness
+  measures it; a head-on hit scrubs its excess over tenths of a second and costs Flow once, which is the commitment.
 - **Headwalls** (90 m) become the hairpin's wall ride: a ball that runs wide rides up the headwall, round the
   outside of the arc and back down onto the exit leg. The headwall's foot is the same 30 m arc above the berm.
   Whether the primary's hairpin should be *designed* to be ridden (Trackmania), and whether the ride costs the

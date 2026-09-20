@@ -117,10 +117,16 @@ steering   on a wall the stick is read in the wall's frame: forward along travel
            pushing toward a wall climbs it and pushing away comes down
 drive      × WallRideDriveMultiplier (0): a wall is ridden on momentum; gravity along the wall brings the ball
            back, or the wall's top (convex, v²|κ| ≥ g·n.y) releases it into the air as any crest does
-climb      the up-wall speed is capped at WallRideMaxClimbSpeed (45 m/s, a 26 m climb at the game's gravity):
-           a fillet turns whatever speed points at the wall into a climb, and a head-on hit at the cap would
-           ride 200 m up and out of any canyon; the excess is shed, and the impact rule (§9) takes Flow for it,
-           which is the price of a missed line; an oblique ride under the limit loses nothing
+climb      above WallRideMaxClimbSpeed (45 m/s, alone a 26 m climb at the game's gravity) the excess up-wall
+           speed is scrubbed off (D-110): it decays with the time constant WallRideClimbScrubSeconds (0.1 s),
+           so the ball rides up the wall visibly losing speed instead of stopping at the foot (the D-108
+           one-tick clip read as an invisible wall: 137 to 63 m/s in one tick at the fillet's foot). A fillet
+           turns whatever speed points at the wall into a climb, and a head-on hit at the cap would ride 200 m
+           up and out of any canyon; the decay bounds the surface travelled while scrubbing at any entry speed
+           (about limit·τ·ln(excess/limit) + excess·τ, under 40 m at the Flow ceiling): measured 20 m above
+           the corridor at 125 m/s head-on, about 30 m at the cap, near 50 m at the ceiling. The price: once the speed scrubbed on a ride reaches ImpactSpeedLoss the
+           ride costs one impact's Flow (WallScrubCount), and the impact rule (§9) ignores the scrub's share of
+           a tick's loss; an oblique ride under the limit loses nothing
 cap        the locomotion plane is the wall's, so the whole velocity is inside the cap while riding
 ```
 
@@ -546,7 +552,7 @@ terrain wavelength 1.005 are part of the same promotion.
 | Air control multiplier | 0.308 | ACCEPTED (D-078) |
 | Ball radius | 0.66 m (1.32 m diameter) | ACCEPTED (V-005, D-091; was 2.125: the visual-scale dial, physics and generation stay in metres) |
 | Ground follow / snap distance | on / 0.5 m (off = the contact-only D-091 controller) | ACCEPTED (D-092) |
-| Wall ride / min normal dot / min speed / drive / max climb | on / −0.2 / 30 m/s / 0 / 45 m/s (off = the D-092/D-101 controller) | ACCEPTED (D-108, D-109, user's call) |
+| Wall ride / min normal dot / min speed / drive / max climb / scrub time | on / −0.2 / 30 m/s / 0 / 45 m/s / 0.1 s (off = the D-092/D-101 controller) | ACCEPTED (D-108, D-109, D-110, user's call) |
 | Min jump takeoff vertical speed | 2.03 m/s (a bare tap is a hop; the charge is the jump) | ACCEPTED (V-010) |
 | Max jump takeoff vertical speed | 84.63 m/s | ACCEPTED (V-010, D-091; was 58.21) |
 | Max jump charge seconds | 0.445 s, linear | ACCEPTED (V-010) |

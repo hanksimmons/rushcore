@@ -14,7 +14,7 @@ RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>                    # pure-data case
 RUSHCORE_CELL_SIZE=8 <same command>                             # the stage case at another cell size (8 or 16)
 <same command> --seed 8                                         # the stage case drives stage 8/0 (pick a seed with a gap or a ramp)
 RUSHCORE_DRIVE_TRACE=3020 <same command> --seed 8               # per-tick ball trace ±120 m around that route metre
-RUSHCORE_ARCHETYPE=canyon <same command> --seed 3               # the stage case drives a Canyon Run stage (D-098); RUSHCORE_WALL_TRACE=1 prints the canyon wall ride per tick (D-109)
+RUSHCORE_ARCHETYPE=canyon <same command> --seed 3               # the stage case drives a Canyon Run stage (D-098); RUSHCORE_WALL_TRACE=1 prints the canyon wall ride per tick (D-109); RUSHCORE_WALL_AIM=<deg> rides at one aim only (default 20° then 90°); RUSHCORE_WALL_PROBE=1 prints the stamp/collider/analytic-normal probe along the wall (D-110)
 RUSHCORE_ARCHETYPE=dunes <same command>                         # the stage case drives a Dune Sea stage (D-099)
 RUSHCORE_ARCHETYPE=sky <same command>                           # the stage case drives a Sky Terraces stage and drops the ball from its top floor (D-103)
 RUSHCORE_BATCH_FAILS=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>   # tally what attempt 1 failed on across each batch, with the first seed's features and bends

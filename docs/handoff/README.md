@@ -129,6 +129,8 @@ hash; the check runs in the 35 s data-only mode, so run it after every edit near
 | `T6_SAMPLE_FIXES.md` | Presentation fixes from the user's sample-stage playtest | `opus/t6-sample-fixes` | the user's notes |
 | `T7_TUBE_JUDDER.md` | Bug: the ball judders while boosting through a tube | `opus/t7-tube-judder` | none |
 
+**Second programme (2026-09-20):** the classification of everything that remains, Fable versus Opus, with the Opus queue in order and the kickoff line, is `WORK_SPLIT.md`. The next free packet number is T9.
+
 Suggested order: T7 (a bug the user sees), T1, T4, T5 (independent, quick to merge), then T2, T3, then T6 when the notes exist.
 
 The prompts to paste for each session are in `PROMPTS.md`.

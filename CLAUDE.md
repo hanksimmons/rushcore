@@ -292,7 +292,9 @@ Until the implementation plan advances:
 > progression system (D-119, `docs/16`: XP orbs, cash balls, the magnet, levels 1–8, the found shop) is the user's 2026-09-20 spec;
 > **slice P1 is delivered** (2026-09-20: placement by rule from the stage seed, the pickup field and its chase rule, levels on the
 > run, the stat ladder as read points beside the frozen tuning, the choice panel at the outro, the HUD lines, `L`); P2 the found
-> shop is an Opus packet, and `docs/handoff/WORK_SPLIT.md` classifies everything that remains between the two tracks.
+> shop is an Opus packet, and `docs/handoff/WORK_SPLIT.md` classifies everything that remains between the two tracks. **D-120 (the
+> user, 2026-09-20):** a level-up is chosen at once, the run paused on the panel; the metagame is a tree of nodes to unlock and
+> level up when a run ends (Phase 10); the item pool is deferred.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

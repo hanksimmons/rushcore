@@ -56,8 +56,11 @@ public sealed class RunDirector
     /// <summary>XP the next level needs: XpPerLevel × level (10, 20, … 70); 0 at level 8.</summary>
     public int XpToNext => Level >= MaxLevel ? 0 : System.Math.Max(1, (int)System.MathF.Round(_run.XpPerLevel)) * Level;
     public float Xp01 => Level >= MaxLevel ? 1f : Xp / (float)XpToNext;
-    /// <summary>Level-ups earned and not yet chosen; the stage outro resolves them one choice each (02 §10, docs/16 §3).</summary>
+    /// <summary>Level-ups earned and not yet chosen. Chosen the moment they happen (D-120: the run pauses on the choice
+    /// panel); with <see cref="ChooseAtOnce"/> off they wait for the stage outro (the harness drives at rank 0 that way).</summary>
     public int PendingLevelUps { get; private set; }
+    /// <summary>The user's call (D-120): a level-up is chosen at once, mid-run. Off, level-ups queue for the outro.</summary>
+    public bool ChooseAtOnce { get; set; } = true;
     /// <summary>The stat ranks of this run (docs/16 §4).</summary>
     public UpgradeState Upgrades { get; }
 

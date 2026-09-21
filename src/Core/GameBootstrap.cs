@@ -53,6 +53,9 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public PlayerHud Hud => _hud;
     public bool StageOutroActive => _outro != OutroPhase.None;
     public bool StageChoiceOpen => _outro == OutroPhase.Choose;
+    public bool ChoiceOpen => _choice.IsOpen;
+    /// <summary>The mid-run choice (D-120): the tree is paused while the panel is up, and restored to what it was.</summary>
+    private bool _choiceHold, _pausedBeforeChoice;
     /// <summary>Run seed and stage index (T1). The clipboard copies the run seed alone, for `--seed N`.</summary>
     public string SeedText => $"{_director.RunSeed}/{_director.StageIndex}";
 
@@ -135,6 +138,9 @@ public partial class GameBootstrap : Node3D, IDebugActions
         ui.MoveChild(_hud, 0);
         _choice = new UpgradeChoicePanel(this);
         ui.AddChild(_choice);
+        // A level-up is chosen the moment it happens (D-120): the run pauses on the panel and resumes on the choice. During
+        // an outro the outro's own Choose phase takes it instead.
+        _director.LevelledUp += _ => { if (_director.ChooseAtOnce && _outro == OutroPhase.None && !_choiceHold) OpenChoiceHold(); };
         _tuningPanel = new TuningPanel(this) { Visible = false };
         ui.AddChild(_tuningPanel);
 
@@ -179,6 +185,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public override void _Process(double delta)
     {
         if (!InputBootstrap.IsTextEntryFocused(GetViewport())) HandleDebugHotkeys();
+        if (_choiceHold && _director.PendingLevelUps == 0) CloseChoiceHold();
+        else if (_choiceHold) _choice.Refresh();
 
         if (_screenshotFrame > 0) StepScreenshotCapture();
 
@@ -523,6 +531,21 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public void PlayDamage() => _playerVfx.PlayDamage();
 
     public void BurstCoins() => SpawnRewardBurst(_player.GlobalPosition + Vector3.Up * 2f, 12);
+
+    private void OpenChoiceHold()
+    {
+        _choiceHold = true;
+        _pausedBeforeChoice = GetTree().Paused;
+        GetTree().Paused = true;
+        _choice.Open();
+    }
+
+    private void CloseChoiceHold()
+    {
+        _choiceHold = false;
+        _choice.Close();
+        GetTree().Paused = _pausedBeforeChoice;
+    }
 
     public void GrantLevel()
     {

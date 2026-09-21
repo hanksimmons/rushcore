@@ -85,8 +85,8 @@ takeoff stay on the F2 telemetry, which also gained a `health` row.
 **Progression** (D-119, `docs/16`): every generated stage carries teal experience orbs (clusters beside the line, denser on
 optional lines) and gold cash balls (one on each line's middle, on every ramp landing and gap rim, a few loose); inside
 `Run › Magnet Radius` (14 m) they fly to the ball and never give up. Ten orbs is level 2, then 20 more, and so on to level 8
-at 280. A level-up waits for the exit: the outro fades, the choice panel opens (eight stats, three ranks each; `1`–`8`, click,
-or arrows and Enter), and the next stage builds once every queued level is chosen. Rank 0 is the frozen baseline; a rank is a
+at 280. A level-up pauses the run on the choice panel the moment it happens (eight stats, three ranks each; `1`–`8`, click, or
+arrows and Enter) and the run resumes on the choice (D-120); one that lands during the exit outro is chosen behind the fade. Rank 0 is the frozen baseline; a rank is a
 factor read beside the tuning value, so the `Upgrades` tab in F1 tunes the ladder and `Run` the XP and the magnet. `L` grants a
 level to see the panel. Ranks, level, XP and cash are the run's: a new seed or `--seed` wipes them.
 

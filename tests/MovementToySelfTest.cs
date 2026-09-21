@@ -75,6 +75,9 @@ public partial class MovementToySelfTest : Node
         Name = "MovementToySelfTest";
         _player = _debug.Player;
         BuildRig();
+        // Level-ups queue for the outro here (D-120 chooses them at once in play, pausing the tree): the drives stay at rank 0
+        // and the lifecycle case exercises the outro's hold; the HUD case exercises the immediate hold once, on the lab.
+        _debug.Run.ChooseAtOnce = false;
 
         _player.Jumped += c => { _jumpedCount++; _lastJumpCharge = c; };
         _player.JumpChargeCanceled += () => _chargeCanceledCount++;
@@ -3672,6 +3675,23 @@ public partial class MovementToySelfTest : Node
             foreach (var _ in Frames(2)) yield return null;
             Check("a level-up moves the level line, empties the XP line and queues a choice",
                 hud.LevelShown == 2 && run.PendingLevelUps == 1 && hud.XpShown < 0.05f, $"level {hud.LevelShown}, pending {run.PendingLevelUps}, xp {hud.XpShown:0.00}");
+            run.StartRun(run.RunSeed, run.StageIndex);
+
+            // The immediate choice (D-120): a level-up mid-run opens the panel and pauses the tree; the choice closes it and
+            // resumes, with the rank raised. The harness node keeps processing while paused (it hangs off the always-processing root).
+            run.ChooseAtOnce = true;
+            run.AddXp(run.XpToNext);
+            foreach (var _ in Frames(2)) yield return null;
+            bool opened = _debug.ChoiceOpen, paused = GetTree().Paused;
+            Vector3 held = _player.GlobalPosition;
+            foreach (var _ in Frames(10)) yield return null;
+            bool frozen = _player.GlobalPosition.DistanceTo(held) < 0.001f && _debug.ChoiceOpen;
+            run.ChooseUpgrade(Rushcore.Run.UpgradeStat.Hangtime);
+            foreach (var _ in Frames(2)) yield return null;
+            Check("a level-up mid-run opens the choice panel and pauses the run until the choice is made (D-120)",
+                opened && paused && frozen && !_debug.ChoiceOpen && !GetTree().Paused && run.Upgrades.Rank(Rushcore.Run.UpgradeStat.Hangtime) == 1 && run.PendingLevelUps == 0,
+                $"opened={opened} paused={paused} frozen={frozen} open after={_debug.ChoiceOpen} paused after={GetTree().Paused} rank {run.Upgrades.Rank(Rushcore.Run.UpgradeStat.Hangtime)}");
+            run.ChooseAtOnce = false;
             run.StartRun(run.RunSeed, run.StageIndex);
         }
 

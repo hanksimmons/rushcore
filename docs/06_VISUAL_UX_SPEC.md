@@ -324,8 +324,8 @@ Combine screens where doing so reduces interruption.
 
 ## 14. Level-up presentation
 
-> **Amended 2026-09-20 (D-119):** there is no reel and no rarity. The level-up is a choice panel over the fade at the
-> stage outro (`UpgradeChoicePanel`): the level, how many choices remain, the eight stats each with rank pips and what
+> **Amended 2026-09-20 (D-119, D-120):** there is no reel and no rarity. The level-up is a choice panel that opens the
+> moment the level is reached, the run paused beneath it (or over the fade if it lands in an outro; `UpgradeChoicePanel`): the level, how many choices remain, the eight stats each with rank pips and what
 > the next rank does in words, a stat at rank 3 greyed; keys 1–8, click, or focus and accept. The section below is the
 > record of the earlier design.
 

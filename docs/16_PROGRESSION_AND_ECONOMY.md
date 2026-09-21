@@ -58,10 +58,11 @@ never catch a ball above 60 m/s).
 
 - `Level` starts at 1 and ends at 8. XP to the next level is `XpPerLevel × level` (10, 20, … 70: 280 XP to reach 8).
   Surplus XP past level 8 does nothing (no prestige, no wrap).
-- Level-ups **queue** and resolve at a safe moment (`02 §10`, unchanged): the stage's completion outro, before the next
-  stage builds. The **choice panel** lists the eight stats with their rank pips (0–3) and the effect of the next rank in
-  words; one choice per queued level; a stat at rank 3 is greyed. Escape is not an option: a queued level is chosen
-  before the next stage (a run is the only place ranks live).
+- A level-up is **chosen at once** (D-120, the user's call): the run pauses on the **choice panel** the moment the level is
+  reached and resumes on the choice. The panel lists the eight stats with their rank pips (0–3) and the effect of the next
+  rank in words; one choice per queued level; a stat at rank 3 is greyed. Escape is not an option. A level-up that lands
+  during a stage outro is chosen there, behind the fade, before the next stage builds; `RunDirector.ChooseAtOnce` off
+  queues every level-up to the outro (the harness drives at rank 0 that way).
 - **Run death** wipes level, XP, ranks and cash (`01 §Run failure/meta`). A new run starts at level 1, rank 0.
 - The HUD (`06 §12`) shows the level and an XP bar at top-left beside the stage counter (`LV 3  +2` while two level-ups
   are queued), and the cash count where the currency label already is; both pulse on a collection.
@@ -125,5 +126,7 @@ drives at rank 0 and checks each rank's multiplier at its read point.
 ## 8. Decisions the user owns
 
 - every number in §4 (V-018) and the pickup counts in §2, on play;
-- whether a level-up is chosen at once (a pause mid-run) instead of at the stage's end;
+- ~~whether a level-up is chosen at once (a pause mid-run) instead of at the stage's end~~ — at once (D-120);
+- the metagame (D-120's direction): when a run ends, a tree of nodes to unlock and level up (`01 §Run failure/meta`: 12–20
+  nodes, modest starting advantages); its design is a session with the user before Phase 10 builds it;
 - the item pool, and whether a shop can sell a stat rank.

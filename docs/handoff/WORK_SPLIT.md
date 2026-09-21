@@ -77,7 +77,7 @@ Size: **S** under a session, **M** a session, **L** several sessions, **XL** a s
 | Phase 6 — escalating difficulty, route modifiers | 01, 09 | **parked** by the user until after Phase 4 | — | — | — |
 | Phase 7 — passive item framework and initial items | 02 §11 | **user** then split per item | — | The stat ladder replaced the random offers (D-119); items are the shop's stock. | The item brainstorm. |
 | Phase 9 — the final encounter | 01, 09 | **Fable** | XL | A designed arena generated as a stage plus the encounter's rules on the movement verbs. | Phase 4. |
-| Phase 10 — recap, score screen, meta XP, persistence, the meta tree | 01, 02, 09 | **Opus** | M | UI plus one small save file (no migration framework, per `CLAUDE.md`); meta nodes that give "modest starting advantages" apply through the read points P1 builds (`UpgradeState`), so no physics edit. | P1; a complete loop. |
+| Phase 10 — recap, score screen, meta XP, persistence, the meta tree (confirmed by the user 2026-09-20, D-120: a tree of nodes to unlock and level up when a run ends; design it with the user before building) | 01, 02, 09 | **Opus** | M | UI plus one small save file (no migration framework, per `CLAUDE.md`); meta nodes that give "modest starting advantages" apply through the read points P1 builds (`UpgradeState`), so no physics edit. | P1; a complete loop. |
 | Phase 11 — render profiling, draw calls, mesh budgets | 09, 13 §4.4 | **Opus** | M | Measured with `Performance` monitors on the samples. | — |
 | Phase 11 — the physics tick-rate test (120 Hz) if high-speed behaviour needs it | 09, CLAUDE.md | **Fable** | S | Only if measured; a harness comparison. | — |
 

@@ -239,7 +239,8 @@ Boost does not require Flow as a primary refill source. If Flow later affects bo
 > **Amended 2026-09-20 (D-119):** `docs/16 §3–§4` owns level-ups now. Experience is picked up as orbs; levels are strict
 > 1 → 8; a level-up is the player's choice of one of eight stats (three ranks each over the frozen baseline), made at the
 > stage outro; there is no spin, no rarity and no random offer for stats. The section below is the record of the earlier
-> design; its "queue during play, resolve at a safe moment" rule stands.
+> design; its "resolve at a safe moment" rule is overridden too (D-120): the choice is made the moment the level is
+> reached, with the run paused on the panel.
 
 Level-ups are frequent capability modifiers.
 

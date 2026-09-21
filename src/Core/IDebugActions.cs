@@ -26,6 +26,8 @@ public interface IDebugActions
     bool StageOutroActive { get; }
     /// <summary>True while the outro is held at the upgrade choice panel (docs/16 §3): a level-up is queued and unchosen.</summary>
     bool StageChoiceOpen { get; }
+    /// <summary>True while the choice panel is open at all: mid-run with the tree paused (D-120), or in the outro.</summary>
+    bool ChoiceOpen { get; }
 
     void RestartSameSeed();
     void RestartNewSeed();

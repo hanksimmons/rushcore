@@ -97,7 +97,7 @@ public partial class PlayerVfx : Node3D
         BuildDamage(softAdd);
         BuildCarve(chunkMix, softMix);
 
-        ApplyRadius(Mathf.Max(0.05f, _t.Movement.BallRadius));
+        ApplyRadius(Mathf.Max(0.05f, _player.Radius));
 
         _player.Jumped += OnJumped;
         _player.Landed += OnLanded;
@@ -144,7 +144,7 @@ public partial class PlayerVfx : Node3D
     {
         float dt = (float)delta;
         var vfx = _t.Vfx;
-        float r = Mathf.Max(0.05f, _t.Movement.BallRadius);
+        float r = Mathf.Max(0.05f, _player.Radius);
         if (!Mathf.IsEqualApprox(r, _lastRadius)) ApplyRadius(r);
 
         float cap = Mathf.Max(1f, _t.Movement.HardMaxLocomotionSpeed);

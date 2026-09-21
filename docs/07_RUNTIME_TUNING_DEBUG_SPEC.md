@@ -211,6 +211,10 @@ own damage pulse; the fourth throws twelve coins at the ball and lets it magneti
 is also what the row's burst pad does when the ball rolls over it. None of them has a hotkey: the panel is enough for
 a cue that is judged by looking at it.
 
+Delivered (D-119): **Grant Level** (`L`) gives the XP the next level needs, so the level-up queues and the choice panel
+can be seen at the next exit without collecting orbs; nothing on the panel. The F1 panel gains `Run › XP Per Level`,
+the magnet sliders and the pickup counts, and an `Upgrades` tab with the twenty-four rank values (`docs/16 §4`).
+
 Delivered (T2): **Kill Player** (`K`) takes health to zero, which recovers to the checkpoint and refills on arrival
 (P-004); **Heal Player** (`H`) returns it to full. Both are on the panel too. Nothing damages health yet.
 

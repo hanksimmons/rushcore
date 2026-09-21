@@ -33,6 +33,8 @@ public static class PlaceholderPalette
     public static readonly StandardMaterial3D ShooterAim = Glow(new Color(1.00f, 0.74f, 0.24f), 1.2f);
     /// <summary>The elite treatment, and only it: the halo ring and the crown (02 §7 "one constrained modifier").</summary>
     public static readonly StandardMaterial3D Elite = Glow(new Color(1.00f, 0.86f, 0.42f), 1.6f);
+    /// <summary>Experience orb (docs/16 §2): small, teal, the one cool reward in the world beside the ball.</summary>
+    public static readonly StandardMaterial3D Orb = Glow(new Color(0.22f, 0.92f, 0.80f), 1.0f);
     /// <summary>Currency: warm, flat, never red.</summary>
     public static readonly StandardMaterial3D Currency = Glow(new Color(1.00f, 0.80f, 0.30f), 0.7f);
     /// <summary>XP / reward: cool, so it never sits in the hazard family.</summary>

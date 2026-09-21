@@ -24,6 +24,8 @@ public interface IDebugActions
     bool TelemetryVisible { get; set; }
     /// <summary>True while the stage-completion outro is playing (controls locked, fade running).</summary>
     bool StageOutroActive { get; }
+    /// <summary>True while the outro is held at the upgrade choice panel (docs/16 §3): a level-up is queued and unchosen.</summary>
+    bool StageChoiceOpen { get; }
 
     void RestartSameSeed();
     void RestartNewSeed();
@@ -38,6 +40,8 @@ public interface IDebugActions
     void KillPlayer();
     /// <summary>Debug (07 §12): back to full health.</summary>
     void HealPlayer();
+    /// <summary>Debug (07 §12, D-119): the XP the next level needs, at once; the level-up queues for the outro.</summary>
+    void GrantLevel();
     /// <summary>Debug (07 §12, T3): the crush one-shot on the showcase Pylon, or at the ball if the row is off.</summary>
     void PlayCrush();
     /// <summary>Debug (07 §12, T3): the failed-impact one-shot on the showcase Bulwark, or at the ball.</summary>

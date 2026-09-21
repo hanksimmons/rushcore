@@ -8,8 +8,10 @@ namespace Rushcore.Pickups;
 /// magnetize/auto-collect to preserve momentum"; P-007).
 ///
 /// <para>Coins are kinematic: a code-integrated ballistic arc for <see cref="FreeFlightSeconds"/>, then a
-/// magnetise toward the ball that eases up to <see cref="MagnetSpeed"/> and collects inside
-/// <see cref="CollectRadius"/>. No physics bodies, no colliders, and above all no force on the ball — the
+/// magnetise toward the ball that eases up to the chase speed and collects inside <see cref="CollectRadius"/>. The
+/// chase speed is the pickup field's rule (docs/16 §2, D-119): max(<see cref="MagnetSpeed"/>, ball speed +
+/// <see cref="ClosingMargin"/>), so a coin catches a ball it could never outrun (the T3 open item: at 60 m/s flat a
+/// crush at the cap paid nothing). No physics bodies, no colliders, and above all no force on the ball — the
 /// whole point of auto-collect is that momentum is never the price of a reward (02 §12).</para>
 ///
 /// <para>One node per burst, not per coin: the coins are instances of a single <see cref="MultiMesh"/> whose
@@ -20,8 +22,9 @@ public partial class RewardBurst : Node3D
 {
     /// <summary>Ballistic flight before the magnet takes over (P-007).</summary>
     public const float FreeFlightSeconds = 0.4f;
-    /// <summary>Top magnetise speed. Above the ball's cap, so a coin catches a player who is leaving.</summary>
+    /// <summary>Magnetise speed floor; the chase runs at the ball's speed plus <see cref="ClosingMargin"/> above it.</summary>
     public const float MagnetSpeed = 60f;
+    public const float ClosingMargin = 15f;
     /// <summary>Collected inside this radius of the ball.</summary>
     public const float CollectRadius = 1.2f;
     /// <summary>A burst never outlives this, collected or not.</summary>
@@ -37,6 +40,7 @@ public partial class RewardBurst : Node3D
     private float[] _spin = System.Array.Empty<float>();
     private bool[] _gone = System.Array.Empty<bool>();
     private Func<Vector3>? _player;
+    private Func<Vector3>? _playerVelocity;
     private WorldVfx? _vfx;
     private float _age;
 
@@ -55,7 +59,8 @@ public partial class RewardBurst : Node3D
     /// when the caller wants it to be and incidental when it does not.
     /// </summary>
     public static RewardBurst Spawn(Node parent, Vector3 origin, PickupKind kind, int count,
-                                    RandomNumberGenerator rng, Func<Vector3> player, WorldVfx? vfx = null)
+                                    RandomNumberGenerator rng, Func<Vector3> player, WorldVfx? vfx = null,
+                                    Func<Vector3>? playerVelocity = null)
     {
         count = Mathf.Clamp(count, 1, 64);
         var burst = new RewardBurst
@@ -63,6 +68,7 @@ public partial class RewardBurst : Node3D
             Name = "RewardBurst",
             Kind = kind,
             _player = player,
+            _playerVelocity = playerVelocity,
             _vfx = vfx,
             _position = new Vector3[count],
             _velocity = new Vector3[count],
@@ -112,6 +118,7 @@ public partial class RewardBurst : Node3D
         float dt = (float)delta;
         _age += dt;
         Vector3 ball = _player?.Invoke() ?? Vector3.Zero;
+        float chase = Mathf.Max(MagnetSpeed, (_playerVelocity?.Invoke() ?? Vector3.Zero).Length() + ClosingMargin);
 
         for (int i = 0; i < _position.Length; i++)
         {
@@ -130,7 +137,7 @@ public partial class RewardBurst : Node3D
                 if (distance > 0.001f)
                 {
                     float ramp = Mathf.Clamp((_age - FreeFlightSeconds) / 0.25f, 0f, 1f);
-                    Vector3 want = to / distance * MagnetSpeed * ramp;
+                    Vector3 want = to / distance * chase * ramp;
                     _velocity[i] = _velocity[i].Lerp(want, Mathf.Clamp(dt * 9f, 0f, 1f));
                 }
             }

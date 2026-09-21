@@ -289,7 +289,10 @@ Until the implementation plan advances:
 > the speed profile addressed by plan distance (its 3D label had drifted past the module window by 12 km), twelve regeneration
 > attempts, prop colliders as server shapes (they were quadratic); every hash re-recorded; the collider (2–5 s of every build) is
 > the user's decision. Next per `docs/13 §5`: H2 the cloud dome, T3 pockets; the user played T1 + H1 + T2 and plays W2 next. The
-> progression system (D-119, `docs/16`: XP orbs, cash balls, the magnet, levels 1–8, the found shop) is the user's 2026-09-20 spec.
+> progression system (D-119, `docs/16`: XP orbs, cash balls, the magnet, levels 1–8, the found shop) is the user's 2026-09-20 spec;
+> **slice P1 is delivered** (2026-09-20: placement by rule from the stage seed, the pickup field and its chase rule, levels on the
+> run, the stat ladder as read points beside the frozen tuning, the choice panel at the outro, the HUD lines, `L`); P2 the found
+> shop is an Opus packet, and `docs/handoff/WORK_SPLIT.md` classifies everything that remains between the two tracks.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

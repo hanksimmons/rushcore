@@ -173,7 +173,7 @@ public partial class PlayerVisual : Node3D
 
         var vfx = _t.Vfx;
         float squash = Str(vfx.SquashStretchStrength);
-        float r = Mathf.Max(0.05f, _t.Movement.BallRadius);
+        float r = Mathf.Max(0.05f, _player.Radius);
         float cap = Mathf.Max(1f, _t.Movement.HardMaxLocomotionSpeed);
         float speed01 = Mathf.Clamp(_player.LocomotionSpeed / cap, 0f, 1f);
 

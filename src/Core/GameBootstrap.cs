@@ -20,7 +20,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
 {
     private const int DefaultSeed = 20260905;
 
-    private GameplayTuning _tuning = null!;
+    private readonly GameplayTuning _tuning = new();
     private MovementToyWorld _world = null!;
     private PlayerPhysics _player = null!;
     private CameraRig _camera = null!;
@@ -31,12 +31,15 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private readonly RandomNumberGenerator _burstRng = new();
     private PlayerHud _hud = null!;
     private readonly PlayerHealth _health = new();
-    private readonly RunDirector _director = new(DefaultSeed);
+    private readonly RunDirector _director;
+    private UpgradeChoicePanel _choice = null!;
+
+    public GameBootstrap() => _director = new RunDirector(DefaultSeed, _tuning.Run, _tuning.Upgrades);
     private int _sampleSeen;
     private float _cellSizeSeen, _cellSizeDwell;
 
-    /// <summary>The completion sequence (T1): exit feedback, fade out, rebuild, fade in.</summary>
-    private enum OutroPhase { None, Feedback, FadeOut, FadeIn }
+    /// <summary>The completion sequence (T1): exit feedback, fade out, the queued level choices (docs/16 §3), rebuild, fade in.</summary>
+    private enum OutroPhase { None, Feedback, FadeOut, Choose, FadeIn }
     private OutroPhase _outro;
     private float _outroT;
     private int _outroExit = -1;
@@ -49,6 +52,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public PlayerHealth Health => _health;
     public PlayerHud Hud => _hud;
     public bool StageOutroActive => _outro != OutroPhase.None;
+    public bool StageChoiceOpen => _outro == OutroPhase.Choose;
     /// <summary>Run seed and stage index (T1). The clipboard copies the run seed alone, for `--seed N`.</summary>
     public string SeedText => $"{_director.RunSeed}/{_director.StageIndex}";
 
@@ -69,7 +73,6 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
         InputBootstrap.Register();
 
-        _tuning = new GameplayTuning();
         GameplayTuning.InstallBundledPresets();
         // Compiled defaults remain the clean-build authority (07 §8); the saved override is
         // applied on launch so feel work persists between sessions, and the panel/telemetry
@@ -91,9 +94,13 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _world.StageCompleted += OnStageCompleted;
         // The showcase row's pad throws the coins; the wallet they land in is the run's (T2, T3).
         _world.RewardPadTriggered += at => SpawnRewardBurst(at, 12);
+        // Orbs and cash (docs/16 §2, D-119) land in the run: experience queues levels for the outro, cash in the wallet.
+        _world.PickupCollected += (kind, worth) => { if (kind == FieldPickupKind.Orb) _director.AddXp(worth); else _director.AddCurrency(worth); };
 
         _player = new PlayerPhysics(_tuning);
         AddChild(_player);
+        _player.Upgrades = _director.Upgrades;   // the stat ladder's read points (docs/16 §4); rank 0 is the frozen baseline
+        _world.Player = _player;
         _player.GlobalPosition = _world.SpawnPoint;
         _player.SetCheckpoint(_world.SpawnPoint);
         _player.AddChild(new PlayerVisual(_tuning, _player));
@@ -126,6 +133,8 @@ public partial class GameBootstrap : Node3D, IDebugActions
         _hud = new PlayerHud(this, _health);
         ui.AddChild(_hud);
         ui.MoveChild(_hud, 0);
+        _choice = new UpgradeChoicePanel(this);
+        ui.AddChild(_choice);
         _tuningPanel = new TuningPanel(this) { Visible = false };
         ui.AddChild(_tuningPanel);
 
@@ -225,6 +234,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (Input.IsActionJustPressed(InputBootstrap.DebugTeleportNearExit)) TeleportNearExit();
         if (Input.IsActionJustPressed(InputBootstrap.DebugKillPlayer)) KillPlayer();
         if (Input.IsActionJustPressed(InputBootstrap.DebugHealPlayer)) HealPlayer();
+        if (Input.IsActionJustPressed(InputBootstrap.DebugGrantLevel)) GrantLevel();
         if (Input.IsActionJustPressed(InputBootstrap.DebugTogglePhysicsHz))
         {
             // V-007: 60 Hz is the baseline; 120 is only to be tried if high-speed
@@ -366,6 +376,23 @@ public partial class GameBootstrap : Node3D, IDebugActions
                 SetFade(r.FadeOutSeconds <= 0f ? 1f : _outroT / r.FadeOutSeconds);
                 if (_outroT < r.FadeOutSeconds) break;
                 SetFade(1f);
+                // Queued level-ups resolve here, behind the fade and before the next stage builds (docs/16 §3, 02 §10):
+                // the panel holds the outro until every queued level has its choice.
+                if (_director.PendingLevelUps > 0)
+                {
+                    _choice.Open();
+                    _outro = OutroPhase.Choose;
+                    _outroT = 0f;
+                    break;
+                }
+                BuildNextStage();
+                _outro = OutroPhase.FadeIn;
+                _outroT = 0f;
+                break;
+
+            case OutroPhase.Choose:
+                if (_director.PendingLevelUps > 0) break;
+                _choice.Close();
                 BuildNextStage();
                 _outro = OutroPhase.FadeIn;
                 _outroT = 0f;
@@ -437,6 +464,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
         if (_outro == OutroPhase.None) return;
         _outro = OutroPhase.None;
         _outroT = 0f;
+        _choice.Close();
         SetFade(0f);
         _player.ControlsLocked = false;
     }
@@ -496,6 +524,13 @@ public partial class GameBootstrap : Node3D, IDebugActions
 
     public void BurstCoins() => SpawnRewardBurst(_player.GlobalPosition + Vector3.Up * 2f, 12);
 
+    public void GrantLevel()
+    {
+        if (_director.Level >= RunDirector.MaxLevel) { GD.Print("[RUSHCORE] Already at level 8."); return; }
+        _director.AddXp(_director.XpToNext - _director.Xp);
+        GD.Print($"[RUSHCORE] Level {_director.Level}; {_director.PendingLevelUps} level-up(s) queued for the stage outro.");
+    }
+
     /// <summary>
     /// Throws a reward burst and points its collected coins at the run's wallet (P-007). The burst is kinematic
     /// and frees itself; nothing here can touch the ball's velocity, which is the whole reason auto-collect
@@ -504,7 +539,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     private void SpawnRewardBurst(Vector3 origin, int coins)
     {
         var burst = RewardBurst.Spawn(_world, origin, PickupKind.Currency, coins, _burstRng,
-                                      () => _player.GlobalPosition, _world.Vfx);
+                                      () => _player.GlobalPosition, _world.Vfx, () => _player.Velocity);
         burst.Collected += (_, amount) => _director.AddCurrency(amount);
     }
 

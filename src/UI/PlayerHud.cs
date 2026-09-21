@@ -27,6 +27,9 @@ public partial class PlayerHud : Control
     private static readonly Color FlowPulse = new(1.00f, 0.96f, 0.72f);
     private static readonly Color FlowDim = new(0.42f, 0.38f, 0.30f);
     private static readonly Color ProgressFill = new(0.55f, 0.86f, 0.92f);
+    private static readonly Color XpFill = new(0.22f, 0.92f, 0.80f);
+    private static readonly Color XpPulse = new(0.80f, 1.00f, 0.95f);
+    private static readonly Color CashPulse = new(1.00f, 0.92f, 0.60f);
     private static readonly Color[] BandColors =
     {
         new(0.72f, 0.80f, 0.90f),   // Roll
@@ -45,13 +48,15 @@ public partial class PlayerHud : Control
     private ColorRect _flowBack = null!, _flowFill = null!;
     private ColorRect _progressBack = null!, _progressFill = null!;
     private Label _stageLabel = null!, _currencyLabel = null!, _bandLabel = null!;
+    private Label _levelLabel = null!;
+    private ColorRect _xpBack = null!, _xpFill = null!;
     private Label _healthCaption = null!, _boostCaption = null!, _flowCaption = null!;
     private Font? _font;
 
     // Cached values: nothing is written to a node, and no string is built, unless what it shows changed.
     private float _shownHealth = -1f, _shownBoost = -1f, _shownFlow = -1f, _shownProgress = -1f;
-    private float _shownScale = -1f, _pulse;
-    private int _shownStage = -1, _shownStageCount = -1, _shownCurrency = -1;
+    private float _shownScale = -1f, _pulse, _xpPulse, _cashPulse, _shownXp = -1f;
+    private int _shownStage = -1, _shownStageCount = -1, _shownCurrency = -1, _shownLevel = -1, _shownPending = -1;
     private bool _shownBoosting, _shownBandWord;
     private SpeedBand _shownBand = (SpeedBand)(-1);
 
@@ -79,6 +84,9 @@ public partial class PlayerHud : Control
     /// <summary>The stage number the label reads (1-based), and the currency it shows.</summary>
     public int StageShown => _shownStage;
     public int CurrencyShown => _shownCurrency;
+    /// <summary>The level and XP the HUD draws (docs/16 §3, D-119); the harness reads them.</summary>
+    public int LevelShown => _shownLevel;
+    public float XpShown => Drawn(_xpFill, _xpBack);
     public bool BandWordVisible => _bandLabel.Visible;
 
     private static float Drawn(ColorRect fill, ColorRect back) => back.Size.X <= 0f ? 0f : fill.Size.X / back.Size.X;
@@ -98,6 +106,7 @@ public partial class PlayerHud : Control
         (_boostBack, _boostFill) = AddBar(BoostFill);
         (_flowBack, _flowFill) = AddBar(FlowFill);
         (_progressBack, _progressFill) = AddBar(ProgressFill);
+        (_xpBack, _xpFill) = AddBar(XpFill);
 
         _dialCaption = AddLabel("m/s", HorizontalAlignment.Center);
         _healthCaption = AddLabel("HEALTH", HorizontalAlignment.Left);
@@ -105,6 +114,7 @@ public partial class PlayerHud : Control
         _flowCaption = AddLabel("FLOW", HorizontalAlignment.Right);
         _stageLabel = AddLabel("STAGE 1 / 9", HorizontalAlignment.Center);
         _currencyLabel = AddLabel("0", HorizontalAlignment.Right);
+        _levelLabel = AddLabel("LV 1", HorizontalAlignment.Left);
         _bandLabel = AddLabel("ROLL", HorizontalAlignment.Right);
         _bandLabel.Visible = false;   // off by default (P-005); the toggle turns it on
 
@@ -143,7 +153,7 @@ public partial class PlayerHud : Control
         int fs = Mathf.Max(12, Mathf.RoundToInt(FontSize * scale));   // never below 12 px, even at scale 0.6
         float gap = LabelGap * scale;
 
-        foreach (var l in new[] { _healthCaption, _boostCaption, _flowCaption, _stageLabel, _currencyLabel, _bandLabel })
+        foreach (var l in new[] { _healthCaption, _boostCaption, _flowCaption, _stageLabel, _currencyLabel, _bandLabel, _levelLabel })
             l.AddThemeFontSizeOverride("font_size", fs);
         float lineHeight = fs * 1.4f;
 
@@ -178,10 +188,14 @@ public partial class PlayerHud : Control
         Place(_progressBack, new Vector2(px, m + lineHeight + gap), new Vector2(pw, Mathf.Max(2f, 3f * scale)));
         Place(_progressFill, _progressBack.Position, new Vector2(pw, Mathf.Max(2f, 3f * scale)));
         Place(_currencyLabel, new Vector2(screen.X - m - 140f * scale, m), new Vector2(140f * scale, lineHeight));
+        // Level and its XP line, top-left (docs/16 §3): beside the stage counter, the same thin line as the progress.
+        Place(_levelLabel, new Vector2(m, m), new Vector2(160f * scale, lineHeight));
+        Place(_xpBack, new Vector2(m, m + lineHeight + gap), new Vector2(160f * scale, Mathf.Max(2f, 3f * scale)));
+        Place(_xpFill, _xpBack.Position, new Vector2(160f * scale, Mathf.Max(2f, 3f * scale)));
 
         _shownScale = scale;
         // Every fill is re-sized against the new bar width on the next update.
-        _shownHealth = _shownBoost = _shownFlow = _shownProgress = -1f;
+        _shownHealth = _shownBoost = _shownFlow = _shownProgress = _shownXp = -1f;
     }
 
     private static void Place(Control control, Vector2 position, Vector2 size)
@@ -246,9 +260,26 @@ public partial class PlayerHud : Control
         int currency = _debug.Run.Currency;
         if (currency != _shownCurrency)
         {
+            if (_shownCurrency >= 0 && currency > _shownCurrency) _cashPulse = PulseSeconds;
             _shownCurrency = currency;
             _currencyLabel.Text = currency.ToString();
         }
+        float dt = (float)delta;
+        if (_cashPulse > 0f) { _cashPulse -= dt; _currencyLabel.AddThemeColorOverride("font_color", _cashPulse > 0f ? CashPulse : Ink); }
+
+        // Level, queued level-ups and the XP line (docs/16 §3): a collection pulses the line.
+        int level = _debug.Run.Level, pending = _debug.Run.PendingLevelUps;
+        if (level != _shownLevel || pending != _shownPending)
+        {
+            _shownLevel = level;
+            _shownPending = pending;
+            _levelLabel.Text = pending > 0 ? $"LV {level}  +{pending}" : $"LV {level}";
+        }
+        float xp01 = _debug.Run.Xp01;
+        if (_shownXp >= 0f && xp01 > _shownXp + 0.001f) _xpPulse = PulseSeconds;
+        if (level >= Rushcore.Run.RunDirector.MaxLevel && _shownXp < 0.999f) _xpPulse = PulseSeconds;
+        SetFill(_xpFill, _xpBack, xp01, ref _shownXp);
+        if (_xpPulse > 0f) { _xpPulse -= dt; _xpFill.Color = _xpPulse > 0f ? XpPulse : XpFill; }
 
         bool bandWord = t.BandWord;
         if (bandWord != _shownBandWord)

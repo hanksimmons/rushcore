@@ -96,6 +96,9 @@ it is worth making again now that they are big enough to see.
 
 ### A-8. A reward burst cannot catch a ball above about 60 m/s — anywhere, including on its own line
 
+**CLOSED (2026-09-20, D-119):** the burst adopts the pickup field's chase rule, max(60, ball speed + 15) m/s, so a coin
+closes on any ball at any speed; the arc and the 0.4 s free flight stay. The entry below is the record.
+
 Measured: twelve coins thrown 30 m to the side of a ball travelling at 73 m/s collected **0 of 12** and the burst
 freed itself at its 6 s limit. Parked, the same burst collects all twelve in well under a second.
 

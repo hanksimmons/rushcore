@@ -1,4 +1,5 @@
 using Rushcore.Generation;
+using Rushcore.Tuning;
 
 namespace Rushcore.Run;
 
@@ -7,17 +8,28 @@ namespace Rushcore.Run;
 /// exit the last stage was left by. A plain class with no engine dependency: the composition root owns
 /// one and hands its <see cref="Request"/> to the world, so the stage index stops being a hard-coded 0.
 ///
-/// <para>Currency, XP, route cards, difficulty and death are later phases and deliberately absent.</para>
+/// <para>Progression (docs/16 §3, D-119): experience, the level (1–8), the level-ups queued for the stage outro and the
+/// stat ranks live here too, since a run is the only place they exist; run death and a new run reset them all.
+/// Route cards, difficulty and death itself are later phases and deliberately absent.</para>
 /// </summary>
 public sealed class RunDirector
 {
     /// <summary>Stages in one run (02 §2). Reaching the end wraps to 0 until the run summary exists (Phase 10).</summary>
     public const int StageCount = 9;
+    /// <summary>Levels are strict 1 → 8 (docs/16 §0); XP past 8 does nothing.</summary>
+    public const int MaxLevel = 8;
+
+    private readonly RunTuning _run;
 
     private static readonly TerrainArchetype[] Archetypes =
         { TerrainArchetype.RollingHighlands, TerrainArchetype.CanyonRun, TerrainArchetype.DuneSea, TerrainArchetype.SkyTerraces };
 
-    public RunDirector(int runSeed) => RunSeed = runSeed;
+    public RunDirector(int runSeed, RunTuning run, UpgradeTuning upgrades)
+    {
+        RunSeed = runSeed;
+        _run = run;
+        Upgrades = new UpgradeState(upgrades);
+    }
 
     public int RunSeed { get; private set; }
     public int StageIndex { get; private set; }
@@ -32,6 +44,50 @@ public sealed class RunDirector
     public void AddCurrency(int amount)
     {
         if (amount > 0) Currency += amount;
+        CurrencyChanged?.Invoke(Currency);
+    }
+    public event Action<int>? CurrencyChanged;
+
+    // ---- experience and levels (docs/16 §3) ----
+
+    public int Level { get; private set; } = 1;
+    /// <summary>XP toward the next level (resets at each level-up; idle at level 8).</summary>
+    public int Xp { get; private set; }
+    /// <summary>XP the next level needs: XpPerLevel × level (10, 20, … 70); 0 at level 8.</summary>
+    public int XpToNext => Level >= MaxLevel ? 0 : System.Math.Max(1, (int)System.MathF.Round(_run.XpPerLevel)) * Level;
+    public float Xp01 => Level >= MaxLevel ? 1f : Xp / (float)XpToNext;
+    /// <summary>Level-ups earned and not yet chosen; the stage outro resolves them one choice each (02 §10, docs/16 §3).</summary>
+    public int PendingLevelUps { get; private set; }
+    /// <summary>The stat ranks of this run (docs/16 §4).</summary>
+    public UpgradeState Upgrades { get; }
+
+    /// <summary>XP gained (the new total toward the next level).</summary>
+    public event Action<int>? XpChanged;
+    /// <summary>A level was reached (the new level).</summary>
+    public event Action<int>? LevelledUp;
+
+    /// <summary>Experience picked up. Levels queue; nothing here chooses.</summary>
+    public void AddXp(int amount)
+    {
+        if (amount <= 0 || Level >= MaxLevel) return;
+        Xp += amount;
+        while (Level < MaxLevel && Xp >= XpToNext)
+        {
+            Xp -= XpToNext;
+            Level++;
+            PendingLevelUps++;
+            LevelledUp?.Invoke(Level);
+        }
+        if (Level >= MaxLevel) Xp = 0;
+        XpChanged?.Invoke(Xp);
+    }
+
+    /// <summary>Spends one queued level-up on a stat. False with nothing queued or the stat at rank 3.</summary>
+    public bool ChooseUpgrade(UpgradeStat stat)
+    {
+        if (PendingLevelUps <= 0 || !Upgrades.Raise(stat)) return false;
+        PendingLevelUps--;
+        return true;
     }
     /// <summary>
     /// Debug and harness affordance (P-012): with this off, reaching an exit still raises completion and
@@ -47,6 +103,12 @@ public sealed class RunDirector
         EnteredByExit = -1;
         StagesCompleted = 0;
         Currency = 0;
+        Level = 1;
+        Xp = 0;
+        PendingLevelUps = 0;
+        Upgrades.Reset();
+        CurrencyChanged?.Invoke(Currency);
+        XpChanged?.Invoke(Xp);
     }
 
     /// <summary>The generation request for the current stage of the current run.</summary>

@@ -236,6 +236,11 @@ Boost does not require Flow as a primary refill source. If Flow later affects bo
 
 ## 10. Level-up upgrades
 
+> **Amended 2026-09-20 (D-119):** `docs/16 §3–§4` owns level-ups now. Experience is picked up as orbs; levels are strict
+> 1 → 8; a level-up is the player's choice of one of eight stats (three ranks each over the frozen baseline), made at the
+> stage outro; there is no spin, no rarity and no random offer for stats. The section below is the record of the earlier
+> design; its "queue during play, resolve at a safe moment" rule stands.
+
 Level-ups are frequent capability modifiers.
 
 Presentation:
@@ -290,6 +295,9 @@ No active-use item system in MVP.
 
 ## 12. Currency and reward collection
 
+> **Amended 2026-09-20 (D-119):** cash lies in the world as gold balls (`docs/16 §2`); the magnet radius and the chase rule
+> (a magnetised pickup never gives up) are the collection rule for pickups and bursts alike.
+
 Run money exists only for shop purchases in MVP.
 
 Enemy/reward currency should not create cleanup behavior.
@@ -301,6 +309,10 @@ Preferred presentation:
 This preserves the satisfaction of physical drops without requiring U-turns for coins.
 
 ## 13. Shop
+
+> **Amended 2026-09-20 (D-119):** the shop is found in a map (`docs/16 §5`), tucked off an optional line on about a third
+> of stages, never consecutive, never the first; it is not an inter-stage screen. Three offers and the recovery purchase
+> stand; the item pool is the user's later brainstorm.
 
 MVP shop:
 

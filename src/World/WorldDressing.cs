@@ -60,6 +60,11 @@ public partial class WorldDressing : Node3D
     }
 
     public event Action<float>? BoostPickupCollected;
+    /// <summary>The pickup field collected something (docs/16 §2): forwarded to the world, then the run.</summary>
+    public event Action<FieldPickupKind, int>? PickupCollected;
+    private PickupField? _pickupField;
+    /// <summary>The stage's experience orbs and cash balls (D-119); null off a stage.</summary>
+    public PickupField? Pickups => _pickupField;
     /// <summary>The showcase row's burst pad was driven over (T3); the composition root throws the coins.</summary>
     public event Action<Vector3>? RewardPadTriggered;
 
@@ -236,6 +241,7 @@ public partial class WorldDressing : Node3D
         _exitFlashes.Clear();
         _pulseExit = -1;
         Showcase = null;
+        _pickupField = null;
 
         _colliders = new StaticBody3D
         {
@@ -381,6 +387,13 @@ public partial class WorldDressing : Node3D
         // line, pad, anchor, lid or the spiral disc.
         BuildStageScatter(stage, field);
         BuildEdgeMarkers(stage);
+
+        // Experience orbs and cash balls (docs/16 §2, D-119): placed from the stage seed by rule, drawn and collected by
+        // one node with no physics bodies; the stage hash never sees them.
+        var placed = PickupPlacement.Place(stage, _t.Run, (x, z) => _world.SampleHeight(x, z));
+        _pickupField = new PickupField(_t.Run, placed, () => _world.Player, _world.Vfx) { Name = "PickupField" };
+        _pickupField.Collected += (kind, worth) => PickupCollected?.Invoke(kind, worth);
+        _content.AddChild(_pickupField);
 
         // Boost rings on the primary at the tuned spacing (D-106): with no passive regen these are the meter's
         // only refill on a stage, so the spacing is the scarcity dial. Never inside the first 900 m or the last 400 m.

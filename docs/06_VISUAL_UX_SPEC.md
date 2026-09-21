@@ -305,6 +305,9 @@ F2 telemetry (07 §10). `HUD › Visible`, `HUD › Scale` (0.6–1.6) and `HUD 
 `ROLL / RUSH / CRUSH / OVERDRIVE` word, off by default, P-005) are the handles. The HUD is built once on the UI layer
 and a world rebuild never touches it; it reads player and run state and writes nothing.
 
+Delivered (D-119, `docs/16 §3`): the level (`LV n`, with `+k` while k level-ups are queued for the outro) and a thin XP
+line top-left, the same teal as the orbs; the XP line pulses on a collection, the wallet pulses when cash lands.
+
 ## 13. Stage/inter-stage UX
 
 On normal stage completion, resolve needed safe-state interactions without building a long stack of menus.
@@ -320,6 +323,11 @@ Possible sequence:
 Combine screens where doing so reduces interruption.
 
 ## 14. Level-up presentation
+
+> **Amended 2026-09-20 (D-119):** there is no reel and no rarity. The level-up is a choice panel over the fade at the
+> stage outro (`UpgradeChoicePanel`): the level, how many choices remain, the eight stats each with rank pips and what
+> the next rank does in words, a stat at rank 3 greyed; keys 1–8, click, or focus and accept. The section below is the
+> record of the earlier design.
 
 Quick slot/reel-like reveal:
 

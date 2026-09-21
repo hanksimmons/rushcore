@@ -27,6 +27,7 @@ public static class InputBootstrap
     public const string DebugKillPlayer = "rc_debug_kill";
     public const string DebugHealPlayer = "rc_debug_heal";
     public const string DebugTogglePhysicsHz = "rc_debug_toggle_physics_hz";
+    public const string DebugGrantLevel = "rc_debug_grant_level";
 
     public static void Register()
     {
@@ -49,6 +50,7 @@ public static class InputBootstrap
         Key(DebugKillPlayer, Godot.Key.K);
         Key(DebugHealPlayer, Godot.Key.H);
         Key(DebugTogglePhysicsHz, Godot.Key.F4);
+        Key(DebugGrantLevel, Godot.Key.L);
 
         // Gamepad parity for the movement verbs.
         JoyButton(Jump, Godot.JoyButton.A);

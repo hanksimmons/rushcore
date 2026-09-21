@@ -127,6 +127,11 @@ Terrain archetypes do not secretly change player physics.
 
 ### Run progression
 
+> **Amended 2026-09-20 (D-119, `docs/16`):** the user's design replaces the random offers and rarity tiers for the stat
+> side. Experience is teal orbs picked up in the world (a magnet radius brings them in), levels are strict 1 → 8, and each
+> level-up is the player's choice of one of eight stats, each with three ranks over the frozen baseline; the choice is
+> made at the stage's end. Passive items stay as the shop's stock (`docs/16 §5`). The bullets below are the record.
+
 - XP and queued level-ups.
 - Approximately 8–15 level selections in a successful run as a **VALIDATE** pacing target.
 - Three randomized upgrade results; choose one.
@@ -140,6 +145,10 @@ Terrain archetypes do not secretly change player physics.
 - No active-use item system.
 
 ### Economy/shop
+
+> **Amended 2026-09-20 (D-119, `docs/16`):** cash is gold balls picked up in the world (magnetised, never a U-turn), and
+> the shop is found in a map on about a third of stages rather than offered between stages; a player who does not find
+> it does not shop. The bullets below are the record.
 
 - One run currency.
 - Money is for shop purchases only in MVP.

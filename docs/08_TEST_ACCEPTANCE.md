@@ -375,6 +375,17 @@ Manual:
 - build power grows without removing movement skill,
 - no safe indefinite farming becomes optimal.
 
+**Delivered (progression P1, D-119, 2026-09-20; `docs/16 §6`):** on a director of its own, XP 10 + 20 + … + 70 reaches level 8
+at exactly 280 and idles past it, a stat takes three ranks and no more with each choice spending one queued level, every
+ladder steps from its baseline in order, a new run resets all of it; every batch seed places its orbs and cash by the rule
+(count bounds, off every pad and lid, clear of the start and of every covered run, deterministic on the re-generated seeds);
+on the built stage every pickup rests on its ground and the drive's magnetised pickups are all collected and credited as
+XP and cash; each rank at its read point (Hangtime 3 flies a full charge 1/0.7 as long, Auto Refill 3 regains 2/s at rest
+while rank 0 regains none, Ball Size 3 rests ×1.36 higher, Max Speed 3 holds 175.2 m/s on the runway) with the run left at
+rank 0 for every other drive; the outro holds at the choice panel with a level queued and continues on the choice; the
+HUD's level and XP lines. Default 428/428, canyon 446/446, sky 429/429; no hash moved. The ridge-line drive snaps the camera down
+the line before it starts (it steered from the recovery's leftover yaw and ran a dive 19 m wide into the trench wall).
+
 ## 9. Presentation — Gate V0
 
 At maximum playable speed:

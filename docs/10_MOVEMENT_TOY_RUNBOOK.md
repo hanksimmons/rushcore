@@ -27,6 +27,7 @@ RUSHCORE_MEASURE=1 RUSHCORE_ARCHETYPE=dunes <same command> --seed 1   # the same
 RUSHCORE_SELFTEST_DATA_ONLY=1 RUSHCORE_BATCH_ARCHETYPE=sky RUSHCORE_BATCH_COUNT=20 RUSHCORE_BATCH_LIST=1 <same command>   # one archetype's batch, shortened, one summary line per stage-0 seed (for picking samples and regression seeds, D-118)
 RUSHCORE_MODULE_TRACE=1 <same command>                            # every ramp module: the polyline round its lip, the model's flights near it (D-118)
 RUSHCORE_COLLIDER_PROBE=1 <same command> --seed 1                 # builds the terrain collider three more times and prints each build's time (the collider decision, D-115/D-118)
+RUSHCORE_LINE_DRIVE_TRACE=1 <same command>                        # the ridge/dive line drive tick by tick (D-119: it steered from a stale camera yaw once)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Archetype = 1)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --dunes --seed 1    # play a Dune Sea stage (World › Archetype = 2)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 2   # a Canyon Run with two wall tunnels and the spiral pit finale (D-102)
@@ -64,6 +65,7 @@ which is how the slam-dive framing lag was found (D-090 amendment).
 | B | refill boost (debug; a run starts at `Boost › Start Fraction`, 30%, and there is no passive regen, D-106) |
 | K | kill the player (health to 0 → recover to the checkpoint → refill on arrival; T2) |
 | H | heal to full (T2) |
+| L | grant the next level (debug, D-119): the level-up queues and the choice panel opens at the next exit |
 
 Falling below the kill plane recovers automatically. Recovery resets physics interpolation.
 
@@ -76,9 +78,17 @@ played and B or C landing in a different landscape (P-011). Nine stages, then it
 
 **Player HUD** (T2): the speedometer bottom-left (a dial, redlined above the base cap so the red is Flow headroom;
 the health bar sits slim above it and appears only once health is off full), boost bottom-centre, Flow bottom-right (it pulses on a gain), the stage
-number and a progress line top-centre, the wallet top-right. `HUD › Visible`, `HUD › Scale` and `HUD › Band Word`
+number and a progress line top-centre, the wallet top-right, the level and its XP line top-left (D-119). `HUD › Visible`, `HUD › Scale` and `HUD › Band Word`
 (the `ROLL / RUSH / CRUSH / OVERDRIVE` word, off by default) are in the F1 panel. It carries no numbers: m/s, caps and
 takeoff stay on the F2 telemetry, which also gained a `health` row.
+
+**Progression** (D-119, `docs/16`): every generated stage carries teal experience orbs (clusters beside the line, denser on
+optional lines) and gold cash balls (one on each line's middle, on every ramp landing and gap rim, a few loose); inside
+`Run › Magnet Radius` (14 m) they fly to the ball and never give up. Ten orbs is level 2, then 20 more, and so on to level 8
+at 280. A level-up waits for the exit: the outro fades, the choice panel opens (eight stats, three ranks each; `1`–`8`, click,
+or arrows and Enter), and the next stage builds once every queued level is chosen. Rank 0 is the frozen baseline; a rank is a
+factor read beside the tuning value, so the `Upgrades` tab in F1 tunes the ladder and `Run` the XP and the magnet. `L` grants a
+level to see the panel. Ranks, level, XP and cash are the run's: a new seed or `--seed` wipes them.
 
 **Enemy and pickup showcase** (`World › Enemy Showcase`, off by default; T3): a row 40 m to the left of the lab
 spawn, running back down the calibration lane, carrying one of each enemy (Pylon, Bulwark, Strider, Shooter), one

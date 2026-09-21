@@ -178,6 +178,12 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
 
     /// <summary>Raised when the player collects a boost pickup; carries the refill amount.</summary>
     public event Action<float>? BoostPickupCollected;
+    /// <summary>An experience orb or a cash ball was collected (docs/16 §2, D-119): the kind and its worth.</summary>
+    public event Action<Rushcore.Pickups.FieldPickupKind, int>? PickupCollected;
+    /// <summary>The ball, set by the composition root once it exists; the pickup field reads its position and speed.</summary>
+    public Rushcore.Player.PlayerPhysics? Player { get; set; }
+    /// <summary>The stage's pickup field (orbs and cash), or null off a stage.</summary>
+    public Rushcore.Pickups.PickupField? Pickups => _dressing.Pickups;
 
     /// <summary>Raised once per build when the ball first reaches an exit pad; carries the exit index (T1).</summary>
     public event Action<int>? StageCompleted;
@@ -224,6 +230,7 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         _dressing = new WorldDressing(_t, this);
         AddChild(_dressing);
         _dressing.BoostPickupCollected += amount => BoostPickupCollected?.Invoke(amount);
+        _dressing.PickupCollected += (kind, worth) => PickupCollected?.Invoke(kind, worth);
         _dressing.RewardPadTriggered += at => RewardPadTriggered?.Invoke(at);
 
         Build();

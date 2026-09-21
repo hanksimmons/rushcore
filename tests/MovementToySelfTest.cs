@@ -386,6 +386,7 @@ public partial class MovementToySelfTest : Node
             RunRegressionSeedsCase();
             RunGoldenHashCase();
             RunSpeedModelDataChecks();
+            RunProgressionDataChecks();
             yield break;
         }
 
@@ -1262,9 +1263,13 @@ public partial class MovementToySelfTest : Node
         RunStageGenerationBatchCase();
         RunRegressionSeedsCase();
         RunGoldenHashCase();
+        RunProgressionDataChecks();
 
         // ---- route speed model (D-081): the generator's speed oracle must track the real ball ----
         foreach (var e in RunRouteSpeedModelCase()) yield return e;
+
+        // ---- D-119: the stat ladder's read points, each rank measured where it is read; the run is left at rank 0 ----
+        foreach (var e in RunUpgradeReadPointsCase()) yield return e;
 
         // ---- Phase 2: a generated stage builds, spawns the player and is driveable along its route ----
         foreach (var e in RunGeneratedStageCase()) yield return e;
@@ -2071,6 +2076,9 @@ public partial class MovementToySelfTest : Node
         double msSum = 0, msMax = 0;
         string firstFailure = "";
         string tuningBefore = TuningSnapshot();
+        // Pickups (docs/16 §2, D-119): placed by rule on every seed, counted, checked against the rule and for determinism.
+        int pickBad = 0, pickOrbsMin = int.MaxValue, pickOrbsMax = 0, pickCashMin = int.MaxValue, pickCashMax = 0; long pickOrbsSum = 0, pickCashSum = 0;
+        bool pickDeterministic = true; string pickWhy = "";
         // T5 instruments (RUSHCORE_MEASURE=1): read-only tallies, no Check, no effect on the run's count.
         // RUSHCORE_BATCH_LIST=1 prints one line per stage-0 seed (what it carries), for picking samples and regression seeds.
         bool list = System.Environment.GetEnvironmentVariable("RUSHCORE_BATCH_LIST") == "1";
@@ -2110,6 +2118,21 @@ public partial class MovementToySelfTest : Node
             }
             if (def.DroppedLines > 0 && droppedShown++ < 2) GD.Print($"[SELFTEST] {A} seed {req.RunSeed}/{req.StageIndex} dropped optional lines: {def.DroppedDetail}");
             if (again is null || def.Hash() == again.Hash()) deterministic++;
+            if (def.HeightField is { } hfp)
+            {
+                var placed = PickupPlacement.Place(def, _debug.Tuning.Run, (x, z) => hfp.Sample(x, z));
+                int orbs = 0, cash = 0;
+                foreach (var p in placed)
+                {
+                    if (p.Kind == FieldPickupKind.Orb) orbs++; else cash++;
+                    string w = PickupPlacement.Why(def, p.Position);
+                    if (w.Length == 0 && p.Kind == FieldPickupKind.Orb && InCoveredRun(def, p.Position)) w = "in a tunnel's covered run";
+                    if (w.Length > 0) { pickBad++; if (pickWhy.Length == 0) pickWhy = $"seed {req.RunSeed}/{req.StageIndex} ({p.Position.X:0}, {p.Position.Z:0}): {w}"; }
+                }
+                pickOrbsMin = Mathf.Min(pickOrbsMin, orbs); pickOrbsMax = Mathf.Max(pickOrbsMax, orbs); pickOrbsSum += orbs;
+                pickCashMin = Mathf.Min(pickCashMin, cash); pickCashMax = Mathf.Max(pickCashMax, cash); pickCashSum += cash;
+                if (again?.HeightField is { } hfa && !placed.SequenceEqual(PickupPlacement.Place(again, _debug.Tuning.Run, (x, z) => hfa.Sample(x, z)))) pickDeterministic = false;
+            }
             hashes.Add(def.Hash());
             bends += def.PrimaryRoute.Bends.Count;
             committed += def.PrimaryRoute.Bends.Count(b => b.Radius <= WorldScale.CommittedBendRadius + 1e-3f);
@@ -2182,6 +2205,10 @@ public partial class MovementToySelfTest : Node
         GD.Print($"[SELFTEST] {A} generation batch  {Count} stages: {passed} valid, {fallbacks} fallbacks, {hashes.Count} distinct; " +
                  $"length {lenMin:0}..{lenMax:0} (avg {lenSum / Count:0}) m; base-kit time {tMin:0.0}..{tMax:0.0} (avg {tSum / Count:0.0}) s; " +
                  $"bends avg {bends / (float)Count:0.0} ({committed / (float)Count:0.0} committed); lines avg {linesTotal / (float)Count:0.0} ({withLines} seeds, {droppedLines} dropped); anchors ≥ {minAnchors}; {msSum / Count:0.00} ms avg, {msMax:0.0} ms max, {sw.ElapsedMilliseconds} ms wall");
+        GD.Print($"[SELFTEST] {A} pickups per stage: orbs {pickOrbsMin}–{pickOrbsMax} (mean {pickOrbsSum / (float)Mathf.Max(1, Count):0}), cash {pickCashMin}–{pickCashMax} (mean {pickCashSum / (float)Mathf.Max(1, Count):0.0}); {pickBad} outside the rule");
+        Check($"{A}: " + "every batch seed places its orbs and cash by the rule (docs/16 §2): inside the count bounds, off every pad and lid, clear of the start, none in a covered run, deterministic",
+            pickBad == 0 && pickDeterministic && pickOrbsMin >= 150 && pickOrbsMax <= 2500 && pickCashMin >= 4 && pickCashMax <= 150,
+            $"orbs {pickOrbsMin}–{pickOrbsMax}, cash {pickCashMin}–{pickCashMax}, {pickBad} outside the rule{(pickWhy.Length > 0 ? "; " + pickWhy : "")}, deterministic={pickDeterministic}");
         Check($"{A}: " + "every seed in the batch generates a valid primary route", passed == Count, $"{passed}/{Count}; first failure: {firstFailure}");
         Check($"{A}: " + "no seed needed the known-safe fallback", fallbacks == 0, $"fallbacks={fallbacks}: " + string.Join(", ", fallbackReasons.Select(kv => $"{kv.Key} ×{kv.Value}")));
         Check($"{A}: " + "same request gives the same stage hash", deterministic == Count, $"{deterministic}/{Count}");
@@ -2469,6 +2496,27 @@ public partial class MovementToySelfTest : Node
             _player.IsGrounded && Forward.Dot(stage.StartFacing) > 0.98f && _player.GlobalPosition.DistanceTo(stage.StartPosition) < 12f,
             $"grounded={_player.IsGrounded} pos={_player.GlobalPosition} fwd={Forward}");
 
+        // Pickups (docs/16 §2, D-119): the field is built with the stage, every placed point stands on the ground by the rule,
+        // and the geometry hash never saw it (the golden hashes stand).
+        int cashBefore = _debug.Run.Currency, levelBefore = _debug.Run.Level, xpBefore = _debug.Run.Xp;
+        {
+            var pf = world.Pickups;
+            int bad = 0; float worstHeight = 0f; string why = "";
+            if (pf is not null)
+                foreach (var p in pf.Placed)
+                {
+                    string w = PickupPlacement.Why(stage, p.Position);
+                    if (w.Length == 0 && p.Kind == FieldPickupKind.Orb && InCoveredRun(stage, p.Position)) w = "in a tunnel's covered run";
+                    if (w.Length > 0) { bad++; if (why.Length == 0) why = $"({p.Position.X:0}, {p.Position.Z:0}): {w}"; }
+                    float rest = p.Kind == FieldPickupKind.Orb ? PickupPlacement.OrbRest : PickupPlacement.CashRest;
+                    worstHeight = Mathf.Max(worstHeight, Mathf.Abs(p.Position.Y - rest - world.SampleHeight(p.Position.X, p.Position.Z)));
+                }
+            GD.Print($"[SELFTEST] pickups: {pf?.OrbCount ?? 0} orbs, {pf?.CashCount ?? 0} cash on the stage; {bad} outside the rule; worst rest-height error {worstHeight:0.00} m");
+            Check("the stage carries its experience orbs and cash balls, placed by the rule (docs/16 §2)",
+                pf is not null && pf.OrbCount >= 150 && pf.CashCount >= 4 && bad == 0, $"{pf?.OrbCount} orbs, {pf?.CashCount} cash, {bad} outside the rule{(why.Length > 0 ? "; " + why : "")}");
+            Check("every pickup rests on the ground it was placed over", pf is not null && worstHeight < 0.5f, $"worst {worstHeight:0.00} m");
+        }
+
         // Drive the whole primary route: steer at the vertex ~60 m ahead of the nearest one. A smoke
         // test of one seed against the route speed model, not an agent that plays stages (04 §12).
         var verts = stage.PrimaryRoute.Vertices;
@@ -2671,6 +2719,25 @@ public partial class MovementToySelfTest : Node
         GD.Print($"[SELFTEST] generated stage drive: {progressed:0} of {stage.PrimaryRoute.Length:0} m in {ticks / (float)Engine.PhysicsTicksPerSecond:0.0} s " +
                  $"(model {profile.TotalTime:0.0} s, {timeErr:P1}), grounded {groundedFrac:P0}, max {maxSpeed:0.0} m/s, off-line ≤ {maxOffLine:0} m, stage clock {world.StageClock:0.0} s;{marks}");
         Check("the ball drives the whole generated route to the exit pad", exitTick > 0, $"{progressed:0} of {stage.PrimaryRoute.Length:0} m");
+        // The magnet (docs/16 §2): whatever came inside the radius on the drive is collected — a magnetised pickup never gives
+        // up, and at the cap the ball outruns nothing — and what was collected is the run's XP and cash (D-119).
+        {
+            foreach (var _ in Seconds(1.0f)) yield return null;
+            var pf = world.Pickups;
+            var run = _debug.Run;
+            int collected = (pf?.CollectedOrbs ?? 0) + (pf?.CollectedCash ?? 0);
+            int xpTotal = 0;
+            for (int l = levelBefore; l < run.Level; l++) xpTotal += l * Mathf.RoundToInt(t.Run.XpPerLevel);
+            xpTotal += run.Xp - xpBefore;
+            GD.Print($"[SELFTEST] pickups on the drive: {pf?.CollectedOrbs} orbs and {pf?.CollectedCash} cash of {pf?.OrbCount}/{pf?.CashCount}; magnetised {pf?.MagnetisedTotal}, still chasing {pf?.Chasing}; " +
+                     $"run level {run.Level}, xp {run.Xp}/{run.XpToNext}, {run.PendingLevelUps} level-up(s) queued, cash {run.Currency}");
+            Check("the drive magnetises pickups and every magnetised pickup is collected (docs/16 §2: the magnet catches a ball it cannot outrun)",
+                pf is not null && pf.MagnetisedTotal > 0 && pf.MagnetisedTotal == collected && pf.Chasing == 0,
+                $"magnetised {pf?.MagnetisedTotal}, collected {collected}, chasing {pf?.Chasing}");
+            Check("collected orbs are the run's XP (levels queue) and collected cash is its wallet (D-119)",
+                pf is not null && (run.Level >= Rushcore.Run.RunDirector.MaxLevel || xpTotal == pf.CollectedOrbs) && run.Currency == cashBefore + pf.CollectedCash && run.PendingLevelUps == run.Level - levelBefore,
+                $"xp {xpTotal} vs {pf?.CollectedOrbs} orbs; cash {run.Currency} vs {cashBefore} + {pf?.CollectedCash}; level {levelBefore} -> {run.Level}, pending {run.PendingLevelUps}");
+        }
         GD.Print($"[SELFTEST] resident mesh on the drive:{windowLog} peak {maxResident / 1000} k tris");
         Check("the fine window covers every tile within 1.0 km on every kilometre, none beyond 1.6 km, under 1.2 M triangles (docs/13 §3.4)",
             windowMarks > 0 && windowFail.Length == 0, windowFail.Length == 0 ? $"{windowMarks} marks, peak {maxResident / 1000} k tris" : windowFail);
@@ -2748,6 +2815,9 @@ public partial class MovementToySelfTest : Node
             var line = stage.OptionalLines[0];
             var lv = line.Vertices;
             foreach (var _ in Settle(world.SurfacePoint(lv[0].Position.X, lv[0].Position.Z, m.BallRadius + 0.5f), 0.6f)) yield return null;
+            // The follower steers camera-relative, so the view is snapped down the line first (as the tunnel drive does): with the
+            // yaw the fall recovery left, the stick is wrong for the first second and the ball ran 19 m wide into a dive's trench wall.
+            if (_player.CameraBasis is Rushcore.Camera.CameraRig lineRig) lineRig.SnapYawToward(new Vector3(Mathf.Cos(lv[0].Heading), 0f, Mathf.Sin(lv[0].Heading)));
             _player.LinearVelocity = new Vector3(Mathf.Cos(lv[0].Heading), 0f, Mathf.Sin(lv[0].Heading)) * 60f;
             // Time enough for the line at 90 m/s (a 3× stage's terrace runs 2.5 km, D-118), and never under the old ten seconds.
             int lt = 0, lg = 0, ln = 0, lineTicks = Mathf.RoundToInt(Engine.PhysicsTicksPerSecond * Mathf.Max(10f, line.Length / 90f));
@@ -2763,6 +2833,9 @@ public partial class MovementToySelfTest : Node
                 var target = lv[Mathf.Min(lv.Count - 1, ln + 15)].Position;
                 _worldDrive = new Vector3(target.X - p.X, 0f, target.Z - p.Z);
                 if (_player.IsGrounded) lg++;
+                // RUSHCORE_LINE_DRIVE_TRACE=1: the ridge/dive drive tick by tick (every tenth), for a line that stalls.
+                if (lt % 10 == 1 && System.Environment.GetEnvironmentVariable("RUSHCORE_LINE_DRIVE_TRACE") == "1")
+                    GD.Print($"[LINE] t={lt / (float)Engine.PhysicsTicksPerSecond:0.00} ln={ln} d={lv[ln].Distance:0} v={_player.LocomotionSpeed:0.0} vy={_player.VerticalSpeed:0.0} y={p.Y:0.0} line.y={lv[ln].Position.Y:0.0} surf={world.SampleHeight(p.X, p.Z, p.Y):0.0} off={new Vector2(lv[ln].Position.X - p.X, lv[ln].Position.Z - p.Z).Length():0.0} g={_player.IsGrounded} wall={_player.IsWallRiding} follow={_player.GroundFollowActive} impacts={_player.ImpactCount} scrubs={_player.WallScrubCount}");
                 yield return null;
             }
             ReleaseAll();
@@ -3579,11 +3652,27 @@ public partial class MovementToySelfTest : Node
 
         // Run state: the stage label and the wallet the reward burst will fill (T3).
         {
+            int wallet = _debug.Run.Currency;
             _debug.Run.AddCurrency(25);
             foreach (var _ in Frames(2)) yield return null;
             Check("the HUD shows the run's stage number and its wallet",
-                hud.StageShown == _debug.Run.StageIndex + 1 && hud.CurrencyShown == 25,
+                hud.StageShown == _debug.Run.StageIndex + 1 && hud.CurrencyShown == wallet + 25,
                 $"stage {hud.StageShown}, currency {hud.CurrencyShown} vs {_debug.Run.Currency}");
+        }
+
+        // Level and XP (docs/16 §3, D-119): the level line follows the run and the XP line is the fraction to the next level.
+        {
+            var run = _debug.Run;
+            run.StartRun(run.RunSeed, run.StageIndex);   // the director alone: level 1, rank 0, nothing queued; the world stands
+            run.AddXp(run.XpToNext / 2);
+            foreach (var _ in Frames(2)) yield return null;
+            Check("the HUD draws the level and the XP toward the next level (docs/16 §3)",
+                hud.LevelShown == 1 && Mathf.Abs(hud.XpShown - 0.5f) < 0.05f, $"level {hud.LevelShown}, xp {hud.XpShown:0.00}");
+            run.AddXp(run.XpToNext - run.Xp);
+            foreach (var _ in Frames(2)) yield return null;
+            Check("a level-up moves the level line, empties the XP line and queues a choice",
+                hud.LevelShown == 2 && run.PendingLevelUps == 1 && hud.XpShown < 0.05f, $"level {hud.LevelShown}, pending {run.PendingLevelUps}, xp {hud.XpShown:0.00}");
+            run.StartRun(run.RunSeed, run.StageIndex);
         }
 
         // The toggles: hidden means hidden, and the band word is off by default (P-005).
@@ -3981,6 +4070,169 @@ public partial class MovementToySelfTest : Node
     /// next stage of the same run is built with Flow and boost carried (P-010) and the archetype the exit taken
     /// picked (P-011). One seed, driven by the follower over the last stretch: a lifecycle check, not a feel one.
     /// </summary>
+    // ---------------- D-119: progression (docs/16), pure data ----------------
+
+    /// <summary>XP thresholds, the level queue and the stat ladder's rules (docs/16 §3, §4, §6), on a director of their own.</summary>
+    private void RunProgressionDataChecks()
+    {
+        var t = _debug.Tuning;
+        var run = new Rushcore.Run.RunDirector(1, t.Run, t.Upgrades);
+        run.StartRun(1, 0);
+        int levelUps = 0, total = 0;
+        run.LevelledUp += _ => levelUps++;
+        while (run.Level < Rushcore.Run.RunDirector.MaxLevel && total < 10000) { run.AddXp(1); total++; }
+        Check("XP thresholds 10 + 20 + … + 70 reach level 8 at exactly 280 XP, one level at a time (docs/16 §3)",
+            total == 280 && levelUps == 7 && run.PendingLevelUps == 7 && run.Xp == 0, $"{total} XP, {levelUps} level-ups, pending {run.PendingLevelUps}, xp {run.Xp}");
+        run.AddXp(500);
+        Check("XP past level 8 is idle (no prestige, no wrap)", run.Level == 8 && run.Xp == 0 && run.PendingLevelUps == 7, $"level {run.Level}, xp {run.Xp}, pending {run.PendingLevelUps}");
+
+        var up = run.Upgrades;
+        Check("rank 0 of every stat is the frozen baseline (multiplier 1, refill 0, the tuning's own burst factor)",
+            up.MaxSpeed == 1f && up.Acceleration == 1f && up.TurnRadius == 1f && up.BallSize == 1f && up.JumpHeight == 1f
+            && up.BurstMultiplier(t.JumpSlam.LandingBurstMultiplier) == t.JumpSlam.LandingBurstMultiplier && up.AutoRefillPerSecond == 0f && up.Gravity == 1f && up.TotalRanks == 0);
+        bool three = run.ChooseUpgrade(Rushcore.Run.UpgradeStat.MaxSpeed) && run.ChooseUpgrade(Rushcore.Run.UpgradeStat.MaxSpeed) && run.ChooseUpgrade(Rushcore.Run.UpgradeStat.MaxSpeed);
+        bool fourth = run.ChooseUpgrade(Rushcore.Run.UpgradeStat.MaxSpeed);
+        Check("a stat takes three ranks and no more, and each choice spends one queued level (docs/16 §4)",
+            three && !fourth && up.Rank(Rushcore.Run.UpgradeStat.MaxSpeed) == 3 && run.PendingLevelUps == 4 && Mathf.IsEqualApprox(up.MaxSpeed, t.Upgrades.MaxSpeed3),
+            $"three={three} fourth={fourth} rank {up.Rank(Rushcore.Run.UpgradeStat.MaxSpeed)} pending {run.PendingLevelUps} ×{up.MaxSpeed:0.00}");
+        bool ladder = true; string ladderDetail = "";
+        for (int i = 0; i < Rushcore.Run.UpgradeState.StatCount; i++)
+        {
+            var stat = (Rushcore.Run.UpgradeStat)i;
+            float v0 = up.ValueAt(stat, 0, 1.15f), v1 = up.ValueAt(stat, 1, 1.15f), v2 = up.ValueAt(stat, 2, 1.15f), v3 = up.ValueAt(stat, 3, 1.15f);
+            bool ok = stat == Rushcore.Run.UpgradeStat.Hangtime ? v0 > v1 && v1 > v2 && v2 > v3 && v3 > 0f : v0 < v1 && v1 < v2 && v2 < v3;
+            if (!ok) { ladder = false; ladderDetail += $" {stat}: {v0:0.00}/{v1:0.00}/{v2:0.00}/{v3:0.00};"; }
+        }
+        Check("every stat's three ranks step away from its baseline in order (Hangtime downward: less gravity)", ladder, ladderDetail.Trim());
+        run.AddCurrency(7);
+        run.StartRun(2, 0);
+        Check("a new run starts at level 1, rank 0, no XP queued and an empty wallet (docs/16 §3: run death wipes it all)",
+            run.Level == 1 && run.Xp == 0 && run.PendingLevelUps == 0 && up.TotalRanks == 0 && run.Currency == 0,
+            $"level {run.Level}, xp {run.Xp}, pending {run.PendingLevelUps}, ranks {up.TotalRanks}, cash {run.Currency}");
+    }
+
+    /// <summary>True where a plan point lies inside a tunnel line's covered run (its half width either side of the axis).</summary>
+    private static bool InCoveredRun(StageDefinition stage, Vector3 p)
+    {
+        foreach (var line in stage.OptionalLines)
+        {
+            if (!line.IsTunnel || line.CoverStart < 0) continue;
+            var lv = line.Vertices;
+            for (int i = line.CoverStart; i <= line.CoverEnd && i < lv.Count; i++)
+            {
+                float dx = p.X - lv[i].Position.X, dz = p.Z - lv[i].Position.Z;
+                if (dx * dx + dz * dz <= WorldScale.TunnelHalfWidth * WorldScale.TunnelHalfWidth) return true;
+            }
+        }
+        return false;
+    }
+
+    // ---------------- D-119: the stat ladder's read points (docs/16 §4, §6) ----------------
+
+    /// <summary>
+    /// Each rank is measured where the controller reads it: Hangtime in a full-charge jump's airtime, Auto Refill in the meter
+    /// at rest, Ball Size in the rest height on the platform, Max Speed on the strip runway. The run is left at rank 0, so
+    /// every other drive in this harness is the frozen baseline (docs/16 §6).
+    /// </summary>
+    private IEnumerable RunUpgradeReadPointsCase()
+    {
+        var t = _debug.Tuning;
+        var m = t.Movement;
+        var js = t.JumpSlam;
+        var run = _debug.Run;
+        var up = run.Upgrades;
+        run.StartRun(run.RunSeed, run.StageIndex);
+
+        // Hangtime: a full-charge jump from rest, at rank 0 and at rank 3; the airtime goes with 1 / gravity.
+        var air = new float[2];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            if (pass == 1) for (int k = 0; k < 3; k++) up.Raise(Rushcore.Run.UpgradeStat.Hangtime);
+            foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+            Input.ActionPress(InputBootstrap.Jump, 1f);
+            foreach (var _ in Seconds(js.MaxJumpChargeSeconds + 0.08f)) yield return null;
+            Input.ActionRelease(InputBootstrap.Jump);
+            foreach (var _ in Act()) yield return null;
+            int ticks = 0;
+            while (!_player.IsGrounded && ticks++ < Engine.PhysicsTicksPerSecond * 20) yield return null;
+            air[pass] = ticks / (float)Engine.PhysicsTicksPerSecond;
+            ReleaseAll();
+            foreach (var _ in Seconds(0.8f)) yield return null;
+        }
+        up.Reset();
+        float ratio = air[1] / Mathf.Max(0.01f, air[0]);
+        GD.Print($"[SELFTEST] upgrades: full-charge airtime {air[0]:0.00} s at rank 0, {air[1]:0.00} s at Hangtime 3 (ratio {ratio:0.000}, wanted {1f / t.Upgrades.Hangtime3:0.000})");
+        Check("Hangtime rank 3 flies a full-charge jump 1 / 0.7 as long (docs/16 §4: gravity × 0.7 at the ball and in the follow)",
+            air[0] > 1f && Mathf.Abs(ratio - 1f / t.Upgrades.Hangtime3) < 0.06f, $"{air[0]:0.00} s -> {air[1]:0.00} s, ratio {ratio:0.000}");
+
+        // Auto Boost Refill: rank 3 fills 2 per second at rest from empty (50 s to full; 100 s and 200 s at the lower ranks).
+        {
+            for (int k = 0; k < 3; k++) up.Raise(Rushcore.Run.UpgradeStat.AutoBoostRefill);
+            _player.RefillBoost(-1000f);
+            foreach (var _ in Frames(1)) yield return null;
+            float empty = _player.BoostAmount;
+            foreach (var _ in Seconds(4f)) yield return null;
+            float gained = _player.BoostAmount - empty;
+            up.Reset();
+            foreach (var _ in Seconds(0.5f)) yield return null;
+            float idle = _player.BoostAmount;
+            foreach (var _ in Seconds(1f)) yield return null;
+            Check("Auto Boost Refill rank 3 regains 2 boost a second at rest, and rank 0 regains none (D-106)",
+                empty < 0.5f && Mathf.Abs(gained - 4f * t.Upgrades.AutoRefill3) < 0.6f && Mathf.Abs(_player.BoostAmount - idle) < 0.01f,
+                $"from {empty:0.0}: +{gained:0.0} in 4 s at rank 3; rank 0 {idle:0.00} -> {_player.BoostAmount:0.00}");
+            _player.ResetBoostToStart();
+        }
+
+        // Ball Size: rank 3 is the collider's radius × 1.36, read as the rest height on the platform.
+        {
+            for (int k = 0; k < 3; k++) up.Raise(Rushcore.Run.UpgradeStat.BallSize);
+            foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+            float rest = _player.GlobalPosition.Y - PlatformY;
+            float wanted = m.BallRadius * t.Upgrades.BallSize3;
+            up.Reset();
+            foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
+            float rest0 = _player.GlobalPosition.Y - PlatformY;
+            Check("Ball Size rank 3 grows the collider (the ball rests × 1.36 higher) and rank 0 is the tuning's radius again",
+                Mathf.Abs(rest - wanted) < 0.12f && Mathf.Abs(rest0 - m.BallRadius) < 0.12f && Mathf.IsEqualApprox(_player.Radius, m.BallRadius),
+                $"rest {rest:0.000} m (wanted {wanted:0.000}), rank 0 {rest0:0.000} m (radius {m.BallRadius:0.000})");
+        }
+
+        // Max Speed: rank 3 on the strip runway reaches the base cap × 1.18 and holds there (the effective cap and the
+        // steering saturation both follow the upgraded base).
+        {
+            for (int k = 0; k < 3; k++) up.Raise(Rushcore.Run.UpgradeStat.MaxSpeed);
+            t.World.CalibrationStrip = true;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+            var world = _debug.World;
+            foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.StartX, 0f, m.BallRadius + 0.4f), 1.2f)) yield return null;
+            float x0 = _player.GlobalPosition.X, top = 0f, cap = m.HardMaxLocomotionSpeed * t.Upgrades.MaxSpeed3;
+            Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            int ticks = 0, held = 0;
+            while (ticks++ < Engine.PhysicsTicksPerSecond * 20)
+            {
+                yield return null;
+                top = Mathf.Max(top, _player.LocomotionSpeed);
+                if (_player.LocomotionSpeed >= cap - 0.5f) held++;
+                if (held >= 30 || x0 - _player.GlobalPosition.X > ScaleStripHeightField.RunwayEnd - 10f) break;
+            }
+            ReleaseAll();
+            GD.Print($"[SELFTEST] upgrades: Max Speed 3 runway top {top:0.0} m/s (cap {cap:0.0}, base {m.HardMaxLocomotionSpeed:0.0}), held {held} ticks");
+            Check("Max Speed rank 3 reaches the base cap × 1.18 on the runway and holds there (docs/16 §4)",
+                held >= 30 && top <= cap + 0.5f && Mathf.IsEqualApprox(_player.LocomotionCap, cap),
+                $"top {top:0.0} of {cap:0.0} m/s, held {held} ticks, LocomotionCap {_player.LocomotionCap:0.0}");
+            up.Reset();
+            t.World.CalibrationStrip = false;
+            _debug.RestartSameSeed();
+            foreach (var _ in Frames(3)) yield return null;
+        }
+
+        run.StartRun(run.RunSeed, run.StageIndex);
+        Check("the read-point case leaves the run at rank 0 (every other drive in this harness is the frozen baseline)",
+            up.TotalRanks == 0 && Mathf.IsEqualApprox(_player.Radius, m.BallRadius) && Mathf.IsEqualApprox(_player.LocomotionCap, m.HardMaxLocomotionSpeed) && run.PendingLevelUps == 0,
+            $"ranks {up.TotalRanks}, radius {_player.Radius:0.000}, cap {_player.LocomotionCap:0.0}");
+    }
+
     private IEnumerable RunStageLifecycleCase()
     {
         var t = _debug.Tuning;
@@ -4085,6 +4337,11 @@ public partial class MovementToySelfTest : Node
         }
 
         // ---- exit A: drive the last stretch onto the primary's pad and let the transition run ----
+        // A level-up is queued first (docs/16 §3): the outro must hold at the choice panel behind the fade, and continue
+        // once the choice is made; the harness chooses after twelve ticks of the hold.
+        run.AddXp(run.XpToNext - run.Xp);
+        bool choiceSeen = false; int choiceHeldStage = -1, choiceTicks = 0, chosen = 0;
+        int levelAtExit = run.Level;
         run.AutoAdvance = true;
         int completedBefore = _completedCount;
         var prevArchetype = world.Archetype;
@@ -4142,6 +4399,11 @@ public partial class MovementToySelfTest : Node
             int guard = 0, sinceBuild = -1;
             while (_debug.StageOutroActive && guard++ < Engine.PhysicsTicksPerSecond * 10)
             {
+                if (_debug.StageChoiceOpen)
+                {
+                    if (!choiceSeen) { choiceSeen = true; choiceHeldStage = world.StageIndex; }
+                    if (++choiceTicks % 12 == 0 && run.ChooseUpgrade(Rushcore.Run.UpgradeStat.MaxSpeed)) chosen++;
+                }
                 maxInput = Mathf.Max(maxInput, _player.InputVector.Length());
                 chargedDuringOutro |= _player.IsCharging;
                 if (world.StageIndex == 0) { flowPreBuild = _player.Flow; boostPreBuild = _player.BoostAmount; }
@@ -4157,6 +4419,10 @@ public partial class MovementToySelfTest : Node
             $"charging={chargedDuringOutro} jumps {_jumpedCount - jumpedBefore} max input {maxInput:0.000} boost={outroBoost} (charge cancels {_chargeCanceledCount - chargeCanceledBefore})");
         Check("the ball rolls free through the exit feedback rather than freezing",
             rolled > 1f, $"rolled {rolled:0.0} m in {t.Run.OutroSeconds:0.00} s from {speedAtExit:0.0} m/s at the pad");
+
+        Check("the outro holds at the choice panel behind the fade while a level-up is queued, and each choice raises a rank (docs/16 §3)",
+            choiceSeen && choiceHeldStage == 0 && chosen >= 1 && run.PendingLevelUps == 0 && run.Upgrades.Rank(Rushcore.Run.UpgradeStat.MaxSpeed) == chosen && run.Level >= levelAtExit,
+            $"seen={choiceSeen} at stage {choiceHeldStage}, chose {chosen}, pending {run.PendingLevelUps}, rank {run.Upgrades.Rank(Rushcore.Run.UpgradeStat.MaxSpeed)}, level {levelAtExit} -> {run.Level}");
 
         // ---- the next stage of the same run ----
         var newStage = world.Stage!;

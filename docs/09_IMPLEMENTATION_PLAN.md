@@ -192,13 +192,17 @@ Deliver:
 
 ## Phase 7 — Run Progression
 
+Redesigned by the user 2026-09-20 (D-119, `docs/16`) and pulled forward: XP orbs, levels 1–8, the eight-stat ladder with
+three ranks each and the choice panel at the stage outro — **delivered 2026-09-20 (slice P1)**. The slot presentation and
+the rarity tiers are gone; passive items are the shop's stock and wait on the user's item brainstorm.
+
 Deliver:
 
-- XP,
-- queued safe level choices,
-- three-result slot presentation,
-- Common/Rare/Legendary,
-- initial upgrade set,
+- XP — delivered (D-119),
+- queued safe level choices — delivered (D-119, the choice panel at the outro),
+- ~~three-result slot presentation~~ (D-119),
+- ~~Common/Rare/Legendary~~ (D-119),
+- initial upgrade set — the stat ladder, delivered (D-119; numbers V-018),
 - passive item framework,
 - stacking rules,
 - initial items.
@@ -209,10 +213,10 @@ Prove synergies before filling content ceilings.
 
 Deliver:
 
-- one run currency,
-- magnetized/auto-collected reward presentation,
-- three-offer shop,
-- one recovery purchase,
+- one run currency — cash balls in the world, delivered (D-119),
+- magnetized/auto-collected reward presentation — the magnet radius and the chase rule, delivered (D-119),
+- three-offer shop — the found shop of `docs/16 §5` (slice P2, an Opus packet per `docs/handoff/WORK_SPLIT.md`),
+- one recovery purchase — with P2,
 - route reward integration.
 
 ## Phase 9 — Final Encounter

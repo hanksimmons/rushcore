@@ -261,6 +261,39 @@ public sealed class RunTuning
     public float OutroSeconds = 0.7f;
     public float FadeOutSeconds = 0.5f;
     public float FadeInSeconds = 0.4f;
+
+    // Progression (docs/16 §2–§3, D-119; the numbers are V-018, provisional): XP to the next level is XpPerLevel × level
+    // (10, 20, … 70: 280 XP from level 1 to 8), and the pickups are placed and collected by these.
+    public float XpPerLevel = 10f;
+    /// <summary>Metres from the ball inside which a pickup is magnetised; it then chases at
+    /// max(<see cref="MagnetSpeed"/>, ball speed + <see cref="MagnetClosingMargin"/>) until collected.</summary>
+    public float MagnetRadius = 14f;
+    public float MagnetSpeed = 40f;
+    public float MagnetClosingMargin = 15f;
+    /// <summary>Metres of primary between experience-orb clusters (optional lines carry them at twice the density).</summary>
+    public float OrbClusterSpacing = 150f;
+    /// <summary>Loose cash balls scattered along the primary, per kilometre (the earned ones are placed by feature).</summary>
+    public float CashScatterPerKm = 1f;
+}
+
+/// <summary>
+/// The stat ladder (docs/16 §4, V-018): what each rank of each stat multiplies its baseline by (or adds, for the
+/// refill). Rank 0 is always the frozen tuning value itself. Sliders, so the user tunes them in play; the harness
+/// drives at rank 0 and checks each rank at its read point (<see cref="Run.UpgradeState"/>).
+/// </summary>
+public sealed class UpgradeTuning
+{
+    public float MaxSpeed1 = 1.06f, MaxSpeed2 = 1.12f, MaxSpeed3 = 1.18f;
+    public float Acceleration1 = 1.15f, Acceleration2 = 1.30f, Acceleration3 = 1.45f;
+    public float TurnRadius1 = 1.12f, TurnRadius2 = 1.24f, TurnRadius3 = 1.36f;
+    public float BallSize1 = 1.12f, BallSize2 = 1.24f, BallSize3 = 1.36f;
+    public float JumpHeight1 = 1.10f, JumpHeight2 = 1.20f, JumpHeight3 = 1.30f;
+    /// <summary>The landing burst's factor at each rank (the tuning's 1.15 is rank 0; D-088 documents 1.0–1.3).</summary>
+    public float SlamBoost1 = 1.20f, SlamBoost2 = 1.25f, SlamBoost3 = 1.30f;
+    /// <summary>Boost per second while not boosting, of the 100 capacity: very very slow, very slow, slow (the user's words).</summary>
+    public float AutoRefill1 = 0.5f, AutoRefill2 = 1f, AutoRefill3 = 2f;
+    /// <summary>× gravity: moon physics.</summary>
+    public float Hangtime1 = 0.90f, Hangtime2 = 0.80f, Hangtime3 = 0.70f;
 }
 
 /// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>
@@ -308,6 +341,7 @@ public sealed class GameplayTuning
     public readonly CarveTuning Carve = new();
     public readonly RunTuning Run = new();
     public readonly HudTuning Hud = new();
+    public readonly UpgradeTuning Upgrades = new();
 
     public const string CatMovement = "Movement";
     public const string CatJumpSlam = "Jump / Slam";
@@ -319,9 +353,10 @@ public sealed class GameplayTuning
     public const string CatCarve = "Carve";
     public const string CatRun = "Run";
     public const string CatHud = "HUD";
+    public const string CatUpgrades = "Upgrades";
 
     public static readonly string[] Categories =
-        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatRun, CatHud, CatWorld };
+        { CatMovement, CatJumpSlam, CatBoost, CatCarve, CatFlow, CatCamera, CatVfx, CatRun, CatUpgrades, CatHud, CatWorld };
 
     public IReadOnlyList<TuningParameter> Parameters { get; }
     public IReadOnlyList<TuningToggle> Toggles { get; }
@@ -447,6 +482,38 @@ public sealed class GameplayTuning
         F(CatRun, "Outro (s)", 0f, 3f, () => rn.OutroSeconds, v => rn.OutroSeconds = v);
         F(CatRun, "Fade Out (s)", 0f, 3f, () => rn.FadeOutSeconds, v => rn.FadeOutSeconds = v);
         F(CatRun, "Fade In (s)", 0f, 3f, () => rn.FadeInSeconds, v => rn.FadeInSeconds = v);
+        F(CatRun, "XP Per Level", 1f, 100f, () => rn.XpPerLevel, v => rn.XpPerLevel = Mathf.Round(v));
+        F(CatRun, "Magnet Radius (m)", 0f, 60f, () => rn.MagnetRadius, v => rn.MagnetRadius = v);
+        F(CatRun, "Magnet Speed (m/s)", 5f, 200f, () => rn.MagnetSpeed, v => rn.MagnetSpeed = v);
+        F(CatRun, "Magnet Closing Margin (m/s)", 0f, 60f, () => rn.MagnetClosingMargin, v => rn.MagnetClosingMargin = v);
+        F(CatRun, "Orb Cluster Spacing (m)", 40f, 600f, () => rn.OrbClusterSpacing, v => rn.OrbClusterSpacing = v);
+        F(CatRun, "Cash Scatter Per Km", 0f, 10f, () => rn.CashScatterPerKm, v => rn.CashScatterPerKm = v);
+
+        var up = Upgrades;
+        F(CatUpgrades, "Max Speed 1", 1f, 2f, () => up.MaxSpeed1, v => up.MaxSpeed1 = v);
+        F(CatUpgrades, "Max Speed 2", 1f, 2f, () => up.MaxSpeed2, v => up.MaxSpeed2 = v);
+        F(CatUpgrades, "Max Speed 3", 1f, 2f, () => up.MaxSpeed3, v => up.MaxSpeed3 = v);
+        F(CatUpgrades, "Acceleration 1", 1f, 3f, () => up.Acceleration1, v => up.Acceleration1 = v);
+        F(CatUpgrades, "Acceleration 2", 1f, 3f, () => up.Acceleration2, v => up.Acceleration2 = v);
+        F(CatUpgrades, "Acceleration 3", 1f, 3f, () => up.Acceleration3, v => up.Acceleration3 = v);
+        F(CatUpgrades, "Turn Radius 1", 1f, 3f, () => up.TurnRadius1, v => up.TurnRadius1 = v);
+        F(CatUpgrades, "Turn Radius 2", 1f, 3f, () => up.TurnRadius2, v => up.TurnRadius2 = v);
+        F(CatUpgrades, "Turn Radius 3", 1f, 3f, () => up.TurnRadius3, v => up.TurnRadius3 = v);
+        F(CatUpgrades, "Ball Size 1", 1f, 3f, () => up.BallSize1, v => up.BallSize1 = v);
+        F(CatUpgrades, "Ball Size 2", 1f, 3f, () => up.BallSize2, v => up.BallSize2 = v);
+        F(CatUpgrades, "Ball Size 3", 1f, 3f, () => up.BallSize3, v => up.BallSize3 = v);
+        F(CatUpgrades, "Jump Height 1", 1f, 2f, () => up.JumpHeight1, v => up.JumpHeight1 = v);
+        F(CatUpgrades, "Jump Height 2", 1f, 2f, () => up.JumpHeight2, v => up.JumpHeight2 = v);
+        F(CatUpgrades, "Jump Height 3", 1f, 2f, () => up.JumpHeight3, v => up.JumpHeight3 = v);
+        F(CatUpgrades, "Slam Boost 1", 1f, 1.5f, () => up.SlamBoost1, v => up.SlamBoost1 = v);
+        F(CatUpgrades, "Slam Boost 2", 1f, 1.5f, () => up.SlamBoost2, v => up.SlamBoost2 = v);
+        F(CatUpgrades, "Slam Boost 3", 1f, 1.5f, () => up.SlamBoost3, v => up.SlamBoost3 = v);
+        F(CatUpgrades, "Auto Refill 1 (/s)", 0f, 20f, () => up.AutoRefill1, v => up.AutoRefill1 = v);
+        F(CatUpgrades, "Auto Refill 2 (/s)", 0f, 20f, () => up.AutoRefill2, v => up.AutoRefill2 = v);
+        F(CatUpgrades, "Auto Refill 3 (/s)", 0f, 20f, () => up.AutoRefill3, v => up.AutoRefill3 = v);
+        F(CatUpgrades, "Hangtime 1 (× gravity)", 0.2f, 1f, () => up.Hangtime1, v => up.Hangtime1 = v);
+        F(CatUpgrades, "Hangtime 2 (× gravity)", 0.2f, 1f, () => up.Hangtime2, v => up.Hangtime2 = v);
+        F(CatUpgrades, "Hangtime 3 (× gravity)", 0.2f, 1f, () => up.Hangtime3, v => up.Hangtime3 = v);
 
         var hd = Hud;
         B(CatHud, "Visible", () => hd.Visible, v => hd.Visible = v);

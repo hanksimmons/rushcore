@@ -452,6 +452,7 @@ public partial class TuningPanel : Control
         GameplayTuning.CatCamera => "Camera",
         GameplayTuning.CatVfx => "VFX",
         GameplayTuning.CatWorld => "World",
+        GameplayTuning.CatUpgrades => "Upgr",
         _ => category,
     };
 

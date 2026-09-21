@@ -93,18 +93,30 @@ public partial class PlayerPhysics : RigidBody3D
     public bool IsWallRiding { get; private set; }
     /// <summary>The terrain grid the ground follow reads; null (the default) disables the follow.</summary>
     public IGroundSurface? Ground { get; set; }
+    /// <summary>The run's stat ranks (docs/16 §4, D-119): each is a factor read beside a tuning value at its point of use,
+    /// below; null (the default, and the harness's) is rank 0 of everything, which is the frozen baseline byte for byte.</summary>
+    public Rushcore.Run.UpgradeState? Upgrades { get; set; }
+    private float UpgradeMaxSpeed => Upgrades?.MaxSpeed ?? 1f;
+    private float UpgradeAcceleration => Upgrades?.Acceleration ?? 1f;
+    private float UpgradeTurn => Upgrades?.TurnRadius ?? 1f;
+    private float UpgradeJump => Upgrades?.JumpHeight ?? 1f;
+    private float UpgradeGravity => Upgrades?.Gravity ?? 1f;
+    private float UpgradeRefill => Upgrades?.AutoRefillPerSecond ?? 0f;
+    /// <summary>The ball's radius as played: the tuning's × the Ball Size rank. The collider, the visual, the follow's
+    /// rest height and the teleports read this; generation sizes never do.</summary>
+    public float Radius => _t.Movement.BallRadius * (Upgrades?.BallSize ?? 1f);
     public Vector3 GroundNormal => _groundNormal;
     public Vector3 Velocity { get; private set; }
     /// <summary>Grounded: ground-tangent speed. Airborne: world-XZ speed (03 §5).</summary>
     public float LocomotionSpeed { get; private set; }
     public float VerticalSpeed => Velocity.Y;
-    public float LocomotionCap => _t.Movement.HardMaxLocomotionSpeed;
+    public float LocomotionCap => _t.Movement.HardMaxLocomotionSpeed * UpgradeMaxSpeed;
     /// <summary>Flow 0..1: gained by perfect actions, lost by mistakes, never by time while a chain lives.</summary>
     public float Flow { get; private set; }
     /// <summary>Seconds since the last Flow gain (∞ before the first).</summary>
     public float SinceFlowGain => _sinceFlowGain;
     /// <summary>Base cap raised by Flow headroom: base × (1 + Flow × Headroom).</summary>
-    public float FlowCap => Mathf.Max(0.001f, _t.Movement.HardMaxLocomotionSpeed) * (1f + Flow * Mathf.Max(0f, _t.Flow.Headroom));
+    public float FlowCap => Mathf.Max(0.001f, _t.Movement.HardMaxLocomotionSpeed * UpgradeMaxSpeed) * (1f + Flow * Mathf.Max(0f, _t.Flow.Headroom));
     /// <summary>Hard impacts counted (one-tick locomotion loss above the tuned threshold).</summary>
     public int ImpactCount { get; private set; }
     /// <summary>Wall scrubs counted (D-110): rides whose scrubbed up-wall speed reached the impact threshold, priced once each.</summary>
@@ -116,7 +128,7 @@ public partial class PlayerPhysics : RigidBody3D
     public float ChargeSeconds => _chargeSeconds;
     public float Charge01 => Mathf.Clamp(_chargeSeconds / Mathf.Max(0.001f, _t.JumpSlam.MaxJumpChargeSeconds), 0f, 1f);
     public float ComputedTakeoffSpeed =>
-        Mathf.Lerp(_t.JumpSlam.MinJumpTakeoffVerticalSpeed, _t.JumpSlam.MaxJumpTakeoffVerticalSpeed, Charge01);
+        Mathf.Lerp(_t.JumpSlam.MinJumpTakeoffVerticalSpeed, _t.JumpSlam.MaxJumpTakeoffVerticalSpeed, Charge01) * UpgradeJump;
     /// <summary>True while a fresh Space press would fire the landing burst (D-077).</summary>
     public bool BurstWindowOpen => _burstArmed && _sinceSlamLanding <= _t.JumpSlam.LandingBurstWindowSeconds;
     /// <summary>Seconds left in the post-landing half of the burst window (0 when closed).</summary>
@@ -167,7 +179,7 @@ public partial class PlayerPhysics : RigidBody3D
     public override void _Ready()
     {
         Name = "Player";
-        _shape.Radius = _t.Movement.BallRadius;
+        _shape.Radius = Radius;
         AddChild(new CollisionShape3D { Shape = _shape, Name = "Collider" });
 
         Mass = 1.0f;
@@ -221,9 +233,9 @@ public partial class PlayerPhysics : RigidBody3D
         }
 
         // Live tunables that live on engine objects rather than in our integration math.
-        GravityScale = _t.Movement.Gravity / Mathf.Max(0.001f, _defaultGravity);
-        if (!Mathf.IsEqualApprox(_shape.Radius, _t.Movement.BallRadius))
-            _shape.Radius = _t.Movement.BallRadius;
+        GravityScale = _t.Movement.Gravity * UpgradeGravity / Mathf.Max(0.001f, _defaultGravity);
+        if (!Mathf.IsEqualApprox(_shape.Radius, Radius))
+            _shape.Radius = Radius;
     }
 
     public override void _Process(double delta)
@@ -319,7 +331,7 @@ public partial class PlayerPhysics : RigidBody3D
         // cap, the steer and the drive, is the wall's; only the drive is scaled and the stick re-framed below.
         IsWallRiding = m.WallRide && IsGrounded && planeNormal.Y < m.MinGroundNormalDot;
         var f = _t.Flow;
-        float cap = Mathf.Max(0.001f, m.HardMaxLocomotionSpeed);
+        float cap = Mathf.Max(0.001f, m.HardMaxLocomotionSpeed * UpgradeMaxSpeed);
         // Steering authority saturates at the base cap: the frozen curve (03 §4) is untouched by headroom.
         float speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
 
@@ -370,7 +382,7 @@ public partial class PlayerPhysics : RigidBody3D
             float limit = FlowCap + _capAllowance;
             if (curDir != Vector3.Zero && speed > 0.5f)
             {
-                float target = Mathf.Min(speed * Mathf.Max(1f, _t.JumpSlam.LandingBurstMultiplier), Mathf.Max(speed, limit));
+                float target = Mathf.Min(speed * Mathf.Max(1f, Upgrades?.BurstMultiplier(_t.JumpSlam.LandingBurstMultiplier) ?? _t.JumpSlam.LandingBurstMultiplier), Mathf.Max(speed, limit));
                 vT = curDir * target;
                 speed = target;
                 speed01 = Mathf.Clamp(speed / cap, 0f, 1f);
@@ -382,8 +394,8 @@ public partial class PlayerPhysics : RigidBody3D
         float effectiveCap = FlowCap + _capAllowance;
 
         // ---- authority ----
-        float lateral = m.GroundSteeringLateralAccel * Mathf.Lerp(1f, m.HighSpeedSteeringMultiplier, speed01);
-        float drive = m.GroundDriveAcceleration;
+        float lateral = m.GroundSteeringLateralAccel * Mathf.Lerp(1f, m.HighSpeedSteeringMultiplier, speed01) * UpgradeTurn;
+        float drive = m.GroundDriveAcceleration * UpgradeAcceleration;
         if (!IsGrounded)
         {
             lateral *= m.AirControlMultiplier;
@@ -595,12 +607,12 @@ public partial class PlayerPhysics : RigidBody3D
         float hl = g.Height(c.X + q.X * cell, c.Z + q.Z * cell, c.Y), hr = g.Height(c.X - q.X * cell, c.Z - q.Z * cell, c.Y);
         float sd = (hf - hb) / (2f * cell), sq = (hl - hr) / (2f * cell);
         Vector3 n = new Vector3(-(sd * d.X + sq * q.X), 1f, -(sd * d.Z + sq * q.Z)).Normalized();
-        float gap = (c.Y - h0) * n.Y - m.BallRadius;              // perpendicular distance from the resting height
+        float gap = (c.Y - h0) * n.Y - Radius;              // perpendicular distance from the resting height
         float kappa = 0f;
         // The authored wall (D-109): in the wall band a walled stage's stamp knows the exact surface, so the follow
         // reads that instead of the grid and the ride never depends on the facets. Below the band the grid rule stands.
         bool analytic = false;
-        if (m.WallRide && g.WallSurface(c, m.BallRadius, out Vector3 wallN, out float wallGap, out float wallK)
+        if (m.WallRide && g.WallSurface(c, Radius, out Vector3 wallN, out float wallGap, out float wallK)
             && Mathf.Abs(wallGap) <= m.GroundFollowSnapDistance)
         {
             analytic = true; n = wallN; gap = wallGap; kappa = wallK;
@@ -625,7 +637,7 @@ public partial class PlayerPhysics : RigidBody3D
         // Below the band the follow is the D-092 rule byte for byte, so ordinary ground is untouched.
         bool carry = m.WallRide && wasGrounded && (analytic || n.Y < m.MinGroundNormalDot) && kappa >= 0f;
         if (!carry && vN < -m.GroundFollowSnapDistance / dt) return false;   // arriving faster than one snap per tick: a landing
-        if (kappa < 0f && vT.LengthSquared() * -kappa >= m.Gravity * n.Y) return false;
+        if (kappa < 0f && vT.LengthSquared() * -kappa >= m.Gravity * UpgradeGravity * n.Y) return false;
 
         // On a concave wall the collider's flat facets are chords on the ball's side of the smooth surface, so the rest
         // height sits the chord's sagitta off it. On the authored wall the
@@ -850,7 +862,7 @@ public partial class PlayerPhysics : RigidBody3D
         if (_isCharging && (_jumpReleasedEdge || !_jumpHeld))
         {
             float charge01 = Charge01;
-            float takeoff = Mathf.Lerp(js.MinJumpTakeoffVerticalSpeed, js.MaxJumpTakeoffVerticalSpeed, charge01);
+            float takeoff = Mathf.Lerp(js.MinJumpTakeoffVerticalSpeed, js.MaxJumpTakeoffVerticalSpeed, charge01) * UpgradeJump;
             // Preserve all useful horizontal momentum; only establish upward velocity (D-012).
             v.Y = Mathf.Max(v.Y, takeoff);
             LastTakeoffVerticalSpeed = v.Y;
@@ -936,7 +948,7 @@ public partial class PlayerPhysics : RigidBody3D
     {
         var b = _t.Boost;
         if (_boostActive) _boost = Mathf.Max(0f, _boost - b.BoostDrainRate * dt);
-        else _boost = Mathf.Min(b.BoostCapacity, _boost + b.PassiveBoostRegen * dt);
+        else _boost = Mathf.Min(b.BoostCapacity, _boost + (b.PassiveBoostRegen + UpgradeRefill) * dt);
     }
 
     private void UpdateSpeedBand(float locomotionSpeed)
@@ -958,7 +970,7 @@ public partial class PlayerPhysics : RigidBody3D
         if (_checkpointTimer > 0f) return;
         _checkpointTimer = CheckpointIntervalSeconds;
         if (_rawGrounded && !_slamActive)
-            _checkpoint = state.Transform.Origin + Vector3.Up * (_t.Movement.BallRadius + 0.5f);
+            _checkpoint = state.Transform.Origin + Vector3.Up * (Radius + 0.5f);
     }
 }
 

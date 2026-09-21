@@ -1,6 +1,6 @@
 # 16 — Progression and Economy: experience, cash, the magnet, the stat ladder, the found shop
 
-**Status:** Draft 0.1 — the user's design of 2026-09-20 (D-119), written before its first slice
+**Status:** Draft 0.2 — the user's design of 2026-09-20 (D-119); **P1 delivered 2026-09-20** (§2–§4, §6: `PickupPlacement`, `PickupField`, `RunDirector` levels, `UpgradeState`, `UpgradeChoicePanel`, the HUD lines); P2 (the found shop, §5) open, an Opus packet per `docs/handoff/WORK_SPLIT.md`
 **Authority:** Owns run progression and the run economy in the MVP. Where this conflicts with `01 §Run progression`,
 `01 §Economy/shop`, `02 §10`, `02 §12` or `02 §13`, this document wins: it records the user's later call, and those
 sections are amended to point here.
@@ -39,8 +39,12 @@ the pickup shapes (`06 §9`), the HUD (`06 §12`).
 | Cash ball | a gold sphere, 0.8 m, spinning, `PickupKind.Currency`'s gold | 1 cash (a burst coin's worth) | **rarer and earned**: one on each optional line's plateau or floor at its middle, one past every ramp's lip on the paid path's landing, one at the far rim of every gap, one in every tunnel's covered run; a small scatter (`CashScatterPerKm` 1 per km) on the primary |
 
 Both are placed by `WorldDressing` with the stage (a `pickups` stream derived from the stage seed, `SeedChain.Derive`),
-as the boost rings are, and read the same keep-outs as scatter (`StageScatter`) plus the corridor rule above. Counts are
-per stage and scale with length (an 18 km stage carries about 400 orbs and 40 cash balls at the provisional numbers).
+as the boost rings are, through `PickupPlacement` (pure data: the dressing places what it returns and the harness asks it
+about every point, so the rule is stated once): off every pad and lid, out of every feature's reserved run, 30 m clear of
+a covered run's ends. Counts are per stage and scale with length. **Measured (D-119, the provisional numbers):** 430–980 orbs
+and 15–28 cash on a Highlands stage, 320–700 / 10–29 on Canyon Run, 180–370 / 5–18 on the Dune Sea, 430–980 / 15–28 on
+Sky Terraces — more orbs than this draft's 400 estimate, because every optional line carries them at twice the density;
+`Run › Orb Cluster Spacing` and `Run › Cash Scatter Per Km` are the dials, on play (V-018).
 
 **The field.** One `PickupField` node per stage: a `MultiMesh` per kind, plain arrays of position, state and phase, no
 physics bodies, no colliders (the burst of P-007 is the model). Every physics tick it walks the live pickups: inside
@@ -59,8 +63,9 @@ never catch a ball above 60 m/s).
   words; one choice per queued level; a stat at rank 3 is greyed. Escape is not an option: a queued level is chosen
   before the next stage (a run is the only place ranks live).
 - **Run death** wipes level, XP, ranks and cash (`01 §Run failure/meta`). A new run starts at level 1, rank 0.
-- The HUD (`06 §12`) shows the level and an XP bar at top-left beside the stage counter, and the cash count where the
-  currency label already is; both pulse on a collection.
+- The HUD (`06 §12`) shows the level and an XP bar at top-left beside the stage counter (`LV 3  +2` while two level-ups
+  are queued), and the cash count where the currency label already is; both pulse on a collection.
+- Debug: `L` grants the XP the next level needs, so the panel can be seen without collecting 10 orbs (07 §12).
 
 ## 4. The stat ladder (V-018, the user's numbers; provisional)
 
@@ -112,7 +117,9 @@ drives at rank 0 and checks each rank's multiplier at its read point.
 
 ## 7. Slices
 
-- **P1 — pickups, the magnet, XP, levels, the stat ladder, the choice panel, the HUD.** One commit; D-119.
+- **P1 — pickups, the magnet, XP, levels, the stat ladder, the choice panel, the HUD.** One commit; D-119. **Delivered
+  2026-09-20**: the read points are in `PlayerPhysics` (`Upgrades`, `Radius`), the run state in `RunDirector`, the panel is
+  `UpgradeChoicePanel` (opened by the outro between the fade-out and the rebuild), the harness lines of §6 are in.
 - **P2 — the found shop** with the two placeholder purchases; the item pool is a later brainstorm with the user.
 
 ## 8. Decisions the user owns

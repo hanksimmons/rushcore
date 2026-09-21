@@ -11,7 +11,10 @@ namespace Rushcore.Generation;
 /// </summary>
 public sealed class StageGenerator
 {
-    public const int MaxAttempts = 4;
+    /// <summary>Bounded regeneration (04 §5H). Four per 6 km until D-118: a 3× stage is three of the old ones and a relief flight into a bend
+    /// at the ceiling (the one failure regeneration exists for) is three times as likely per attempt: eight would match the old rate on paper,
+    /// and twelve held the measured rate under 1 in 400 on Sky Terraces; only a failing seed pays for the extra attempts.</summary>
+    public const int MaxAttempts = 12;
 
     private readonly RouteSpeedModel _speed;
     private readonly RouteSpeedModel _ceiling;
@@ -874,6 +877,13 @@ public sealed class StageGenerator
                 ceilingRange = _ceiling.JumpRange(mod.CeilingEntrySpeed * cos, _fullTakeoff, f.Rise, mod.CeilingEntrySpeed * sin);
                 // The free path is the uncharged launch the model integrates itself; it must exist and land on the straight.
                 Flight? free = ModuleFlight(profile, f.CentreDistance);
+                if (System.Environment.GetEnvironmentVariable("RUSHCORE_MODULE_TRACE") == "1")
+                {
+                    var pl = route.Polyline(); int li = route.IndexAtDistance(f.CentreDistance);
+                    string ys = string.Join(" ", Enumerable.Range(-6, 13).Select(o => $"{pl[Mathf.Clamp(li + o, 0, pl.Length - 1)].Y:0.0}"));
+                    string fls = string.Join(" ", profile.Flights.Where(x => Mathf.Abs(x.LaunchDistance - f.CentreDistance) < 600f).Select(x => $"[{x.LaunchDistance:0}->{x.LandingDistance:0} v{x.LaunchSpeed:0}]"));
+                    GD.Print($"[MODULE-TRACE] ramp at {f.CentreDistance:0} m (lip index {li}, x {v[li].Position.X:0}): y {ys}; speed at lip {profile.SpeedAt(f.CentreDistance):0.0}; flights {fls}; free {(free is null ? "none" : "yes")}");
+                }
                 float ceilingSlam = f.CentreDistance + SlamRun(mod.CeilingEntrySpeed, f.Slope, f.Rise);
                 freeOk &= free is not null && free.LandingDistance <= straightEnd && ceilingSlam <= straightEnd + 1e-3f;
                 mod.Detail = $"entry {mod.EntrySpeed:0} m/s: uncharged flight {(free is null ? "none" : $"{free.Length:0} m, lands {free.LandingVerticalSpeed:0} m/s down")}, full charge {mod.PaidRange:0} m on a {straightEnd - f.CentreDistance:0} m straight; free path exits at {mod.FreeExitSpeed:0} m/s; ceiling entry {mod.CeilingEntrySpeed:0} m/s: full charge {ceilingRange:0} m, slam landing at +{ceilingSlam - f.CentreDistance:0} m";

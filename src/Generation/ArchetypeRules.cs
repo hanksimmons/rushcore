@@ -49,6 +49,16 @@ public sealed record ArchetypeRules(
     /// dune sea tries everywhere. Provisional (V-017).</summary>
     float TunnelChance = 0f)
 {
+    /// <summary>The acts (docs/13 §3.1, D-118): the 3× course is three 6 km acts, open cruise, technical middle, finale, each scaling the
+    /// archetype's feature spacing and its optional-line (and lid) spacing. The family table is provisional (the user's, docs/13 §6);
+    /// an archetype may carry its own.</summary>
+    public ActRhythm[] Acts { get; init; } = FamilyActs;
+    public static readonly ActRhythm[] FamilyActs = { new(1.25f, 1.25f), new(0.75f, 0.75f), new(1f, 1f) };
+    /// <summary>The feature spacing at a stage X: the archetype's, scaled by the act there.</summary>
+    public float FeatureSpacingAt(float x) => FeatureSpacing * Acts[WorldScale.ActAt(x)].Feature;
+    /// <summary>The optional-line spacing at a stage X: the family's 700 m, scaled by the act there.</summary>
+    public float LineSpacingAt(float x) => WorldScale.OptionalLineSpacing * Acts[WorldScale.ActAt(x)].Line;
+
     public bool HasDunes => TrainCrestsMax > 0;
 
     public static readonly ArchetypeRules RollingHighlands = new(
@@ -92,3 +102,6 @@ public sealed record ArchetypeRules(
         _ => "highlands",
     };
 }
+
+/// <summary>One act's multipliers on the feature spacing and the optional-line spacing (docs/13 §3.1, D-118).</summary>
+public readonly record struct ActRhythm(float Feature, float Line);

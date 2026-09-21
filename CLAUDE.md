@@ -284,8 +284,12 @@ Until the implementation plan advances:
 > deficit, ramps to the knee rule, the fill where the ground beside is lower, the floor's convexity checked before stamping) on
 > the Highlands, Sky Terraces and Dune Sea; the tunnel drive and the cap drive on every archetype. **D-117 (found with it):** every
 > offset line's ramps are shaped in the line's own distance and the speed model's launch stencil reads uneven vertex spacing
-> correctly (both hid or made convex kinks at bend boundaries); every golden hash re-recorded. Next per `docs/13 §5`: W2 the
-> length (with the collider decision), then H2, T3; the user plays after T1 + H1 + T2.
+> correctly (both hid or made convex kinks at bend boundaries); every golden hash re-recorded. **D-118 (W2, 2026-09-20):** the 3×
+> course: 18 × 2 km stages, 20 km routes in three 6 km acts (a spacing table on `ArchetypeRules`), counts ×3 with every spacing kept,
+> the speed profile addressed by plan distance (its 3D label had drifted past the module window by 12 km), twelve regeneration
+> attempts, prop colliders as server shapes (they were quadratic); every hash re-recorded; the collider (2–5 s of every build) is
+> the user's decision. Next per `docs/13 §5`: H2 the cloud dome, T3 pockets; the user played T1 + H1 + T2 and plays W2 next. The
+> progression system (D-119, `docs/16`: XP orbs, cash balls, the magnet, levels 1–8, the found shop) is the user's 2026-09-20 spec.
 
 **Parallel track (2026-09-07):** while the main track holds D-105 (branching exits) and the Phase 4 impact core, a second
 agent works the packets in `docs/handoff/` (stage lifecycle, HUD, enemy and pickup visuals, prop scatter, generation

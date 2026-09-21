@@ -246,6 +246,16 @@ technical middle, finale), a three-entry table on `ArchetypeRules`; nothing else
 parked until after Phase 4). How many stages make a run is Phase 5's (with 3× stages a three-stage run is about
 eight minutes at the cap).
 
+**Delivered (W2, D-118, 2026-09-20)** as written: footprint 18 000 × 2 000 m, routes 19.8–21.1 km on the wandering archetypes
+(a dune sea's 18.1–18.2 km), 139–147 s at the cap (a dune sea's 126–130 s), 2.25 M heights, per-stage counts ×3 with every
+spacing kept, the acts table 1.25 / 0.75 / 1.0 (the family's, provisional). Two things the length exposed and W2 fixed: the speed
+profile was addressed by the 3D polyline length while everything is placed in plan distance (45 m apart by 12 km, past the module
+window: every ramp past 9 km "never launched" and a quarter of canyon seeds fell back), and prop colliders were quadratic in the
+physics space (1.6 s of the build; 39 ms as server shapes on a body that enters the tree last). Time to first frame is 4.9 s on the
+first build of a process and 3.3–3.5 s after, of which the collider is 3.9 s and 2.0–2.5 s: everything else is 1.0 s, and the
+collider is the user's decision (§3.3). Bounded regeneration is twelve attempts (four per 6 km held zero fallbacks; a relief flight
+into a bend at the ceiling is three times as likely per attempt on 18 km).
+
 ### 3.2 What scales for free
 
 Route skeleton, corridor stamp, validators and speed profiles are linear in length: 47 ms today, 150–200 ms at 3×.
@@ -301,14 +311,17 @@ depth fog begins at 800 m and ends at 6 km (§4.3).
 - resident triangles stay under 1.2 M on every kilometre,
 - the coarse mesh's height under the ball agrees with the collider within one coarse cell's chord,
 - the full-length drive runs on **one** archetype per harness run (the archetype selector's); the other
-  archetypes drive their first 6 km. Wall time per run stays under 4 minutes.
+  archetypes drive their first 6 km. Wall time per run stays under 4 minutes. (W2: the selector's archetype drives its
+  20 km; the borrowed drives on the other archetypes, the tunnel, terrace and exit rides, are segments of a few
+  kilometres as they were; a run is about four minutes, the batch a hundred seeds per archetype with determinism sampled
+  on every tenth. The first-frame gate is 2 s outside the collider, and the collider is bounded at 8 s until it is decided.)
 
 ### 3.5 Slices
 
 - **W1 — the resident mesh on the 6 km stage.** Coarse mesh, fine window, worker-thread tile build, hide rule,
   build-time and window checks. No generator change, no hash moves. **Delivered 2026-09-19 (D-115).**
 - **W2 — the length.** Footprint and route length ×3, acts, per-stage counts, the far plane and fog; every golden
-  hash moves and is re-recorded; regression seeds re-picked; the harness drive policy above.
+  hash moves and is re-recorded; regression seeds re-picked; the harness drive policy above. **Delivered 2026-09-20 (D-118).**
 
 ## 4. The far horizon
 
@@ -369,15 +382,12 @@ decision logged (D-113 onward) and its owning doc updated. The user plays after 
 
 ## 7. Post-compaction handoff
 
-T1 (D-113), H1 (D-114), W1 (D-115) and T2 (D-116, the dive) are delivered; the user plays T1 + H1 + T2 next (`-- --canyon --seed 1`
-for the portal, `-- --seed 1` for the dive) and owns three decisions: the tunnel numbers (V-017, now with the dive's), whether
-the collider becomes a square heightfield (§3.3), and the dive chances per archetype. The next session starts at **W2, the
-length** (§3.1, §3.5): footprint 18 × 2 km, route 19–21 km, three acts of 6 km with their own feature and line spacing
-multipliers on `ArchetypeRules`, per-stage counts ×3 (lids, lines, checkpoints, rings keep their spacing), the far plane and
-fog as set, the collider decision applied first (a mesh shape at 3× builds in about 3.5 s; a square heightfield in a few
-hundred milliseconds, quantised), every golden hash re-recorded and the regression seeds re-picked, the harness drive
-policy of §3.4 (the full drive on one archetype per run, the others their first 6 km, wall time under 4 minutes). Read, in
-order: `README.md`, this document (§0, §3, §5), `DECISIONS` D-113–D-116, `08 §1` and `§5`, `04 §5`, `04 §8`, `04 §9`, then
-the code: `WorldScale` (footprint and spacing constants), `RouteSkeletonBuilder`, `StageGenerator`, `MovementToyWorld` (the
-heights, the collider, the resident mesh), `HorizonRing`, and in `tests/MovementToySelfTest.cs` the batch (`RunGenerationBatch`)
-and `RunGeneratedStageCase`. After W2: H2 the cloud dome, T3 pockets (§5).
+T1 (D-113), H1 (D-114), W1 (D-115), T2 (D-116) and W2 (D-118, the 3× course) are delivered; the user played T1 + H1 + T2 and
+called them good, and plays W2 next (`-- --seed 1`, `-- --canyon --seed 1`, `-- --sky --seed 6`). The user owns: the collider
+(§3.3: a mesh shape costs 2–5 s of every build at 3×), the acts table (§3.1), the tunnel numbers (V-017). The next session starts at
+**H2, the cloud dome** (§4.2, §4.5): the sky gradient by archetype, the cloud layer, the sun, the fog as set; then **T3, pockets**
+(§2.3). Both are presentation and validators, no generator rule moves. In parallel the user has asked for the progression system
+(experience orbs, cash balls, the magnet, levels 1–8 with a three-rank stat ladder, a shop found in a map): its spec is D-119 and
+`docs/16` once written; it does not touch generation beyond placing pickups and one shop pad. Read, in order: `README.md`, this
+document (§0, §4, §5), `DECISIONS` D-113–D-118, `08 §1` and `§5`, `06 §3`, then the code: `WorldDressing` (the environment, fog,
+sky), `HorizonRing`, `MovementToyWorld.BuildHorizon`, and in `tests/MovementToySelfTest.cs` `RunGeneratedStageCase`.

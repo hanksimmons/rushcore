@@ -116,8 +116,8 @@ Add, in this order, one PR each (the vertical grammar of D-096 is folded in):
 - Dune Sea — delivered 2026-09-07 (D-099: the seeded dune wave, dune trains riding it, the swale between; the set-piece dune and a dune-specific optional line remain open),
 - tubes: delivered 2026-09-07 (D-101) and **removed 2026-09-19 (D-112)**; tunnels replace them per `docs/13`: slice T1, the
   portal tunnel on Canyon Run, delivered 2026-09-19 (D-113); H1 (the horizon ring, D-114) and W1 (the resident mesh, D-115)
-  delivered the same day; T2 (the dive, D-116) delivered 2026-09-20; W2 (the 3× length), H2 (the cloud dome) and T3 (pockets)
-  follow in that order,
+  delivered the same day; T2 (the dive, D-116) and W2 (the 3× course: 18 km stages in three acts, D-118) delivered 2026-09-20;
+  H2 (the cloud dome) and T3 (pockets) follow in that order,
 - Sky Terraces: terrace steps, drains, the cloud band and bridges between floors — first cut delivered 2026-09-07 (D-103: ramp-climbed terrace floors with cliff edges onto the floor below, the drain validator, the cloud band; jump steps, bridges and floor-3 branching remain open),
 - route/challenge/structure debug views — delivered 2026-09-07 (D-104: `World › Stage Debug Views`),
 - branching exits (02 §3, §4; 04 §5J) — delivered 2026-09-07 (D-105: terminal lines ending on their own pads, one to three exits per stage; the route cards on the fork signs and the next-stage seed from the exit taken arrive with Phase 6),

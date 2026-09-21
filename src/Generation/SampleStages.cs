@@ -10,13 +10,13 @@ public static class SampleStages
 
     public static readonly Entry[] All =
     {
-        new("tunnel", TerrainArchetype.CanyonRun, 1, "a portal tunnel through the canyon wall (docs/13, D-113)"),
-        new("dive", TerrainArchetype.RollingHighlands, 1, "a dive beneath the Highlands: the open cut, the portal, the cap over it (docs/13, D-116)"),
-        new("tunnels + pit", TerrainArchetype.CanyonRun, 2, "two wall tunnels and the spiral pit finale (D-102)"),
-        new("sky floor 3", TerrainArchetype.SkyTerraces, 32, "a floor-2 and floor-3 terrace stack (D-103; seed 30 until D-116 moved the line stream)"),
-        new("dune trains", TerrainArchetype.DuneSea, 1, "a three-crest dune train (D-099)"),
-        new("gap + turns", TerrainArchetype.RollingHighlands, 8, "a mandatory gap and four committed banked turns (D-097)"),
-        new("three exits", TerrainArchetype.RollingHighlands, 4, "two terminal lines forking to exits B and C beside exit A (D-105)"),
+        new("tunnel", TerrainArchetype.CanyonRun, 1, "six portal tunnels through the canyon wall and six lids over 20 km (docs/13, D-113, D-118)"),
+        new("dive", TerrainArchetype.RollingHighlands, 1, "a dive beneath the Highlands (the open cut, the portal, the cap over it) with a ridge and two exit lines (docs/13, D-116)"),
+        new("tunnels + pit", TerrainArchetype.CanyonRun, 2, "six lids, five portals and the spiral pit finale (D-102)"),
+        new("sky floor 3", TerrainArchetype.SkyTerraces, 6, "a floor-2 and floor-3 terrace stack among three dives (D-103; seed 30, then 32, until D-118 lengthened the course)"),
+        new("dune trains", TerrainArchetype.DuneSea, 1, "fourteen crests in dune trains on the wave, and a dive (D-099)"),
+        new("gap + turns", TerrainArchetype.RollingHighlands, 8, "a mandatory gap and five committed banked turns, three dives (D-097)"),
+        new("three exits", TerrainArchetype.RollingHighlands, 4, "two terminal lines forking to exits B and C beside exit A, a dive and five ridges (D-105)"),
     };
 
     /// <summary>The entry an index selects, or null for 0 / out of range.</summary>

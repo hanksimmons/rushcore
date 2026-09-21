@@ -187,13 +187,18 @@ Required:
 - the far horizon (D-114, `docs/13 §4.4`): the ring builds on every archetype's batch seed with no point inside the
   footprint, its inner ring meeting the stage's own ground within 5 m at 16 probes and at most 60 k triangles; the built
   stage draws it,
-- the resident mesh (D-115, `docs/13 §3.4`): the world builds to its first frame within 2.5 s (2 s once the collider is a
-  heightfield, the user's call) with the fine window round the start pad complete and nothing still building; on every
+- the resident mesh (D-115, `docs/13 §3.4`): the world builds to its first frame within 2 s outside the collider (the
+  collider, a mesh shape until the user decides it, is bounded at 8 s; D-118) with the fine window round the start pad complete and nothing still building; on every
   kilometre of the drive every tile within 1.0 km of the ball has its fine mesh, no fine tile beyond 1.6 km is resident,
   the resident triangles stay under 1.2 M, and the coarse mesh's height under the ball agrees with the collider within
   its cell's own chord (the span of the cell's corners plus half a metre),
 - Summit Descent (D-107, `docs/12 §8`), once delivered: across the batch every primary vertex's corner limit holds the base cap; the rails and headwalls are continuous (sampled every 10 m, both sides, chute gaps and exit forks excepted); the base-cap profile has no launch on the switchback section; the descent is 540–660 m with every tier 90–170 m; every hairpin passes the sightline rule; every chute's free path is grounded, its half-charge landing falls inside its landing zone and its full-charge flight lands drivable; the face outside the rails drains to the valley. The harness drives a base-cap ball into a rail at 25° and straight into a headwall and asserts it stays on the bench both times, drives the switchbacks to the valley fully grounded, and drives a chute free and half-charged with the slam landing inside the zone,
 - exits (02 §4, D-105): every stage's exits are distinct, inside the footprint and on level pads; most seeds of each archetype offer a second exit (floors: Highlands 75%, Canyon Run 85%, Sky Terraces 65%, Dune Sea 40%); the harness drives the ball from the primary up a terminal line's ramp to its pad and asserts the stage ends by that exit with the plateau holding the ball grounded.
+- the 3× course (D-118, `docs/13 §3`): the batch's routes sit within 0.9–1.3 of the 18 km target and their base-kit times bracket
+  140 s (100–210 s); a stage definition generates in 350 ms on average; the batch checks determinism on every tenth seed; the
+  full drive covers the selector's archetype's whole route within the model's time (the drive bound is 300 s); a ramp lip's flight
+  is held to 30% of the model's (a crest's to 20%): at a lip the follow releases at the ease and the last facets add up to 9 m/s of
+  vertical, open for the controller.
 
 Manual sample:
 
@@ -277,6 +282,19 @@ grounded 100%, min speed inside 148.5 m/s, no portal impact, exit 148.5 m/s agai
 the arch on every tick; the cap drive over 433 m of the covered run grounded 100%, never below the cap's top. Before
 D-117 the same drive was 84% grounded inside: the ball flew off the trench's start, where a floor that only cut rode the
 lower ground beside the primary and then dropped into the cut. Default 405/405; canyon 423/423 (its portal drive unchanged: 289 ticks inside grounded 100%, exit at the model's speed); sky 406/406 (the dive drive on sky seed 1: 294 ticks inside, grounded 100%, exit 148.5 m/s, the cap drive 100% over 528 m); the windowed default run 404/405 with only the known camera-band check, the dive's open cut, portal, bore and cap seen in its shots.
+
+**Result (the 3× course, W2, D-118, 2026-09-20):** 100 seeds per archetype: 100 valid, 0 fallbacks on every archetype; routes
+19.8–21.1 km (Dune Sea 18.1–18.2), base-kit 139–147 s (Dune Sea 126–130), generation 127–320 ms average (Sky Terraces the most:
+its dropped lines rebuild the field); lines 5 per stage (Dune Sea 1.7), portals on 95% of canyon seeds with six lids each, dives on
+68 / 62 / 75% of Highlands / Dune Sea / Sky seeds, a second exit on 79 / 93 / 57 / 68% (Highlands / Canyon / Dune / Sky). The
+Highlands drive seed builds to its first frame in 4.9–6.8 s on the first build of a process (generate 0.36, heights 0.47,
+collider 3.9–5.7, mesh 0.14, structures 0.07, dressing 0.08) and 3.3–3.9 s after (the collider 2.2–2.5 s): outside the collider the
+build is one second. The full drive: 20 079 of 20 083 m in 139.1 s against the model's 141.0 s (1.3%), grounded 90%, 16–20 fine
+tiles per kilometre, peak 977 k resident triangles, the coarse mesh within 0.01 m of the collider. Default 406/406 in 236 s
+wall; canyon 424/424 in 261 s (the 20 km drive within 1.1% of the model, the wall ride's window 100 m clear of bends both ways,
+the head-on hit bounded by the scrub's own first tick, the exit line's level run grounded 100% with its descent's 22 airborne ticks
+of 99 reported apart); sky 407/407 in 233 s (a 2.5 km terrace driven 2372 m grounded 100%). Every golden hash re-recorded; "sky
+floor 3" is seed 6.
 
 **Result (the resident mesh, W1, D-115, 2026-09-19):** the Highlands drive seed builds to its first frame in 1.86 s (the
 canyon sample 2.1 s; 4.6 s before W1), 1.15 s of it the collider (a Jolt mesh shape, because the map is not square; the

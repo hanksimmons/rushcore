@@ -10,14 +10,19 @@ namespace Rushcore.Generation;
 public static class WorldScale
 {
     // ---- stage footprint and route (docs/11 §3f) ----
-    public const float FootprintLength = 6000f;          // along the stage axis (+X)
+    public const float FootprintLength = 18000f;         // along the stage axis (+X); 6 km until D-118 (docs/13 §3, the 3× course)
     public const float FootprintWidth = 2000f;
-    public const float PrimaryRouteLength = 6000f;       // target; V-009 provisional
+    public const float PrimaryRouteLength = 18000f;      // target; V-009 provisional (6 km until D-118)
+    /// <summary>The run's rhythm over the length (docs/13 §3.1, D-118): three acts of this much stage, open cruise, technical middle,
+    /// finale, each scaling the archetype's feature and line spacing (<c>ArchetypeRules.Acts</c>). An act is read from X, the stage axis.</summary>
+    public const float ActLength = 6000f;
+    public const int ActCount = 3;
+    public static int ActAt(float x) => (int)Mathf.Clamp((x + FootprintLength * 0.5f) / ActLength, 0f, ActCount - 1);
     public const float RouteBandHalfWidth = 600f;        // the primary route stays within ±this of the axis
     public const float SceneryMargin = 400f;
     public const float EntryMargin = 100f;               // start pad distance from the stage edge
     public const float ExitMargin = 100f;
-    public const float TargetBaseKitSeconds = 60f;
+    public const float TargetBaseKitSeconds = 140f;      // 47 s per 6 km measured at the cap (V-009); the 3× course is three of them (docs/13 §3.1)
 
     // ---- bend ladder (docs/11 §3a) ----
     public const float CruiseBendRadius = 160f;          // holds the cap (D-091: 250 m/s)
@@ -93,7 +98,7 @@ public static class WorldScale
     public const float LaunchCrestSpacing = 1000f;       // at most one launch crest per this much route
 
     // ---- optional lines and checkpoints (04 §2, §13) ----
-    public const int OptionalLinesMax = 3;
+    public const int OptionalLinesMax = 9;               // 3 per 6 km (04 §2); the 3× course carries three times the count, not the spacing (D-118)
     public const float OptionalLineSpacing = 700f;       // route distance between optional lines
     public const float RidgeOffset = 200f;               // lateral offset of a ridge line from the primary
     /// <summary>Ridge plateau height: with the cosine ramp below, the knee radius 2L² / (π² H) stays above the cap's
@@ -228,7 +233,7 @@ public static class WorldScale
     public const float LidClearance = 15f;
     public const float LidLengthMin = 150f, LidLengthMax = 300f;
     public const float LidThickness = 6f;
-    public const int LidsMax = 2;
+    public const int LidsMax = 6;                        // 2 per 6 km; ×3 on the 3× course (D-118)
     /// <summary>The lens keeps this much below a roof it is under.</summary>
     public const float LidCameraMargin = 1.5f;
 

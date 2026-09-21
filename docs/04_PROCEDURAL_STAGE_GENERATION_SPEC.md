@@ -23,7 +23,7 @@ Each stage contains:
 
 - one guaranteed primary traversable region/route, ending at exit A,
 - up to two terminal lines ending at exits B and C (§5J, D-105),
-- approximately 1–3 meaningful optional lines/shortcuts,
+- approximately 1–3 meaningful optional lines/shortcuts per 6 km (up to nine on the 18 km stage, D-118),
 - many small local line choices,
 - hazards/enemies/rewards integrated into those lines,
 - safe recovery checkpoints.
@@ -87,7 +87,7 @@ Generate:
 - start,
 - exit,
 - primary route,
-- 1–3 optional line opportunities as allowed by archetype/stage,
+- 1–3 optional line opportunities per 6 km as allowed by archetype/stage (the 18 km stage carries up to nine, D-118),
 - reserved challenge zones,
 - landmark zones.
 
@@ -645,8 +645,9 @@ lie within 1.2 km of the ball (re-evaluated every 100 m of travel, 300 m of hyst
 committed on the main thread), coarse tiles hidden under fine ones, a 6 m skirt on every tile's edges. The collider is
 never windowed: one `HeightMapShape3D` at 4 m over the whole stage, so physics, the follow and the validators see one
 surface at all times. Known (D-115): Godot's Jolt module builds a non-square heightmap as a mesh shape (exact, 1.15 s at
-752 k samples); a square one as a true heightfield (0.1 s, samples quantised per block). The map stays non-square until
-the user decides.
+752 k samples, 2.0–2.5 s at the 3× stage's 2.25 M and 3.9–5.7 s on the first build of a process, D-118); a square one as a
+true heightfield (0.1 s, samples quantised per block; at 3× that is nine 501-sample squares side by side or one 20 M-sample pad).
+The map stays non-square until the user decides; everything else in the build is one second.
 
 Do not default the entire terrain to one giant concave triangle collider.
 

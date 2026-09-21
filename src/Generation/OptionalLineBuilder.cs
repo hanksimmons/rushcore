@@ -123,7 +123,7 @@ public static class OptionalLineBuilder
                 else if (shape.Kind == RouteLineKind.Tunnel)
                     shape = shape with { Transition = Mathf.Clamp(Mathf.Min(bs - ps, ne - beLast) - 20f, WorldScale.TunnelTransition, WorldScale.TunnelTransitionMax) };
                 float T = shape.Transition, L = shape.Length;
-                float dLo = Mathf.Max(Mathf.Max(ps, beLast + T - L), lastEnd + WorldScale.OptionalLineSpacing);
+                float dLo = Mathf.Max(Mathf.Max(ps, beLast + T - L), lastEnd + rules.LineSpacingAt(v[bends[k].StartIndex].Position.X));   // the act's spacing (D-118)
                 float dHi = Mathf.Min(bs - T, Mathf.Min(ne - L, stop - L));
                 if (dHi < dLo) { if (dive) Tally("dive: no room"); continue; }
                 float d = 0.5f * (dLo + dHi);

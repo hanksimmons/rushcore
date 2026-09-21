@@ -118,7 +118,7 @@ public sealed class RouteSkeletonBuilder
         while (true)
         {
             // A feature straight hosts a crest (or a dune train), a gap or a ramp: approach + feature + landing (04 §10: no bend in the flight).
-            bool wantFeature = pos.X - lastCrestX >= rules.FeatureSpacing && rng.Chance(rules.FeatureChance);
+            bool wantFeature = pos.X - lastCrestX >= rules.FeatureSpacingAt(pos.X) && rng.Chance(rules.FeatureChance);   // the act's spacing (D-118)
             float kindRoll = rng.NextFloat();
             RouteFeatureKind kind = kindRoll < rules.CrestWeight ? RouteFeatureKind.LaunchCrest
                                   : kindRoll < rules.CrestWeight + rules.GapWeight ? RouteFeatureKind.Gap : RouteFeatureKind.LaunchRamp;

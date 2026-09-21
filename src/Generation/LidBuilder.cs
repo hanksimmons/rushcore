@@ -29,7 +29,7 @@ public static class LidBuilder
             float length = Mathf.Min(WorldScale.LidLengthMax, run - 100f);
             float centre = 0.5f * (d0 + d1);
             float from = centre - length * 0.5f, to = centre + length * 0.5f;
-            if (from < lastEnd + WorldScale.OptionalLineSpacing * 0.5f) continue;
+            if (from < lastEnd + rules.LineSpacingAt(v[s].Position.X) * 0.5f) continue;   // the act's spacing (D-118)
             if (to > primary.Length - 400f) break;
             if (primary.Spiral is { } pit && to > pit.ApproachDistance - 100f) break;
             if (FeatureBetween(primary, from - 50f, to + 50f) || LineJoinBetween(primary, lines, from - 50f, to + 50f)) continue;

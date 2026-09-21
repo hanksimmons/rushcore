@@ -242,25 +242,21 @@ public partial class WorldDressing : Node3D
             Name = "PropColliders",
             PhysicsMaterialOverride = new PhysicsMaterial { Friction = PlayerPhysics.ArcadeSurfaceFriction, Bounce = 0f },
         };
+
+        if (_world.IsStage) BuildStageDressing();
+        else if (_world.IsStrip) BuildStripDressing();
+        else
+        {
+            BuildLaneMarkers();
+            BuildPillars(TerrainHeightField.LaneStartX - 10f, TerrainHeightField.LaneZ + 62f);
+            BuildFeaturePylons();
+            BuildScatteredProps(IsClearOfInstruments, 500f, 500f, 1f, PlacementChance);
+            BuildBoostPickups();
+            if (_t.World.EnemyShowcase) BuildEnemyShowcase();
+        }
+        // The prop body enters the tree last: a shape added to a body already in the space rebuilds the body's compound shape, so
+        // thousands of props were quadratic (1.6 s of the 3× stage's build, D-118); collected on entry, they are one build.
         _content.AddChild(_colliders);
-
-        if (_world.IsStage)
-        {
-            BuildStageDressing();
-            return;
-        }
-        if (_world.IsStrip)
-        {
-            BuildStripDressing();
-            return;
-        }
-
-        BuildLaneMarkers();
-        BuildPillars(TerrainHeightField.LaneStartX - 10f, TerrainHeightField.LaneZ + 62f);
-        BuildFeaturePylons();
-        BuildScatteredProps(IsClearOfInstruments, 500f, 500f, 1f, PlacementChance);
-        BuildBoostPickups();
-        if (_t.World.EnemyShowcase) BuildEnemyShowcase();
     }
 
     // ---------------------------------------------------------------- generated stage (Phase 2)
@@ -926,7 +922,7 @@ public partial class WorldDressing : Node3D
                 Vector3 pos = _world.SurfacePoint(x, z, -r * 0.25f);
                 rocks.Add(new Transform3D(basis, pos));
                 rockColors.Add(Shift(new Color(0.46f, 0.42f, 0.38f), tint));
-                AddCollider(new BoxShape3D { Size = new Vector3(2f * r, 2f * r * sy, 2f * r * sz) * 0.9f }, pos, yaw);
+                AddCollider(new Vector3(2f * r, 2f * r * sy, 2f * r * sz) * 0.9f, pos, yaw);
             }
             else if (roll < 0.85f)
             {
@@ -936,7 +932,7 @@ public partial class WorldDressing : Node3D
                 Vector3 pos = _world.SurfacePoint(x, z, h * 0.5f - h * 0.15f);
                 crystals.Add(new Transform3D(basis, pos));
                 crystalColors.Add(Shift(new Color(0.32f, 0.55f, 0.68f), tint));
-                AddCollider(new BoxShape3D { Size = new Vector3(1.2f * r, h, 1.2f * r) }, pos, yaw);
+                AddCollider(new Vector3(1.2f * r, h, 1.2f * r), pos, yaw);
             }
             else
             {
@@ -963,7 +959,7 @@ public partial class WorldDressing : Node3D
     /// ceiling, not the working number — at the default density a stage lands well under them, so `Prop Density`
     /// still does something; the caps bind only when the slider is pushed past about 0.6.
     /// </summary>
-    public const int RockCap = 1800, CrystalCap = 900, MarkerCap = 240;
+    public const int RockCap = 5400, CrystalCap = 2700, MarkerCap = 720;   // per stage; ×3 with the 3× course (D-118)
     /// <summary>Placement attempts at density 1.0 over the lab's area; the stage's larger footprint scales it.</summary>
     private const float ScatterAttempts = 900f;
 
@@ -1015,6 +1011,8 @@ public partial class WorldDressing : Node3D
         float rangeX = _world.HalfX - 50f, rangeZ = _world.HalfZ - 50f;
         float area = (_world.HalfX * _world.HalfZ) / (MovementToyWorld.Extent * MovementToyWorld.Extent * 0.25f);
         int attempts = Mathf.RoundToInt(ScatterAttempts * density * area);
+        long tLine = 0, tClear = 0, tSuits = 0;   // where the candidates' time goes (D-118 instrument)
+        ulong loopStart = Time.GetTicksMsec();
 
         for (int i = 0; i < attempts; i++)
         {
@@ -1028,11 +1026,17 @@ public partial class WorldDressing : Node3D
             float shape = rng.Randf();
             float lottery = rng.Randf();
 
-            if (!_world.InBounds(x, z, 40f) || !keep.Clear(x, z)) continue;
+            if (!_world.InBounds(x, z, 40f)) continue;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             float toLine = keep.DistanceToLine(x, z);
+            long t1 = System.Diagnostics.Stopwatch.GetTimestamp(); tLine += t1 - t0;
+            if (!keep.Clear(x, z, toLine)) { tClear += System.Diagnostics.Stopwatch.GetTimestamp() - t1; continue; }
+            long t2 = System.Diagnostics.Stopwatch.GetTimestamp(); tClear += t2 - t1;
             float slope = Steepness(x, z);
             float y = _world.SampleHeight(x, z);
-            if (!Suits(arch, stage, field, x, z, y, slope, toLine, cloudCeiling, lottery, out bool crystal, out Color color)) continue;
+            bool suits = Suits(arch, stage, field, x, z, y, slope, toLine, cloudCeiling, lottery, out bool crystal, out Color color);
+            long t3 = System.Diagnostics.Stopwatch.GetTimestamp(); tSuits += t3 - t2;
+            if (!suits) continue;
 
             // Farther from the line means bigger: the parallax is the speed cue (06 §16).
             float grow = Mathf.Lerp(0.9f, 1.8f, Mathf.Clamp((toLine - StageScatter.LineClearance) / 900f, 0f, 1f));
@@ -1080,12 +1084,19 @@ public partial class WorldDressing : Node3D
             }
         }
 
+        ulong loopMs = Time.GetTicksMsec() - loopStart;
         AddMultiMesh("Rocks", _rockMesh, rocks, rockColors);
         AddMultiMesh("Crystals", _crystalMesh, crystals, crystalColors);
+        ulong meshMs = Time.GetTicksMsec() - loopStart - loopMs;
         ScatterRocks = rocks.Count;
         ScatterCrystals = crystals.Count;
         ScatterMillis = Time.GetTicksMsec() - start;
+        double tick = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        ScatterPhases = $"loop {loopMs} ms (line {tLine * tick:0}, keep-out {tClear * tick:0}, suits {tSuits * tick:0}) over {attempts} candidates, multimeshes {meshMs} ms, before the loop {loopStart - start} ms";
     }
+
+    /// <summary>Where the scatter's candidates spent their time (D-118 instrument).</summary>
+    public string ScatterPhases { get; private set; } = "";
 
     /// <summary>
     /// Where each archetype's scenery belongs, and what colour it is (06 §3, §16). Returns false where this
@@ -1256,14 +1267,21 @@ public partial class WorldDressing : Node3D
     /// high-speed collision/CCD against (08 §3). Shapes are sized directly rather than
     /// scaling the node, which keeps Jolt free of non-uniform-scale warnings.
     /// </summary>
+    /// <summary>One unit box, shared by every prop collider: the instance's size rides in its transform's scale (Jolt scales a box
+    /// exactly). A prop collider is a server shape on the one prop body, not a node: a node per prop cost 0.4 ms each, 1.6 s of the
+    /// 3× stage's build for 3 900 props (D-118); the server call is a few microseconds.</summary>
+    private static readonly BoxShape3D UnitBox = new() { Size = Vector3.One };
+
+    private void AddCollider(Vector3 size, Vector3 position, float yaw = 0f)
+    {
+        var basis = new Basis(Vector3.Up, yaw).Scaled(size);
+        PhysicsServer3D.BodyAddShape(_colliders.GetRid(), UnitBox.GetRid(), new Transform3D(basis, position));
+    }
+
+    /// <summary>A collider of its own shape (the few signs, pillars and lab props): a node, as before.</summary>
     private void AddCollider(Shape3D shape, Vector3 position, float yaw = 0f)
     {
-        _colliders.AddChild(new CollisionShape3D
-        {
-            Shape = shape,
-            Position = position,
-            Rotation = new Vector3(0f, yaw, 0f),
-        });
+        _colliders.AddChild(new CollisionShape3D { Shape = shape, Position = position, Rotation = new Vector3(0f, yaw, 0f) });
     }
 
     // ---------------------------------------------------------------- T3 showcase row (lab only)

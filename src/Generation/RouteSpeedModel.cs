@@ -200,7 +200,10 @@ public sealed class RouteSpeedModel
             sinGrade[i] = len > 1e-6f ? -d.Y / len : 0f;
             Vector2 flat = new(d.X, d.Z);
             flatDir[i] = flat.LengthSquared() > 1e-12f ? flat.Normalized() : Vector2.Zero;
-            profile.Distance[i + 1] = profile.Distance[i] + len;
+            // The profile is addressed by the skeleton's plan distance (every feature, module, anchor and line join is placed in it), so the
+            // label is the plan length; the physics below integrates the 3D segment (D-118: the 3D label had drifted 45 m past a lip at 12 km,
+            // beyond the module window, so every ramp past 9 km of the 3× course read as never launching).
+            profile.Distance[i + 1] = profile.Distance[i] + flat.Length();
         }
 
         profile.CornerLimit[0] = float.PositiveInfinity;

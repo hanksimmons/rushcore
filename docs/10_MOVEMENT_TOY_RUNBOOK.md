@@ -24,6 +24,9 @@ RUSHCORE_EXIT_TRACE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>    # tally wh
 RUSHCORE_MEASURE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>       # T5 generation instruments, tables 1 and 3: wall probe, floor-3 room (grep '[MEASURE]')
 RUSHCORE_MEASURE=1 <same command> --seed 8                            # T5 table 4: metres from each landing until the ball is back on the model's speed
 RUSHCORE_MEASURE=1 RUSHCORE_ARCHETYPE=dunes <same command> --seed 1   # the same over a dune train's five crest landings
+RUSHCORE_SELFTEST_DATA_ONLY=1 RUSHCORE_BATCH_ARCHETYPE=sky RUSHCORE_BATCH_COUNT=20 RUSHCORE_BATCH_LIST=1 <same command>   # one archetype's batch, shortened, one summary line per stage-0 seed (for picking samples and regression seeds, D-118)
+RUSHCORE_MODULE_TRACE=1 <same command>                            # every ramp module: the polyline round its lip, the model's flights near it (D-118)
+RUSHCORE_COLLIDER_PROBE=1 <same command> --seed 1                 # builds the terrain collider three more times and prints each build's time (the collider decision, D-115/D-118)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 3   # play a Canyon Run stage (also World › Archetype = 1)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --dunes --seed 1    # play a Dune Sea stage (World › Archetype = 2)
 /Applications/Godot_mono.app/Contents/MacOS/godot --path . -- --canyon --seed 2   # a Canyon Run with two wall tunnels and the spiral pit finale (D-102)
@@ -359,13 +362,13 @@ launch-crest straights; boost rings on the primary every `Boost › Pickup Spaci
 
 | # | Name | Command | What to look at |
 |---|---|---|---|
-| 1 | tunnel | `-- --canyon --seed 1` | a portal tunnel through the canyon wall (D-113, `docs/13 §2`): the open cut, the arched portal, the covered run beside the primary |
-| 2 | dive | `-- --seed 1` | a dive beneath the Highlands (D-116, `docs/13 §2.2`): the line leaves the primary, the ground swallows it down an open cut, the portal, the cap over the covered run |
-| 3 | tunnels + pit | `-- --canyon --seed 2` | two wall tunnels, the spiral pit finale (D-102); walls are the authored profile since D-109 (hash re-recorded) |
-| 4 | sky floor 3 | `-- --sky --seed 32` | a floor-2 and floor-3 terrace stack (D-103; seed 30 until D-116 moved the line stream) |
-| 5 | dune trains | `-- --dunes --seed 1` | a three-crest dune train (D-099) |
-| 6 | gap + turns | `-- --seed 8` | a mandatory gap and four committed banked turns (D-097) |
-| 7 | three exits | `-- --seed 4` | two terminal lines forking to exits B and C beside exit A (D-105) |
+| 1 | tunnel | `-- --canyon --seed 1` | six portal tunnels through the canyon wall over 20 km (D-113, D-118, `docs/13 §2`): the open cut, the arched portal, the covered run beside the primary; six lids |
+| 2 | dive | `-- --seed 1` | a dive beneath the Highlands (D-116, `docs/13 §2.2`): the line leaves the primary, the ground swallows it down an open cut, the portal, the cap over the covered run; a ridge and two exit lines |
+| 3 | tunnels + pit | `-- --canyon --seed 2` | six lids, five portals and the spiral pit finale (D-102); walls are the authored profile since D-109 |
+| 4 | sky floor 3 | `-- --sky --seed 6` | a floor-2 and floor-3 terrace stack among three dives (D-103; seed 30, then 32, until D-118 lengthened the course) |
+| 5 | dune trains | `-- --dunes --seed 1` | fourteen crests in dune trains on the wave, and a dive (D-099) |
+| 6 | gap + turns | `-- --seed 8` | a mandatory gap and five committed banked turns, three dives (D-097) |
+| 7 | three exits | `-- --seed 4` | two terminal lines forking to exits B and C beside exit A, a dive and five ridges (D-105) |
 | 8 | summit | `-- --summit --seed N` | *not yet built* (D-107, `docs/12`): five switchback tiers and a chute; the seed is pinned when S1 lands |
 
 Setting the selector picks the archetype and seed and rebuilds; the `seed` row shows the seed. Set it back to 0

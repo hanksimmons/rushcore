@@ -172,6 +172,9 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
     public int Tiles { get; private set; }
     public int SampleCount => _heights.Length;
     public ulong BuildMillis { get; private set; }
+    /// <summary>Of <see cref="BuildMillis"/>, the milliseconds Godot's Jolt module spent building the terrain collider (a mesh shape for the
+    /// non-square map, D-115: 2–5 s at 3×, the user's decision; the harness budgets the rest of the build).</summary>
+    public ulong ColliderMillis { get; private set; }
 
     /// <summary>Raised when the player collects a boost pickup; carries the refill amount.</summary>
     public event Action<float>? BoostPickupCollected;
@@ -288,10 +291,21 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         _minHeight = rowMin.Min();
         _maxHeight = rowMax.Max();
 
+        ulong tSample = Time.GetTicksMsec() - start;
+        // The collider: Godot's Jolt module builds the shape here, synchronously (a mesh shape for a non-square map, D-115).
         _terrainShape.MapWidth = nx;
         _terrainShape.MapDepth = nz;
         _terrainShape.MapData = _heights;
         ulong tHeights = Time.GetTicksMsec() - start;
+        ulong tCollider = tHeights - tSample;
+        ColliderMillis = tCollider;
+        if (System.Environment.GetEnvironmentVariable("RUSHCORE_COLLIDER_PROBE") == "1")
+        {
+            ulong p0 = Time.GetTicksMsec(); _terrainShape.MapData = _heights; ulong p1 = Time.GetTicksMsec();
+            var copy = (float[])_heights.Clone(); copy[nx * nz / 2] += 0.01f; _terrainShape.MapData = copy; ulong p2 = Time.GetTicksMsec();
+            _terrainShape.MapData = _heights; ulong p3 = Time.GetTicksMsec();
+            GD.Print($"[RUSHCORE] collider probe: same array again {p1 - p0} ms, a changed copy {p2 - p1} ms, the original again {p3 - p2} ms");
+        }
 
         BuildTerrainTiles(_dressing.CreateTerrainMaterial());
         ulong tTiles = Time.GetTicksMsec() - start - tHeights;
@@ -311,12 +325,12 @@ public partial class MovementToyWorld : Node3D, Rushcore.Player.IGroundSurface
         ScatterMillis = _dressing.ScatterMillis;
         if (IsStage)
             GD.Print($"[RUSHCORE] scatter: {ScatterRocks} rocks, {ScatterCrystals} crystals, {ScatterMarkers} markers " +
-                     $"({ScatterColliders} with colliders) in {ScatterMillis} ms at density {_t.World.PropDensity:0.00}");
+                     $"({ScatterColliders} with colliders) in {ScatterMillis} ms at density {_t.World.PropDensity:0.00}: {_dressing.ScatterPhases}");
         BuiltDebugViews = _t.World.StageDebugViews;
         BuiltShowcase = _dressing.Showcase is not null;
         BuildMillis = Time.GetTicksMsec() - start;
         GD.Print($"[RUSHCORE] World built seed={Seed} {(IsStage ? "GENERATED STAGE" : IsStrip ? "SCALE STRIP" : "lab")} in {BuildMillis} ms " +
-                 $"(generate {tGenerate}, heights {tHeights - tGenerate}, mesh {tTiles}, structures {tStructures}, dressing {BuildMillis - tHeights - tTiles - tStructures}): " +
+                 $"(generate {tGenerate}, heights {tSample - tGenerate}, collider {tCollider}, mesh {tTiles}, structures {tStructures}, dressing {BuildMillis - tHeights - tTiles - tStructures}): " +
                  $"{_field.SizeX:0} x {_field.SizeZ:0} m at {CellSize:0.#} m cells = {SampleCount / 1000f:0} k samples, " +
                  $"coarse {CoarseTriangles / 1000f:0} k tris at {CellSize * _stride:0} m, fine window {FineTiles} of {Tiles} tiles = {FineTriangles / 1000f:0} k tris, " +
                  $"heights {SampleCount * 4 / 1e6f:0.0} MB, height {_minHeight:0.0}..{_maxHeight:0.0} m");

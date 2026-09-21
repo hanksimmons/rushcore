@@ -47,9 +47,12 @@ public sealed class StageScatter
     /// True where a prop may stand: outside every line, exit pad, checkpoint anchor, lid and the spiral
     /// disc. A module's body and its landing run lie on their line and are inside the line keep-out already.
     /// </summary>
-    public bool Clear(float x, float z)
+    public bool Clear(float x, float z) => Clear(x, z, DistanceToLine(x, z));
+
+    /// <summary>The same with the line distance already measured (the dressing measures it once per candidate).</summary>
+    public bool Clear(float x, float z, float toLine)
     {
-        if (DistanceToLine(x, z) <= LineClearance) return false;
+        if (toLine <= LineClearance) return false;
         if (DistanceToExitPad(x, z) <= WorldScale.PadRadius + ExitPadClearance) return false;
         foreach (var cp in _stage.Checkpoints)
             if (Plan(cp.Position, x, z) <= AnchorClearance) return false;

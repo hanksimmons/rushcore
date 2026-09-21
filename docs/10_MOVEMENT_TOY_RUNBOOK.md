@@ -25,6 +25,7 @@ RUSHCORE_MEASURE=1 RUSHCORE_SELFTEST_DATA_ONLY=1 <same command>       # T5 gener
 RUSHCORE_MEASURE=1 <same command> --seed 8                            # T5 table 4: metres from each landing until the ball is back on the model's speed
 RUSHCORE_MEASURE=1 RUSHCORE_ARCHETYPE=dunes <same command> --seed 1   # the same over a dune train's five crest landings
 RUSHCORE_SELFTEST_DATA_ONLY=1 RUSHCORE_BATCH_ARCHETYPE=sky RUSHCORE_BATCH_COUNT=20 RUSHCORE_BATCH_LIST=1 <same command>   # one archetype's batch, shortened, one summary line per stage-0 seed (for picking samples and regression seeds, D-118)
+RUSHCORE_SELFTEST_QUICK=1 <same command>                          # the everyday run: everything but the four-archetype seed batch (about half the time); the full run is the pre-push gate
 RUSHCORE_MODULE_TRACE=1 <same command>                            # every ramp module: the polyline round its lip, the model's flights near it (D-118)
 RUSHCORE_COLLIDER_PROBE=1 <same command> --seed 1                 # builds the terrain collider three more times and prints each build's time (the collider decision, D-115/D-118)
 RUSHCORE_LINE_DRIVE_TRACE=1 <same command>                        # the ridge/dive line drive tick by tick (D-119: it steered from a stale camera yaw once)
@@ -87,7 +88,7 @@ optional lines) and gold cash balls (one on each line's middle, on every ramp la
 `Run › Magnet Radius` (14 m) they fly to the ball and never give up. Ten orbs is level 2, then 20 more, and so on to level 8
 at 280. A level-up pauses the run on the choice panel the moment it happens (eight stats, three ranks each; `1`–`8`, click, or
 arrows and Enter) and the run resumes on the choice (D-120); one that lands during the exit outro is chosen behind the fade. Rank 0 is the frozen baseline; a rank is a
-factor read beside the tuning value, so the `Upgrades` tab in F1 tunes the ladder and `Run` the XP and the magnet. `L` grants a
+factor read beside the tuning value, so the `Upgrades` tab in F1 tunes the ladder and `Run` the XP, the magnet and the pickups' size (`Pickup Size`, a fraction of the ball's diameter, 0.5). `L` grants a
 level to see the panel. Ranks, level, XP and cash are the run's: a new seed or `--seed` wipes them.
 
 **Enemy and pickup showcase** (`World › Enemy Showcase`, off by default; T3): a row 40 m to the left of the lab

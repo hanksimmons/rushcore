@@ -360,7 +360,7 @@ public partial class MovementToySelfTest : Node
     {
         _done = true;
         ReleaseAll();
-        GD.Print($"[SELFTEST] ---- {_checks - _failures.Count}/{_checks} checks passed in {_clock.Elapsed.TotalSeconds:0.0} s wall ----");
+        GD.Print($"[SELFTEST] ---- {_checks - _failures.Count}/{_checks} checks passed in {_clock.Elapsed.TotalSeconds:0.0} s wall{(System.Environment.GetEnvironmentVariable("RUSHCORE_SELFTEST_QUICK") == "1" ? " (quick mode: no seed batch)" : "")} ----");
         foreach (var f in _failures) GD.Print("[SELFTEST] FAILED: " + f);
         GD.Print(_failures.Count == 0 ? "[SELFTEST] RESULT: PASS" : $"[SELFTEST] RESULT: FAIL ({_failures.Count})");
         GetTree().Quit(_failures.Count == 0 ? 0 : 1);
@@ -1263,7 +1263,11 @@ public partial class MovementToySelfTest : Node
         }
 
         // ---- Phase 2 generation, pure data: route skeletons for a seed batch (04 §12, 08 §5) ----
-        RunStageGenerationBatchCase();
+        // RUSHCORE_SELFTEST_QUICK=1 skips the four-archetype seed batch (half the run's wall time at 3×) and leans on the
+        // regression seeds, the golden hashes and the built stage instead: the everyday run. The full run is the pre-push gate.
+        if (System.Environment.GetEnvironmentVariable("RUSHCORE_SELFTEST_QUICK") == "1")
+            GD.Print("[SELFTEST] quick mode: the seed batch is skipped (RUSHCORE_SELFTEST_QUICK=1); the full run is the pre-push gate");
+        else RunStageGenerationBatchCase();
         RunRegressionSeedsCase();
         RunGoldenHashCase();
         RunProgressionDataChecks();
@@ -3683,6 +3687,9 @@ public partial class MovementToySelfTest : Node
             run.AddXp(run.XpToNext);
             foreach (var _ in Frames(2)) yield return null;
             bool opened = _debug.ChoiceOpen, paused = GetTree().Paused;
+            Vector2 screenMid = GetViewport().GetVisibleRect().Size * 0.5f, plateMid = _debug.Choice.PlateCentre;
+            Check("the choice panel stands in the middle of the screen (it once sat half off the top-left corner)",
+                opened && plateMid.DistanceTo(screenMid) <= 1.5f, $"plate centre {plateMid} vs screen centre {screenMid}");
             Vector3 held = _player.GlobalPosition;
             foreach (var _ in Frames(10)) yield return null;
             bool frozen = _player.GlobalPosition.DistanceTo(held) < 0.001f && _debug.ChoiceOpen;

@@ -28,6 +28,8 @@ public interface IDebugActions
     bool StageChoiceOpen { get; }
     /// <summary>True while the choice panel is open at all: mid-run with the tree paused (D-120), or in the outro.</summary>
     bool ChoiceOpen { get; }
+    /// <summary>The level-up choice panel (D-119); the harness reads where it draws.</summary>
+    Rushcore.UI.UpgradeChoicePanel Choice { get; }
 
     void RestartSameSeed();
     void RestartNewSeed();

@@ -391,7 +391,7 @@ public partial class WorldDressing : Node3D
         // Experience orbs and cash balls (docs/16 §2, D-119): placed from the stage seed by rule, drawn and collected by
         // one node with no physics bodies; the stage hash never sees them.
         var placed = PickupPlacement.Place(stage, _t.Run, (x, z) => _world.SampleHeight(x, z));
-        _pickupField = new PickupField(_t.Run, placed, () => _world.Player, _world.Vfx) { Name = "PickupField" };
+        _pickupField = new PickupField(_t, placed, () => _world.Player, _world.Vfx) { Name = "PickupField" };
         _pickupField.Collected += (kind, worth) => PickupCollected?.Invoke(kind, worth);
         _content.AddChild(_pickupField);
 

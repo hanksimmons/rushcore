@@ -54,6 +54,7 @@ public partial class GameBootstrap : Node3D, IDebugActions
     public bool StageOutroActive => _outro != OutroPhase.None;
     public bool StageChoiceOpen => _outro == OutroPhase.Choose;
     public bool ChoiceOpen => _choice.IsOpen;
+    public UpgradeChoicePanel Choice => _choice;
     /// <summary>The mid-run choice (D-120): the tree is paused while the panel is up, and restored to what it was.</summary>
     private bool _choiceHold, _pausedBeforeChoice;
     /// <summary>Run seed and stage index (T1). The clipboard copies the run seed alone, for `--seed N`.</summary>

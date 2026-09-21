@@ -35,8 +35,8 @@ the pickup shapes (`06 §9`), the HUD (`06 §12`).
 
 | Kind | Shape (06 §9) | Worth | Where it lies |
 |---|---|---|---|
-| Experience orb | a small teal sphere, 0.5 m, bobbing, `PickupKind.Reward` recoloured teal | 1 XP | in **clusters of 3–5** along the primary every `OrbClusterSpacing` 150 m, offset laterally inside the level width so a line through them is a choice, not the racing line; along every optional line at twice the density (the line is the reward's road); none inside a module's body, on a pad, under a lid, in a tunnel's covered run or within 60 m of the start |
-| Cash ball | a gold sphere, 0.8 m, spinning, `PickupKind.Currency`'s gold | 1 cash (a burst coin's worth) | **rarer and earned**: one on each optional line's plateau or floor at its middle, one past every ramp's lip on the paid path's landing, one at the far rim of every gap, one in every tunnel's covered run; a small scatter (`CashScatterPerKm` 1 per km) on the primary |
+| Experience orb | a teal sphere, half the ball's diameter (`Run › Pickup Size` 0.5 × 1.32 m; the user's call 2026-09-20, from 0.5 m), bobbing, `PickupKind.Reward` recoloured teal | 1 XP | in **clusters of 3–5** along the primary every `OrbClusterSpacing` 150 m, offset laterally inside the level width so a line through them is a choice, not the racing line; along every optional line at twice the density (the line is the reward's road); none inside a module's body, on a pad, under a lid, in a tunnel's covered run or within 60 m of the start |
+| Cash ball | a gold sphere, the same size as the orb (from 0.8 m), spinning, `PickupKind.Currency`'s gold | 1 cash (a burst coin's worth) | **rarer and earned**: one on each optional line's plateau or floor at its middle, one past every ramp's lip on the paid path's landing, one at the far rim of every gap, one in every tunnel's covered run; a small scatter (`CashScatterPerKm` 1 per km) on the primary |
 
 Both are placed by `WorldDressing` with the stage (a `pickups` stream derived from the stage seed, `SeedChain.Derive`),
 as the boost rings are, through `PickupPlacement` (pure data: the dressing places what it returns and the harness asks it

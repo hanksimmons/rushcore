@@ -16,14 +16,12 @@ namespace Rushcore.Pickups;
 public partial class PickupField : Node3D
 {
     public const float CollectRadius = 1.5f;
-    /// <summary>Diameters (docs/16 §2): a small orb, a larger ball.</summary>
-    public const float OrbSize = 0.5f, CashSize = 0.8f;
     /// <summary>Idle pickups farther than this from the ball keep their rest transform (no per-tick write).</summary>
     public const float AnimateRange = 500f;
 
     private const byte Idle = 0, Magnetised = 1, Gone = 2;
 
-    private readonly RunTuning _t;
+    private readonly GameplayTuning _t;
     private readonly PlacedPickup[] _placed;
     private readonly Func<PlayerPhysics?> _player;
     private readonly WorldVfx? _vfx;
@@ -38,7 +36,7 @@ public partial class PickupField : Node3D
     /// <summary>A pickup landed: its kind and its worth (1).</summary>
     public event Action<FieldPickupKind, int>? Collected;
 
-    public PickupField(RunTuning tuning, IReadOnlyList<PlacedPickup> placed, Func<PlayerPhysics?> player, WorldVfx? vfx)
+    public PickupField(GameplayTuning tuning, IReadOnlyList<PlacedPickup> placed, Func<PlayerPhysics?> player, WorldVfx? vfx)
     {
         _t = tuning;
         _placed = placed.ToArray();
@@ -97,8 +95,9 @@ public partial class PickupField : Node3D
         var player = _player();
         if (player is null) return;
         Vector3 ball = player.GlobalPosition;
-        float chase = Mathf.Max(_t.MagnetSpeed, player.Velocity.Length() + _t.MagnetClosingMargin);
-        float magnet2 = _t.MagnetRadius * _t.MagnetRadius, animate2 = AnimateRange * AnimateRange;
+        var rt = _t.Run;
+        float chase = Mathf.Max(rt.MagnetSpeed, player.Velocity.Length() + rt.MagnetClosingMargin);
+        float magnet2 = rt.MagnetRadius * rt.MagnetRadius, animate2 = AnimateRange * AnimateRange;
         int chasing = 0;
 
         for (int i = 0; i < _placed.Length; i++)
@@ -148,10 +147,13 @@ public partial class PickupField : Node3D
 
     private MultiMesh Mesh(FieldPickupKind kind) => kind == FieldPickupKind.Orb ? _orbs : _cash;
 
+    /// <summary>Both kinds are drawn at the tuned fraction of the ball's diameter (docs/16 §2; the user's call: about half).</summary>
+    public float Size => 2f * _t.Movement.BallRadius * _t.Run.PickupSize;
+
     private void Write(int i, float bob, float spin)
     {
         var kind = _placed[i].Kind;
-        float size = kind == FieldPickupKind.Orb ? OrbSize : CashSize;
+        float size = Size;
         var basis = new Basis(Vector3.Up, spin).Scaled(Vector3.One * size);
         Mesh(kind).SetInstanceTransform(_slot[i], new Transform3D(basis, _pos[i] + Vector3.Up * bob));
     }

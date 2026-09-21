@@ -42,6 +42,10 @@ On target macOS arm64 development machine:
 
 Exact local commands are implementation/bootstrap work.
 
+**Two harness runs (2026-09-20):** the everyday run is `RUSHCORE_SELFTEST_QUICK=1` (everything but the four-archetype seed
+batch, which was half the wall time at 3×: the regression seeds, the golden hashes and the built stage stand in for it);
+the full run, on the default, canyon and sky archetypes, is the gate before a push. Commands in `docs/10`.
+
 ## 3. Movement Toy — Gate M0
 
 Toy contains only:

@@ -19,11 +19,14 @@ public partial class UpgradeChoicePanel : Control
     private readonly IDebugActions _debug;
     private Label _title = null!, _subtitle = null!;
     private readonly Button[] _buttons = new Button[UpgradeState.StatCount];
+    private PanelContainer _plate = null!;
     private Font? _font;
 
     public UpgradeChoicePanel(IDebugActions debug) => _debug = debug;
 
     public bool IsOpen => Visible;
+    /// <summary>Where the plate's middle is drawn, in viewport pixels (the harness checks it is the screen's middle).</summary>
+    public Vector2 PlateCentre => _plate.Position + _plate.Size * 0.5f;
 
     public override void _Ready()
     {
@@ -34,13 +37,12 @@ public partial class UpgradeChoicePanel : Control
         Visible = false;
         _font = new SystemFont { FontNames = new[] { "Menlo", "Monaco", "SF Mono", "Consolas", "DejaVu Sans Mono", "monospace" } };
 
-        var plate = new PanelContainer { MouseFilter = MouseFilterEnum.Stop };
+        var plate = _plate = new PanelContainer { MouseFilter = MouseFilterEnum.Stop };
         var style = new StyleBoxFlat { BgColor = Plate, ContentMarginLeft = 22f, ContentMarginRight = 22f, ContentMarginTop = 16f, ContentMarginBottom = 16f };
         style.SetCornerRadiusAll(6);
         plate.AddThemeStyleboxOverride("panel", style);
-        plate.SetAnchorsPreset(LayoutPreset.Center);
-        plate.GrowHorizontal = GrowDirection.Both;
-        plate.GrowVertical = GrowDirection.Both;
+        // Centred on the viewport by hand (below): a Control under a CanvasLayer has no parent rect to anchor to, and
+        // anchoring the plate's centre to it put the plate's middle at the screen's origin.
         plate.CustomMinimumSize = new Vector2(620f, 0f);
         AddChild(plate);
 
@@ -81,7 +83,22 @@ public partial class UpgradeChoicePanel : Control
     {
         Visible = true;
         Refresh();
+        Centre();
         foreach (var b in _buttons) if (!b.Disabled) { b.GrabFocus(); break; }
+    }
+
+    public override void _Process(double delta)
+    {
+        if (Visible) Centre();
+    }
+
+    /// <summary>The plate sits in the middle of the viewport whatever its size and the window's.</summary>
+    private void Centre()
+    {
+        Vector2 screen = GetViewportRect().Size;
+        Vector2 size = _plate.GetCombinedMinimumSize();
+        if (_plate.Size != size) _plate.Size = size;
+        _plate.Position = ((screen - size) * 0.5f).Round();
     }
 
     public void Close() => Visible = false;

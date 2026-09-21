@@ -274,6 +274,8 @@ public sealed class RunTuning
     public float OrbClusterSpacing = 150f;
     /// <summary>Loose cash balls scattered along the primary, per kilometre (the earned ones are placed by feature).</summary>
     public float CashScatterPerKm = 1f;
+    /// <summary>Orb and cash ball diameter as a fraction of the ball's own diameter (the user's call: about half; 0.66 m at the 0.66 m ball).</summary>
+    public float PickupSize = 0.5f;
 }
 
 /// <summary>
@@ -488,6 +490,7 @@ public sealed class GameplayTuning
         F(CatRun, "Magnet Closing Margin (m/s)", 0f, 60f, () => rn.MagnetClosingMargin, v => rn.MagnetClosingMargin = v);
         F(CatRun, "Orb Cluster Spacing (m)", 40f, 600f, () => rn.OrbClusterSpacing, v => rn.OrbClusterSpacing = v);
         F(CatRun, "Cash Scatter Per Km", 0f, 10f, () => rn.CashScatterPerKm, v => rn.CashScatterPerKm = v);
+        F(CatRun, "Pickup Size (× ball diameter)", 0.1f, 3f, () => rn.PickupSize, v => rn.PickupSize = v);
 
         var up = Upgrades;
         F(CatUpgrades, "Max Speed 1", 1f, 2f, () => up.MaxSpeed1, v => up.MaxSpeed1 = v);

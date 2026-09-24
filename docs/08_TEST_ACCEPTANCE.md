@@ -385,7 +385,7 @@ ladder steps from its baseline in order, a new run resets all of it; every batch
 (count bounds, off every pad and lid, clear of the start and of every covered run, deterministic on the re-generated seeds);
 on the built stage every pickup rests on its ground and the drive's magnetised pickups are all collected and credited as
 XP and cash; each rank at its read point (Hangtime 3 flies a full charge 1/0.7 as long, Auto Refill 3 regains 2/s at rest
-while rank 0 regains none, Ball Size 3 rests ×1.36 higher, Max Speed 3 holds 175.2 m/s on the runway) with the run left at
+while rank 0 regains none, Ball Size 3 rests by its rank factor higher, Max Speed 3 lifts the locomotion ceiling above the base cap without being exceeded — the cap is a ceiling, not a runway target, D-121) with the run left at
 rank 0 for every other drive; the outro holds at the choice panel with a level queued and continues on the choice; a level-up mid-run opens the panel,
 pauses the run and resumes on the choice with the rank raised (D-120; the drives run with `ChooseAtOnce` off, at rank 0); the
 HUD's level and XP lines. Default 428/428, canyon 446/446, sky 429/429; no hash moved. The ridge-line drive snaps the camera down

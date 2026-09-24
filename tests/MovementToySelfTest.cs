@@ -4210,7 +4210,7 @@ public partial class MovementToySelfTest : Node
             _player.ResetBoostToStart();
         }
 
-        // Ball Size: rank 3 is the collider's radius × 1.36, read as the rest height on the platform.
+        // Ball Size: rank 3 is the collider's radius × the rank factor, read as the rest height on the platform.
         {
             for (int k = 0; k < 3; k++) up.Raise(Rushcore.Run.UpgradeStat.BallSize);
             foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
@@ -4219,13 +4219,15 @@ public partial class MovementToySelfTest : Node
             up.Reset();
             foreach (var _ in Settle(PlatformCenter + Vector3.Up * 3f)) yield return null;
             float rest0 = _player.GlobalPosition.Y - PlatformY;
-            Check("Ball Size rank 3 grows the collider (the ball rests × 1.36 higher) and rank 0 is the tuning's radius again",
+            Check("Ball Size rank 3 grows the collider (the ball rests by the rank's factor higher) and rank 0 is the tuning's radius again",
                 Mathf.Abs(rest - wanted) < 0.12f && Mathf.Abs(rest0 - m.BallRadius) < 0.12f && Mathf.IsEqualApprox(_player.Radius, m.BallRadius),
                 $"rest {rest:0.000} m (wanted {wanted:0.000}), rank 0 {rest0:0.000} m (radius {m.BallRadius:0.000})");
         }
 
-        // Max Speed: rank 3 on the strip runway reaches the base cap × 1.18 and holds there (the effective cap and the
-        // steering saturation both follow the upgraded base).
+        // Max Speed: rank 3 raises the ceiling. The cap is a ceiling, not a target — flat-ground drive alone does not
+        // reach base × 3.0's 272 m/s inside the runway (measured top ~185 m/s), so the check asserts what the rank is
+        // for: LocomotionCap carries the upgraded value, the ball climbs past the *base* cap, and it never exceeds the
+        // new one. Downhill, boost and Flow are what approach it in play.
         {
             for (int k = 0; k < 3; k++) up.Raise(Rushcore.Run.UpgradeStat.MaxSpeed);
             t.World.CalibrationStrip = true;
@@ -4235,8 +4237,11 @@ public partial class MovementToySelfTest : Node
             foreach (var _ in Settle(world.SurfacePoint(ScaleStripHeightField.StartX, 0f, m.BallRadius + 0.4f), 1.2f)) yield return null;
             float x0 = _player.GlobalPosition.X, top = 0f, cap = m.HardMaxLocomotionSpeed * t.Upgrades.MaxSpeed3;
             Input.ActionPress(InputBootstrap.MoveForward, 1f);
+            // Bounded at 12 s: the claim is that the ceiling rises above the base cap and is never exceeded, which the
+            // ball settles inside that window. Driving the full runway for an unreachable cap (D-121: rank 3 is 272 m/s
+            // and flat ground reaches ~185) left the resident-mesh window short a tile on the stage drive that follows.
             int ticks = 0, held = 0;
-            while (ticks++ < Engine.PhysicsTicksPerSecond * 20)
+            while (ticks++ < Engine.PhysicsTicksPerSecond * 12)
             {
                 yield return null;
                 top = Mathf.Max(top, _player.LocomotionSpeed);
@@ -4245,9 +4250,9 @@ public partial class MovementToySelfTest : Node
             }
             ReleaseAll();
             GD.Print($"[SELFTEST] upgrades: Max Speed 3 runway top {top:0.0} m/s (cap {cap:0.0}, base {m.HardMaxLocomotionSpeed:0.0}), held {held} ticks");
-            Check("Max Speed rank 3 reaches the base cap × 1.18 on the runway and holds there (docs/16 §4)",
-                held >= 30 && top <= cap + 0.5f && Mathf.IsEqualApprox(_player.LocomotionCap, cap),
-                $"top {top:0.0} of {cap:0.0} m/s, held {held} ticks, LocomotionCap {_player.LocomotionCap:0.0}");
+            Check("Max Speed rank 3 raises the locomotion ceiling above the base cap and is never exceeded (docs/16 §4)",
+                top > m.HardMaxLocomotionSpeed + 1f && top <= cap + 0.5f && Mathf.IsEqualApprox(_player.LocomotionCap, cap),
+                $"top {top:0.0}, base cap {m.HardMaxLocomotionSpeed:0.0}, rank-3 cap {cap:0.0} m/s, held {held} ticks, LocomotionCap {_player.LocomotionCap:0.0}");
             up.Reset();
             t.World.CalibrationStrip = false;
             _debug.RestartSameSeed();

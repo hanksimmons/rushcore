@@ -202,7 +202,11 @@ Deliver:
 - queued safe level choices — delivered (D-119, the choice panel at the outro),
 - ~~three-result slot presentation~~ (D-119),
 - ~~Common/Rare/Legendary~~ (D-119),
-- initial upgrade set — the stat ladder, delivered (D-119; numbers V-018),
+- initial upgrade set — the stat ladder, delivered (D-119; numbers V-018, set on play by D-121),
+- **the ladder's ceiling against generation (V-019) — decide before the next batch of stage content or Phase 4**: the
+  Max Speed rank multiplies a cap `RouteSpeedModel` does not read, so a levelled player outruns the speed every stage
+  is validated for (254.7 m/s validated, 466.6 m/s reachable at rank 3 and full Flow). Structural to D-119; retuning
+  the ladder does not close it,
 - passive item framework,
 - stacking rules,
 - initial items.
@@ -273,6 +277,7 @@ Stop feature expansion and fix foundation if:
 - hard speed cap produces broken-feeling motion,
 - high-speed collisions are unstable,
 - generation routinely produces invalid mandatory routes,
+- a player-reachable speed exceeds the ceiling generation validates against (V-019),
 - stage transitions leak state,
 - tuning values are duplicated,
 - target performance fails.

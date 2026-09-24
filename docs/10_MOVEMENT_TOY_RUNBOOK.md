@@ -236,11 +236,11 @@ values, and were not promoted.
 | Jump / Slam › Slam Initial Speed | 42.95 | 90 | the slam reads as instant; slider widened to 0–150 |
 | Jump / Slam › Slam Downward Accel | 141.1 | 250 | slider widened to 0–400 |
 | Carve › Yaw Rate (deg/s) | 190.34 | 84.09 | a slower, longer swing |
-| VFX › Dust Intensity | 1 | 1.925 | |
+| VFX › Dust Intensity | 1 | 3.0 | |
 | VFX › Slam Effect | 1 | 3 | |
-| VFX › Burst Effect / Carve Effect | 1 / 1 | 1.73 / 2.275 | |
-| VFX › Squash / Stretch | 1 | 1.935 | |
-| VFX › Max Visual Roll (rev/s) | 3 | 3.285 | |
+| VFX › Burst Effect / Carve Effect | 1 / 1 | 2.135 / 2.475 | |
+| VFX › Squash / Stretch | 1 | 2.615 | |
+| VFX › Max Visual Roll (rev/s) | 3 | 3.6 | |
 
 ## Locked preset (2026-09-06): `manual-small-2` = compiled defaults (superseded by `manual-small-3`)
 

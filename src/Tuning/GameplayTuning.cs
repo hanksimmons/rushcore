@@ -226,20 +226,20 @@ public sealed class CameraTuning
 
 public sealed class VfxTuning
 {
-    public float ChargeEffectStrength = 3.0f;
-    public float JumpReleaseStrength = 1f;
-    public float TrailIntensity = 1f;
-    public float DustIntensity = 1.92499995231628f;
+    public float ChargeEffectStrength = 2.89499998092651f;
+    public float JumpReleaseStrength = 0.974999964237213f;
+    public float TrailIntensity = 3.0f;
+    public float DustIntensity = 3.0f;
     public float SlamEffectStrength = 3.0f;
-    public float ImpactEffectStrength = 1f;
+    public float ImpactEffectStrength = 0.949999988079071f;
     /// <summary>Landing burst sparks, boom rings and flash (D-077).</summary>
-    public float BurstEffectStrength = 1.73000001907349f;
+    public float BurstEffectStrength = 2.13499999046326f;
     /// <summary>Carve debris (D-089): rocks and spray thrown to the outside of the corner.</summary>
-    public float CarveEffectStrength = 2.27499985694885f;
-    public float SquashStretchStrength = 1.93499994277954f;
+    public float CarveEffectStrength = 2.47499990463257f;
+    public float SquashStretchStrength = 2.61500000953674f;
     /// <summary>Visual-only cap on the ball's spin: a real 1 m ball at 60 m/s turns 9.5
     /// rev/s, which strobes at 60 fps. Collision is unaffected.</summary>
-    public float MaxVisualRollRevPerSecond = 3.28499984741211f;
+    public float MaxVisualRollRevPerSecond = 3.59999990463257f;
 }
 
 /// <summary>Player HUD (06 §12, T2): whether it is shown, how big, and the optional speed-band word.</summary>
@@ -267,15 +267,15 @@ public sealed class RunTuning
     public float XpPerLevel = 10f;
     /// <summary>Metres from the ball inside which a pickup is magnetised; it then chases at
     /// max(<see cref="MagnetSpeed"/>, ball speed + <see cref="MagnetClosingMargin"/>) until collected.</summary>
-    public float MagnetRadius = 14f;
+    public float MagnetRadius = 21.0900001525879f;
     public float MagnetSpeed = 40f;
     public float MagnetClosingMargin = 15f;
     /// <summary>Metres of primary between experience-orb clusters (optional lines carry them at twice the density).</summary>
     public float OrbClusterSpacing = 150f;
     /// <summary>Loose cash balls scattered along the primary, per kilometre (the earned ones are placed by feature).</summary>
     public float CashScatterPerKm = 1f;
-    /// <summary>Orb and cash ball diameter as a fraction of the ball's own diameter (the user's call: about half; 0.66 m at the 0.66 m ball).</summary>
-    public float PickupSize = 0.5f;
+    /// <summary>Orb and cash ball diameter as a fraction of the ball's own diameter (0.905: about 0.60 m at the 0.66 m ball).</summary>
+    public float PickupSize = 0.904999971389771f;
 }
 
 /// <summary>
@@ -285,17 +285,17 @@ public sealed class RunTuning
 /// </summary>
 public sealed class UpgradeTuning
 {
-    public float MaxSpeed1 = 1.06f, MaxSpeed2 = 1.12f, MaxSpeed3 = 1.18f;
-    public float Acceleration1 = 1.15f, Acceleration2 = 1.30f, Acceleration3 = 1.45f;
-    public float TurnRadius1 = 1.12f, TurnRadius2 = 1.24f, TurnRadius3 = 1.36f;
-    public float BallSize1 = 1.12f, BallSize2 = 1.24f, BallSize3 = 1.36f;
-    public float JumpHeight1 = 1.10f, JumpHeight2 = 1.20f, JumpHeight3 = 1.30f;
-    /// <summary>The landing burst's factor at each rank (the tuning's 1.15 is rank 0; D-088 documents 1.0–1.3).</summary>
-    public float SlamBoost1 = 1.20f, SlamBoost2 = 1.25f, SlamBoost3 = 1.30f;
-    /// <summary>Boost per second while not boosting, of the 100 capacity: very very slow, very slow, slow (the user's words).</summary>
-    public float AutoRefill1 = 0.5f, AutoRefill2 = 1f, AutoRefill3 = 2f;
+    public float MaxSpeed1 = 1.29299998283386f, MaxSpeed2 = 1.55099999904633f, MaxSpeed3 = 1.83200001716614f;
+    public float Acceleration1 = 1.5f, Acceleration2 = 2.1100001335144f, Acceleration3 = 2.8050000667572f;
+    public float TurnRadius1 = 1.42200005054474f, TurnRadius2 = 2.00500011444092f, TurnRadius3 = 2.77300000190735f;
+    public float BallSize1 = 1.64100003242493f, BallSize2 = 2.25f, BallSize3 = 3.0f;
+    public float JumpHeight1 = 1.25800001621246f, JumpHeight2 = 1.43700003623962f, JumpHeight3 = 1.81599998474121f;
+    /// <summary>The landing burst's factor at each rank (the tuning's 1.15 is rank 0). Rank 3 at 1.406 sits above the 1.0–1.3 band D-088 documents.</summary>
+    public float SlamBoost1 = 1.20200002193451f, SlamBoost2 = 1.2849999666214f, SlamBoost3 = 1.40600001811981f;
+    /// <summary>Boost per second while not boosting, of the 100 capacity. Rank 3 refills a full meter in about 10 s, so D-106's "no passive refill by default" holds only at rank 0.</summary>
+    public float AutoRefill1 = 1.63999998569489f, AutoRefill2 = 5.15999984741211f, AutoRefill3 = 9.6899995803833f;
     /// <summary>× gravity: moon physics.</summary>
-    public float Hangtime1 = 0.90f, Hangtime2 = 0.80f, Hangtime3 = 0.70f;
+    public float Hangtime1 = 0.89900004863739f, Hangtime2 = 0.80f, Hangtime3 = 0.70f;
 }
 
 /// <summary>Macro handles for the Movement Toy calibration world only (07 §5).</summary>

@@ -24,13 +24,13 @@
     "Movement/Gravity": 39.3899993896484,
     "Movement/Min Ground Normal Dot": 0.498000025749207,
     "Movement/Steering Lateral Accel": 222.65998840332,
-    "VFX/Burst Effect": 1.73000001907349,
-    "VFX/Carve Effect": 2.27499985694885,
-    "VFX/Charge Effect": 3.0,
-    "VFX/Dust Intensity": 1.92499995231628,
-    "VFX/Max Visual Roll (rev/s)": 3.28499984741211,
+    "VFX/Burst Effect": 2.13499999046326,
+    "VFX/Carve Effect": 2.47499990463257,
+    "VFX/Charge Effect": 2.89499998092651,
+    "VFX/Dust Intensity": 3.0,
+    "VFX/Max Visual Roll (rev/s)": 3.59999990463257,
     "VFX/Slam Effect": 3.0,
-    "VFX/Squash / Stretch": 1.93499994277954
+    "VFX/Squash / Stretch": 2.61500000953674
   },
   "version": 1
 }

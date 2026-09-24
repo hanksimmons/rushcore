@@ -571,7 +571,7 @@ terrain wavelength 1.005 are part of the same promotion.
 | Boost start fraction / ring spacing | 0.3 / 1200 m | ACCEPTED (D-106) |
 | Boost pickup refill | 35 | ACCEPTED (toy) |
 | Rush / Crush / Overdrive thresholds | 50 / 94.99 / 141.06 m/s | Overdrive ACCEPTED (D-078); Rush/Crush provisional ladder (V-004), readability/Flow hooks only |
-| VFX charge / slam / burst / carve / dust / squash / max visual roll | 3 / 3 / 1.73 / 2.275 / 1.925 / 1.935 / 3.285 rev/s (the rest 1) | ACCEPTED (D-091, D-095); presentation, no physics reads them |
+| VFX charge / slam / burst / carve / dust / squash / max visual roll | 2.895 / 3 / 2.135 / 2.475 / 3.0 / 2.615 / 3.6 rev/s (jump release 0.975, impact 0.95, trail 3.0) | ACCEPTED (D-091, D-095; re-promoted 2026-09-22, D-121); presentation, no physics reads them |
 
 Do not create tuning knobs for every intermediate equation. Keep the runtime panel centered on parameters a designer can reason about.
 

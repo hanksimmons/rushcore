@@ -75,14 +75,14 @@ Each stat has three ranks. Rank 0 is the frozen baseline. A rank is a multiplier
 
 | Stat | Tuning it reads beside | Rank 1 | Rank 2 | Rank 3 | Notes |
 |---|---|---|---|---|---|
-| Max Speed | `HardMaxLocomotionSpeed` (the base cap) | ×1.06 | ×1.12 | ×1.18 | the effective cap of D-088 multiplies the upgraded base; steering saturates at the upgraded base |
-| Acceleration | `GroundDriveAcceleration` | ×1.15 | ×1.30 | ×1.45 | ground propulsion only; slopes and boost unchanged |
-| Turn Radius | `GroundSteeringLateralAccel` and `HighSpeedSteeringMultiplier` | ×1.12 | ×1.24 | ×1.36 | both low and high speed, as asked |
-| Ball Size | `BallRadius` | ×1.12 | ×1.24 | ×1.36 | collider, visual and the camera's clearance; generation sizes (corridor 75 m, tunnel 30 m wide) are untouched |
-| Jump Height | `MinJumpTakeoffVerticalSpeed`, `MaxJumpTakeoffVerticalSpeed` | ×1.10 | ×1.20 | ×1.30 | height goes with the square: +21 / +44 / +69% |
-| Slam Boost | `LandingBurstMultiplier` (1.15) | 1.20 | 1.25 | 1.30 | the documented ceiling of the burst (D-088: 1.0–1.3); still limited by the effective cap |
-| Auto Boost Refill | `PassiveBoostRegen` (0) | 0.5 /s | 1 /s | 2 /s | of the 100 capacity (drain 30 /s): 200 s, 100 s, 50 s to fill from empty |
-| Hangtime | `Gravity` | ×0.90 | ×0.80 | ×0.70 | moon physics: the follow's launch threshold (v²κ against g) moves with it, so an upgraded ball leaves gentler crests, by design |
+| Max Speed | `HardMaxLocomotionSpeed` (the base cap) | ×1.293 | ×1.551 | ×1.832 | the effective cap of D-088 multiplies the upgraded base; steering saturates at the upgraded base. Rank 3 puts the ceiling at 272.1 m/s, above D-088's 254.7; flat-ground drive reaches only ~185 m/s, so the ceiling is approached downhill, on boost and on Flow (D-121) |
+| Acceleration | `GroundDriveAcceleration` | ×1.5 | ×2.11 | ×2.805 | ground propulsion only; slopes and boost unchanged |
+| Turn Radius | `GroundSteeringLateralAccel` and `HighSpeedSteeringMultiplier` | ×1.422 | ×2.005 | ×2.773 | both low and high speed, as asked |
+| Ball Size | `BallRadius` | ×1.641 | ×2.25 | ×3.0 | collider, visual and the camera's clearance; generation sizes (corridor 75 m, tunnel 30 m wide) are untouched. Rank 3 is a 1.98 m ball against the frozen 0.66 m (D-121) |
+| Jump Height | `MinJumpTakeoffVerticalSpeed`, `MaxJumpTakeoffVerticalSpeed` | ×1.258 | ×1.437 | ×1.816 | height goes with the square: +58 / +107 / +230% |
+| Slam Boost | `LandingBurstMultiplier` (1.15) | 1.202 | 1.285 | 1.406 | rank 3 sits above the 1.0–1.3 band D-088 documents (D-121); still limited by the effective cap |
+| Auto Boost Refill | `PassiveBoostRegen` (0) | 1.64 /s | 5.16 /s | 9.69 /s | of the 100 capacity (drain 30 /s): 61 s, 19 s, 10 s to fill from empty. D-106's "no passive refill by default" holds at rank 0 only (D-121) |
+| Hangtime | `Gravity` | ×0.899 | ×0.80 | ×0.70 | moon physics: the follow's launch threshold (v²κ against g) moves with it, so an upgraded ball leaves gentler crests, by design |
 
 All twenty-four values are `Upgrades` sliders in the tuning panel (`07`), so the user tunes them in play; the harness
 drives at rank 0 and checks each rank's multiplier at its read point.
